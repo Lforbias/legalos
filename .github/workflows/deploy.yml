@@ -35,13 +35,20 @@ jobs:
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Diagnóstico da chave (não mostra segredos)
+        run: |
+          echo "linhas da chave: $(wc -l < ~/.ssh/deploy_key)"
+          echo "primeira linha: $(head -n 1 ~/.ssh/deploy_key | cut -c1-40)"
+          echo "última linha:   $(tail -n 1 ~/.ssh/deploy_key | cut -c1-40)"
+          echo "impressão digital da chave:"; ssh-keygen -lf ~/.ssh/deploy_key || echo "CHAVE INVÁLIDA (formato)"
+          echo "known_hosts: $(wc -l < ~/.ssh/known_hosts) linha(s), tipo: $(awk '{print $2}' ~/.ssh/known_hosts | head -n 1)"
       - name: Enviar e publicar
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
         run: |
           SHA="$(git rev-parse HEAD)"
-          git archive --format=tar.gz HEAD | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "receive ${SHA}"
+          git archive --format=tar.gz HEAD | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes -o IdentitiesOnly=yes "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "receive ${SHA}"
       - name: Conferir o site
         run: |
           for i in $(seq 1 20); do
