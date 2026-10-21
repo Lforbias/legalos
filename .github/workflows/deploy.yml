@@ -1,6 +1,8 @@
 name: Publicar no servidor
-# Só publica o que está no ramo main E passou em todos os testes do workflow "CI".
-# O ambiente "production" pode exigir aprovação de uma pessoa (Settings → Environments → production → Required reviewers).
+# Padrão: publicação MANUAL (Actions → Publicar no servidor → Run workflow). O clique é a aprovação.
+# Para publicar sozinho depois que o CI do main ficar verde, crie a variável do repositório AUTO_DEPLOY = true
+# (Settings → Secrets and variables → Actions → Variables). Apague a variável para voltar ao modo manual.
+# Se o plano do GitHub permitir, o ambiente "production" também pode exigir aprovação (Required reviewers).
 on:
   workflow_run:
     workflows: ["CI"]
@@ -17,7 +19,7 @@ permissions:
 
 jobs:
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (vars.AUTO_DEPLOY == 'true' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 40

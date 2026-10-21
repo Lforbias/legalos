@@ -56,9 +56,10 @@ Teste (no Mac): `ssh -i ~/.ssh/legalos_deploy root@187.127.59.92 "qualquer coisa
 
 Depois apague a chave privada do Mac se quiser (`rm ~/.ssh/legalos_deploy`), pois ela já estará no GitHub.
 
-### 6. Ambiente com aprovação (recomendado)
-*Settings → Environments → New environment → `production` → Required reviewers* → marque a Dra. Talita e/ou o Luiz. Assim, mesmo depois do merge, a publicação só começa quando alguém clica em **Approve**.
-Também recomendado: *Settings → Branches → Add rule* para `main` com **Require a pull request** e **Require status checks (verify)**.
+### 6. Aprovação da publicação
+- **Padrão (manual):** a publicação só acontece quando alguém clica em *Actions → Publicar no servidor → Run workflow*. O clique é a aprovação.
+- **Automática (opcional):** crie a variável do repositório `AUTO_DEPLOY` = `true` (*Settings → Secrets and variables → Actions → Variables*). Aí, cada merge no `main` com o CI verde publica sozinho. Apague a variável para voltar ao manual.
+- **Repositório privado em plano gratuito:** o GitHub não oferece *Required reviewers* nem regra de proteção de ramo. Em plano pago (Pro/Team), dá para exigir aprovação em *Settings → Environments → production* e proteger o `main`. Não torne o repositório público.
 
 ### 7. Deixar o Claude enviar as versões (opcional)
 O Claude não tem acesso ao GitHub por padrão. Para ele enviar ramos e abrir pull requests: crie um *fine-grained personal access token* **só para este repositório**, com permissões **Contents: Read and write** e **Pull requests: Read and write**, validade de 90 dias, e coloque-o na variável de ambiente `GH_TOKEN` das configurações do ambiente da sessão (nunca no chat). Ele **não** tem como alterar segredos, ambientes nem proteção de ramo. Sem isso, você continua enviando com `git push` (ou o GitHub Desktop).
