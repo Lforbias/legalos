@@ -16,13 +16,14 @@ concurrency:
 
 permissions:
   contents: read
+  packages: write
 
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || (vars.AUTO_DEPLOY == 'true' && github.event.workflow_run.conclusion == 'success') }}
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 40
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,13 +43,52 @@ jobs:
           echo "última linha:   $(tail -n 1 ~/.ssh/deploy_key | cut -c1-40)"
           echo "impressão digital da chave:"; ssh-keygen -lf ~/.ssh/deploy_key || echo "CHAVE INVÁLIDA (formato)"
           echo "known_hosts: $(wc -l < ~/.ssh/known_hosts) linha(s), tipo: $(awk '{print $2}' ~/.ssh/known_hosts | head -n 1)"
+      - name: Nomes das imagens
+        id: img
+        run: |
+          REPO="ghcr.io/${GITHUB_REPOSITORY,,}"
+          echo "app=$REPO/app:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "migrate=$REPO/migrate:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "cache=$REPO/cache" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Construir imagem do app (no GitHub, com cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runner
+          push: true
+          tags: ${{ steps.img.outputs.app }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=registry,ref=${{ steps.img.outputs.cache }}
+          cache-to: type=registry,ref=${{ steps.img.outputs.cache }},mode=max
+      - name: Construir imagem da migração (reaproveita o cache)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: migrate
+          push: true
+          tags: ${{ steps.img.outputs.migrate }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=registry,ref=${{ steps.img.outputs.cache }}
       - name: Enviar e publicar
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           SHA="$(git rev-parse HEAD)"
-          git archive --format=tar.gz HEAD | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes -o IdentitiesOnly=yes "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "receive ${SHA}"
+          # o servidor baixa as imagens prontas; o token vale só enquanto este job roda e vai dentro do pacote, não na linha de comando
+          mkdir -p /tmp/meta
+          { echo "APP_IMAGE=${{ steps.img.outputs.app }}"; echo "MIGRATE_IMAGE=${{ steps.img.outputs.migrate }}"; echo "GHCR_USER=${{ github.actor }}"; echo "GHCR_TOKEN=${GHCR_TOKEN}"; } > /tmp/meta/.deploy-meta
+          chmod 600 /tmp/meta/.deploy-meta
+          git archive --format=tar HEAD > /tmp/src.tar
+          tar -rf /tmp/src.tar -C /tmp/meta .deploy-meta
+          gzip -c /tmp/src.tar | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes -o IdentitiesOnly=yes "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "receive ${SHA}"
       - name: Conferir o site
         run: |
           for i in $(seq 1 20); do

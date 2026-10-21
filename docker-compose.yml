@@ -18,6 +18,7 @@ services:
       retries: 10
 
   migrate:
+    image: ${MIGRATE_IMAGE:-legalos-migrate:local}
     build: { context: ., target: migrate }
     profiles: ["tools"]
     env_file: .env.production
@@ -27,6 +28,8 @@ services:
       db: { condition: service_healthy }
 
   app:
+    # Publicação rápida: o GitHub já deixa a imagem pronta (APP_IMAGE/MIGRATE_IMAGE); sem essas variáveis, constrói aqui mesmo.
+    image: ${APP_IMAGE:-legalos-app:local}
     build: { context: ., target: runner }
     restart: unless-stopped
     env_file: .env.production

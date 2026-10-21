@@ -11,6 +11,9 @@ env_get() {
   printf '%s' "$v"
 }
 
+# imagem em uso (publicação rápida): faz os demais scripts (seed, importação, migração à mão) usarem a mesma imagem do app no ar
+if [ -z "${APP_IMAGE:-}" ] && [ -f "$APP_DIR/.deployed-image" ]; then export $(cat "$APP_DIR/.deployed-image"); fi
+
 log() { printf '[%s] %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
 die() { log "ERRO: $*" >&2; exit 1; }
 

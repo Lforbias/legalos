@@ -81,3 +81,13 @@ Publicar à mão (por exemplo, em emergência): *Actions → Publicar no servido
 - Não testado no servidor real ainda: **na primeira vez, acompanhe**. Rode o workflow e, em paralelo no servidor, `tail -f /var/log/legalos-deploy.log`.
 - O app fica fora do ar por alguns segundos na troca do contêiner (não há versão azul/verde).
 - Um erro de migração interrompe antes de subir o app novo: o app antigo continua rodando e o código volta ao anterior.
+
+## Publicação rápida (imagem construída no GitHub)
+
+A partir desta versão, "Publicar no servidor" constrói a imagem no próprio GitHub (com cache) e envia ao servidor só o código e os nomes das imagens; o servidor **baixa** a imagem pronta (GHCR), migra e sobe. Meta: ~10 min ou menos, sem compilar na máquina de produção (3,9 GB de RAM).
+
+- A **primeira** publicação depois de instalar esta versão ainda usa o caminho antigo (o script do servidor é o antigo até se atualizar); a partir da segunda, é o caminho rápido.
+- O token do GitHub (`GITHUB_TOKEN`) só vale durante a execução do job; o servidor faz login, baixa e faz logout. Nada novo para configurar.
+- Volta automática (rollback) agora reaproveita a imagem anterior, sem reconstruir.
+- Arquivos novos/alterados: `.github/workflows/deploy.yml` (copie e faça commit pelo Git; a pasta `.github` não é gravada pela entrega), `docker-compose.yml`, `scripts/server/deploy.sh`, `scripts/server/lib.sh`.
+- No dia a dia: `npm run verify:fast <teste>` (tipos + lint + testes pedidos, ~40 s); a suíte completa roda no CI a cada push.

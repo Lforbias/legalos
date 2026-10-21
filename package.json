@@ -25,7 +25,8 @@
     "mail-test": "tsx scripts/mail-test.ts",
     "postinstall": "prisma generate",
     "test:e2e": "playwright test",
-    "check": "npm run typecheck && npm run lint && npm run test"
+    "check": "npm run typecheck && npm run lint && npm run test",
+    "verify:fast": "bash scripts/verify-fast.sh"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.9.1",
