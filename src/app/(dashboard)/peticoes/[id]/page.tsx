@@ -14,6 +14,8 @@ import { NotFoundError } from "@/lib/permissions/check";
 import { uuidSchema } from "@/lib/validation/common";
 import { PetitionAttachments } from "@/modules/petitions/petition-attachments";
 import { PetitionControls } from "@/modules/petitions/petition-controls";
+import { ScheduleCard } from "@/modules/petitions/schedule-card";
+import { getScheduleSwitch } from "@/server/services/petition-queue.service";
 import { PETITION_STATUS_LABEL, PETITION_STATUS_TONE, type AttachmentClassKey, type PetitionStatusKey } from "@/modules/petitions/schemas";
 import { can } from "@/server/context";
 import { listDocuments } from "@/server/services/document.service";
@@ -111,6 +113,15 @@ export default async function PetitionPage({ params }: { params: Promise<{ id: s
           />
         </CardBody>
       </Card>
+
+      {status === "APPROVED" && can(ctx, "petitions:approve") ? (
+        <Card className="mt-4">
+          <CardHeader title="Agendar envio" description="Opcional: o sistema envia a versão aprovada no horário escolhido." />
+          <CardBody>
+            <ScheduleCard id={p.id} enabled={await getScheduleSwitch(ctx)} scheduledLabel={p.scheduledFor ? formatDateTime(p.scheduledFor, tz) : null} note={p.scheduleNote} real={!getPetitioningAdapter().isDemo} caseNumber={p.case.number} stale={stale || anyStale} />
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card className="mt-4">
         <CardHeader title="Ações" description="Fluxo: rascunho → revisão → aprovação → envio. A versão do documento revisada é a mesma que será enviada." />

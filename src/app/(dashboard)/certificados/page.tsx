@@ -5,9 +5,9 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
-import { RevokeCertificateButton, UploadCertificateForm } from "@/modules/certificates/certificate-ui";
+import { AuthorizedUsers, RevokeCertificateButton, UploadCertificateForm } from "@/modules/certificates/certificate-ui";
 import { can } from "@/server/context";
-import { listCertificates, runCertificateExpiryCheck, vaultAvailable, type CertStatus } from "@/server/services/certificate.service";
+import { listAuthorizedUsers, listCertificates, runCertificateExpiryCheck, vaultAvailable, type CertStatus } from "@/server/services/certificate.service";
 import { listActiveMembers } from "@/server/services/members";
 import { db } from "@/lib/db/client";
 import { requireTenant } from "@/server/session";
@@ -28,6 +28,7 @@ export default async function CertificatesPage() {
   const mfa = await db.userMfa.findUnique({ where: { userId: ctx.userId }, select: { enabledAt: true } });
   await runCertificateExpiryCheck(ctx.organizationId).catch(() => 0);
   const [certs, members] = await Promise.all([available ? listCertificates(ctx) : Promise.resolve([]), listActiveMembers(ctx)]);
+  const authorizedById = new Map(await Promise.all(certs.map(async (c) => [c.id, c.revokedAt ? [] : await listAuthorizedUsers(ctx, c.id)] as const)));
   const tz = organization.timezone;
   return (
     <div className="mx-auto max-w-4xl">
@@ -62,6 +63,7 @@ export default async function CertificatesPage() {
                     <p className="text-xs text-muted">
                       Válido até {formatDate(c.notAfter, tz)} · {c.lastUsedAt ? `último uso ${formatDateTime(c.lastUsedAt, tz)}` : "ainda não usado"}
                     </p>
+                    {!c.revokedAt ? <AuthorizedUsers certificateId={c.id} authorized={authorizedById.get(c.id) ?? []} candidates={members.filter((m) => m.id !== c.ownerUserId).map((m) => ({ id: m.id, name: m.name }))} /> : null}
                   </div>
                   {!c.revokedAt ? <RevokeCertificateButton id={c.id} /> : null}
                 </li>

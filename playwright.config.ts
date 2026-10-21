@@ -34,7 +34,7 @@ export default defineConfig({
       url: `http://localhost:${PORT}/api/health`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { DATABASE_URL: TEST_DB, LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${PORT}` },
+      env: { DATABASE_URL: TEST_DB, LEGALOS_PROTOTYPES: "1", LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${PORT}` },
     },
     {
       command: `npx next start -p ${WA_PORT}`,

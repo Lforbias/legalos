@@ -10,6 +10,8 @@ export const JOBS = {
   billing: { label: "Rotina de assinaturas (cobrança da plataforma)", everyMin: 60, manual: false },
   "chat-sla": { label: "SLA de resposta do Chat (avisos internos)", everyMin: 5, manual: true },
   "push-due": { label: "Avisos no celular (prazos e tarefas a vencer)", everyMin: 15, manual: true },
+  "petition-queue": { label: "Fila de protocolos agendados", everyMin: 1, manual: true },
+  monitoring: { label: "Alertas do monitoramento de intimações", everyMin: 30, manual: true },
   "whatsapp-billing": { label: "Lembretes de cobrança no WhatsApp", everyMin: 60, manual: false },
 } as const;
 export type JobKey = keyof typeof JOBS;

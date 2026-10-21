@@ -5,8 +5,9 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/form";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
-import { OrgSuspendControl, SubscriptionControl } from "@/modules/platform/admin-controls";
+import { CreditsControl, OrgSuspendControl, SubscriptionControl } from "@/modules/platform/admin-controls";
 import { requirePlatform } from "@/server/platform";
+import { platformCreditsSnapshot } from "@/server/services/credit.service";
 import { listOrganizations, listPlans } from "@/server/services/platform.service";
 
 export const metadata: Metadata = { title: "Administração — escritórios" };
@@ -17,6 +18,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   const sp = await searchParams;
   const status = sp.situacao === "suspensos" ? "suspended" : sp.situacao === "ativos" ? "active" : undefined;
   const [r, plans] = await Promise.all([listOrganizations(pc, { q: sp.q, status }), listPlans(pc)]);
+  const credits = await platformCreditsSnapshot(pc, r.items.map((o) => o.id));
   const STATUS: Record<string, string> = { TRIALING: "Em teste", ACTIVE: "Ativa", PAST_DUE: "Em atraso", CANCELED: "Cancelada" };
   return (
     <div>
@@ -72,6 +74,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
                       </>
                     ) : <span className="text-muted">Sem assinatura</span>}
                     <SubscriptionControl orgId={o.id} plans={plans} current={o.plan ? { planKey: o.plan.key, status: o.plan.status } : null} />
+                    <CreditsControl orgId={o.id} enabled={credits.get(o.id)?.enabled ?? false} balance={credits.get(o.id)?.balance ?? 0} />
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted">
                     {[o.aiEnabled ? "IA" : null, o.datajudEnabled ? "DataJud" : null, o.djenMonitors ? `DJEN ${o.djenMonitors}` : null, o.courtConnections ? `PJe ${o.courtConnections}` : null].filter(Boolean).join(", ") || "—"}

@@ -10,6 +10,66 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "3.0-F6", when: "2026-10-21", title: "LegalMail: sistema por tribunal e registro de conectores", migration: "20261207000000_legalmail_f6",
+    items: [
+      "Configurações → Sistemas dos tribunais: o escritório diz qual sistema atende cada tribunal (PJe, eproc, e-SAJ, PROJUDI). Nada é presumido.",
+      "Relatório de prontidão: só o PJe/MNI tem conector, e ainda sem validação em tribunal real. eproc, e-SAJ e PROJUDI estão marcados como sem conector.",
+      "Tribunal definido em sistema sem conector recusa consulta e protocolo automáticos, com aviso claro (nada é simulado).",
+    ],
+  },
+  {
+    id: "3.0-F7", when: "2026-10-21", title: "LegalMail: painel de saúde do monitoramento", migration: "(sem migração)",
+    items: [
+      "Página Monitoramento: cada fonte (DJEN e PJe/MNI) com última execução, erro e situação (em dia, com erro, parada, nunca rodou, desligada), e as intimações importadas nos últimos 7 dias.",
+      "Nova rotina agendada a cada 30 minutos avisa quem administra integrações quando uma fonte falha ou fica mais de 36 horas parada (sem repetir o mesmo aviso). Exige reinstalar o agendador (install-cron.sh).",
+    ],
+  },
+  {
+    id: "3.0-F8", when: "2026-10-21", title: "LegalMail: classificação de documentos por IA", migration: "20261206000000_legalmail_f8",
+    items: [
+      "Sugestão de categoria do documento pela IA (só com a chave do escritório e a IA ligada), com trecho mascarado e exemplos das decisões anteriores do próprio escritório.",
+      "Fila Documentos → Classificar com IA: uma pessoa aceita, corrige ou descarta; nada muda sozinho. Processos sigilosos respeitados.",
+    ],
+  },
+  {
+    id: "3.0-F3b", when: "2026-10-21", title: "LegalMail: Google Drive/Docs opcional", migration: "20261205000000_legalmail_f3b",
+    items: [
+      "Cada escritório cadastra as próprias credenciais do Google (Configurações → Integrações); cifradas, com liga/desliga e escopo restrito (drive.file). Sem chave global.",
+      "Envio do documento ao Drive, edição no Google Docs e retorno como nova versão. Processos sigilosos nunca são enviados.",
+    ],
+  },
+  {
+    id: "3.0-notas", when: "2026-10-21", title: "LegalMail: notas com anexos e histórico", migration: "20261204000000_legalmail_notes",
+    items: [
+      "Notas de processo podem ser editadas (o texto anterior fica no histórico), receber até 10 anexos e têm histórico de criação, fixação e exclusão.",
+    ],
+  },
+  {
+    id: "3.0-F6b", when: "2026-10-21", title: "LegalMail: credenciais por tribunal e usuário", migration: "20261203000000_legalmail_f6b",
+    items: [
+      "Cada pessoa guarda a própria credencial de acesso ao tribunal (cifrada, nunca volta para a tela). Administradores veem quem tem credencial e podem remover, sem ler o segredo.",
+      "Conferência de requisitos do sistema (senha, certificado do cofre) sem acessar o tribunal.",
+    ],
+  },
+  {
+    id: "3.0-F10", when: "2026-10-21", title: "LegalMail: créditos e custos", migration: "20261202000000_legalmail_f10",
+    items: [
+      "Cobrança por créditos opcional por escritório (liga o administrador do sistema). Protocolo real consome 5 créditos, do lote que vence primeiro; sem saldo, não protocola. Aviso de saldo baixo e de lotes a vencer.",
+    ],
+  },
+  {
+    id: "3.0-F9", when: "2026-10-21", title: "LegalMail: certificado com usuários autorizados e webhooks de protocolo", migration: "20261201000000_legalmail_f9",
+    items: [
+      "Certificado pode ser autorizado a usuários específicos. Novos webhooks: petição enviada e petição com falha (sem expor mensagem técnica).",
+    ],
+  },
+  {
+    id: "3.0-F5", when: "2026-10-21", title: "LegalMail: fila de protocolos, recibo e agendamento", migration: "20261130000000_legalmail_f5",
+    items: [
+      "Fila de protocolos com acompanhamento, recibo, agendamento e cancelamento com cópia em rascunho. Aguarda validação em tribunal real.",
+    ],
+  },
+  {
     id: "3.0-F2", when: "2026-10-21", title: "LegalMail: Tarefas 2.0", migration: "20261129000000_legalmail_f2",
     items: [
       "Tipos de tarefa com pontuação (Configurações → Tarefas): cada tipo vale N pontos. Na lista de Tarefas, o cartão \"Pontuação do mês\" soma os pontos das tarefas concluídas, por responsável.",
@@ -169,14 +229,15 @@ export const PHASES_3: Phase[] = [
   { id: "3.0-F1", title: "Cadastro único de partes, campos personalizados, arquivar, notas fixas e em lote", status: "feita" },
   { id: "3.0-F2", title: "Tarefas 2.0 (tipos com pontuação, etiquetas, menções, anexos, histórico)", status: "feita" },
   { id: "3.0-F3", title: "Autotextos com variáveis, timbrados e prévia em PDF", status: "feita" },
-  { id: "3.0-F3b", title: "Google Drive/Docs opcional, com credenciais de cada escritório (Configurações → Integrações)", status: "a fazer" },
+  { id: "3.0-F3b", title: "Google Drive/Docs opcional, com credenciais de cada escritório (Configurações → Integrações)", status: "feita" },
   { id: "3.0-F4", title: "Importação de processos em lote e download de autos", status: "feita" },
-  { id: "3.0-F5", title: "Fila de protocolos, recibo, agendamento e cancelamento", status: "a fazer" },
-  { id: "3.0-F6", title: "Conectores de peticionamento além do MNI", status: "a fazer" },
-  { id: "3.0-F7", title: "Monitoramento de intimações nos sistemas dos tribunais", status: "a fazer" },
-  { id: "3.0-F8", title: "Classificação de documentos por IA", status: "a fazer" },
-  { id: "3.0-F9", title: "Certificado com usuários autorizados e webhooks de protocolo", status: "a fazer" },
-  { id: "3.0-F10", title: "Créditos e custos", status: "a fazer" },
+  { id: "3.0-F5", title: "Fila de protocolos, recibo, agendamento e cancelamento", status: "feita" },
+  { id: "3.0-F6", title: "Conectores de peticionamento além do MNI", status: "feita" },
+  { id: "3.0-F7", title: "Monitoramento de intimações nos sistemas dos tribunais", status: "feita" },
+  { id: "3.0-F8", title: "Classificação de documentos por IA", status: "feita" },
+  { id: "3.0-F9", title: "Certificado com usuários autorizados e webhooks de protocolo", status: "feita" },
+  { id: "3.0-F10", title: "Créditos e custos", status: "feita" },
+  { id: "3.0-F6b", title: "Credenciais por tribunal e usuário no cofre", status: "feita" },
   { id: "3.0-F11", title: "Completar com o que aparecer nas telas do LegalMail", status: "a fazer" },
 ];
 
@@ -226,6 +287,7 @@ export const TEAM_TODO: string[] = [
   "Configurar o SMTP e rodar o mail-test.",
   "Ciclo completo no Asaas sandbox.",
   "Importar andamentos do Astrea (--only andamentos --dry-run, conferir, depois --yes).",
+  "3.0: validar em ambiente real o que só foi testado com simuladores: protocolo MNI (homologação do tribunal), Google Drive (credenciais próprias do escritório), classificação por IA (chave do provedor) e o painel de monitoramento; reinstalar o agendador (install-cron.sh) para a rotina monitoring.",
   "Fornecer a chave do provedor de IA quando chegar a F10.",
   "Gerar as chaves VAPID, colocar no .env.production (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT), reiniciar o app e rodar install-cron.sh (passo a passo em docs/push.md); depois ligar os avisos do escritório em Minha conta.",
   "Publicação automática: seguir docs/deploy-github.md (repositório privado, chave de deploy, 4 segredos no GitHub, ambiente production com aprovação) e acompanhar a primeira publicação.",

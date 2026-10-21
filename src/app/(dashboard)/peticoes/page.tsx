@@ -28,11 +28,16 @@ export default async function PetitionsPage({ searchParams }: { searchParams: Pr
       <PageHeader
         title="Peticionamento"
         description="Preparação, revisão e aprovação de petições antes do envio."
-        actions={can(ctx, "petitions:write") ? (
-          <Link href="/peticoes/nova" className={bv({})}>
-            <Plus className="h-4 w-4" aria-hidden /> Nova petição
-          </Link>
-        ) : undefined}
+        actions={(
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/peticoes/fila" className={bv({ variant: "secondary" })}>Fila de protocolos</Link>
+            {can(ctx, "petitions:write") ? (
+              <Link href="/peticoes/nova" className={bv({})}>
+                <Plus className="h-4 w-4" aria-hidden /> Nova petição
+              </Link>
+            ) : null}
+          </div>
+        )}
       />
       {adapter.isDemo ? (
         <Alert tone="warning" className="mb-4">

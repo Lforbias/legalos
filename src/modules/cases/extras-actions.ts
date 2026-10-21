@@ -2,11 +2,12 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { ValidationError } from "@/lib/permissions/check";
 import { uuidSchema, type ActionState } from "@/lib/validation/common";
 import { parse, runAction } from "@/server/action-helpers";
 import { requireTenant } from "@/server/session";
 import { setCaseAcervo } from "@/server/services/case.service";
-import { addBulkNote, addCaseNoteItem, deleteCaseNote, setNotePinned } from "@/server/services/case-note.service";
+import { addBulkNote, addCaseNoteItem, addNoteAttachment, deleteCaseNote, deleteNoteAttachment, setNotePinned, updateCaseNote } from "@/server/services/case-note.service";
 import { createCustomField, setCaseCustomFields, setCustomFieldActive } from "@/server/services/custom-field.service";
 import { createRegistryParty, deleteRegistryParty, updateRegistryParty } from "@/server/services/party-registry.service";
 import { bulkNoteSchema, caseNoteSchema, customFieldDefSchema, customValuesSchema } from "./extras-schemas";
@@ -120,5 +121,33 @@ export async function searchRegistryAction(q: string): Promise<ActionState<{ id:
     const { ctx } = await requireTenant();
     const { searchRegistry } = await import("@/server/services/party-registry.service");
     return searchRegistry(ctx, parse(z.string().max(80), q));
+  });
+}
+
+export async function updateNoteAction(noteId: string, input: unknown): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const v = parse(caseNoteSchema.pick({ title: true, body: true }), input);
+    touch(await updateCaseNote(ctx, parse(uuidSchema, noteId), v));
+    return undefined;
+  });
+}
+
+export async function addNoteAttachmentAction(noteId: string, formData: FormData): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const file = formData.get("file");
+    if (!(file instanceof File) || file.size === 0) throw new ValidationError("Escolha um arquivo.", { file: ["Escolha um arquivo."] });
+    if (file.size > 8 * 1024 * 1024) throw new ValidationError("Arquivo muito grande.", { file: ["O tamanho máximo é 8 MB."] });
+    touch(await addNoteAttachment(ctx, parse(uuidSchema, noteId), { name: file.name, buffer: Buffer.from(await file.arrayBuffer()) }));
+    return undefined;
+  });
+}
+
+export async function deleteNoteAttachmentAction(id: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    touch(await deleteNoteAttachment(ctx, parse(uuidSchema, id)));
+    return undefined;
   });
 }

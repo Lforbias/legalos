@@ -20,7 +20,7 @@ export default async function ModulePage({ params }: { params: Promise<{ key: st
         <PageHeader title="Roadmap e status dos módulos" description="O que já está operacional e o que será entregue em cada fase." />
         <Card>
           <ul className="divide-y divide-border">
-            {NAV_ITEMS.map((n) => (
+            {NAV_ITEMS.filter((n) => n.key !== "prototypes").map((n) => (
               <li key={n.key} className="flex items-start justify-between gap-4 px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">{n.label}</p>

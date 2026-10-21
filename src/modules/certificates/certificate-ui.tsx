@@ -5,7 +5,7 @@ import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
-import { revokeCertificateAction } from "./actions";
+import { authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction } from "./actions";
 
 export function UploadCertificateForm({ members }: { members: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -96,6 +96,58 @@ export function RevokeCertificateButton({ id }: { id: string }) {
       >
         Revogar
       </Button>
+    </div>
+  );
+}
+
+export function AuthorizedUsers({ certificateId, authorized, candidates }: { certificateId: string; authorized: { userId: string; name: string }[]; candidates: { id: string; name: string }[] }) {
+  const router = useRouter();
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, start] = React.useTransition();
+  const [pick, setPick] = React.useState("");
+  const taken = new Set(authorized.map((a) => a.userId));
+  const options = candidates.filter((m) => !taken.has(m.id));
+  const run = (fn: () => Promise<{ ok: boolean; message?: string }>) =>
+    start(async () => {
+      const r = await fn();
+      if (!r.ok) setError(r.message ?? "Não foi possível concluir.");
+      else {
+        setError(null);
+        setPick("");
+        router.refresh();
+      }
+    });
+  return (
+    <div className="mt-2 space-y-1.5 text-xs">
+      <p className="text-muted">Também podem usar para protocolar: {authorized.length ? "" : "ninguém além do titular."}</p>
+      {authorized.length ? (
+        <ul className="flex flex-wrap gap-1.5">
+          {authorized.map((a) => (
+            <li key={a.userId} className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5">
+              {a.name}
+              <button type="button" aria-label={`Remover ${a.name}`} disabled={pending} className="text-danger hover:underline" onClick={() => run(() => unauthorizeCertificateUserAction(certificateId, a.userId))}>
+                remover
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {options.length ? (
+        <div className="flex items-center gap-2">
+          <Select aria-label="Autorizar usuário" value={pick} onChange={(e) => setPick(e.target.value)}>
+            <option value="">Autorizar usuário…</option>
+            {options.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.name}
+              </option>
+            ))}
+          </Select>
+          <Button size="sm" variant="secondary" loading={pending} disabled={!pick} onClick={() => run(() => authorizeCertificateUserAction(certificateId, pick))}>
+            Autorizar
+          </Button>
+        </div>
+      ) : null}
+      {error ? <p className="text-danger">{error}</p> : null}
     </div>
   );
 }

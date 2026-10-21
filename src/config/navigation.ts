@@ -7,6 +7,7 @@ import {
   CheckSquare,
   FileText,
   Hourglass,
+  Activity,
   Inbox,
   KeyRound,
   LayoutDashboard,
@@ -19,6 +20,7 @@ import {
   Users,
   UserSquare2,
   Wallet,
+  FlaskConical,
   Globe,
   Zap,
 } from "lucide-react";
@@ -34,7 +36,7 @@ export const SPACES: Record<Space, { name: string; short: string; home: string; 
 };
 
 /** Caminhos que pertencem ao Box e ao Chat; todo o resto pertence ao Func. */
-const BOX_PREFIXES = ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/integracoes"];
+const BOX_PREFIXES = ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/integracoes", "/monitoramento"];
 const CHAT_PREFIXES = ["/atendimento"];
 const under = (pathname: string, prefixes: string[]) => prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
@@ -83,6 +85,8 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "ai", space: "func", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use", phase: 8, implemented: true, summary: "Perguntas sobre o processo com fontes citadas, opt-in por escritório e limite mensal de consumo." },
   { key: "certificates", space: "box", label: "Certificados digitais", href: "/certificados", icon: KeyRound, permission: "certificates:manage", phase: 10, implemented: true, summary: "Cofre de certificados A1 cifrados, com registro de uso e alerta de vencimento (base do motor de tribunais)." },
   { key: "integrations", space: "box", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "Consulta DataJud/CNJ (opt-in); e-mail e calendários em etapa futura." },
+  { key: "monitoring", space: "box", label: "Monitoramento", href: "/monitoramento", icon: Activity, permission: "integrations:manage", phase: 10, implemented: true, summary: "Saúde da captura de intimações (DJEN e PJe/MNI): última execução, erros e fontes paradas." },
+  { key: "prototypes", space: "both", label: "Protótipos", href: "/prototipos", icon: FlaskConical, phase: 0, implemented: true, summary: "Telas só visuais das próximas versões (visível só com LEGALOS_PROTOTYPES=1)." },
   { key: "settings", space: "both", label: "Configurações", href: "/configuracoes", icon: Settings, phase: 1, implemented: true, summary: "Escritório, equipe, perfis e auditoria." },
 ];
 

@@ -11,6 +11,9 @@ export default async function SettingsLayout({ children }: { children: React.Rea
     ...(can(ctx, "audit:read") ? [{ href: "/configuracoes/auditoria", label: "Auditoria" }] : []),
     ...(can(ctx, "cases:read") ? [{ href: "/configuracoes/campos", label: "Campos personalizados" }] : []),
     ...(can(ctx, "tasks:read") ? [{ href: "/configuracoes/tarefas", label: "Tarefas (tipos e etiquetas)" }] : []),
+    ...(can(ctx, "billing:manage") ? [{ href: "/configuracoes/creditos", label: "Créditos" }] : []),
+    ...(can(ctx, "cases:read") ? [{ href: "/configuracoes/credenciais", label: "Credenciais dos tribunais" }] : []),
+    ...(can(ctx, "integrations:manage") ? [{ href: "/configuracoes/tribunais", label: "Sistemas dos tribunais" }] : []),
     { href: "/conta", label: "Minha conta" },
   ];
   return (

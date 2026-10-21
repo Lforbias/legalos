@@ -13,6 +13,9 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { formatDateTime } from "@/lib/dates/format";
 import {
   addCaseNoteItemAction,
+  addNoteAttachmentAction,
+  deleteNoteAttachmentAction,
+  updateNoteAction,
   bulkNoteAction,
   createCustomFieldAction,
   deleteNoteItemAction,
@@ -54,9 +57,123 @@ export function AcervoButton({ caseId, inAcervo }: { caseId: string; inAcervo: b
 
 // ---------- notas fixas ----------
 
-export type NoteRow = { id: string; title: string | null; body: string; pinned: boolean; authorName: string | null; createdAt: string; bulk: boolean };
+export type NoteRow = { id: string; title: string | null; body: string; pinned: boolean; authorName: string | null; createdAt: string; bulk: boolean; attachments: { id: string; name: string; sizeBytes: number }[] };
+export type NoteEventRow = { id: string; kind: string; detail: string; previous: string | null; userName: string; createdAt: string };
 
-export function CaseNotesPanel({ caseId, notes, canWrite, tz }: { caseId: string; notes: NoteRow[]; canWrite: boolean; tz: string }) {
+const kb = (n: number) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+function NoteExtras({ note, canWrite, startEdit }: { note: NoteRow; canWrite: boolean; startEdit: () => void }) {
+  const router = useRouter();
+  const [pending, start] = React.useTransition();
+  const [msg, setMsg] = React.useState<string | null>(null);
+  const formRef = React.useRef<HTMLFormElement>(null);
+  return (
+    <div className="mt-2 space-y-1.5">
+      {note.attachments.length ? (
+        <ul className="space-y-1 text-xs" aria-label="Anexos da nota">
+          {note.attachments.map((a) => (
+            <li key={a.id} className="flex items-center justify-between gap-2" data-testid="note-attachment">
+              <span className="min-w-0 truncate">
+                <a className="hover:underline" href={`/api/cases/notes/attachments/${a.id}`}>{a.name}</a> <span className="text-muted">{kb(a.sizeBytes)}</span>
+              </span>
+              {canWrite ? <ConfirmAction label="Remover" confirmLabel="Remover anexo" description="O anexo deixa de aparecer na nota." action={() => deleteNoteAttachmentAction(a.id)} onDone={() => router.refresh()} /> : null}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      {canWrite ? (
+        <form
+          ref={formRef}
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            setMsg(null);
+            start(async () => {
+              const res = await addNoteAttachmentAction(note.id, fd);
+              if (res.ok) formRef.current?.reset();
+              setMsg(res.ok ? "Anexo adicionado." : (res.fieldErrors?.file?.[0] ?? res.message ?? "Não foi possível anexar."));
+              router.refresh();
+            });
+          }}
+        >
+          <label htmlFor={`na-${note.id}`} className="sr-only">Anexar arquivo à nota</label>
+          <input id={`na-${note.id}`} name="file" type="file" className="text-xs" />
+          <Button type="submit" size="sm" variant="secondary" loading={pending}>Anexar</Button>
+          <Button type="button" size="sm" variant="ghost" onClick={startEdit}>Editar</Button>
+        </form>
+      ) : null}
+      {msg ? <p role="status" className="text-xs text-muted">{msg}</p> : null}
+    </div>
+  );
+}
+
+function EditNote({ note, done }: { note: NoteRow; done: () => void }) {
+  const router = useRouter();
+  const [title, setTitle] = React.useState(note.title ?? "");
+  const [body, setBody] = React.useState(note.body);
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, start] = React.useTransition();
+  return (
+    <div className="mt-2 space-y-2">
+      {error ? <Alert tone="error">{error}</Alert> : null}
+      <Input aria-label="Título da nota" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <Textarea aria-label="Texto da nota" rows={4} value={body} onChange={(e) => setBody(e.target.value)} />
+      <div className="flex gap-2">
+        <Button
+          size="sm"
+          loading={pending}
+          onClick={() =>
+            start(async () => {
+              const r = await updateNoteAction(note.id, { title, body });
+              if (!r.ok) setError(Object.values(r.fieldErrors ?? {})[0]?.[0] ?? r.message ?? "Não foi possível salvar.");
+              else {
+                setError(null);
+                done();
+                router.refresh();
+              }
+            })
+          }
+        >
+          Salvar edição
+        </Button>
+        <Button size="sm" variant="ghost" onClick={done}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}
+
+const EVENT_LABEL: Record<string, string> = { created: "Criada", edited: "Editada", pinned: "Fixada", unpinned: "Desafixada", attachment_added: "Anexo", attachment_removed: "Anexo removido", deleted: "Excluída" };
+
+export function NoteHistory({ events, tz }: { events: NoteEventRow[]; tz: string }) {
+  return (
+    <Card>
+      <CardHeader title="Histórico das notas" description="Quem criou, editou, fixou, anexou ou excluiu. Em edições e exclusões o texto anterior fica guardado." />
+      <CardBody>
+        {events.length === 0 ? <p className="text-sm text-muted">Sem alterações registradas.</p> : null}
+        <ul className="divide-y divide-border text-sm">
+          {events.map((e) => (
+            <li key={e.id} className="py-2" data-testid="note-event">
+              <p>
+                <Badge>{EVENT_LABEL[e.kind] ?? e.kind}</Badge> {e.detail}
+              </p>
+              <p className="text-xs text-muted">{e.userName} · {formatDateTime(new Date(e.createdAt), tz)}</p>
+              {e.previous ? (
+                <details className="mt-1 text-xs">
+                  <summary className="cursor-pointer text-muted">Ver texto anterior</summary>
+                  <p className="mt-1 whitespace-pre-wrap rounded bg-surface-2 p-2">{e.previous}</p>
+                </details>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      </CardBody>
+    </Card>
+  );
+}
+
+export function CaseNotesPanel({ caseId, notes, canWrite, tz, events = [] }: { caseId: string; notes: NoteRow[]; canWrite: boolean; tz: string; events?: NoteEventRow[] }) {
+  const [editing, setEditing] = React.useState<string | null>(null);
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
   const { form, submit, pending: saving, message } = useServerForm<CaseNoteInput, undefined>({
@@ -118,13 +235,21 @@ export function CaseNotesPanel({ caseId, notes, canWrite, tz }: { caseId: string
                     </div>
                   ) : null}
                 </div>
-                <p className="mt-1 whitespace-pre-wrap text-sm">{n.body}</p>
-                <p className="mt-1 text-xs text-muted">{n.authorName ?? "Sistema"} · {formatDateTime(new Date(n.createdAt), tz)}</p>
+                {editing === n.id ? (
+                  <EditNote note={n} done={() => setEditing(null)} />
+                ) : (
+                  <>
+                    <p className="mt-1 whitespace-pre-wrap text-sm">{n.body}</p>
+                    <p className="mt-1 text-xs text-muted">{n.authorName ?? "Sistema"} · {formatDateTime(new Date(n.createdAt), tz)}</p>
+                    <NoteExtras note={n} canWrite={canWrite} startEdit={() => setEditing(n.id)} />
+                  </>
+                )}
               </li>
             ))}
           </ul>
         </CardBody>
       </Card>
+      <NoteHistory events={events} tz={tz} />
     </div>
   );
 }

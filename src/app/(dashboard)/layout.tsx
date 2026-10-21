@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { NAV_ITEMS } from "@/config/navigation";
 import { can } from "@/server/context";
+import { prototypesEnabled } from "@/modules/prototypes/registry";
 import { ResendVerificationButton } from "@/modules/auth/components";
 import { listNotifications, syncDueNotifications, unreadCount } from "@/server/services/notification.service";
 import { listUserOrganizations } from "@/server/services/organization.service";
@@ -30,7 +31,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const chatBadge = can(ctx, "whatsapp:read") ? await unreadTotal(ctx).catch(() => 0) : 0;
   const ent = await getEntitlements(ctx.organizationId).catch(() => null);
   const planNotice = ent ? PLAN_NOTICE[ent.state]?.(ent.trialDaysLeft) ?? null : null;
-  const visibleKeys = NAV_ITEMS.filter((n) => !n.permission || can(ctx, n.permission)).map((n) => n.key);
+  const visibleKeys = NAV_ITEMS.filter((n) => (n.key !== "prototypes" || prototypesEnabled()) && (!n.permission || can(ctx, n.permission))).map((n) => n.key);
 
   return (
     <AppShell

@@ -20,13 +20,17 @@ import { WebhookForm, WebhookList } from "@/modules/webhooks/webhooks-ui";
 import { listWebhooks, recentDeliveries, webhooksAvailable, WEBHOOK_EVENTS } from "@/server/services/webhook.service";
 import { can } from "@/server/context";
 import { datajudStatus } from "@/server/services/datajud.service";
+import { DriveSettingsPanel } from "@/modules/google/google-ui";
+import { getDriveSettings } from "@/server/services/google-drive.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Integrações" };
 
-export default async function IntegrationsPage() {
+export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<{ google?: string; msg?: string }> }) {
   const { ctx } = await requireTenant();
   if (!can(ctx, "integrations:manage")) return <AccessDenied />;
+  const sp = await searchParams;
+  const drive = await getDriveSettings(ctx);
   const s = await datajudStatus(ctx);
   const monitors = await listMonitors(ctx);
   const [rcvMembers, rcvTeams] = await Promise.all([listActiveMembers(ctx), listTeams(ctx)]);
@@ -46,6 +50,15 @@ export default async function IntegrationsPage() {
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Integrações" description="Conectores reais, sempre desligados até haver credenciais e consentimento do escritório." />
       <div className="space-y-4">
+        {sp.google === "ok" ? <Alert tone="success">Google conectado. Falta só ligar o Drive neste escritório.</Alert> : null}
+        {sp.google === "erro" ? <Alert tone="error">Não foi possível conectar ao Google{sp.msg ? `: ${sp.msg.slice(0, 160)}` : "."}</Alert> : null}
+        <Card>
+          <CardHeader title="Google Drive / Docs (opcional)" action={drive.enabled ? <Badge tone="success">Ligado</Badge> : <Badge tone="warning">Desligado</Badge>} />
+          <CardBody className="space-y-3 text-sm">
+            <p>Envie documentos ao Drive do escritório, edite no Google Docs e traga a edição de volta como nova versão. Cada escritório usa a própria conta e as próprias credenciais do Google (nada é compartilhado entre escritórios, nem há chave global). O acesso é limitado ao que o LegalOS cria (escopo drive.file) e processos sigilosos nunca são enviados.</p>
+            <DriveSettingsPanel s={drive} />
+          </CardBody>
+        </Card>
         <Card>
           <CardHeader title="DataJud (CNJ)" action={active ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-3 text-sm">

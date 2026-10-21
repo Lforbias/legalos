@@ -21,6 +21,11 @@ import { getDocument } from "@/server/services/document.service";
 import { getDocumentTextInfo } from "@/server/services/document-text.service";
 import { TextPanel } from "@/modules/documents/text-panel";
 import { userNames } from "@/server/services/members";
+import { isConvertible } from "@/lib/google/drive";
+import { DocumentDriveCard } from "@/modules/google/google-ui";
+import { driveEnabled, getDocumentDriveLink } from "@/server/services/google-drive.service";
+import { SuggestOneButton, SuggestionItem } from "@/modules/documents/classify-ui";
+import { getPendingForDocument } from "@/server/services/doc-classify.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Documento" };
@@ -36,6 +41,9 @@ export default async function DocumentPage({ params, searchParams }: { params: P
   const textInfo = await getDocumentTextInfo(ctx, doc.id);
   const names = await userNames(ctx, versions.map((v) => v.uploadedById));
   const canWrite = can(ctx, "documents:write");
+  const pendingClass = canWrite ? await getPendingForDocument(ctx, doc.id) : null;
+  const driveOn = canWrite && (await driveEnabled(ctx));
+  const driveLink = driveOn ? await getDocumentDriveLink(ctx, doc.id) : null;
   const missing = (await searchParams).faltam?.split("|").filter(Boolean).slice(0, 30) ?? [];
   const tz = organization.timezone;
 
@@ -118,6 +126,26 @@ export default async function DocumentPage({ params, searchParams }: { params: P
                   <DocumentShareToggle documentId={doc.id} shared={doc.sharedWithPortal} />
                 </CardBody>
               </Card>
+              {can(ctx, "ai:use") || pendingClass ? (
+                <Card>
+                  <CardHeader title="Categoria por IA" description="A IA só sugere; você decide." />
+                  <CardBody>
+                    {pendingClass ? (
+                      <SuggestionItem showName={false} s={{ id: pendingClass.id, documentId: doc.id, documentName: doc.name, suggested: pendingClass.suggested as DocumentCategory, confidence: pendingClass.confidence, reason: pendingClass.reason, stale: pendingClass.version !== doc.currentVersion }} />
+                    ) : (
+                      <SuggestOneButton documentId={doc.id} />
+                    )}
+                  </CardBody>
+                </Card>
+              ) : null}
+              {driveOn ? (
+                <Card>
+                  <CardHeader title="Google Drive" description="Copie para o Drive do escritório e edite no Google Docs." />
+                  <CardBody>
+                    <DocumentDriveCard documentId={doc.id} link={driveLink ? { webViewLink: driveLink.webViewLink, isGoogleDoc: driveLink.isGoogleDoc, sentVersion: driveLink.sentVersion } : null} convertible={isConvertible(doc.mimeType)} />
+                  </CardBody>
+                </Card>
+              ) : null}
               <Card>
                 <CardHeader title="Nova versão" />
                 <CardBody>

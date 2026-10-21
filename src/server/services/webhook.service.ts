@@ -11,6 +11,8 @@ export const WEBHOOK_EVENTS = {
   "notice.created": "Intimação registrada",
   "case.created": "Processo cadastrado",
   "deadline.created": "Prazo cadastrado",
+  "petition.submitted": "Petição protocolada",
+  "petition.failed": "Falha no protocolo de petição",
 } as const;
 export type WebhookEvent = keyof typeof WEBHOOK_EVENTS;
 export const WEBHOOK_EVENT_LIST = Object.keys(WEBHOOK_EVENTS) as WebhookEvent[];

@@ -1,6 +1,7 @@
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { isValidCnj, onlyDigits } from "@/lib/validation/br-documents";
 import { jtrOfCnj } from "@/lib/mni/tribunals";
+import { assertConnectorFor } from "./court-system-map.service";
 import { postSoap } from "@/lib/mni/transport";
 import { buildEntregarManifestacao, MniError, parseEntregarManifestacao, type MniManifestDoc } from "@/lib/mni/xml";
 import { SubmissionUncertainError, type PetitioningAdapter } from "@/lib/petitioning/adapter";
@@ -34,6 +35,7 @@ export async function setPetitionTypes(ctx: TenantContext, connectionId: string,
 async function findConnection(ctx: TenantContext, caseNumber: string | null) {
   if (!caseNumber || !isValidCnj(caseNumber)) throw new ConflictError("O processo precisa ter um número CNJ válido para protocolar no tribunal.");
   const jtr = jtrOfCnj(caseNumber);
+  await assertConnectorFor(ctx.organizationId, jtr, "petition");
   const conn = jtr ? await db.courtConnection.findFirst({ where: { organizationId: ctx.organizationId, jtr, enabled: true }, select: { id: true, petitionTypes: true, label: true } }) : null;
   if (!conn) throw new ConflictError("Nenhuma conexão PJe/MNI ativa para o tribunal deste processo (cadastre em Integrações).");
   return conn;
@@ -67,7 +69,7 @@ export const mniAdapter: PetitioningAdapter = {
     const post = (env.post as SoapPost | undefined) ?? postSoap;
     const conn = await findConnection(ctx, input.caseNumber);
     const types = asTypes(conn.petitionTypes) as Record<string, string>;
-    const { c, secret } = await loadConnection(ctx, conn.id);
+    const { c, secret } = await loadConnection(ctx, conn.id, { personal: true });
     const cnj = onlyDigits(input.caseNumber ?? "");
     const docs: MniManifestDoc[] = [
       { tipoDocumento: types.PETICAO!, mimetype: input.document.mimeType, descricao: input.title.slice(0, 120), conteudo: env.files.main },

@@ -101,6 +101,39 @@ export async function listCertificateUsage(ctx: TenantContext, id: string, take 
   return db.certificateUsage.findMany({ where: { certificateId: id, organizationId: ctx.organizationId }, orderBy: { createdAt: "desc" }, take: Math.min(take, 200) });
 }
 
+/* ---------- usuários autorizados (3.0-F9) ---------- */
+export async function listAuthorizedUsers(ctx: TenantContext, certificateId: string) {
+  assertCan(ctx, "certificates:manage");
+  const c = await db.certificate.findFirst({ where: { id: certificateId, organizationId: ctx.organizationId }, select: { id: true } });
+  if (!c) throw new NotFoundError("Certificado não encontrado.");
+  const rows = await db.certificateAuthorizedUser.findMany({ where: { certificateId, organizationId: ctx.organizationId }, orderBy: { createdAt: "asc" } });
+  const users = rows.length ? await db.user.findMany({ where: { id: { in: rows.map((r) => r.userId) } }, select: { id: true, name: true } }) : [];
+  return rows.map((r) => ({ userId: r.userId, name: users.find((u) => u.id === r.userId)?.name ?? "Usuário removido", createdAt: r.createdAt }));
+}
+
+export async function authorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string) {
+  assertCan(ctx, "certificates:manage");
+  await requireMfa(ctx.userId);
+  const c = await db.certificate.findFirst({ where: { id: certificateId, organizationId: ctx.organizationId, revokedAt: null }, select: { id: true, ownerUserId: true } });
+  if (!c) throw new NotFoundError("Certificado não encontrado ou revogado.");
+  if (c.ownerUserId === userId) throw new ValidationError("O titular já pode usar o certificado.", { userId: ["O titular já tem acesso."] });
+  const m = await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId, status: "ACTIVE", role: { key: { not: "CLIENT" } } }, select: { userId: true } });
+  if (!m) throw new ValidationError("Escolha um membro ativo da equipe.", { userId: ["Membro não encontrado."] });
+  await db.certificateAuthorizedUser.upsert({
+    where: { certificateId_userId: { certificateId, userId } },
+    create: { certificateId, userId, organizationId: ctx.organizationId, createdById: ctx.userId },
+    update: {},
+  });
+  await audit({ action: "certificate.authorize", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificateId, metadata: { target: userId }, meta: ctx.meta });
+}
+
+export async function unauthorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string) {
+  assertCan(ctx, "certificates:manage");
+  const res = await db.certificateAuthorizedUser.deleteMany({ where: { certificateId, userId, organizationId: ctx.organizationId } });
+  if (res.count !== 1) throw new NotFoundError("Autorização não encontrada.");
+  await audit({ action: "certificate.unauthorize", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificateId, metadata: { target: userId }, meta: ctx.meta });
+}
+
 export type CertificateMaterial = { pfx: Buffer; passphrase: string; subjectCn: string; certificateId: string };
 
 /**
@@ -111,7 +144,11 @@ export type CertificateMaterial = { pfx: Buffer; passphrase: string; subjectCn: 
 export async function getCertificateMaterial(ctx: TenantContext, id: string, purpose: string, caseId?: string | null): Promise<CertificateMaterial> {
   const key = requireKey();
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId } });
-  if (!c || (c.ownerUserId !== ctx.userId && !can(ctx, "certificates:manage"))) throw new NotFoundError("Certificado não encontrado.");
+  if (!c) throw new NotFoundError("Certificado não encontrado.");
+  if (c.ownerUserId !== ctx.userId && !can(ctx, "certificates:manage")) {
+    const auth = await db.certificateAuthorizedUser.findUnique({ where: { certificateId_userId: { certificateId: id, userId: ctx.userId } }, select: { userId: true } });
+    if (!auth) throw new NotFoundError("Certificado não encontrado.");
+  }
   if (c.revokedAt) throw new ConflictError("Este certificado foi revogado.");
   if (c.notAfter <= new Date()) throw new ConflictError("Este certificado está vencido.");
   const cleanPurpose = purpose.trim().slice(0, 120);
@@ -122,6 +159,30 @@ export async function getCertificateMaterial(ctx: TenantContext, id: string, pur
   ]);
   await audit({ action: "certificate.use", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: id, metadata: { purpose: cleanPurpose }, meta: ctx.meta });
   return { pfx: openBytes(c.pfxEnc, key), passphrase: openBytes(c.passEnc, key).toString("utf8"), subjectCn: c.subjectCn, certificateId: id };
+}
+
+/** Certificados que ESTA pessoa pode usar agora (titular, autorizada ou administradora do cofre). Só id e nome. */
+export async function listUsableCertificates(ctx: TenantContext): Promise<{ id: string; label: string }[]> {
+  const now = new Date();
+  const manage = can(ctx, "certificates:manage");
+  const authIds = manage ? [] : (await db.certificateAuthorizedUser.findMany({ where: { userId: ctx.userId, organizationId: ctx.organizationId }, select: { certificateId: true } })).map((a) => a.certificateId);
+  return db.certificate.findMany({
+    where: { organizationId: ctx.organizationId, revokedAt: null, notAfter: { gt: now }, ...(manage ? {} : { OR: [{ ownerUserId: ctx.userId }, { id: { in: authIds } }] }) },
+    select: { id: true, label: true },
+    orderBy: { label: "asc" },
+  });
+}
+
+/** Confere (sem registrar uso nem abrir o segredo) se este usuário pode usar o certificado agora: titular, administrador do cofre ou autorizado; vigente e não revogado. */
+export async function assertCertificateUsable(ctx: TenantContext, id: string): Promise<void> {
+  const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { ownerUserId: true, revokedAt: true, notAfter: true } });
+  if (!c) throw new NotFoundError("Certificado não encontrado.");
+  if (c.ownerUserId !== ctx.userId && !can(ctx, "certificates:manage")) {
+    const auth = await db.certificateAuthorizedUser.findUnique({ where: { certificateId_userId: { certificateId: id, userId: ctx.userId } }, select: { userId: true } });
+    if (!auth) throw new NotFoundError("Certificado não encontrado.");
+  }
+  if (c.revokedAt) throw new ConflictError("Este certificado foi revogado.");
+  if (c.notAfter <= new Date()) throw new ConflictError("Este certificado está vencido.");
 }
 
 /** Avisa titular e administradores do cofre quando faltam 30 e 7 dias (ou já venceu). Idempotente. */

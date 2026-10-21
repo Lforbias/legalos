@@ -27,7 +27,7 @@ import { listNotices } from "@/server/services/notice.service";
 import { listTasksForCase } from "@/server/services/task.service";
 import { dateToYmd, formatYmd } from "@/lib/dates/ymd";
 import { AcervoButton, CaseNotesPanel, CustomValuesCard } from "@/modules/cases/extras-ui";
-import { listCaseNotes } from "@/server/services/case-note.service";
+import { listCaseNotes, listNoteHistory } from "@/server/services/case-note.service";
 import { listCustomFields } from "@/server/services/custom-field.service";
 import { DocumentsPanel } from "@/modules/documents/documents-panel";
 import { can } from "@/server/context";
@@ -111,6 +111,7 @@ export default async function CaseDetailPage({
   const caseTasks = tab === "tarefas" && canTasks ? await listTasksForCase(ctx, c.id) : null;
   const casePetitions = tab === "peticoes" && canPetitions ? await listPetitions(ctx, { caseId: c.id }) : null;
   const caseNotes = tab === "notas" ? await listCaseNotes(ctx, c.id) : null;
+  const noteHistory = tab === "notas" ? await listNoteHistory(ctx, c.id) : [];
   const customDefs = tab === "resumo" ? await listCustomFields(ctx) : [];
   const responsible = c.members.find((m) => m.role === "RESPONSIBLE");
 
@@ -218,7 +219,8 @@ export default async function CaseDetailPage({
           caseId={c.id}
           canWrite={canWrite}
           tz={tz}
-          notes={caseNotes.map((n) => ({ id: n.id, title: n.title, body: n.body, pinned: n.pinned, authorName: n.authorName, createdAt: n.createdAt.toISOString(), bulk: n.bulkId !== null }))}
+          notes={caseNotes.map((n) => ({ id: n.id, title: n.title, body: n.body, pinned: n.pinned, authorName: n.authorName, createdAt: n.createdAt.toISOString(), bulk: n.bulkId !== null, attachments: n.attachments }))}
+          events={noteHistory.map((e) => ({ id: e.id, kind: e.kind, detail: e.detail, previous: e.previous, userName: e.userName, createdAt: e.createdAt.toISOString() }))}
         />
       ) : null}
 

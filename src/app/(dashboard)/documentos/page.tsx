@@ -42,6 +42,11 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
               <LayoutTemplate className="h-4 w-4" aria-hidden /> {canTemplates ? "Modelos" : "Ver modelos"}
             </Link>
             {canWrite ? (
+              <Link href="/documentos/classificar" className={bv({ variant: "secondary" })}>
+                Classificar com IA
+              </Link>
+            ) : null}
+            {canWrite ? (
               <Link href="/documentos/gerar" className={bv({})}>
                 <FilePlus2 className="h-4 w-4" aria-hidden /> Gerar de modelo
               </Link>

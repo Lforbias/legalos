@@ -123,6 +123,17 @@ model Organization {
   settings         Json               @default("{}")
   aiEnabled        Boolean            @default(false) @map("ai_enabled")
   datajudEnabled   Boolean            @default(false) @map("datajud_enabled")
+  /// 3.0-F5: permite agendar o protocolo de petições aprovadas (nasce desligado).
+  petitionScheduleEnabled Boolean     @default(false) @map("petition_schedule_enabled")
+  /// 3.0-F10: cobra créditos por ação (nasce desligado). `creditsLowThreshold` = aviso de saldo baixo (0 = sem aviso).
+  creditsEnabled          Boolean     @default(false) @map("credits_enabled")
+  creditsLowThreshold     Int         @default(0) @map("credits_low_threshold")
+  creditGrants            CreditGrant[]
+  creditUsages            CreditUsage[]
+  courtCredentials        CourtCredential[]
+  courtSystemMaps         CourtSystemMap[]
+  googleIntegration       GoogleIntegration?
+  documentClassifications DocumentClassification[]
   suspendedAt      DateTime?          @map("suspended_at") @db.Timestamptz(3)
   suspendedReason  String?            @map("suspended_reason")
   certificates     Certificate[]
@@ -553,6 +564,8 @@ model Document {
   petitions           PetitionFiling[]
   petitionAttachments PetitionAttachment[]
   texts               DocumentText[]
+  driveLink           DocumentDriveLink?
+  classifications     DocumentClassification[]
 
   @@unique([organizationId, externalKey])
   @@index([organizationId])
@@ -958,6 +971,9 @@ model PetitionFiling {
   reviewedAt      DateTime?      @map("reviewed_at") @db.Timestamptz(3)
   submittedById   String?        @map("submitted_by_id") @db.Uuid
   submittedAt     DateTime?      @map("submitted_at") @db.Timestamptz(3)
+  scheduledFor    DateTime?      @map("scheduled_for") @db.Timestamptz(3)
+  scheduledById   String?        @map("scheduled_by_id") @db.Uuid
+  scheduleNote    String?        @map("schedule_note")
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt       DateTime?      @map("deleted_at") @db.Timestamptz(3)
@@ -1430,10 +1446,26 @@ model Certificate {
   owner        User               @relation("CertificateOwner", fields: [ownerUserId], references: [id])
   usage        CertificateUsage[]
   connections  CourtConnection[]
+  authorized   CertificateAuthorizedUser[]
+  credentials  CourtCredential[]
 
   @@unique([organizationId, fingerprintSha256])
   @@index([organizationId, revokedAt])
   @@map("certificates")
+}
+
+model CertificateAuthorizedUser {
+  certificateId  String   @map("certificate_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
+
+  @@id([certificateId, userId])
+  @@index([organizationId])
+  @@map("certificate_authorized_users")
 }
 
 model CertificateUsage {
@@ -2238,7 +2270,8 @@ model CaseNote {
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  case        Case               @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  attachments CaseNoteAttachment[]
 
   @@index([caseId, pinned, createdAt(sort: Desc)])
   @@index([organizationId])
@@ -2307,4 +2340,177 @@ model CaseImportItem {
 
   @@index([batchId, position])
   @@map("case_import_items")
+}
+
+/// 3.0-F10: lote de créditos concedido a um escritório (com validade opcional). O consumo é do lote que vence primeiro.
+model CreditGrant {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  amount         Int
+  remaining      Int
+  expiresAt      DateTime? @map("expires_at") @db.Timestamptz(3)
+  note           String?
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, expiresAt])
+  @@map("credit_grants")
+}
+
+/// 3.0-F10: consumo de créditos (extrato). (organização, ação, refType, refId) é único quando há refId (índice parcial na migração).
+model CreditUsage {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  action         String
+  cost           Int
+  refType        String?  @map("ref_type")
+  refId          String?  @map("ref_id")
+  userId         String?  @map("user_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("credit_usages")
+}
+
+/// 3.0-F6b: credencial de acesso a um sistema de tribunal, por usuário (e por tribunal; courtCode vazio = todos). Segredo cifrado.
+model CourtCredential {
+  id            String    @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId        String    @map("user_id") @db.Uuid
+  system        String
+  courtCode     String    @default("") @map("court_code")
+  authMode      String    @map("auth_mode")
+  certificateId String?   @map("certificate_id") @db.Uuid
+  secretEnc     String    @map("secret_enc")
+  checkedAt     DateTime? @map("checked_at") @db.Timestamptz(3)
+  checkStatus   String?   @map("check_status")
+  checkMessage  String?   @map("check_message")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  certificate  Certificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, userId, system, courtCode])
+  @@index([organizationId])
+  @@map("court_credentials")
+}
+
+/// Anexo de nota do processo (arquivo no armazenamento; exclusão lógica).
+model CaseNoteAttachment {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  noteId         String    @map("note_id") @db.Uuid
+  name           String
+  mimeType       String    @map("mime_type")
+  sizeBytes      Int       @map("size_bytes")
+  sha256         String
+  storageKey     String    @unique @map("storage_key")
+  uploadedById   String?   @map("uploaded_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  note CaseNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@index([noteId])
+  @@map("case_note_attachments")
+}
+
+/// Histórico de alterações das notas de um processo (criada, editada, fixada, anexo, excluída). `previous` guarda o texto anterior numa edição.
+model CaseNoteEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  caseId         String   @map("case_id") @db.Uuid
+  noteId         String   @map("note_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  kind           String
+  detail         String
+  previous       String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([caseId, createdAt])
+  @@index([organizationId])
+  @@map("case_note_events")
+}
+
+/// 3.0-F3b: integração OPCIONAL com o Google Drive/Docs, com as credenciais OAuth do próprio escritório (segredo e token cifrados). Escopo drive.file.
+model GoogleIntegration {
+  organizationId  String    @id @map("organization_id") @db.Uuid
+  clientId        String    @map("client_id")
+  clientSecretEnc String    @map("client_secret_enc")
+  refreshTokenEnc String?   @map("refresh_token_enc")
+  enabled         Boolean   @default(false)
+  folderId        String?   @map("folder_id")
+  folderName      String    @default("LegalOS") @map("folder_name")
+  connectedById   String?   @map("connected_by_id") @db.Uuid
+  connectedAt     DateTime? @map("connected_at") @db.Timestamptz(3)
+  lastError       String?   @map("last_error")
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("google_integrations")
+}
+
+/// Ligação de um documento com a cópia mais recente enviada ao Drive do escritório.
+model DocumentDriveLink {
+  documentId     String    @id @map("document_id") @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  driveFileId    String    @map("drive_file_id")
+  webViewLink    String    @map("web_view_link")
+  isGoogleDoc    Boolean   @default(false) @map("is_google_doc")
+  sentVersion    Int       @map("sent_version")
+  sentAt         DateTime  @default(now()) @map("sent_at") @db.Timestamptz(3)
+  sentById       String?   @map("sent_by_id") @db.Uuid
+  pulledAt       DateTime? @map("pulled_at") @db.Timestamptz(3)
+
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("document_drive_links")
+}
+
+/// 3.0-F8: sugestão de categoria feita pela IA. Nunca altera o documento sozinha: PENDING até alguém aceitar ou corrigir.
+model DocumentClassification {
+  id            String    @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  documentId    String    @map("document_id") @db.Uuid
+  version       Int
+  suggested     String
+  confidence    Int
+  reason        String?
+  status        String    @default("PENDING")
+  finalCategory String?   @map("final_category")
+  model         String?
+  requestedById String?   @map("requested_by_id") @db.Uuid
+  decidedById   String?   @map("decided_by_id") @db.Uuid
+  decidedAt     DateTime? @map("decided_at") @db.Timestamptz(3)
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  document     Document     @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status, createdAt])
+  @@index([documentId])
+  @@map("document_classifications")
+}
+
+model CourtSystemMap {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  jtr            String
+  system         String
+  setById        String?  @map("set_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, jtr])
+  @@map("court_system_maps")
 }

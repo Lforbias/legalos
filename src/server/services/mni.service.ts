@@ -4,12 +4,14 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions
 import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
 import { isValidCnj, isValidCpf, isValidCnpj, onlyDigits } from "@/lib/validation/br-documents";
 import { isKnownJtr, jtrOfCnj } from "@/lib/mni/tribunals";
+import { systemForJtr } from "./court-system-map.service";
 import { postSoap, assertEndpointUrl, type Mtls } from "@/lib/mni/transport";
 import { buildConsultarAvisosPendentes, buildConsultarProcesso, MniError, parseAvisosPendentes, parseConsultarProcesso, type MniAviso, type MniDocumento, type MniProcesso } from "@/lib/mni/xml";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertCaseVisible } from "./case.service";
 import { requireMfa, getCertificateMaterial } from "./certificate.service";
+import { resolveMyCredential } from "./court-credential.service";
 import { isUniqueViolation } from "./db-errors";
 import { createNotice } from "./notice.service";
 import { classifyFile, MAX_DOCUMENT_BYTES, sanitizeFileName, storeNewDocument } from "./document.service";
@@ -92,13 +94,21 @@ export async function deleteConnection(ctx: TenantContext, id: string) {
   await audit({ action: "mni.connection_delete", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: id, meta: ctx.meta });
 }
 
-export async function loadConnection(ctx: TenantContext, id: string) {
+/**
+ * `personal: true` (ações de uma pessoa: consulta, autos, protocolo) usa a credencial pessoal dela para este tribunal, se existir
+ * (3.0-F6b); sem ela, ou em rotinas automáticas, vale a credencial da conexão do escritório.
+ */
+export async function loadConnection(ctx: TenantContext, id: string, opts: { personal?: boolean } = {}) {
   const c = await db.courtConnection.findFirst({ where: { id, organizationId: ctx.organizationId } });
   if (!c) throw new NotFoundError("Conexão não encontrada.");
   if (!c.enabled) throw new ConflictError("Esta conexão está desligada.");
   const key = requireKey();
   const secret = JSON.parse(openBytes(c.secretEnc, key).toString("utf8")) as { document: string; password: string };
-  return { c, secret };
+  if (opts.personal) {
+    const mine = await resolveMyCredential(ctx, "pje-mni", c.jtr);
+    if (mine) return { c: { ...c, authMode: mine.authMode, certificateId: mine.certificateId }, secret: mine.secret, personal: true as const };
+  }
+  return { c, secret, personal: false as const };
 }
 
 export async function mtlsFor(ctx: TenantContext, certificateId: string | null, purpose: string, caseId?: string): Promise<Mtls | undefined> {
@@ -179,6 +189,8 @@ export async function connectionForCase(ctx: TenantContext, caseId: string) {
   const c = await db.case.findFirst({ where: { id: caseId, organizationId: ctx.organizationId }, select: { number: true } });
   const jtr = c?.number ? jtrOfCnj(c.number) : null;
   if (!jtr) return null;
+  const mapped = await systemForJtr(ctx.organizationId, jtr);
+  if (mapped && mapped !== "pje-mni") return null;
   return db.courtConnection.findFirst({ where: { organizationId: ctx.organizationId, jtr, enabled: true }, select: { id: true, label: true } });
 }
 
@@ -193,7 +205,7 @@ export async function consultCaseMni(ctx: TenantContext, caseId: string, post: S
   if (!c.number) throw new ValidationError("Informe o número CNJ do processo para consultar o tribunal.");
   const conn = await connectionForCase(ctx, caseId);
   if (!conn) throw new ConflictError("Nenhuma conexão PJe/MNI ativa para o tribunal deste processo (cadastre em Integrações).");
-  const { c: connection, secret } = await loadConnection(ctx, conn.id);
+  const { c: connection, secret } = await loadConnection(ctx, conn.id, { personal: true });
   let proc: MniProcesso;
   try {
     const mtls = await mtlsFor(ctx, connection.certificateId, "mni:consultarProcesso", caseId);
@@ -253,7 +265,7 @@ export async function importAutosMni(ctx: TenantContext, caseId: string, post: S
   if (!c.number) throw new ValidationError("Informe o número CNJ do processo para consultar o tribunal.");
   const conn = await connectionForCase(ctx, caseId);
   if (!conn) throw new ConflictError("Nenhuma conexão PJe/MNI ativa para o tribunal deste processo (cadastre em Integrações).");
-  const { c: connection, secret } = await loadConnection(ctx, conn.id);
+  const { c: connection, secret } = await loadConnection(ctx, conn.id, { personal: true });
   const cnj = onlyDigits(c.number);
   const keyOf = (id: string) => `mni:${connection.jtr}:doc:${id}`.slice(0, 200);
   const res: ImportAutosResult = { listed: 0, imported: 0, alreadyKnown: 0, skippedSecret: 0, skippedUnsupported: 0, skippedTooBig: 0, remaining: 0 };

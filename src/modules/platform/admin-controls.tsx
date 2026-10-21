@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
 import type { ActionState } from "@/lib/validation/common";
-import { reactivateOrganizationAction, setSubscriptionAction, updatePlanAction, setUserDisabledAction, suspendOrganizationAction, unlockUserAction } from "./actions";
+import { grantCreditsAction, reactivateOrganizationAction, setCreditsEnabledAction, setSubscriptionAction, updatePlanAction, setUserDisabledAction, suspendOrganizationAction, unlockUserAction } from "./actions";
 
 function useRun() {
   const router = useRouter();
@@ -132,6 +132,37 @@ export function PlanEditor({ plan }: { plan: PlanRow }) {
         <div><label htmlFor={`ai-${plan.key}`} className="mb-1 block text-xs text-muted">IA (tokens/mês; 0 = sem IA)</label><Input id={`ai-${plan.key}`} inputMode="numeric" value={ai} onChange={(e) => setAi(e.target.value)} placeholder="ilimitado" /></div>
       </div>
       <Button size="sm" loading={pending} onClick={() => { setSaved(false); run(() => updatePlanAction(plan.key, { priceCents: toCents(price), maxUsers: toInt(users), maxStorageMb: toInt(storage), maxAiTokensMonth: toInt(ai) }), () => setSaved(true)); }} data-testid={`plan-save-${plan.key}`}>Salvar plano</Button>
+    </div>
+  );
+}
+
+/** Créditos do escritório: liga/desliga a cobrança por créditos e concede lotes (com validade opcional). */
+export function CreditsControl({ orgId, enabled, balance }: { orgId: string; enabled: boolean; balance: number }) {
+  const { run, pending, error } = useRun();
+  const [open, setOpen] = React.useState(false);
+  const [amount, setAmount] = React.useState("");
+  const [days, setDays] = React.useState("");
+  const [note, setNote] = React.useState("");
+  return (
+    <div className="mt-2 text-xs">
+      <p className="text-muted">Créditos: {enabled ? `ligado · saldo ${balance.toLocaleString("pt-BR")}` : "desligado"}</p>
+      {error ? <Alert tone="error">{error}</Alert> : null}
+      {!open ? (
+        <Button size="sm" variant="ghost" onClick={() => setOpen(true)} data-testid={`credits-open-${orgId}`}>Créditos…</Button>
+      ) : (
+        <div className="mt-1 space-y-2 rounded-md border border-border p-2" data-testid={`credits-form-${orgId}`}>
+          <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => setCreditsEnabledAction(orgId, !enabled))}>{enabled ? "Desligar cobrança por créditos" : "Ligar cobrança por créditos"}</Button>
+          <label className="block text-muted" htmlFor={`ca-${orgId}`}>Conceder créditos</label>
+          <Input id={`ca-${orgId}`} inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} placeholder="quantidade" />
+          <label className="block text-muted" htmlFor={`cd-${orgId}`}>Validade (dias; vazio = sem validade)</label>
+          <Input id={`cd-${orgId}`} inputMode="numeric" value={days} onChange={(e) => setDays(e.target.value.replace(/\D/g, ""))} />
+          <Input aria-label="Observação" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Observação (fica registrada)" />
+          <div className="flex gap-2">
+            <Button size="sm" loading={pending} disabled={!amount} onClick={() => run(() => grantCreditsAction(orgId, { amount: Number(amount), expiresInDays: days ? Number(days) : null, note: note || null }), () => { setAmount(""); setDays(""); setNote(""); setOpen(false); })}>Conceder</Button>
+            <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>Fechar</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

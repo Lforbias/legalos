@@ -12,8 +12,14 @@ import { assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service"
 import { isUniqueViolation } from "./db-errors";
 import { userNames } from "./members";
 import { notify } from "./notification.service";
+import { assertCredits, chargeCredits } from "./credit.service";
+import { emitWebhookEvent } from "./webhook.service";
 
 export const PETITION_STATUSES = ["DRAFT", "IN_REVIEW", "APPROVED", "SUBMITTING", "SUBMITTED", "FAILED", "CANCELED"] as const;
+/** Webhook de falha de protocolo (best-effort: nunca derruba o fluxo). Sem dados sensíveis: só ids e o motivo curto. */
+function emitFailed(ctx: TenantContext, p: { id: string; caseId: string }, adapterKey: string, isDemo: boolean, reason: string, uncertain = false) {
+  return emitWebhookEvent(ctx.organizationId, "petition.failed", { petitionId: p.id, caseId: p.caseId, adapter: adapterKey, isDemo, uncertain, reason: reason.slice(0, 200) });
+}
 const STUCK_SUBMITTING_MS = 10 * 60_000;
 export const ATTACHMENT_CLASSES = ["PROCURACAO", "DOCUMENTO_PESSOAL", "COMPROVANTE_RESIDENCIA", "PROVA_DOCUMENTAL", "CONTRATO", "DECISAO_ANEXA", "OUTROS"] as const;
 export type AttachmentClass = (typeof ATTACHMENT_CLASSES)[number];
@@ -217,7 +223,7 @@ export async function requestReview(ctx: TenantContext, id: string) {
     ctx,
     p,
     ["DRAFT"],
-    { status: "IN_REVIEW", documentVersion: p.document.currentVersion, reviewNote: null, reviewerId: null, reviewedAt: null, error: null },
+    { status: "IN_REVIEW", scheduledFor: null, scheduledById: null, documentVersion: p.document.currentVersion, reviewNote: null, reviewerId: null, reviewedAt: null, error: null },
     { kind: "PETITION_REVIEW", title: `Petição enviada para revisão: ${p.title}` },
     "petition.request_review",
     async (tx) => {
@@ -237,7 +243,7 @@ export async function approvePetition(ctx: TenantContext, id: string) {
   assertDocumentUsable(p);
   if (p.document.currentVersion !== p.documentVersion) throw new ConflictError("O documento mudou depois do envio para revisão. Devolva a petição ao rascunho e reenvie.");
   assertAttachmentsUsable(await loadAttachments(ctx, p.id), "approve");
-  await transition(ctx, p, ["IN_REVIEW"], { status: "APPROVED", reviewerId: ctx.userId, reviewedAt: new Date(), reviewNote: null }, { kind: "PETITION_APPROVED", title: `Petição aprovada: ${p.title}` }, "petition.approve");
+  await transition(ctx, p, ["IN_REVIEW"], { status: "APPROVED", scheduledFor: null, scheduledById: null, scheduleNote: null, reviewerId: ctx.userId, reviewedAt: new Date(), reviewNote: null }, { kind: "PETITION_APPROVED", title: `Petição aprovada: ${p.title}` }, "petition.approve");
 }
 
 export async function returnPetition(ctx: TenantContext, id: string, note: string) {
@@ -246,14 +252,14 @@ export async function returnPetition(ctx: TenantContext, id: string, note: strin
   if (n.length < 3) throw new ValidationError("Informe o motivo.", { note: ["Explique o que precisa ser ajustado."] });
   if (n.length > 1000) throw new ValidationError("Texto muito longo.", { note: ["Máximo de 1000 caracteres."] });
   const p = await loadPetition(ctx, id);
-  await transition(ctx, p, ["IN_REVIEW", "APPROVED"], { status: "DRAFT", reviewerId: ctx.userId, reviewedAt: new Date(), reviewNote: n }, { kind: "PETITION_RETURNED", title: `Petição devolvida para ajustes: ${p.title}`, description: n }, "petition.return");
+  await transition(ctx, p, ["IN_REVIEW", "APPROVED"], { status: "DRAFT", scheduledFor: null, scheduledById: null, scheduleNote: null, reviewerId: ctx.userId, reviewedAt: new Date(), reviewNote: n }, { kind: "PETITION_RETURNED", title: `Petição devolvida para ajustes: ${p.title}`, description: n }, "petition.return");
   if (p.authorId && p.authorId !== ctx.userId) await notify({ organizationId: ctx.organizationId, userId: p.authorId, kind: "petition.returned", title: "Petição devolvida para ajustes", body: p.title, link: `/peticoes/${p.id}`, dedupeKey: `petition.returned:${p.id}:${Date.now()}` });
 }
 
 export async function cancelPetition(ctx: TenantContext, id: string) {
   assertCan(ctx, "petitions:write");
   const p = await loadPetition(ctx, id);
-  await transition(ctx, p, ["DRAFT", "IN_REVIEW", "APPROVED", "FAILED"], { status: "CANCELED" }, { kind: "PETITION_CANCELED", title: `Petição cancelada: ${p.title}` }, "petition.cancel");
+  await transition(ctx, p, ["DRAFT", "IN_REVIEW", "APPROVED", "FAILED"], { status: "CANCELED", scheduledFor: null, scheduledById: null }, { kind: "PETITION_CANCELED", title: `Petição cancelada: ${p.title}` }, "petition.cancel");
 }
 
 /**
@@ -304,6 +310,7 @@ export async function submitPetition(ctx: TenantContext, id: string, opts: { con
     const want = onlyDigits(p.case.number ?? "");
     if (!want || onlyDigits(opts.confirmCase ?? "") !== want) throw new ValidationError("Para protocolar no tribunal, digite o número do processo para confirmar.", { confirmCase: ["Número do processo não confere."] });
   }
+  if (!adapter.isDemo) await assertCredits(ctx.organizationId, "petition.submit");
   await adapter.preflight?.(submission, { ctx, caseId: p.caseId, post: opts.post });
 
   const claim = await db.petitionFiling.updateMany({
@@ -328,16 +335,19 @@ export async function submitPetition(ctx: TenantContext, id: string, opts: { con
       logger.error("petition.submit_uncertain", { petitionId: id, adapter: adapter.key, error: err.message });
       await db.petitionFiling.updateMany({ where: { id, organizationId: ctx.organizationId, status: "SUBMITTING" }, data: { status: "FAILED", error: `ATENÇÃO: não recebemos confirmação do tribunal e a petição PODE ter sido protocolada. Confira no sistema do tribunal ANTES de reenviar. (${err.message.slice(0, 200)})` } });
       await audit({ action: "petition.submit", result: "FAILURE", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "petition", resourceId: id, metadata: { adapter: adapter.key, uncertain: true }, meta: ctx.meta });
+      await emitFailed(ctx, p, adapter.key, adapter.isDemo, "Sem confirmação do tribunal; pode ter sido protocolada.", true);
       throw new ConflictError("Sem confirmação do tribunal: a petição PODE ter sido protocolada. Confira no sistema do tribunal antes de tentar de novo.");
     }
     if (err instanceof ConflictError || err instanceof ValidationError) {
       await db.petitionFiling.updateMany({ where: { id, organizationId: ctx.organizationId, status: "SUBMITTING" }, data: { status: "FAILED", error: err.message.slice(0, 300) } });
       await audit({ action: "petition.submit", result: "FAILURE", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "petition", resourceId: id, metadata: { adapter: adapter.key }, meta: ctx.meta });
+      await emitFailed(ctx, p, adapter.key, adapter.isDemo, err.message);
       throw err;
     }
     logger.error("petition.submit_failed", { petitionId: id, adapter: adapter.key, error: err instanceof Error ? err.message : String(err) });
     await db.petitionFiling.updateMany({ where: { id, organizationId: ctx.organizationId, status: "SUBMITTING" }, data: { status: "FAILED", error: "O adaptador de peticionamento recusou ou não concluiu o envio. Tente novamente." } });
     await audit({ action: "petition.submit", result: "FAILURE", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "petition", resourceId: id, metadata: { adapter: adapter.key }, meta: ctx.meta });
+    await emitFailed(ctx, p, adapter.key, adapter.isDemo, "O adaptador não concluiu o envio.");
     throw new ConflictError("O envio não foi concluído. A petição voltou para \"Falha no envio\" e pode ser reenviada.");
   }
 
@@ -354,5 +364,7 @@ export async function submitPetition(ctx: TenantContext, id: string, opts: { con
     });
     await audit({ action: "petition.submit", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "petition", resourceId: id, metadata: { adapter: adapter.key, demo: adapter.isDemo, version: p.documentVersion, attachments: attachmentsForAdapter.length }, meta: ctx.meta }, tx);
   });
+  if (!adapter.isDemo) await chargeCredits(ctx.organizationId, "petition.submit", { type: "petition", id, userId: ctx.userId });
+  await emitWebhookEvent(ctx.organizationId, "petition.submitted", { petitionId: p.id, caseId: p.caseId, protocol: receipt.protocol, isDemo: adapter.isDemo, adapter: adapter.key });
   return { protocol: receipt.protocol, isDemo: adapter.isDemo };
 }
