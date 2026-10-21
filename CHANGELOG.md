@@ -12,6 +12,8 @@ Ver `docs/roadmap-3.0.0.md` (comparação com o LegalMail).
 
 - **3.0-F4 Importação de processos em lote** (migração `20261128000000_legalmail_f4`: `case_import_batches`, `case_import_items`): `/processos/importar` cadastra até 200 números CNJ por vez (validação do dígito, repetidos, existentes, cliente opcional como parte); DataJud e autos pelo MNI em passos curtos e retomáveis, por item; histórico das importações.
 
+- **3.0-F2 Tarefas 2.0** (migração `20261129000000_legalmail_f2`: `task_types`, `task_labels`, `task_label_links`, `task_events`, `task_attachments`, `tasks.type_id`, `task_comments.mentioned_ids`): tipos de tarefa com pontuação e etiquetas (Configurações → Tarefas; só `organization:manage` cria), cartão Tipo e etiquetas na tarefa, filtros por etiqueta e tipo, relatório *Pontuação do mês* por responsável, menções `@Nome Completo` em comentários com aviso `task.mention`, anexos (mesma lista de tipos e limite de 8 MB dos documentos, download autenticado em `/api/tasks/attachments/[id]`, respeita sigilo) e histórico de alterações. Fora: anexos/histórico das notas de processo.
+
 ## 6.0.0 (RUTE, planejada)
 Ver `docs/roadmap-6.0.0.md` (servidor MCP + aba Inteligência Artificial). Só plano; nada implementado. A F10 da 2.0 é entregue por esta versão.
 

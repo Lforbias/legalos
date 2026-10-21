@@ -614,14 +614,19 @@ model Task {
   createdById    String?      @map("created_by_id") @db.Uuid
   completedAt    DateTime?    @map("completed_at") @db.Timestamptz(3)
   sourceNoticeId String?      @map("source_notice_id") @db.Uuid
+  typeId         String?      @map("type_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(3)
 
-  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  case         Case?         @relation(fields: [caseId], references: [id], onDelete: Restrict)
-  client       Client?       @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  case         Case?           @relation(fields: [caseId], references: [id], onDelete: Restrict)
+  client       Client?         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  type         TaskType?       @relation(fields: [typeId], references: [id], onDelete: SetNull)
   comments     TaskComment[]
+  labels       TaskLabelLink[]
+  events       TaskEvent[]
+  attachments  TaskAttachment[]
 
   @@index([organizationId])
   @@map("tasks")
@@ -633,6 +638,7 @@ model TaskComment {
   taskId         String   @map("task_id") @db.Uuid
   authorId       String?  @map("author_id") @db.Uuid
   body           String
+  mentionedIds   String[] @default([]) @map("mentioned_ids") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 
   task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -640,6 +646,78 @@ model TaskComment {
   @@index([taskId, createdAt])
   @@index([organizationId])
   @@map("task_comments")
+}
+
+model TaskType {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  points         Int      @default(1)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  tasks Task[]
+
+  @@index([organizationId])
+  @@map("task_types")
+}
+
+model TaskLabel {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  color          String   @default("gray")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  links TaskLabelLink[]
+
+  @@index([organizationId])
+  @@map("task_labels")
+}
+
+model TaskLabelLink {
+  taskId  String @map("task_id") @db.Uuid
+  labelId String @map("label_id") @db.Uuid
+
+  task  Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label TaskLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, labelId])
+  @@map("task_label_links")
+}
+
+model TaskEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  taskId         String   @map("task_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  kind           String
+  detail         String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+  @@map("task_events")
+}
+
+model TaskAttachment {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  taskId         String    @map("task_id") @db.Uuid
+  name           String
+  mimeType       String    @map("mime_type")
+  sizeBytes      Int       @map("size_bytes")
+  sha256         String
+  storageKey     String    @unique @map("storage_key")
+  uploadedById   String?   @map("uploaded_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@map("task_attachments")
 }
 
 model Deadline {

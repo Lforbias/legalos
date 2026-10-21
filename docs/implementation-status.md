@@ -587,10 +587,18 @@ Plano em `docs/roadmap-4.0.0.md`: inventário do ChatGuru (leitura apenas, 2026-
 - **Código:** `lib/templates/{letterhead,docx,pdf}.ts`, `letterhead.service.ts`, `template.service.ts` (`previewTemplatePdf`), rota `/api/templates/preview`, tela `/documentos/timbrados`, seletor de timbrado e botão de prévia em `/documentos/gerar`.
 - **Regras:** ler = `documents:read`; criar/editar/excluir = `templates:manage`; gerar/prévia = `documents:write`. Logo conferido pelos bytes (PNG/JPEG), até 300 KB. Prévia respeita sigilo e escritório.
 - **Fora:** prévia de .docx anexado a petição (sem conversor no servidor).
-- **Google Drive/Docs** virou a fase 3.0-F3b (precisa de credenciais OAuth da equipe).
+- **Google Drive/Docs** virou a fase 3.0-F3b. Desenho decidido: opcional e por escritório — cada escritório cola o próprio Client ID/Secret OAuth em Configurações → Integrações (secret criptografado, liga/desliga), escopo `drive.file`; nada de chave global no servidor.
 
 ## 3.0-F4 — Importação de processos em lote (entregue)
 - **Migração** `20261128000000_legalmail_f4` (`case_import_batches`, `case_import_items`).
 - **Código:** `lib/case-import.ts` (leitura dos números), `case-import.service.ts` (`createImportBatch`, `processBatchStep`, `getImportBatch`), telas `/processos/importar` e `/processos/importar/[id]`, botão em Processos.
 - **Regras:** `cases:write` (autos exigem também `documents:write`); máx. 200 números por lote; cada item falha sozinho; DataJud: 5 por passo; autos: 2 por passo (MNI, até 25 documentos por processo e por passo); sem progresso, o item encerra para não repetir sem fim. Sigilosos nunca vão a serviços externos.
 - **Limite honesto:** o MNI e o DataJud só foram exercitados com simuladores nos testes; o teste real depende da conexão e da chave do escritório.
+
+
+## 3.0-F2 — Tarefas 2.0 (entregue)
+- **Migração** `20261129000000_legalmail_f2` (`task_types`, `task_labels`, `task_label_links`, `task_events`, `task_attachments`, `tasks.type_id`, `task_comments.mentioned_ids`).
+- **Código:** `task-extras.service.ts` (tipos, etiquetas, classificação, histórico, anexos, `pointsReport`), `task-event.ts`, ganchos de histórico e menções em `task.service.ts`, `modules/tasks/{extras-schemas,extras-actions,extras-ui,mentions}`, tela `/configuracoes/tarefas`, cartões na tarefa, filtros/pontuação em `/tarefas`, rota `/api/tasks/attachments/[id]`, script `verify:fast`.
+- **Regras:** tipos/etiquetas: criar/editar/excluir = `organization:manage`, ler = `tasks:read`; classificar/anexar/comentar = `tasks:write`. Menção só a membros ativos do escritório, pelo nome completo; quem se menciona não é avisado. Pontos contam tarefas concluídas no mês com tipo. Anexos: lista de tipos dos documentos, 8 MB, sigilo do processo respeitado.
+- **Testes:** `legalmail-f2.test.ts` (6), `task-mentions.test.ts` (3), `legalmail-f2.spec.ts` (1 E2E). Total: 626 testes, 48 E2E.
+- **Fora:** anexos e histórico das notas de processo.

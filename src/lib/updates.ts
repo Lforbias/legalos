@@ -10,6 +10,17 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "3.0-F2", when: "2026-10-21", title: "LegalMail: Tarefas 2.0", migration: "20261129000000_legalmail_f2",
+    items: [
+      "Tipos de tarefa com pontuação (Configurações → Tarefas): cada tipo vale N pontos. Na lista de Tarefas, o cartão \"Pontuação do mês\" soma os pontos das tarefas concluídas, por responsável.",
+      "Etiquetas coloridas por escritório, no cadastro e como filtro na lista; a tarefa ganha o cartão \"Tipo e etiquetas\".",
+      "Menções nos comentários: escolha \"@ Mencionar\" e a pessoa recebe um aviso. Só membros do escritório, pelo nome completo.",
+      "Anexos na tarefa (PDF, imagens, Office, texto; até 8 MB), baixados só por quem pode ver a tarefa; tarefas de processo sigiloso não vazam anexos.",
+      "Histórico da tarefa: quem criou, mudou prazo, responsável, prioridade, situação, tipo, etiquetas e anexos, e quando.",
+      "Ficou para depois: anexos e histórico das notas de processo (a F1 só tinha as notas).",
+    ],
+  },
+  {
     id: "3.0-F4", when: "2026-10-21", title: "LegalMail: importação de processos em lote", migration: "20261128000000_legalmail_f4",
     items: [
       "Processos → Importar por número: cole até 200 números CNJ (um por linha ou separados por vírgula) e o sistema cadastra todos de uma vez, ligando ao cliente que você escolher.",
@@ -156,9 +167,9 @@ export const PHASES_2: Phase[] = [
 
 export const PHASES_3: Phase[] = [
   { id: "3.0-F1", title: "Cadastro único de partes, campos personalizados, arquivar, notas fixas e em lote", status: "feita" },
-  { id: "3.0-F2", title: "Tarefas 2.0 (tipos com pontuação, etiquetas, menções, anexos, histórico)", status: "a fazer" },
+  { id: "3.0-F2", title: "Tarefas 2.0 (tipos com pontuação, etiquetas, menções, anexos, histórico)", status: "feita" },
   { id: "3.0-F3", title: "Autotextos com variáveis, timbrados e prévia em PDF", status: "feita" },
-  { id: "3.0-F3b", title: "Integração com o Google Drive/Docs para documentos", status: "a fazer" },
+  { id: "3.0-F3b", title: "Google Drive/Docs opcional, com credenciais de cada escritório (Configurações → Integrações)", status: "a fazer" },
   { id: "3.0-F4", title: "Importação de processos em lote e download de autos", status: "feita" },
   { id: "3.0-F5", title: "Fila de protocolos, recibo, agendamento e cancelamento", status: "a fazer" },
   { id: "3.0-F6", title: "Conectores de peticionamento além do MNI", status: "a fazer" },

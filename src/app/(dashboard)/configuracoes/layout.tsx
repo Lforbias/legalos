@@ -10,6 +10,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
     ...(can(ctx, "members:read") ? [{ href: "/configuracoes/equipe", label: "Equipe" }, { href: "/configuracoes/perfis", label: "Perfis de acesso" }] : []),
     ...(can(ctx, "audit:read") ? [{ href: "/configuracoes/auditoria", label: "Auditoria" }] : []),
     ...(can(ctx, "cases:read") ? [{ href: "/configuracoes/campos", label: "Campos personalizados" }] : []),
+    ...(can(ctx, "tasks:read") ? [{ href: "/configuracoes/tarefas", label: "Tarefas (tipos e etiquetas)" }] : []),
     { href: "/conta", label: "Minha conta" },
   ];
   return (

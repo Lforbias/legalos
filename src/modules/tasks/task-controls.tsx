@@ -7,6 +7,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Select, Textarea } from "@/components/ui/form";
 import { addTaskCommentAction, changeTaskStatusAction } from "./actions";
+import { MentionPicker } from "./extras-ui";
 import { commentSchema, TASK_STATUSES, TASK_STATUS_LABEL, type CommentInput } from "./schemas";
 
 /** Troca a situação da tarefa (alternativa acessível ao arrastar cartões). */
@@ -41,7 +42,7 @@ export function TaskStatusSelect({ taskId, status, disabled, compact }: { taskId
   );
 }
 
-export function CommentForm({ taskId }: { taskId: string }) {
+export function CommentForm({ taskId, members = [] }: { taskId: string; members?: { id: string; name: string }[] }) {
   const router = useRouter();
   const { form, submit, pending, message } = useServerForm<CommentInput, undefined>({
     schema: commentSchema,
@@ -59,7 +60,10 @@ export function CommentForm({ taskId }: { taskId: string }) {
       <label htmlFor="comment-body" className="sr-only">Comentário</label>
       <Textarea id="comment-body" rows={3} placeholder="Escreva um comentário…" aria-invalid={Boolean(err)} {...form.register("body")} />
       {err ? <p role="alert" className="text-xs text-danger">{err}</p> : null}
-      <Button type="submit" size="sm" loading={pending}>Comentar</Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="submit" size="sm" loading={pending}>Comentar</Button>
+        {members.length ? <MentionPicker members={members} onPick={(name) => form.setValue("body", `${form.getValues("body")}${form.getValues("body") && !form.getValues("body").endsWith(" ") ? " " : ""}@${name} `, { shouldDirty: true })} /> : null}
+      </div>
     </form>
   );
 }

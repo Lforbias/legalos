@@ -17,6 +17,9 @@ import { CommentForm, TaskStatusSelect } from "@/modules/tasks/task-controls";
 import { dueState, PRIORITY_TONE } from "@/modules/tasks/tone";
 import { can } from "@/server/context";
 import { getTask } from "@/server/services/task.service";
+import { getTaskClassification, listTaskAttachments, listTaskEvents, listTaskLabels, listTaskTypes } from "@/server/services/task-extras.service";
+import { listActiveMembers } from "@/server/services/members";
+import { AttachmentsCard, ClassificationCard, LabelBadge } from "@/modules/tasks/extras-ui";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Tarefa" };
@@ -29,6 +32,9 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   const t = await getTask(ctx, parsed.data).catch((e) => (e instanceof NotFoundError ? null : Promise.reject(e)));
   if (!t) notFound();
   const canWrite = can(ctx, "tasks:write");
+  const [cls, types, labels, attachments, events, members] = await Promise.all([
+    getTaskClassification(ctx, t.id), listTaskTypes(ctx, { onlyActive: true }), listTaskLabels(ctx), listTaskAttachments(ctx, t.id), listTaskEvents(ctx, t.id), listActiveMembers(ctx),
+  ]);
   const tz = organization.timezone;
   const due = t.dueDate ? dateToYmd(t.dueDate) : null;
   const ds = dueState(due, t.status !== "DONE" && t.status !== "CANCELED", tz);
@@ -62,7 +68,21 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
                   <p className="mt-0.5 whitespace-pre-wrap text-sm">{c.body}</p>
                 </div>
               ))}
-              {canWrite ? <CommentForm taskId={t.id} /> : null}
+              {canWrite ? <CommentForm taskId={t.id} members={members} /> : null}
+            </CardBody>
+          </Card>
+          <AttachmentsCard taskId={t.id} canWrite={canWrite} tz={tz} items={attachments.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))} />
+          <Card>
+            <CardHeader title={`Histórico (${events.length})`} />
+            <CardBody>
+              <ol className="space-y-2 text-sm" data-testid="task-history">
+                {events.map((e) => (
+                  <li key={e.id}>
+                    <span className="text-xs text-muted">{formatDateTime(e.createdAt, tz)} · {e.userName}</span>
+                    <br />{e.detail}
+                  </li>
+                ))}
+              </ol>
             </CardBody>
           </Card>
         </div>
@@ -76,9 +96,12 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
                 {due ? <Badge tone={ds === "overdue" ? "danger" : ds === "today" || ds === "soon" ? "warning" : "neutral"}>{formatYmd(due)}{ds === "overdue" ? " · Atrasada" : ""}</Badge> : null}
                 <Badge>{TASK_STATUS_LABEL[t.status]}</Badge>
               </div>
+              {cls.type ? <p className="text-xs text-muted">Tipo: {cls.type.name} ({cls.type.points} pt)</p> : null}
+              {cls.labels.length ? <div className="flex flex-wrap gap-1.5">{cls.labels.map((l) => <LabelBadge key={l.id} name={l.name} color={l.color} />)}</div> : null}
               {t.completedAt ? <p className="text-xs text-muted">Concluída em {formatDateTime(t.completedAt, tz)}</p> : null}
             </CardBody>
           </Card>
+          <ClassificationCard taskId={t.id} canWrite={canWrite} types={types.map((x) => ({ id: x.id, name: x.name, points: x.points }))} labels={labels.map((l) => ({ id: l.id, name: l.name, color: l.color }))} typeId={cls.type?.id ?? ""} labelIds={cls.labels.map((l) => l.id)} />
           <Card>
             <CardHeader title="Vínculos" />
             <CardBody className="space-y-2 text-sm">
