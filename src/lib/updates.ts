@@ -10,6 +10,24 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "3.0-F4", when: "2026-10-21", title: "LegalMail: importação de processos em lote", migration: "20261128000000_legalmail_f4",
+    items: [
+      "Processos → Importar por número: cole até 200 números CNJ (um por linha ou separados por vírgula) e o sistema cadastra todos de uma vez, ligando ao cliente que você escolher.",
+      "Cada número é tratado sozinho: inválidos (tamanho ou dígito verificador), repetidos na lista e os que já existem ficam anotados, sem derrubar o resto. Reimportar o mesmo número não duplica.",
+      "Opcional: buscar os andamentos públicos no DataJud (só se estiver ligado e com chave) e baixar os autos pelo MNI/PJe (só para tribunais com conexão ativa). Roda em passos curtos, com andamento na tela; se você fechar a página, o botão Continuar retoma de onde parou.",
+      "Resultado por número, com o motivo de cada falha, e histórico das importações anteriores. Processos sigilosos nunca são consultados em serviços externos.",
+    ],
+  },
+  {
+    id: "3.0-F3", when: "2026-10-21", title: "LegalMail: timbrados, novas variáveis e prévia em PDF", migration: "20261127000000_legalmail_f3",
+    items: [
+      "Documentos → Modelos → Timbrados: cabeçalho, rodapé e logo (PNG/JPEG até 300 KB) do escritório, com numeração de páginas opcional e um timbrado padrão. O .docx gerado de um modelo já sai com o timbrado escolhido (ou o padrão, ou sem timbrado).",
+      "Pré-visualizar em PDF na tela de gerar documento: mostra como o texto vai ficar, com o timbrado, sem gravar nada. É uma prévia do texto; o arquivo oficial continua sendo o .docx editável.",
+      "Novas variáveis nos modelos: polo ativo e polo passivo, advogado(a) responsável, data de distribuição, número antigo e CNPJ do escritório. O que faltar continua aparecendo como [PREENCHER].",
+      "Autotextos e modelos já existiam; esta fase fechou o que faltava deles em relação ao LegalMail. A prévia em PDF de um .docx já anexado a uma petição não é possível sem um conversor no servidor e ficou fora.",
+    ],
+  },
+  {
     id: "3.0-F1", when: "2026-10-21", title: "LegalMail: partes únicas, campos personalizados, acervo e notas fixas", migration: "20261126000000_legalmail_f1",
     items: [
       "Cadastro único de partes (menu Processos → Cadastro de partes): adversários, advogados e órgãos cadastrados uma vez e reaproveitados em qualquer processo, com busca por nome, documento ou profissão. Editar o nome atualiza os processos ligados; excluir não apaga os dados já gravados nos processos.",
@@ -139,8 +157,9 @@ export const PHASES_2: Phase[] = [
 export const PHASES_3: Phase[] = [
   { id: "3.0-F1", title: "Cadastro único de partes, campos personalizados, arquivar, notas fixas e em lote", status: "feita" },
   { id: "3.0-F2", title: "Tarefas 2.0 (tipos com pontuação, etiquetas, menções, anexos, histórico)", status: "a fazer" },
-  { id: "3.0-F3", title: "Autotextos com variáveis, timbrados e prévia em PDF", status: "a fazer" },
-  { id: "3.0-F4", title: "Importação de processos em lote e download de autos", status: "a fazer" },
+  { id: "3.0-F3", title: "Autotextos com variáveis, timbrados e prévia em PDF", status: "feita" },
+  { id: "3.0-F3b", title: "Integração com o Google Drive/Docs para documentos", status: "a fazer" },
+  { id: "3.0-F4", title: "Importação de processos em lote e download de autos", status: "feita" },
   { id: "3.0-F5", title: "Fila de protocolos, recibo, agendamento e cancelamento", status: "a fazer" },
   { id: "3.0-F6", title: "Conectores de peticionamento além do MNI", status: "a fazer" },
   { id: "3.0-F7", title: "Monitoramento de intimações nos sistemas dos tribunais", status: "a fazer" },

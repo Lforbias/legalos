@@ -27,6 +27,7 @@ export default async function TemplatesPage() {
           <div className="flex gap-2">
             <Link href="/documentos" className={bv({ variant: "secondary" })}>Voltar aos documentos</Link>
             <Link href="/documentos/autotextos" className={bv({ variant: "secondary" })}>Autotextos</Link>
+            <Link href="/documentos/timbrados" className={bv({ variant: "secondary" })}>Timbrados</Link>
             {manage ? (
               <Link href="/documentos/modelos/novo" className={bv({})}>
                 <Plus className="h-4 w-4" aria-hidden /> Novo modelo

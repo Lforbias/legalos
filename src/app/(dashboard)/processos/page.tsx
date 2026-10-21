@@ -55,6 +55,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/partes" className={buttonVariants({ variant: "secondary" })}>Cadastro de partes</Link>
+            {canWrite ? <Link href="/processos/importar" className={buttonVariants({ variant: "secondary" })}>Importar por número</Link> : null}
             {canWrite ? <Link href="/processos/nota-em-lote" className={buttonVariants({ variant: "secondary" })}>Nota em lote</Link> : null}
             <ExportLinks kind="processos" />
             <div className="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="Modo de visualização">

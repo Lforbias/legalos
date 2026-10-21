@@ -42,7 +42,7 @@ export async function generateDocumentAction(input: unknown): Promise<ActionStat
     const { ctx } = await requireTenant();
     const v = parse(generateSchema, input);
     const owner = v.target === "case" ? { caseId: v.caseId } : { clientId: v.clientId };
-    const res = await generateFromTemplate(ctx, v.templateId, owner, v.title);
+    const res = await generateFromTemplate(ctx, v.templateId, owner, v.title, v.letterheadId || null);
     revalidatePath("/documentos");
     if (v.target === "case") revalidatePath(`/processos/${v.caseId}`);
     else revalidatePath(`/clientes/${v.clientId}`);

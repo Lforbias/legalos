@@ -8,6 +8,10 @@ Ver `docs/roadmap-3.0.0.md` (comparação com o LegalMail).
 
 - **3.0-F1 Partes únicas, campos personalizados, acervo e notas** (migração `20261126000000_legalmail_f1`: `party_registry`, `custom_field_defs`, `case_notes`, `cases.archived_at`, `cases.custom_fields`, `case_parties.registry_id`): cadastro único de partes reaproveitável (`/partes`, busca, edição propaga o nome, exclusão lógica); campos personalizados de processo (Configurações → Campos personalizados; texto, número, data e lista; só administradores definem; desativar preserva valores); acervo (mover/devolver, filtro na lista, registro na linha do tempo); aba Notas com fixar no topo e nota em lote (até 50 processos, tudo ou nada, respeita sigilo e isolamento). Fica para a 3.0-F2: anexos e histórico de alterações das notas.
 
+- **3.0-F3 Timbrados e prévia em PDF** (migração `20261127000000_legalmail_f3`: `letterheads`): timbrado do escritório (cabeçalho, rodapé, logo PNG/JPEG até 300 KB, numeração; um padrão por escritório) aplicado ao .docx gerado de modelos; prévia em PDF (`/api/templates/preview`, não grava nada; biblioteca `pdf-lib`); variáveis novas `processo.polo_ativo`, `processo.polo_passivo`, `processo.responsavel`, `processo.data_distribuicao`, `processo.numero_antigo`, `escritorio.documento`. Fora: prévia de .docx já anexado (precisaria de conversor no servidor).
+
+- **3.0-F4 Importação de processos em lote** (migração `20261128000000_legalmail_f4`: `case_import_batches`, `case_import_items`): `/processos/importar` cadastra até 200 números CNJ por vez (validação do dígito, repetidos, existentes, cliente opcional como parte); DataJud e autos pelo MNI em passos curtos e retomáveis, por item; histórico das importações.
+
 ## 6.0.0 (RUTE, planejada)
 Ver `docs/roadmap-6.0.0.md` (servidor MCP + aba Inteligência Artificial). Só plano; nada implementado. A F10 da 2.0 é entregue por esta versão.
 

@@ -20,6 +20,12 @@ export const TEMPLATE_VARIABLES = [
   { key: "processo.assunto", label: "Assunto", group: "Processo" },
   { key: "processo.fase", label: "Fase", group: "Processo" },
   { key: "processo.valor_causa", label: "Valor da causa", group: "Processo" },
+  { key: "processo.numero_antigo", label: "Número antigo / de origem", group: "Processo" },
+  { key: "processo.data_distribuicao", label: "Data de distribuição", group: "Processo" },
+  { key: "processo.responsavel", label: "Advogado(a) responsável pelo processo", group: "Processo" },
+  { key: "processo.polo_ativo", label: "Partes do polo ativo (autores)", group: "Processo" },
+  { key: "processo.polo_passivo", label: "Partes do polo passivo (réus)", group: "Processo" },
+  { key: "escritorio.documento", label: "CNPJ do escritório", group: "Escritório" },
 ] as const;
 
 export type TemplateVariableKey = (typeof TEMPLATE_VARIABLES)[number]["key"];

@@ -14,10 +14,12 @@ import { generateSchema, type GenerateInput } from "./schemas";
 export function GenerateForm({
   templates,
   cases,
+  letterheads,
   initial,
   initialClientLabel = "",
 }: {
   templates: { id: string; name: string }[];
+  letterheads: { id: string; name: string; isDefault: boolean }[];
   cases: { id: string; title: string; number: string | null }[];
   initial: GenerateInput;
   initialClientLabel?: string;
@@ -26,7 +28,7 @@ export function GenerateForm({
   const [clientLabel, setClientLabel] = React.useState(initialClientLabel);
   const { form, submit, pending, message } = useServerForm<GenerateInput, { id: string; missing: string[] }>({
     schema: generateSchema,
-    defaultValues: initial,
+    defaultValues: { ...initial, letterheadId: initial.letterheadId ?? "" },
     action: generateDocumentAction,
     onSuccess: (data) => {
       const q = data && data.missing.length ? `?faltam=${encodeURIComponent(data.missing.join("|"))}` : "";
@@ -53,6 +55,15 @@ export function GenerateForm({
           </Field>
           <Field label="Título do documento" htmlFor="gen-title" error={err("title")} hint="Opcional. Padrão: nome do modelo.">
             <Input id="gen-title" {...form.register("title")} />
+          </Field>
+          <Field label="Timbrado" htmlFor="gen-letterhead" error={err("letterheadId")} hint="Cabeçalho, rodapé e logo do documento.">
+            <Select id="gen-letterhead" {...form.register("letterheadId")}>
+              <option value="">{letterheads.find((l) => l.isDefault) ? `Padrão (${letterheads.find((l) => l.isDefault)!.name})` : "Sem timbrado"}</option>
+              {letterheads.some((l) => l.isDefault) ? <option value="none">Sem timbrado</option> : null}
+              {letterheads.filter((l) => !l.isDefault).map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </Select>
           </Field>
           <Field label="Salvar em" htmlFor="gen-target" error={err("target")}>
             <Select id="gen-target" {...form.register("target")}>
@@ -87,6 +98,25 @@ export function GenerateForm({
       </Card>
       <div className="flex gap-2">
         <Button type="submit" loading={pending}>Gerar documento (.docx)</Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            const v = form.getValues();
+            const q = new URLSearchParams({ modelo: v.templateId });
+            if (v.target === "case" && v.caseId) q.set("processo", v.caseId);
+            if (v.target === "client" && v.clientId) q.set("cliente", v.clientId);
+            if (v.title) q.set("titulo", v.title);
+            if (v.letterheadId) q.set("timbrado", v.letterheadId);
+            if (!v.templateId || (!q.get("processo") && !q.get("cliente"))) {
+              void form.trigger();
+              return;
+            }
+            window.open(`/api/templates/preview?${q.toString()}`, "_blank", "noopener");
+          }}
+          disabled={pending}
+        >
+          Pré-visualizar em PDF
+        </Button>
         <Button variant="ghost" onClick={() => router.back()} disabled={pending}>Cancelar</Button>
       </div>
     </form>

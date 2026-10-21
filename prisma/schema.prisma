@@ -144,6 +144,8 @@ model Organization {
   cases                   Case[]
   partyRegistry           PartyRegistry[]
   customFieldDefs         CustomFieldDef[]
+  letterheads             Letterhead[]
+  caseImportBatches       CaseImportBatch[]
   documents               Document[]
   tasks                   Task[]
   deadlines               Deadline[]
@@ -2163,4 +2165,68 @@ model CaseNote {
   @@index([caseId, pinned, createdAt(sort: Desc)])
   @@index([organizationId])
   @@map("case_notes")
+}
+
+/// 3.0-F3: timbrado do escritório (cabeçalho, rodapé e logo) aplicado ao gerar documentos e na prévia em PDF.
+model Letterhead {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  name            String
+  headerText      String?   @map("header_text")
+  footerText      String?   @map("footer_text")
+  logo            Bytes?
+  logoMime        String?   @map("logo_mime")
+  showPageNumbers Boolean   @default(true) @map("show_page_numbers")
+  isDefault       Boolean   @default(false) @map("is_default")
+  active          Boolean   @default(true)
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt       DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@map("letterheads")
+}
+
+// ---------- 3.0-F4: importação de processos em lote ----------
+
+model CaseImportBatch {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  createdById    String?  @map("created_by_id") @db.Uuid
+  /// { datajud: boolean, autos: boolean, updateExisting: boolean }
+  options        Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  items        CaseImportItem[]
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("case_import_batches")
+}
+
+model CaseImportItem {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  batchId        String   @map("batch_id") @db.Uuid
+  position       Int
+  raw            String
+  number         String?
+  /// CREATED | EXISTS | INVALID | DUPLICATE | FAILED
+  createStatus   String   @map("create_status")
+  caseId         String?  @map("case_id") @db.Uuid
+  message        String?
+  /// NONE | PENDING | OK | SKIPPED | FAILED  (andamentos pelo DataJud)
+  syncStatus     String   @default("NONE") @map("sync_status")
+  syncMessage    String?  @map("sync_message")
+  /// NONE | PENDING | PARTIAL | OK | SKIPPED | FAILED  (autos pelo MNI)
+  autosStatus    String   @default("NONE") @map("autos_status")
+  autosMessage   String?  @map("autos_message")
+
+  batch CaseImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([batchId, position])
+  @@map("case_import_items")
 }

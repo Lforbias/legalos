@@ -19,6 +19,8 @@ export const generateSchema = z
     caseId: uuidOrEmpty,
     clientId: uuidOrEmpty,
     title: z.string().trim().max(120, "Máximo de 120 caracteres."),
+    /** "" = timbrado padrão; "none" = sem timbrado. */
+    letterheadId: z.string().refine((v) => v === "" || v === "none" || z.uuid().safeParse(v).success, "Timbrado inválido.").optional(),
   })
   .superRefine((v, ctx) => {
     if (v.target === "case" && !v.caseId) ctx.addIssue({ code: "custom", path: ["caseId"], message: "Escolha o processo." });

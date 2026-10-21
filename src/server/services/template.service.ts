@@ -1,9 +1,11 @@
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
-import { formatDocument } from "@/lib/validation/br-documents";
+import { formatDocument, onlyDigits } from "@/lib/validation/br-documents";
 import { formatPhone } from "@/lib/format/phone";
 import { formatMoneyBR } from "@/lib/validation/money";
 import { textToDocx } from "@/lib/templates/docx";
+import { renderPreviewPdf } from "@/lib/templates/pdf";
+import { resolveLetterhead } from "./letterhead.service";
 import { expandSnippets, findUnknownVariables, longDate, renderTemplate, shortDate, TEMPLATE_VARIABLES, type MergeValues } from "@/lib/templates/merge";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { todayYmd } from "@/lib/dates/ymd";
@@ -91,7 +93,7 @@ export async function deleteTemplate(ctx: TenantContext, id: string) {
 /** Coleta os valores de mesclagem. Só lê o que o usuário pode ver (sigilo do processo, permissão de clientes). */
 async function collectValues(ctx: TenantContext, owner: { caseId?: string | null; clientId?: string | null }): Promise<MergeValues> {
   const [org, user] = await Promise.all([
-    db.organization.findFirst({ where: { id: ctx.organizationId }, select: { name: true, legalName: true } }),
+    db.organization.findFirst({ where: { id: ctx.organizationId }, select: { name: true, legalName: true, document: true } }),
     db.user.findFirst({ where: { id: ctx.userId }, select: { name: true } }),
   ]);
   const today = todayYmd(ctx.timezone);
@@ -100,6 +102,7 @@ async function collectValues(ctx: TenantContext, owner: { caseId?: string | null
     "advogado.nome": user?.name,
     "data.hoje": shortDate(today),
     "data.hoje_extenso": longDate(today),
+    "escritorio.documento": org?.document ? formatDocument(onlyDigits(org.document).length > 11 ? "COMPANY" : "PERSON", org.document) : null,
   };
   let clientId = owner.clientId ?? null;
   if (owner.caseId) {
@@ -107,7 +110,10 @@ async function collectValues(ctx: TenantContext, owner: { caseId?: string | null
     await assertCaseVisible(ctx, owner.caseId);
     const c = await db.case.findFirst({
       where: { id: owner.caseId, organizationId: ctx.organizationId, deletedAt: null },
-      include: { parties: { where: { clientId: { not: null } }, orderBy: { createdAt: "asc" }, take: 1, select: { clientId: true } } },
+      include: {
+        parties: { orderBy: { createdAt: "asc" }, select: { clientId: true, role: true, name: true } },
+        members: { where: { role: "RESPONSIBLE" }, take: 1, select: { user: { select: { name: true } } } },
+      },
     });
     if (!c) throw new NotFoundError("Processo não encontrado.");
     values["processo.numero"] = c.number;
@@ -118,7 +124,13 @@ async function collectValues(ctx: TenantContext, owner: { caseId?: string | null
     values["processo.assunto"] = c.subject;
     values["processo.fase"] = c.phase;
     values["processo.valor_causa"] = c.claimValue ? formatMoneyBR(c.claimValue.toString()) : null;
-    clientId = clientId ?? c.parties[0]?.clientId ?? null;
+    values["processo.numero_antigo"] = c.legacyNumber;
+    values["processo.data_distribuicao"] = c.distributedAt ? shortDate(c.distributedAt.toISOString().slice(0, 10)) : null;
+    values["processo.responsavel"] = c.members[0]?.user.name ?? null;
+    const poles = (role: string) => c.parties.filter((p) => p.role === role).map((p) => p.name).join("; ") || null;
+    values["processo.polo_ativo"] = poles("PLAINTIFF");
+    values["processo.polo_passivo"] = poles("DEFENDANT");
+    clientId = clientId ?? c.parties.find((p) => p.clientId)?.clientId ?? null;
   }
   if (clientId && can(ctx, "clients:read")) {
     const cl = await db.client.findFirst({ where: { id: clientId, organizationId: ctx.organizationId, deletedAt: null } });
@@ -134,9 +146,8 @@ async function collectValues(ctx: TenantContext, owner: { caseId?: string | null
   return values;
 }
 
-/** Gera um .docx editável a partir do modelo e o grava como documento (versão 1) do processo OU do cliente. */
-export async function generateFromTemplate(ctx: TenantContext, templateId: string, owner: { caseId?: string | null; clientId?: string | null }, rawTitle: string) {
-  assertCan(ctx, "documents:write");
+/** Texto mesclado de um modelo para um destino (processo OU cliente), com as mesmas regras de permissão e sigilo. */
+async function mergeTemplate(ctx: TenantContext, templateId: string, owner: { caseId?: string | null; clientId?: string | null }, rawTitle: string) {
   if (!owner.caseId && !owner.clientId) throw new ValidationError("Informe o processo ou o cliente.");
   if (owner.caseId && owner.clientId) throw new ValidationError("Escolha o processo OU o cliente como destino.");
   const tpl = await getTemplate(ctx, templateId);
@@ -150,7 +161,16 @@ export async function generateFromTemplate(ctx: TenantContext, templateId: strin
   }
   const values = await collectValues(ctx, owner);
   const { text, missing } = renderTemplate(expandSnippets(tpl.body, await activeSnippetMap(ctx.organizationId)), values);
-  const buffer = await textToDocx(text, title);
+  const labels = new Map<string, string>(TEMPLATE_VARIABLES.map((v) => [v.key, v.label]));
+  return { tpl, title, text, missing: missing.map((k) => labels.get(k) ?? k) };
+}
+
+/** Gera um .docx editável (com timbrado) a partir do modelo e o grava como documento (versão 1) do processo OU do cliente. */
+export async function generateFromTemplate(ctx: TenantContext, templateId: string, owner: { caseId?: string | null; clientId?: string | null }, rawTitle: string, letterheadId?: string | null) {
+  assertCan(ctx, "documents:write");
+  const { tpl, title, text, missing } = await mergeTemplate(ctx, templateId, owner, rawTitle);
+  const letterhead = await resolveLetterhead(ctx, letterheadId);
+  const buffer = await textToDocx(text, title, letterhead);
   const fileName = sanitizeFileName(`${title}.docx`);
   const doc = await storeNewDocument(
     ctx,
@@ -158,6 +178,14 @@ export async function generateFromTemplate(ctx: TenantContext, templateId: strin
     { name: fileName, mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", buffer },
     { category: tpl.category && (DOCUMENT_CATEGORIES as readonly string[]).includes(tpl.category) ? tpl.category : null, description: `Gerado do modelo "${tpl.name}".`, source: "TEMPLATE", templateId: tpl.id },
   );
-  const labels = new Map<string, string>(TEMPLATE_VARIABLES.map((v) => [v.key, v.label]));
-  return { id: doc.id, missing: missing.map((k) => labels.get(k) ?? k) };
+  return { id: doc.id, missing };
+}
+
+/** Prévia em PDF do documento que seria gerado. Não grava nada; só lê o que o usuário pode ver. */
+export async function previewTemplatePdf(ctx: TenantContext, templateId: string, owner: { caseId?: string | null; clientId?: string | null }, rawTitle: string, letterheadId?: string | null) {
+  assertCan(ctx, "documents:write");
+  const { title, text, missing } = await mergeTemplate(ctx, templateId, owner, rawTitle);
+  const letterhead = await resolveLetterhead(ctx, letterheadId);
+  const pdf = await renderPreviewPdf(text, title, letterhead);
+  return { pdf, title, missing };
 }

@@ -581,3 +581,16 @@ Plano em `docs/roadmap-4.0.0.md`: inventário do ChatGuru (leitura apenas, 2026-
 - **Regras:** leitura = `cases:read`; escrita = `cases:write`; definir campos = `organization:manage`. Nota em lote: máx. 50, tudo ou nada, sigilo e escritório respeitados. Exclusão de parte do cadastro é lógica (processos mantêm a cópia).
 - **Testes:** `legalmail-f1.test.ts` (11) + `legalmail-f1.spec.ts` (1 E2E). Total: tsc/eslint limpos, 600 testes, 44 E2E, build ok.
 - **Fora desta fase:** anexos e histórico das notas (vão com 3.0-F2).
+
+## 3.0-F3 — Timbrados, variáveis novas e prévia em PDF (entregue)
+- **Migração** `20261127000000_legalmail_f3` (`letterheads`, um padrão por escritório por índice único parcial). Dependência nova: `pdf-lib`.
+- **Código:** `lib/templates/{letterhead,docx,pdf}.ts`, `letterhead.service.ts`, `template.service.ts` (`previewTemplatePdf`), rota `/api/templates/preview`, tela `/documentos/timbrados`, seletor de timbrado e botão de prévia em `/documentos/gerar`.
+- **Regras:** ler = `documents:read`; criar/editar/excluir = `templates:manage`; gerar/prévia = `documents:write`. Logo conferido pelos bytes (PNG/JPEG), até 300 KB. Prévia respeita sigilo e escritório.
+- **Fora:** prévia de .docx anexado a petição (sem conversor no servidor).
+- **Google Drive/Docs** virou a fase 3.0-F3b (precisa de credenciais OAuth da equipe).
+
+## 3.0-F4 — Importação de processos em lote (entregue)
+- **Migração** `20261128000000_legalmail_f4` (`case_import_batches`, `case_import_items`).
+- **Código:** `lib/case-import.ts` (leitura dos números), `case-import.service.ts` (`createImportBatch`, `processBatchStep`, `getImportBatch`), telas `/processos/importar` e `/processos/importar/[id]`, botão em Processos.
+- **Regras:** `cases:write` (autos exigem também `documents:write`); máx. 200 números por lote; cada item falha sozinho; DataJud: 5 por passo; autos: 2 por passo (MNI, até 25 documentos por processo e por passo); sem progresso, o item encerra para não repetir sem fim. Sigilosos nunca vão a serviços externos.
+- **Limite honesto:** o MNI e o DataJud só foram exercitados com simuladores nos testes; o teste real depende da conexão e da chave do escritório.

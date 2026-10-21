@@ -6,6 +6,7 @@ import { db } from "@/lib/db/client";
 import { GenerateForm } from "@/modules/templates/generate-form";
 import { can } from "@/server/context";
 import { listCaseOptions } from "@/server/services/case.service";
+import { listLetterheads } from "@/server/services/letterhead.service";
 import { listTemplates } from "@/server/services/template.service";
 import { requireTenant } from "@/server/session";
 
@@ -16,7 +17,7 @@ export default async function GeneratePage({ searchParams }: { searchParams: Pro
   const { ctx } = await requireTenant();
   if (!can(ctx, "documents:write")) return <AccessDenied />;
   const sp = await searchParams;
-  const [allTemplates, cases] = await Promise.all([listTemplates(ctx), can(ctx, "cases:read") ? listCaseOptions(ctx) : Promise.resolve([])]);
+  const [allTemplates, letterheads, cases] = await Promise.all([listTemplates(ctx), listLetterheads(ctx, { onlyActive: true }), can(ctx, "cases:read") ? listCaseOptions(ctx) : Promise.resolve([])]);
   const templates = allTemplates.filter((t) => t.active);
   const templateId = templates.some((t) => t.id === sp.modelo) ? (sp.modelo as string) : "";
   const caseId = cases.some((c) => c.id === sp.processo) ? (sp.processo as string) : "";
@@ -36,6 +37,7 @@ export default async function GeneratePage({ searchParams }: { searchParams: Pro
         <Alert tone="warning">Não há modelos ativos. {can(ctx, "templates:manage") ? "Crie um em Documentos › Modelos." : "Peça a um administrador para cadastrar modelos."}</Alert>
       ) : (
         <GenerateForm
+          letterheads={letterheads.map((l) => ({ id: l.id, name: l.name, isDefault: l.isDefault }))}
           templates={templates.map((t) => ({ id: t.id, name: t.name }))}
           cases={cases}
           initialClientLabel={clientLabel}
