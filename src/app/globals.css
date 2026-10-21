@@ -1,0 +1,241 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Tokens de design. Dark é o tema inicial; o claro é ativado por data-theme="light". */
+:root,
+:root[data-theme="dark"],
+.force-dark {
+  color-scheme: dark;
+  --bg: #0a0c13;
+  --surface: #11141e;
+  --surface-2: #181c29;
+  --surface-3: #202536;
+  --border: #262c3f;
+  --border-strong: #353d57;
+  --fg: #e9ecf5;
+  --muted: #8f97ad;
+  --primary: #3565f0;
+  --primary-hover: #4a77f5;
+  --primary-fg: #ffffff;
+  --primary-text: #8fadff;
+  --accent: #8b6cff;
+  --accent-text: #b5a0ff;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --danger-bg: #3a1620;
+  --success-bg: #0f2e25;
+  --warning-bg: #35290d;
+  --info-bg: #14214a;
+  --ring: #6b93ff;
+  --wa-bg: #0b141a;
+  --wa-dot: rgba(255, 255, 255, 0.035);
+  --wa-out: #005c4b;
+  --wa-out-fg: #e9edef;
+  --wa-in: #202c33;
+  --wa-in-fg: #e9edef;
+  --wa-meta: rgba(233, 237, 239, 0.6);
+  --wa-tick: #53bdeb;
+}
+
+:root[data-theme="light"],
+.force-light {
+  color-scheme: light;
+  --bg: #f5f6fb;
+  --surface: #ffffff;
+  --surface-2: #f0f2f9;
+  --surface-3: #e6e9f3;
+  --border: #dde1ee;
+  --border-strong: #c3c9dc;
+  --fg: #141826;
+  --muted: #545d73;
+  --primary: #2a56e0;
+  --primary-hover: #1f46c4;
+  --primary-fg: #ffffff;
+  --primary-text: #2448c4;
+  --accent: #6340d9;
+  --accent-text: #5632c4;
+  --success: #0f7b56;
+  --warning: #8a5a00;
+  --danger: #c0262d;
+  --danger-bg: #fdecee;
+  --success-bg: #e3f6ee;
+  --warning-bg: #fdf3d9;
+  --info-bg: #e5ecff;
+  --ring: #2a56e0;
+  --wa-bg: #efeae2;
+  --wa-dot: rgba(0, 0, 0, 0.045);
+  --wa-out: #d9fdd3;
+  --wa-out-fg: #111b21;
+  --wa-in: #ffffff;
+  --wa-in-fg: #111b21;
+  --wa-meta: rgba(17, 27, 33, 0.55);
+  --wa-tick: #2a9fd6;
+}
+
+/* Espaço "Box" (caixa de intimações): mesma interface, identidade verde-água para o usuário saber onde está. */
+[data-space="box"] {
+  --primary: #0f8f83;
+  --primary-hover: #12a597;
+  --primary-text: #5eead4;
+  --accent: #22b8cf;
+  --accent-text: #7ee0ee;
+  --ring: #2dd4bf;
+}
+:root[data-theme="light"] [data-space="box"] {
+  --primary: #0f766e;
+  --primary-hover: #0b5f58;
+  --primary-text: #0f766e;
+  --accent: #0e7490;
+  --accent-text: #0e7490;
+  --ring: #0f766e;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-fg: var(--primary-fg);
+  --color-primary-text: var(--primary-text);
+  --color-accent: var(--accent);
+  --color-accent-text: var(--accent-text);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-danger-bg: var(--danger-bg);
+  --color-success-bg: var(--success-bg);
+  --color-warning-bg: var(--warning-bg);
+  --color-info-bg: var(--info-bg);
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 35%, transparent);
+}
+
+/* Barras de rolagem discretas */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@keyframes lo-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.lo-pop {
+  animation: lo-fade-in 120ms ease-out;
+}
+
+/* Espaço "Chat" (atendimento por WhatsApp): identidade amarela. O texto sobre o amarelo é escuro para manter o contraste. */
+[data-space="chat"] {
+  --primary: #facc15;
+  --primary-hover: #fde047;
+  --primary-fg: #1c1500;
+  --primary-text: #fde047;
+  --accent: #f59e0b;
+  --accent-text: #fcd34d;
+  --ring: #facc15;
+}
+:root[data-theme="light"] [data-space="chat"] {
+  --primary: #eab308;
+  --primary-hover: #ca9a06;
+  --primary-fg: #1c1500;
+  --primary-text: #854d0e;
+  --accent: #d97706;
+  --accent-text: #92400e;
+  --ring: #ca8a04;
+}
+
+
+/* LegalOS Chat: fundo da conversa e balões no estilo do WhatsApp. */
+.wa-wallpaper {
+  background-color: var(--wa-bg);
+  background-image: radial-gradient(var(--wa-dot) 1.2px, transparent 1.2px), radial-gradient(var(--wa-dot) 1.2px, transparent 1.2px);
+  background-size: 26px 26px;
+  background-position: 0 0, 13px 13px;
+}
+
+/* ───── Página pública /produto ───── */
+.prod-grid-bg {
+  background-image: linear-gradient(to right, rgba(143, 173, 255, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(143, 173, 255, 0.07) 1px, transparent 1px);
+  background-size: 56px 56px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+}
+.prod-gradient-text {
+  background: linear-gradient(100deg, #8fadff 0%, #b5a0ff 45%, #5eead4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@keyframes prod-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+@keyframes prod-in {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes prod-glow {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.9; }
+}
+@keyframes prod-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.prod-float { animation: prod-float 6s ease-in-out infinite; }
+.prod-float-slow { animation: prod-float 8s ease-in-out infinite; animation-delay: -2s; }
+.prod-glow { animation: prod-glow 7s ease-in-out infinite; }
+.prod-marquee { animation: prod-marquee 38s linear infinite; }
+.prod-reveal { opacity: 0; transform: translateY(18px); transition: opacity 0.7s ease, transform 0.7s ease; }
+.prod-reveal.is-in { opacity: 1; transform: none; }
+.prod-hero-in { animation: prod-in 0.9s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .prod-float, .prod-float-slow, .prod-glow, .prod-marquee, .prod-hero-in { animation: none; }
+  .prod-reveal { opacity: 1; transform: none; transition: none; }
+}

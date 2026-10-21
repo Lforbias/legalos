@@ -1,0 +1,34 @@
+node_modules
+.next
+out
+build
+coverage
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+next-env.d.ts
+playwright-report
+test-results
+
+# arquivos enviados (armazenamento local)
+.storage/
+
+# NUNCA ir para o GitHub: segredos, chaves, pacotes de entrega, dados do escritório
+.env*
+!.env.example
+*.pem
+*.key
+*.pfx
+*.p12
+*.pub
+ssh-copy-id*
+id_*
+*.tar.gz
+*.dump
+*.enc
+_entregas/
+_arquivos/
+Claude outputs/
+relatorio.json
+BACKUP_TOTAL*/

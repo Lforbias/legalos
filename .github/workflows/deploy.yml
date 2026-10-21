@@ -1,0 +1,49 @@
+name: Publicar no servidor
+# Só publica o que está no ramo main E passou em todos os testes do workflow "CI".
+# O ambiente "production" pode exigir aprovação de uma pessoa (Settings → Environments → production → Required reviewers).
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Preparar chave de acesso
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key && chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+      - name: Enviar e publicar
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          SHA="$(git rev-parse HEAD)"
+          git archive --format=tar.gz HEAD | ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=yes -o BatchMode=yes "${DEPLOY_USER:-root}@${DEPLOY_HOST}" "receive ${SHA}"
+      - name: Conferir o site
+        run: |
+          for i in $(seq 1 20); do
+            if curl -fsS --max-time 8 https://legalossync.tech/api/ready; then echo; exit 0; fi
+            sleep 6
+          done
+          echo "o site não respondeu a /api/ready" >&2; exit 1

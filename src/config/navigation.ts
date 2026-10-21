@@ -1,0 +1,91 @@
+import {
+  BarChart3,
+  Bell,
+  Bot,
+  Briefcase,
+  CalendarClock,
+  CheckSquare,
+  FileText,
+  Hourglass,
+  Inbox,
+  KeyRound,
+  LayoutDashboard,
+  MessageCircle,
+  type LucideIcon,
+  PenLine,
+  Plug,
+  Scale,
+  Settings,
+  Users,
+  UserSquare2,
+  Wallet,
+  Globe,
+  Zap,
+} from "lucide-react";
+import type { PermissionKey } from "@/lib/permissions/catalog";
+
+/** Os três "lugares" do LegalOS. Func = gestão do escritório (estilo Astrea/Advbox); Box = caixa de intimações, capturas e peticionamento (estilo LegalMail); Chat = atendimento por WhatsApp (estilo ChatGuru). */
+export type Space = "func" | "box" | "chat";
+
+export const SPACES: Record<Space, { name: string; short: string; home: string; summary: string }> = {
+  func: { name: "LegalOS Func", short: "Func", home: "/", summary: "Gestão do escritório: processos, clientes, prazos, tarefas, agenda, documentos, financeiro e relatórios." },
+  box: { name: "LegalOS Box", short: "Box", home: "/box", summary: "Caixa de intimações, capturas dos tribunais, peticionamento e certificados." },
+  chat: { name: "LegalOS Chat", short: "Chat", home: "/atendimento", summary: "Atendimento por WhatsApp: conversas, equipe, respostas rápidas e ligação com os clientes." },
+};
+
+/** Caminhos que pertencem ao Box e ao Chat; todo o resto pertence ao Func. */
+const BOX_PREFIXES = ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/integracoes"];
+const CHAT_PREFIXES = ["/atendimento"];
+const under = (pathname: string, prefixes: string[]) => prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+
+export function spaceOfPath(pathname: string): Space {
+  if (under(pathname, BOX_PREFIXES)) return "box";
+  if (under(pathname, CHAT_PREFIXES)) return "chat";
+  return "func";
+}
+
+export type NavItem = {
+  key: string;
+  /** Em qual espaço o item aparece na lateral. "both" = nos dois (ex.: Configurações). */
+  space: Space | "both";
+  label: string;
+  href: string;
+  icon: LucideIcon;
+  /** Permissão exigida para ver o item. Sem permissão => oculto. */
+  permission?: PermissionKey;
+  /** Fase do roadmap em que o módulo é entregue. Módulos não implementados abrem uma página de status honesta. */
+  phase: number;
+  implemented: boolean;
+  summary: string;
+};
+
+export const NAV_ITEMS: NavItem[] = [
+  { key: "overview", space: "func", label: "Visão geral do Func", href: "/", icon: LayoutDashboard, phase: 1, implemented: true, summary: "Indicadores e atividade do escritório." },
+  { key: "indicators", space: "func", label: "Indicadores", href: "/indicadores", icon: BarChart3, phase: 9, implemented: true, summary: "Atrasados por tipo, movimentação de processos, evolução da carteira, processos por cliente e os seus números." },
+  { key: "alerts", space: "func", label: "Central de alertas", href: "/alertas", icon: Bell, phase: 9, implemented: true, summary: "Publicações, andamentos, processos parados, tarefas, prazos, agenda, financeiro e integrações, com link direto para agir." },
+  { key: "box-overview", space: "box", label: "Visão geral do Box", href: "/box", icon: LayoutDashboard, permission: "inbox:read", phase: 4, implemented: true, summary: "Painel do Box: intimações, capturas, certificados e petições." },
+  { key: "inbox", space: "box", label: "Caixa de entrada", href: "/caixa-de-entrada", icon: Inbox, permission: "inbox:read", phase: 4, implemented: true, summary: "Central de intimações: registro manual ou por texto colado, duplicidade, distribuição e criação de tarefas e prazos (importação de tribunais na Fase 8)." },
+  { key: "cases", space: "func", label: "Processos", href: "/processos", icon: Scale, permission: "cases:read", phase: 2, implemented: true, summary: "Cadastro de processos, partes, linha do tempo e carteira." },
+  { key: "clients", space: "func", label: "Clientes", href: "/clientes", icon: Users, permission: "clients:read", phase: 2, implemented: true, summary: "Cadastro de pessoas físicas e jurídicas com perfil completo." },
+  { key: "whatsapp", space: "chat", label: "Conversas", href: "/atendimento", icon: MessageCircle, permission: "whatsapp:read", phase: 11, implemented: true, summary: "Caixa de conversas do WhatsApp (API oficial da Meta ou QR-Code) ligada aos clientes: responder, atribuir, notas internas, respostas rápidas e modelos." },
+  { key: "chat-settings", space: "chat", label: "Configurar o Chat", href: "/atendimento/configuracoes", icon: Settings, permission: "whatsapp:manage", phase: 11, implemented: true, summary: "Número do WhatsApp, ausência e expediente, respostas rápidas e modelos." },
+  { key: "crm", space: "func", label: "CRM comercial", href: "/crm", icon: Briefcase, permission: "crm:read", phase: 6, implemented: true, summary: "Funil de leads, propostas e conversão em cliente." },
+  { key: "tasks", space: "func", label: "Tarefas", href: "/tarefas", icon: CheckSquare, permission: "tasks:read", phase: 3, implemented: true, summary: "Tarefas com Kanban, comentários e vínculo a processos (automações na Fase 6)." },
+  { key: "calendar", space: "func", label: "Agenda", href: "/agenda", icon: CalendarClock, permission: "deadlines:read", phase: 3, implemented: true, summary: "Calendário mensal com compromissos e prazos." },
+  { key: "deadlines", space: "func", label: "Prazos", href: "/prazos", icon: Hourglass, permission: "deadlines:read", phase: 3, implemented: true, summary: "Prazos cadastrados manualmente, com calculadora auxiliar e validação humana." },
+  { key: "documents", space: "func", label: "Documentos", href: "/documentos", icon: FileText, permission: "documents:read", phase: 5, implemented: true, summary: "Repositório privado com versões e modelos com campos de mesclagem (OCR na Fase 8)." },
+  { key: "petitions", space: "box", label: "Peticionamento", href: "/peticoes", icon: PenLine, permission: "petitions:read", phase: 5, implemented: true, summary: "Preparação, revisão e aprovação; envio apenas por adaptador de demonstração (tribunais reais na Fase 8)." },
+  { key: "workflows", space: "func", label: "Automações", href: "/automacoes", icon: Zap, permission: "workflows:manage", phase: 6, implemented: true, summary: "Regras que criam tarefas automaticamente a partir de eventos." },
+  { key: "finance", space: "func", label: "Financeiro", href: "/financeiro", icon: Wallet, permission: "finance:read", phase: 7, implemented: true, summary: "Contas a pagar e receber, baixas e estornos, parcelas e fluxo de caixa." },
+  { key: "team", space: "func", label: "Equipe e produtividade", href: "/equipe", icon: UserSquare2, permission: "productivity:read", phase: 3, implemented: true, summary: "Carga de trabalho por responsável e registro de horas." },
+  { key: "reports", space: "func", label: "Relatórios e BI", href: "/relatorios", icon: BarChart3, permission: "reports:read", phase: 9, implemented: true, summary: "Prazos, intimações, processos, equipe e financeiro por período, com exportação em planilha (CSV) auditada." },
+  { key: "portal", space: "func", label: "Portal do cliente", href: "/portal", icon: Globe, permission: "portal:access", phase: 6, implemented: true, summary: "Área do cliente com processos e documentos compartilhados (cobranças na Fase 7)." },
+  { key: "ai", space: "func", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use", phase: 8, implemented: true, summary: "Perguntas sobre o processo com fontes citadas, opt-in por escritório e limite mensal de consumo." },
+  { key: "certificates", space: "box", label: "Certificados digitais", href: "/certificados", icon: KeyRound, permission: "certificates:manage", phase: 10, implemented: true, summary: "Cofre de certificados A1 cifrados, com registro de uso e alerta de vencimento (base do motor de tribunais)." },
+  { key: "integrations", space: "box", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "Consulta DataJud/CNJ (opt-in); e-mail e calendários em etapa futura." },
+  { key: "settings", space: "both", label: "Configurações", href: "/configuracoes", icon: Settings, phase: 1, implemented: true, summary: "Escritório, equipe, perfis e auditoria." },
+];
+
+export function getNavItem(key: string) {
+  return NAV_ITEMS.find((n) => n.key === key);
+}

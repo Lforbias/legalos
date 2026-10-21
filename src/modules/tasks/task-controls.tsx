@@ -1,0 +1,65 @@
+"use client";
+
+import { useRouter } from "next/navigation";
+import * as React from "react";
+import { fieldError, useServerForm } from "@/components/forms/use-server-form";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Select, Textarea } from "@/components/ui/form";
+import { addTaskCommentAction, changeTaskStatusAction } from "./actions";
+import { commentSchema, TASK_STATUSES, TASK_STATUS_LABEL, type CommentInput } from "./schemas";
+
+/** Troca a situação da tarefa (alternativa acessível ao arrastar cartões). */
+export function TaskStatusSelect({ taskId, status, disabled, compact }: { taskId: string; status: string; disabled?: boolean; compact?: boolean }) {
+  const router = useRouter();
+  const [pending, start] = React.useTransition();
+  const [error, setError] = React.useState<string | null>(null);
+  return (
+    <div>
+      <label className="sr-only" htmlFor={`st-${taskId}`}>Situação da tarefa</label>
+      <Select
+        id={`st-${taskId}`}
+        value={status}
+        disabled={disabled || pending}
+        className={compact ? "h-8 text-xs" : undefined}
+        onChange={(e) => {
+          const next = e.target.value;
+          setError(null);
+          start(async () => {
+            const res = await changeTaskStatusAction(taskId, next);
+            if (!res.ok) setError(res.message ?? "Não foi possível alterar a situação.");
+            router.refresh();
+          });
+        }}
+      >
+        {TASK_STATUSES.map((s) => (
+          <option key={s} value={s}>{TASK_STATUS_LABEL[s]}</option>
+        ))}
+      </Select>
+      {error ? <p role="alert" className="mt-1 text-xs text-danger">{error}</p> : null}
+    </div>
+  );
+}
+
+export function CommentForm({ taskId }: { taskId: string }) {
+  const router = useRouter();
+  const { form, submit, pending, message } = useServerForm<CommentInput, undefined>({
+    schema: commentSchema,
+    defaultValues: { body: "" },
+    action: (v) => addTaskCommentAction(taskId, v),
+    onSuccess: (_d, f) => {
+      f.reset({ body: "" });
+      router.refresh();
+    },
+  });
+  const err = fieldError(form, "body");
+  return (
+    <form onSubmit={submit} noValidate className="space-y-2">
+      {message ? <Alert tone="error">{message}</Alert> : null}
+      <label htmlFor="comment-body" className="sr-only">Comentário</label>
+      <Textarea id="comment-body" rows={3} placeholder="Escreva um comentário…" aria-invalid={Boolean(err)} {...form.register("body")} />
+      {err ? <p role="alert" className="text-xs text-danger">{err}</p> : null}
+      <Button type="submit" size="sm" loading={pending}>Comentar</Button>
+    </form>
+  );
+}
