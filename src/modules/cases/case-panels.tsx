@@ -11,6 +11,7 @@ import { ConfirmAction } from "@/components/ui/confirm-action";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { formatDocument } from "@/lib/validation/br-documents";
 import { ClientPicker } from "@/modules/clients/client-picker";
+import { RegistryPicker } from "@/modules/registry/registry-picker";
 import {
   addMemberAction,
   addNoteAction,
@@ -82,13 +83,15 @@ export type PartyRow = { id: string; role: string; name: string; document: strin
 
 function PartyForm({ caseId, onDone, onCancel }: { caseId: string; onDone: () => void; onCancel: () => void }) {
   const [clientLabel, setClientLabel] = React.useState("");
+  const [registryLabel, setRegistryLabel] = React.useState("");
   const { form, submit, pending, message } = useServerForm<PartyInput, undefined>({
     schema: partySchema,
-    defaultValues: { role: "DEFENDANT", clientId: "", name: "", document: "", lawyerName: "" },
+    defaultValues: { role: "DEFENDANT", clientId: "", registryId: "", saveToRegistry: false, name: "", document: "", lawyerName: "" },
     action: (v) => addPartyAction(caseId, v),
     onSuccess: onDone,
   });
   const clientId = form.watch("clientId");
+  const registryId = form.watch("registryId") ?? "";
   const err = (n: keyof PartyInput) => fieldError(form, n);
   return (
     <form onSubmit={submit} noValidate className="space-y-3 rounded-md border border-border bg-surface-2/50 p-3">
@@ -116,12 +119,32 @@ function PartyForm({ caseId, onDone, onCancel }: { caseId: string; onDone: () =>
         </Field>
         {!clientId ? (
           <>
-            <Field label="Nome da parte" htmlFor="party-name" error={err("name")}>
-              <Input id="party-name" {...form.register("name")} />
-            </Field>
-            <Field label="CPF/CNPJ (opcional)" htmlFor="party-document" error={err("document")}>
-              <Input id="party-document" {...form.register("document")} />
-            </Field>
+            <div className="md:col-span-2">
+              <Field label="Parte do cadastro único (opcional)" htmlFor="party-registry" error={err("registryId")}>
+                <RegistryPicker
+                  id="party-registry"
+                  value={registryId}
+                  label={registryLabel}
+                  onChange={(id, label) => {
+                    form.setValue("registryId", id, { shouldDirty: true });
+                    setRegistryLabel(label);
+                  }}
+                />
+              </Field>
+            </div>
+            {!registryId ? (
+              <>
+                <Field label="Nome da parte" htmlFor="party-name" error={err("name")}>
+                  <Input id="party-name" {...form.register("name")} />
+                </Field>
+                <Field label="CPF/CNPJ (opcional)" htmlFor="party-document" error={err("document")}>
+                  <Input id="party-document" {...form.register("document")} />
+                </Field>
+                <label className="flex items-center gap-2 text-sm md:col-span-2">
+                  <input type="checkbox" {...form.register("saveToRegistry")} /> Guardar no cadastro único para reaproveitar em outros processos
+                </label>
+              </>
+            ) : null}
             <div className="md:col-span-2">
               <Field label="Advogado da parte (opcional)" htmlFor="party-lawyer" error={err("lawyerName")}>
                 <Input id="party-lawyer" {...form.register("lawyerName")} />

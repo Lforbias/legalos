@@ -574,3 +574,10 @@ Plano em `docs/roadmap-4.0.0.md`: inventário do ChatGuru (leitura apenas, 2026-
 ## Infra — publicação automática (GitHub → servidor)
 - `.github/workflows/deploy.yml` (após o CI verde no `main`, ambiente `production` com aprovação opcional), `scripts/server/deploy-entry.sh` (comando único permitido à chave de deploy) e `scripts/server/deploy.sh` (trava, backup, cópia para voltar, rsync, build, migração, `up`, espera `/api/ready`, rollback do código, install-cron). Guia em `docs/deploy-github.md`.
 - Limites: scripts validados só com `bash -n`; **nunca rodaram no servidor real** (acompanhar a primeira vez). O CI do GitHub também ainda não rodou lá. Rollback restaura código, não migração.
+
+## 3.0-F1 — Partes únicas, campos personalizados, acervo e notas (entregue)
+- **Migração** `20261126000000_legalmail_f1`: `party_registry`, `custom_field_defs`, `case_notes`; colunas `cases.archived_at`, `cases.custom_fields`, `case_parties.registry_id`.
+- **Código:** serviços `party-registry`, `custom-field`, `case-note` (+ `setCaseAcervo` e filtro `acervo` em `case.service`); telas `/partes`, `/configuracoes/campos`, `/processos/nota-em-lote`, aba *Notas* e cartão *Campos personalizados* no processo, seletor do cadastro no formulário de parte.
+- **Regras:** leitura = `cases:read`; escrita = `cases:write`; definir campos = `organization:manage`. Nota em lote: máx. 50, tudo ou nada, sigilo e escritório respeitados. Exclusão de parte do cadastro é lógica (processos mantêm a cópia).
+- **Testes:** `legalmail-f1.test.ts` (11) + `legalmail-f1.spec.ts` (1 E2E). Total: tsc/eslint limpos, 600 testes, 44 E2E, build ok.
+- **Fora desta fase:** anexos e histórico das notas (vão com 3.0-F2).

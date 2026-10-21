@@ -29,7 +29,7 @@ Conferido na documentação completa (referências da API): nada além do acima 
 
 | Fase | Entrega | Origem |
 |---|---|---|
-| 3.0-F1 | Cadastro único de partes, campos personalizados de processo, arquivar/acervo, notas fixas e em lote | L7, L9, L13 |
+| 3.0-F1 (feita) | Cadastro único de partes, campos personalizados de processo, arquivar/acervo, notas fixas e em lote | L7, L9, L13 |
 | 3.0-F2 | Tarefas 2.0: tipos com pontuação, etiquetas, comentários com menção, anexos, histórico, equipes | L8 |
 | 3.0-F3 | Autotextos com variáveis do processo, timbrados, prévia em PDF | L10, L16 |
 | 3.0-F4 | Importação de processos em lote e atualização/download de autos | L4, L5 |

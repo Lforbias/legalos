@@ -26,6 +26,9 @@ import { NOTICE_KIND_LABEL, NOTICE_STATUS_LABEL } from "@/modules/inbox/schemas"
 import { listNotices } from "@/server/services/notice.service";
 import { listTasksForCase } from "@/server/services/task.service";
 import { dateToYmd, formatYmd } from "@/lib/dates/ymd";
+import { AcervoButton, CaseNotesPanel, CustomValuesCard } from "@/modules/cases/extras-ui";
+import { listCaseNotes } from "@/server/services/case-note.service";
+import { listCustomFields } from "@/server/services/custom-field.service";
 import { DocumentsPanel } from "@/modules/documents/documents-panel";
 import { can } from "@/server/context";
 import { MniAutosButton, MniConsultButton } from "@/modules/mni/mni-ui";
@@ -90,6 +93,7 @@ export default async function CaseDetailPage({
   const tabs = [
     { key: "resumo", label: "Resumo" },
     { key: "partes", label: "Partes", count: c.parties.length },
+    { key: "notas", label: "Notas" },
     { key: "andamentos", label: "Linha do tempo" },
     ...(canDeadlines ? [{ key: "prazos", label: "Prazos" }] : []),
     ...(canTasks ? [{ key: "tarefas", label: "Tarefas" }] : []),
@@ -106,6 +110,8 @@ export default async function CaseDetailPage({
   const caseNotices = tab === "intimacoes" && canNotices ? await listNotices(ctx, { caseId: c.id, status: undefined }).then(async (open) => ({ items: [...open.items, ...(await listNotices(ctx, { caseId: c.id, status: "PROCESSED" })).items] })) : null;
   const caseTasks = tab === "tarefas" && canTasks ? await listTasksForCase(ctx, c.id) : null;
   const casePetitions = tab === "peticoes" && canPetitions ? await listPetitions(ctx, { caseId: c.id }) : null;
+  const caseNotes = tab === "notas" ? await listCaseNotes(ctx, c.id) : null;
+  const customDefs = tab === "resumo" ? await listCustomFields(ctx) : [];
   const responsible = c.members.find((m) => m.role === "RESPONSIBLE");
 
   return (
@@ -121,6 +127,7 @@ export default async function CaseDetailPage({
               </Badge>
             ) : null}
             <Badge tone={TONE[c.status]}>{CASE_STATUS_LABEL[c.status]}</Badge>
+            {c.archivedAt ? <Badge>Acervo</Badge> : null}
             {can(ctx, "ai:use") ? (
               <Link href={`/ia?processo=${c.id}`} className={buttonVariants({ variant: "secondary" })}>
                 <Bot className="h-4 w-4" aria-hidden /> Perguntar à IA
@@ -172,8 +179,15 @@ export default async function CaseDetailPage({
               <CardBody className="space-y-2">
                 <StatusControl caseId={c.id} status={c.status} canWrite={canWrite} />
                 <p className="text-xs text-muted">Cada alteração é registrada na linha do tempo e na auditoria.</p>
+                {canWrite ? <AcervoButton caseId={c.id} inAcervo={c.archivedAt !== null} /> : null}
               </CardBody>
             </Card>
+            <CustomValuesCard
+              caseId={c.id}
+              canWrite={canWrite}
+              defs={customDefs.map((d) => ({ key: d.key, label: d.label, type: d.type, options: d.options }))}
+              values={(c.customFields ?? {}) as Record<string, string>}
+            />
             {canWrite ? (
               <Card>
                 <CardHeader title="Portal do cliente" description="Compartilha só o resumo do processo e os documentos que você marcar, com os clientes vinculados a ele." />
@@ -197,6 +211,15 @@ export default async function CaseDetailPage({
             {can(ctx, "cases:delete") ? <ArchiveCaseButton caseId={c.id} /> : null}
           </div>
         </div>
+      ) : null}
+
+      {tab === "notas" && caseNotes ? (
+        <CaseNotesPanel
+          caseId={c.id}
+          canWrite={canWrite}
+          tz={tz}
+          notes={caseNotes.map((n) => ({ id: n.id, title: n.title, body: n.body, pinned: n.pinned, authorName: n.authorName, createdAt: n.createdAt.toISOString(), bulk: n.bulkId !== null }))}
+        />
       ) : null}
 
       {tab === "prazos" && canDeadlines ? (

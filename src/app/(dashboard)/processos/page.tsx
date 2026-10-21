@@ -19,7 +19,7 @@ import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Processos" };
 
-type SP = { q?: string; status?: string; area?: string; responsavel?: string; visao?: string; pagina?: string };
+type SP = { q?: string; status?: string; area?: string; responsavel?: string; visao?: string; acervo?: string; pagina?: string };
 
 const TONE = { ACTIVE: "success", SUSPENDED: "warning", ARCHIVED: "neutral", CLOSED: "neutral" } as const;
 
@@ -32,15 +32,16 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   const area = (CASE_AREAS as readonly string[]).includes(sp.area ?? "") ? sp.area : undefined;
   const responsibleId = /^[0-9a-f-]{36}$/i.test(sp.responsavel ?? "") ? sp.responsavel : undefined;
   const page = Math.max(1, Number.parseInt(sp.pagina ?? "1", 10) || 1);
+  const acervo = sp.acervo === "1" ? "only" : undefined;
   const [result, members] = await Promise.all([
-    listCases(ctx, { q: sp.q, status, area, responsibleId, page, board }),
+    listCases(ctx, { q: sp.q, status, area, responsibleId, page, board, acervo }),
     listAssignableMembers(ctx),
   ]);
   const canWrite = can(ctx, "cases:write");
-  const filtered = Boolean(sp.q || status || area || responsibleId);
-  const viewHref = (v: "tabela" | "quadro") => {
+  const filtered = Boolean(sp.q || status || area || responsibleId || acervo);
+  const viewHref = (v: "tabela" | "quadro", ac: boolean = Boolean(acervo)) => {
     const q = new URLSearchParams();
-    for (const [k, val] of Object.entries({ q: sp.q, status, area, responsavel: responsibleId })) if (val) q.set(k, val);
+    for (const [k, val] of Object.entries({ q: sp.q, status, area, responsavel: responsibleId, acervo: ac ? "1" : undefined })) if (val) q.set(k, val);
     if (v === "quadro") q.set("visao", "quadro");
     const qs = q.toString();
     return qs ? `/processos?${qs}` : "/processos";
@@ -53,6 +54,8 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         description="Carteira de processos do escritório. Processos sigilosos só aparecem para a equipe do processo e administradores."
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Link href="/partes" className={buttonVariants({ variant: "secondary" })}>Cadastro de partes</Link>
+            {canWrite ? <Link href="/processos/nota-em-lote" className={buttonVariants({ variant: "secondary" })}>Nota em lote</Link> : null}
             <ExportLinks kind="processos" />
             <div className="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="Modo de visualização">
               <Link href={viewHref("tabela")} aria-current={!board ? "page" : undefined} className={cn("flex h-8 items-center gap-1.5 rounded px-2.5 text-xs", !board ? "bg-surface-3 font-medium" : "text-muted hover:text-fg")}>
@@ -73,6 +76,12 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
 
       <form method="get" className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_200px_auto]" role="search" aria-label="Filtrar processos">
         {board ? <input type="hidden" name="visao" value="quadro" /> : null}
+        <div className="flex items-center gap-4 text-xs text-muted sm:col-span-2 lg:col-span-full">
+          <span>Carteira:</span>
+          <Link href={viewHref(board ? "quadro" : "tabela", false)} aria-current={!acervo ? "page" : undefined} className={!acervo ? "font-medium text-fg" : "hover:text-fg"}>Ativa</Link>
+          <Link href={viewHref(board ? "quadro" : "tabela", true)} aria-current={acervo ? "page" : undefined} className={acervo ? "font-medium text-fg" : "hover:text-fg"} data-testid="acervo-link">Acervo</Link>
+        </div>
+        {acervo ? <input type="hidden" name="acervo" value="1" /> : null}
         <div className="relative">
           <label htmlFor="q" className="sr-only">
             Buscar por número, título ou parte

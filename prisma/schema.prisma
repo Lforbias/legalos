@@ -142,6 +142,8 @@ model Organization {
   subscription            Subscription?
   clients                 Client[]
   cases                   Case[]
+  partyRegistry           PartyRegistry[]
+  customFieldDefs         CustomFieldDef[]
   documents               Document[]
   tasks                   Task[]
   deadlines               Deadline[]
@@ -449,7 +451,13 @@ model Case {
   petitions             PetitionFiling[]
   sharedWithPortal      Boolean                @default(false) @map("shared_with_portal")
   datajudSyncedAt       DateTime?              @map("datajud_synced_at") @db.Timestamptz(3)
+  /// 3.0-F1: acervo (processo guardado fora da carteira ativa, sem exclusão).
+  archivedAt            DateTime?              @map("archived_at") @db.Timestamptz(3)
+  /// 3.0-F1: valores dos campos personalizados, chaveados por CustomFieldDef.key.
+  customFields          Json                   @default("{}") @map("custom_fields")
+  caseNotes             CaseNote[]
 
+  @@index([organizationId, archivedAt])
   @@map("cases")
 }
 
@@ -463,10 +471,13 @@ model CaseParty {
   document       String?
   lawyerName     String?   @map("lawyer_name")
   isOurClient    Boolean   @default(false) @map("is_our_client")
+  /// 3.0-F1: vínculo com o cadastro único de partes (opcional).
+  registryId     String?   @map("registry_id") @db.Uuid
   createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
 
-  case   Case    @relation(fields: [caseId], references: [id], onDelete: Cascade)
-  client Client? @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  case     Case           @relation(fields: [caseId], references: [id], onDelete: Cascade)
+  client   Client?        @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  registry PartyRegistry? @relation(fields: [registryId], references: [id], onDelete: SetNull)
 
   @@index([caseId])
   @@index([organizationId])
@@ -2075,4 +2086,81 @@ model Announcement {
 
   @@index([createdAt(sort: Desc)])
   @@map("announcements")
+}
+
+// ---------- 3.0-F1: cadastro único de partes, campos personalizados e notas do processo ----------
+
+enum RegistryKind {
+  PERSON
+  COMPANY
+  ORGAN
+  LAWYER
+}
+
+/// Parte reaproveitável entre processos (adversários, advogados, órgãos). Clientes continuam no cadastro de clientes.
+model PartyRegistry {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  kind           RegistryKind @default(PERSON)
+  name           String
+  document       String?
+  profession     String?
+  issuingOrgan   String?      @map("issuing_organ")
+  email          String?
+  phone          String?
+  notes          String?
+  createdById    String?      @map("created_by_id") @db.Uuid
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  caseParties  CaseParty[]
+
+  @@index([organizationId, name])
+  @@map("party_registry")
+}
+
+enum CustomFieldType {
+  TEXT
+  NUMBER
+  DATE
+  SELECT
+}
+
+model CustomFieldDef {
+  id             String          @id @default(uuid()) @db.Uuid
+  organizationId String          @map("organization_id") @db.Uuid
+  key            String
+  label          String
+  type           CustomFieldType
+  options        String[]
+  active         Boolean         @default(true)
+  position       Int             @default(0)
+  createdAt      DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+  @@map("custom_field_defs")
+}
+
+/// Nota interna do processo: pode ser fixada no topo e aplicada em vários processos de uma vez (bulkId).
+model CaseNote {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  caseId         String   @map("case_id") @db.Uuid
+  authorId       String?  @map("author_id") @db.Uuid
+  title          String?
+  body           String
+  pinned         Boolean  @default(false)
+  bulkId         String?  @map("bulk_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  case Case @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId, pinned, createdAt(sort: Desc)])
+  @@index([organizationId])
+  @@map("case_notes")
 }

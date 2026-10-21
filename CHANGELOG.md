@@ -3,6 +3,11 @@
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.
 
+## 3.0.0 (em construção)
+Ver `docs/roadmap-3.0.0.md` (comparação com o LegalMail).
+
+- **3.0-F1 Partes únicas, campos personalizados, acervo e notas** (migração `20261126000000_legalmail_f1`: `party_registry`, `custom_field_defs`, `case_notes`, `cases.archived_at`, `cases.custom_fields`, `case_parties.registry_id`): cadastro único de partes reaproveitável (`/partes`, busca, edição propaga o nome, exclusão lógica); campos personalizados de processo (Configurações → Campos personalizados; texto, número, data e lista; só administradores definem; desativar preserva valores); acervo (mover/devolver, filtro na lista, registro na linha do tempo); aba Notas com fixar no topo e nota em lote (até 50 processos, tudo ou nada, respeita sigilo e isolamento). Fica para a 3.0-F2: anexos e histórico de alterações das notas.
+
 ## 6.0.0 (RUTE, planejada)
 Ver `docs/roadmap-6.0.0.md` (servidor MCP + aba Inteligência Artificial). Só plano; nada implementado. A F10 da 2.0 é entregue por esta versão.
 

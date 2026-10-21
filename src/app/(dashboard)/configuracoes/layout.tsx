@@ -9,6 +9,7 @@ export default async function SettingsLayout({ children }: { children: React.Rea
     { href: "/configuracoes", label: "Escritório" },
     ...(can(ctx, "members:read") ? [{ href: "/configuracoes/equipe", label: "Equipe" }, { href: "/configuracoes/perfis", label: "Perfis de acesso" }] : []),
     ...(can(ctx, "audit:read") ? [{ href: "/configuracoes/auditoria", label: "Auditoria" }] : []),
+    ...(can(ctx, "cases:read") ? [{ href: "/configuracoes/campos", label: "Campos personalizados" }] : []),
     { href: "/conta", label: "Minha conta" },
   ];
   return (

@@ -47,6 +47,8 @@ export type CaseListFilters = {
   area?: string;
   responsibleId?: string;
   clientId?: string;
+  /** 3.0-F1: "only" = só o acervo; padrão = só a carteira ativa (fora do acervo); "all" = tudo. */
+  acervo?: "only" | "all";
   page?: number;
   /** Visão em quadro: traz até 200 processos sem paginação. */
   board?: boolean;
@@ -60,6 +62,8 @@ export async function listCases(ctx: TenantContext, f: CaseListFilters = {}) {
   if (f.area) and.push({ area: f.area });
   if (f.responsibleId) and.push({ members: { some: { userId: f.responsibleId, role: "RESPONSIBLE" } } });
   if (f.clientId) and.push({ parties: { some: { clientId: f.clientId } } });
+  if (f.acervo === "only") and.push({ archivedAt: { not: null } });
+  else if (f.acervo !== "all") and.push({ archivedAt: null });
   const q = f.q?.trim().slice(0, 80);
   if (q) {
     const digits = onlyDigits(q);
@@ -89,7 +93,7 @@ export async function listCases(ctx: TenantContext, f: CaseListFilters = {}) {
       skip: f.board ? 0 : (page - 1) * PAGE_SIZE,
       take,
       select: {
-        id: true, number: true, legacyNumber: true, title: true, area: true, court: true, status: true, phase: true, confidential: true, claimValue: true, updatedAt: true,
+        id: true, number: true, legacyNumber: true, title: true, area: true, court: true, status: true, phase: true, confidential: true, claimValue: true, updatedAt: true, archivedAt: true,
         parties: { where: { isOurClient: true }, select: { name: true, clientId: true, client: { select: { name: true } } }, take: 3 },
         members: { where: { role: "RESPONSIBLE" }, select: { user: { select: { id: true, name: true } } }, take: 1 },
       },
@@ -289,6 +293,19 @@ export async function changeCaseStatus(ctx: TenantContext, id: string, status: C
   });
 }
 
+/** 3.0-F1: move o processo para o acervo (ou de volta à carteira). Não exclui nada. */
+export async function setCaseAcervo(ctx: TenantContext, id: string, inAcervo: boolean) {
+  assertCan(ctx, "cases:write");
+  await assertCaseVisible(ctx, id);
+  const existing = await db.case.findFirstOrThrow({ where: { id, organizationId: ctx.organizationId }, select: { archivedAt: true } });
+  if ((existing.archivedAt !== null) === inAcervo) return;
+  await db.$transaction(async (tx) => {
+    await tx.case.update({ where: { id }, data: { archivedAt: inAcervo ? new Date() : null } });
+    await logCaseEvent(tx, ctx, id, { kind: inAcervo ? "ACERVO_IN" : "ACERVO_OUT", title: inAcervo ? "Processo movido para o acervo" : "Processo devolvido à carteira ativa" });
+    await audit({ action: inAcervo ? "case.acervo_in" : "case.acervo_out", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: id, meta: ctx.meta }, tx);
+  });
+}
+
 export async function archiveCase(ctx: TenantContext, id: string) {
   assertCan(ctx, "cases:delete");
   await assertCaseVisible(ctx, id);
@@ -305,7 +322,17 @@ export async function addParty(ctx: TenantContext, caseId: string, raw: PartyInp
   let name = input.name;
   let document: string | null = input.document ? onlyDigits(input.document) || input.document : null;
   let clientId: string | null = null;
-  if (input.clientId) {
+  let registryId: string | null = null;
+  const lawyerName: string | null = input.lawyerName || null;
+  if (input.registryId && !input.clientId) {
+    const reg = await db.partyRegistry.findFirst({ where: { id: input.registryId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true, name: true, document: true } });
+    if (!reg) throw new ValidationError("Parte não encontrada no cadastro.", { registryId: ["Selecione uma parte válida."] });
+    const dup = await db.caseParty.findFirst({ where: { caseId, registryId: reg.id }, select: { id: true } });
+    if (dup) throw new ConflictError("Esta parte já está neste processo.");
+    registryId = reg.id;
+    name = reg.name;
+    document = reg.document;
+  } else if (input.clientId) {
     assertCan(ctx, "clients:read");
     const client = await db.client.findFirst({ where: { id: input.clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true, name: true, document: true } });
     if (!client) throw new ValidationError("Cliente não encontrado.", { clientId: ["Selecione um cliente válido."] });
@@ -316,8 +343,12 @@ export async function addParty(ctx: TenantContext, caseId: string, raw: PartyInp
     document = client.document;
   }
   const party = await db.$transaction(async (tx) => {
+    if (!clientId && !registryId && input.saveToRegistry) {
+      const existing = document ? await tx.partyRegistry.findFirst({ where: { organizationId: ctx.organizationId, deletedAt: null, document }, select: { id: true } }) : null;
+      registryId = existing?.id ?? (await tx.partyRegistry.create({ data: { organizationId: ctx.organizationId, createdById: ctx.userId, kind: document && document.length === 14 ? "COMPANY" : "PERSON", name, document } })).id;
+    }
     const p = await tx.caseParty.create({
-      data: { caseId, organizationId: ctx.organizationId, clientId, role: input.role, name, document, lawyerName: input.lawyerName || null, isOurClient: clientId !== null },
+      data: { caseId, organizationId: ctx.organizationId, clientId, registryId, role: input.role, name, document, lawyerName, isOurClient: clientId !== null },
     });
     await logCaseEvent(tx, ctx, caseId, { kind: "PARTY_ADDED", title: `Parte adicionada: ${name}` });
     await audit({ action: "case.party_add", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: caseId, metadata: { partyId: p.id }, meta: ctx.meta }, tx);

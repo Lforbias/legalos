@@ -6,8 +6,8 @@ export const FACTS = {
   spaces: 3,
   permissions: 41,
   tables: 88,
-  tests: 589,
-  e2e: 43,
+  tests: 600,
+  e2e: 44,
 } as const;
 
 export type ModuleShot = { id: string; label: string; image: string; alt: string; title: string; text: string; points: string[] };

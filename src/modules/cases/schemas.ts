@@ -54,12 +54,16 @@ export const partySchema = z
   .object({
     role: z.enum(PARTY_ROLES),
     clientId: uuidOrEmpty,
+    /** 3.0-F1: parte do cadastro único (adversários, advogados, órgãos). */
+    registryId: uuidOrEmpty.optional(),
+    /** 3.0-F1: guardar esta parte (digitada à mão) no cadastro único para reaproveitar em outros processos. */
+    saveToRegistry: z.boolean().optional(),
     name: text(160),
     document: text(24),
     lawyerName: text(160),
   })
   .superRefine((v, ctx) => {
-    if (v.clientId === "" && v.name.length < 2) ctx.addIssue({ code: "custom", path: ["name"], message: "Informe o nome da parte ou selecione um cliente." });
+    if (v.clientId === "" && !v.registryId && v.name.length < 2) ctx.addIssue({ code: "custom", path: ["name"], message: "Informe o nome da parte ou selecione um cliente." });
   });
 export type PartyInput = z.infer<typeof partySchema>;
 
@@ -98,6 +102,9 @@ export const EVENT_KIND_LABEL: Record<string, string> = {
   NOTE: "Anotação",
   DATAJUD_MOVEMENT: "Andamento (DataJud/CNJ)",
   ANDAMENTO: "Andamento (Astrea)",
+  CUSTOM_FIELDS: "Campos personalizados",
+  ACERVO_IN: "Movido para o acervo",
+  ACERVO_OUT: "Devolvido à carteira",
   PARTY_ADDED: "Parte adicionada",
   PARTY_REMOVED: "Parte removida",
   MEMBER_ADDED: "Equipe: membro adicionado",

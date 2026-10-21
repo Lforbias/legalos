@@ -10,6 +10,16 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "3.0-F1", when: "2026-10-21", title: "LegalMail: partes únicas, campos personalizados, acervo e notas fixas", migration: "20261126000000_legalmail_f1",
+    items: [
+      "Cadastro único de partes (menu Processos → Cadastro de partes): adversários, advogados e órgãos cadastrados uma vez e reaproveitados em qualquer processo, com busca por nome, documento ou profissão. Editar o nome atualiza os processos ligados; excluir não apaga os dados já gravados nos processos.",
+      "Campos personalizados de processo (Configurações → Campos personalizados): texto, número, data e lista de opções, criados por quem administra e preenchidos na página do processo. Desativar esconde o campo e guarda os valores.",
+      "Acervo: botão para mover o processo para o acervo (sem excluir) e devolver à carteira. A lista de processos mostra a carteira ativa e, separado, o acervo.",
+      "Notas do processo numa aba própria, com fixar no topo, e Nota em lote: a mesma nota aplicada a até 50 processos de uma vez (tudo ou nada; respeita sigilo e escritório).",
+      "Anexos nas notas e histórico de alterações da nota ficam para a fase de Tarefas 2.0.",
+    ],
+  },
+  {
     id: "2.0-F6", when: "2026-10-21", title: "Pequenos itens: aniversariantes, 2FA obrigatório, Excel e WhatsApp", migration: "20261125000000_pequenos_itens",
     items: [
       "Central de alertas ganhou a aba Aniversariantes (clientes pessoa física ativos, hoje e próximos 7 dias), com botão para enviar parabéns pelo WhatsApp depois de você revisar o texto.",
@@ -127,7 +137,7 @@ export const PHASES_2: Phase[] = [
 ];
 
 export const PHASES_3: Phase[] = [
-  { id: "3.0-F1", title: "Cadastro único de partes, campos personalizados, arquivar, notas fixas e em lote", status: "a fazer" },
+  { id: "3.0-F1", title: "Cadastro único de partes, campos personalizados, arquivar, notas fixas e em lote", status: "feita" },
   { id: "3.0-F2", title: "Tarefas 2.0 (tipos com pontuação, etiquetas, menções, anexos, histórico)", status: "a fazer" },
   { id: "3.0-F3", title: "Autotextos com variáveis, timbrados e prévia em PDF", status: "a fazer" },
   { id: "3.0-F4", title: "Importação de processos em lote e download de autos", status: "a fazer" },
