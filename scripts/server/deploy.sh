@@ -22,7 +22,7 @@ flock -n 9 || die "já existe uma publicação em andamento"
 PREV="$(cat "$APP_DIR/.deployed-sha" 2>/dev/null || echo desconhecida)"
 log "publicando $SHA (anterior: $PREV)"
 
-EXCLUDES=(--exclude='.env' --exclude='.env.*' --exclude='.storage' --exclude='node_modules' --exclude='*.tar.gz' --exclude='*.log' --exclude='docker-compose.override.yml' --exclude='.deployed-sha')
+EXCLUDES=(--exclude='.env' --exclude='.env.*' --exclude='.storage' --exclude='node_modules' --exclude='*.tar.gz' --exclude='*.log' --exclude='docker-compose.override.yml' --exclude='.deployed-sha' --exclude='/_arquivos' --exclude='/_entregas' --exclude='/relatorio.json' --exclude='/ssh-copy-id*' --exclude='/Claude outputs' --exclude='/BACKUP*' --exclude='._*' --exclude='.git')
 
 install_tree() { # $1 = pacote
   local tmp; tmp="$(mktemp -d)"
