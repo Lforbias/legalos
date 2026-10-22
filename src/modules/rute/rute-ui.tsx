@@ -226,7 +226,7 @@ function ProposalCard({ p }: { p: ProposalItem }) {
         </div>
       </div>
       <dl className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[10rem_1fr]">
-        {Object.entries(p.payload).filter(([, v]) => v !== "" && v !== null && v !== undefined).map(([k, v]) => (
+        {Object.entries(p.payload).filter(([k, v]) => v !== "" && v !== null && v !== undefined && !/Id$/.test(k) && k !== "petitionTitle").map(([k, v]) => (
           <React.Fragment key={k}>
             <dt className="text-muted">{LABELS[k] ?? k}</dt>
             <dd>

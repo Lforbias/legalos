@@ -21,6 +21,7 @@ import { AREAS, listInstructions } from "@/server/services/rute-library.service"
 import { listProposals, pendingProposalCount } from "@/server/services/rute-proposal.service";
 import { getRuteSettings } from "@/server/services/rute-settings.service";
 import { requireTenant } from "@/server/session";
+import { PHASES_7 } from "@/lib/updates";
 
 export const metadata: Metadata = { title: "RUTE — a IA do LegalOS" };
 type SP = Record<string, string | undefined>;
@@ -41,6 +42,7 @@ export default async function RutePage({ searchParams }: { searchParams: Promise
     { key: "biblioteca", label: "Biblioteca" },
     { key: "historico", label: "Histórico" },
     ...(manage ? [{ key: "governanca", label: "Governança" }] : []),
+    { key: "embreve", label: "Em breve" },
   ];
   const current = tabs.some((t) => t.key === sp.aba) ? (sp.aba as string) : "situacao";
   const settings = await getRuteSettings(ctx);
@@ -68,6 +70,8 @@ export default async function RutePage({ searchParams }: { searchParams: Promise
       {current === "biblioteca" ? <Library ctx={ctx} canEdit={library} /> : null}
 
       {current === "historico" ? <History ctx={ctx} tz={tz} /> : null}
+
+      {current === "embreve" ? <Upcoming /> : null}
 
       {current === "governanca" && manage ? <Governance ctx={ctx} settings={settings} sp={sp} tz={tz} /> : null}
     </div>
@@ -200,6 +204,35 @@ async function Governance({ ctx, settings, sp, tz }: { ctx: Ctx; settings: Await
           </div>
         </CardBody>
       </Card>
+    </div>
+  );
+}
+
+const GROUPS_7: { title: string; ids: string[] }[] = [
+  { title: "RUTE com voz e mais autonomia", ids: ["7.0-F1", "7.0-F19"] },
+  { title: "Rotina da RUTE", ids: ["7.0-F2", "7.0-F3", "7.0-F4", "7.0-F5"] },
+  { title: "Para o cliente", ids: ["7.0-F6", "7.0-F7", "7.0-F8"] },
+  { title: "Para a equipe", ids: ["7.0-F9", "7.0-F10"] },
+  { title: "Financeiro", ids: ["7.0-F11", "7.0-F12", "7.0-F13"] },
+  { title: "Processos e uso diário", ids: ["7.0-F14", "7.0-F15", "7.0-F16", "7.0-F17", "7.0-F18"] },
+];
+
+/** Lista do que está planejado para a RUTE e para o LegalOS. Nada aqui existe ainda. */
+function Upcoming() {
+  return (
+    <div className="space-y-4">
+      <Alert tone="info">Estas ideias estão na fila e ainda não existem. A ordem será definida pela equipe. A RUTE continuará só propondo, e o que for liberado para ela fazer sozinha terá interruptor próprio.</Alert>
+      {GROUPS_7.map((g) => (
+        <Card key={g.title}>
+          <CardHeader title={g.title} />
+          <ul className="divide-y divide-border">
+            {g.ids.map((id) => {
+              const p = PHASES_7.find((x) => x.id === id);
+              return p ? <li key={id} className="flex items-start justify-between gap-3 px-4 py-3 text-sm"><span>{p.title}</span><Badge tone="neutral">Em breve</Badge></li> : null;
+            })}
+          </ul>
+        </Card>
+      ))}
     </div>
   );
 }

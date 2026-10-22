@@ -55,6 +55,54 @@ export const MODULES: ModuleShot[] = [
     text: "Acompanhe carteira, produtividade da equipe e financeiro, com abas por permissão e exportação em planilha.",
     points: ["Abas liberadas conforme o perfil de cada pessoa", "Produtividade da equipe e registro de horas", "Exportação em CSV", "Período validado, com mensagens claras"],
   },
+  {
+    id: "rute", label: "RUTE · Assistente", image: "/produto/rute-assistente.webp", alt: "Assistente RUTE respondendo o que fazer hoje, com as consultas feitas e uma proposta de tarefa",
+    title: "A RUTE: a IA do escritório, dentro do LegalOS",
+    text: "Pergunte em linguagem natural o que tem para hoje, quais prazos vencem ou o que há de novo num processo. A RUTE consulta o sistema com as suas permissões e mostra de onde tirou cada resposta.",
+    points: ["Conversa privada de cada pessoa; só enxerga o que o perfil dela já pode ver", "CPF, CNPJ e e-mails são ocultados antes de sair para a IA", "Funciona com Claude, Gemini ou OpenAI, com a chave do escritório", "Botão RUTE nas telas de processo e de cliente abre a conversa já no contexto"],
+  },
+  {
+    id: "rute-propostas", label: "RUTE · Propostas", image: "/produto/rute-propostas.webp", alt: "Lista de propostas da IA aguardando decisão, com texto editável e confirmação reforçada",
+    title: "A IA propõe. Uma pessoa decide.",
+    text: "Tarefa, prazo em rascunho, anotação, minuta, andamento e petição em rascunho viram propostas. Você lê, edita se quiser e aprova. Só então o sistema cria.",
+    points: ["Nada é criado, alterado ou enviado sem confirmação humana", "Ações de maior risco pedem confirmação reforçada", "Nunca protocola e nada fala com cliente", "Tudo fica registrado: quem propôs, quem aprovou e quando"],
+  },
+  {
+    id: "rute-conexoes", label: "RUTE · Conexões", image: "/produto/rute-conexoes.webp", alt: "Conexão do LegalOS com Claude, ChatGPT e Gemini, com passo a passo e lista de conexões",
+    title: "Conecte o Claude, o ChatGPT ou o Gemini ao LegalOS",
+    text: "Quem já usa uma dessas IAs no dia a dia conecta com o login do LegalOS e passa a consultar o escritório de dentro dela, com as mesmas permissões.",
+    points: ["Login com consentimento e verificação em duas etapas, ou chave de acesso", "Botão de testar a conexão e lista de conexões com revogar", "Parada de emergência que corta tudo na hora", "Nasce desligada: o escritório liga quando quiser"],
+  },
+  {
+    id: "rute-biblioteca", label: "RUTE · Biblioteca", image: "/produto/rute-biblioteca.webp", alt: "Biblioteca do escritório com instruções e modelos por área",
+    title: "A IA trabalha do jeito do escritório",
+    text: "Cadastre as instruções (tom das peças, checklists) e os modelos por área. A RUTE segue o que o escritório definiu, e você pode baixar um pacote para usar no Claude.",
+    points: ["Instruções e modelos por área do direito", "Só o conteúdo ativo é usado", "Pacote para o Claude em um clique", "Sem dados de clientes na biblioteca"],
+  },
+  {
+    id: "rute-governanca", label: "RUTE · Governança", image: "/produto/rute-governanca.webp", alt: "Governança da RUTE com limites, uso em tokens e relatório de LGPD",
+    title: "Controle de uso, limites e LGPD",
+    text: "Defina limites por escritório e por perfil, acompanhe o uso do mês e veja o que saiu do sistema para a IA, por cliente e por processo.",
+    points: ["Limite mensal por perfil e por escritório", "Relatório de uso por pessoa", "Relatório de LGPD com exportação em CSV, sem o texto das perguntas", "Retenção das conversas configurável"],
+  },
+  {
+    id: "calculos", label: "Cálculos", image: "/produto/calculo.webp", alt: "Calculadora jurídica com atrasados da Justiça Federal, TJSP, trabalhista e prazos",
+    title: "Calculadoras jurídicas dentro do processo",
+    text: "Atrasados da Justiça Federal, débito do TJSP, atualização trabalhista, verbas rescisórias e prazos, salvos no processo com memorial e planilha.",
+    points: ["Índices oficiais do Banco Central; o que faltar o escritório lança e o sistema nunca inventa índice", "Exportação em Excel, CSV e memorial", "Ferramenta de apoio: confira sempre com a decisão", "Resultado calculado no servidor, nunca no navegador"],
+  },
+  {
+    id: "copiloto", label: "Copiloto", image: "/produto/copiloto.webp", alt: "Copiloto de atendimento com resumo, ações que podem caber, tarefas e documentos sugeridos",
+    title: "Do atendimento para o trabalho, sem redigitar",
+    text: "Cole a transcrição (ou envie o áudio) e receba resumo, ações que podem caber, tarefas e documentos a pedir. Só vira tarefa o que uma pessoa marcar.",
+    points: ["Tudo em rascunho, revisado por uma pessoa", "Nada é enviado ao cliente", "CPF e CNPJ ocultados antes de ir para a IA", "Transcrição de áudio opcional"],
+  },
+  {
+    id: "metas", label: "Metas da equipe", image: "/produto/metas.webp", alt: "Metas mensais por pessoa e carga de trabalho por peso",
+    title: "Metas do mês e carga de trabalho por peso",
+    text: "Metas por pessoa e da equipe (tarefas, pontos, prazos, horas), progresso do mês e carga por peso, com sugestão de distribuição que uma pessoa confirma.",
+    points: ["Números vindos das tarefas, prazos e horas reais", "Carga por pontos do tipo de tarefa", "Sugestão de distribuição das tarefas sem responsável", "Quem decide é sempre uma pessoa"],
+  },
 ];
 
 export const SPACES = [
@@ -63,13 +111,25 @@ export const SPACES = [
   { name: "LegalOS Chat", tone: "#e0a800", text: "O atendimento por WhatsApp, ligado a cliente, processo, tarefas e financeiro.", items: ["Filas e etiquetas", "Robô e automações", "Painel do cliente na conversa", "Interruptores de tudo que é automático"] },
 ] as const;
 
-/** Futuro, ainda NÃO disponível. Mostrado na página do produto como "em planejamento". */
-export const FUTURE_AI = {
+/** A RUTE já está disponível (6.0). Nasce desligada em cada escritório. */
+export const RUTE_INFO = {
   name: "RUTE",
   tone: "#d7263d",
-  text: "A IA do LegalOS, com nome próprio: uma aba só dela no menu. Conecte o Claude, o ChatGPT ou o Gemini ao LegalOS, ou converse com um assistente dentro do sistema. A IA lê o que o seu perfil permite e propõe; só grava depois da confirmação de uma pessoa.",
-  items: ["Conexão por MCP com as IAs que a equipe já usa", "Aba própria da RUTE no menu", "Propostas que só valem depois de confirmadas", "Limites, auditoria e controle do que foi enviado"],
+  text: "A IA do LegalOS, com nome próprio e uma aba só dela no menu. Conecte o Claude, o ChatGPT ou o Gemini ao LegalOS, ou converse com o assistente dentro do sistema. A IA lê o que o seu perfil permite e propõe; só grava depois da confirmação de uma pessoa.",
+  items: ["Conexão com as IAs que a equipe já usa", "Assistente embutido, com contexto de processo e cliente", "Propostas que só valem depois de confirmadas", "Biblioteca do escritório, limites, auditoria e relatório de LGPD"],
 } as const;
+
+/** Em breve (fila da 7.0). Nada disso existe ainda; só entra aqui o que está na fila aprovada. */
+export const COMING_SOON = [
+  "RUTE por voz: falar e ouvir, de mãos livres",
+  "RUTE faz tarefas pequenas sozinha, com interruptor por ação",
+  "Resumo da manhã de cada pessoa",
+  "Preparar audiência e conferir peça antes de protocolar",
+  "Assinatura de contrato e procuração no sistema",
+  "Pedido de documentos ao cliente por link",
+  "Previsão de caixa e repasse de valores ao cliente",
+  "Busca única e modo audiência no celular",
+] as const;
 
 export const SECURITY = [
   { title: "Escritórios totalmente separados", text: "Cada escritório só enxerga os próprios dados. A separação é verificada por testes automatizados." },

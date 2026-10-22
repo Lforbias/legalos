@@ -6,7 +6,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/dates/format";
 import { AnnouncementForm } from "@/modules/platform/announcement-form";
 import { RetryButton, RunJobButton, SwitchOffButton, TestButton } from "@/modules/platform/developer-controls";
-import { PHASES_2, PHASES_3, PHASES_4, PHASES_5, PHASES_6, RELEASES, TEAM_TODO, type Phase } from "@/lib/updates";
+import { PHASES_2, PHASES_3, PHASES_4, PHASES_5, PHASES_6, PHASES_7, RELEASES, TEAM_TODO, type Phase } from "@/lib/updates";
 import { requirePlatform } from "@/server/platform";
 import { listAnnouncements } from "@/server/services/announcement.service";
 import { listOrganizations } from "@/server/services/platform.service";
@@ -371,6 +371,10 @@ function Novidades() {
       <Card>
         <CardHeader title="Versão 6.0.0 — RUTE (MCP e aba de IA)" description="Servidor MCP e aba própria de Inteligência Artificial: a IA lê e propõe, só grava com confirmação. Plano em docs/roadmap-6.0.0.md." />
         <PhaseList phases={PHASES_6} />
+      </Card>
+      <Card>
+        <CardHeader title="Versão 7.0.0 — RUTE com voz e rotina do escritório (fila)" description="Fila de ideias, nada construído. Plano em docs/roadmap-7.0.0.md." />
+        <PhaseList phases={PHASES_7} />
       </Card>
       <Card>
         <CardHeader title="Pendências da equipe (sem código)" />

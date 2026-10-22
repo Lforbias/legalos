@@ -1,6 +1,6 @@
 import { ArrowRight, BellRing, CalendarClock, Inbox, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { FACTS, FUTURE_AI, HONESTY, INTEGRATIONS, MODULES, PWA, SPACES } from "@/config/showcase";
+import { COMING_SOON, FACTS, RUTE_INFO, HONESTY, INTEGRATIONS, MODULES, PWA, SPACES } from "@/config/showcase";
 import { PHASES_2 } from "@/lib/updates";
 import { CtaLink, Eyebrow, SectionTitle } from "./_parts";
 import { BrowserFrame, ModuleTabs, Reveal } from "./showcase-client";
@@ -23,7 +23,7 @@ const DAY = [
 ];
 
 export default function ProdutoHome() {
-  const upcoming = PHASES_2.filter((p) => p.status !== "feita").slice(0, 6);
+  const upcoming = [...PHASES_2.filter((p) => p.status !== "feita").map((p) => p.title), ...COMING_SOON].slice(0, 10);
   return (
     <>
       {/* HERO — escuro */}
@@ -111,23 +111,23 @@ export default function ProdutoHome() {
         </div>
         <Reveal delay={300}>
           <article className="force-dark relative mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0f] p-7 text-fg md:p-9" data-testid="future-ai">
-            <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-30 blur-3xl" style={{ background: FUTURE_AI.tone }} aria-hidden />
+            <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-30 blur-3xl" style={{ background: RUTE_INFO.tone }} aria-hidden />
             <div className="relative grid gap-8 md:grid-cols-[1.2fr_1fr] md:items-center">
               <div>
                 <div className="flex items-center gap-3">
-                  <svg viewBox="0 0 48 48" width="44" height="44" role="img" aria-label="Logotipo do RUTE" className="shrink-0">
+                  <svg viewBox="0 0 48 48" width="44" height="44" role="img" aria-label="Logotipo da RUTE" className="shrink-0">
                     <rect width="48" height="48" rx="12" fill="#0b0b0f" stroke="#ffffff" strokeOpacity="0.25" />
                     <path d="M24 9 L27.2 20.8 L39 24 L27.2 27.2 L24 39 L20.8 27.2 L9 24 L20.8 20.8 Z" fill="#ffffff" />
-                    <circle cx="36" cy="12" r="4" fill={FUTURE_AI.tone} />
+                    <circle cx="36" cy="12" r="4" fill={RUTE_INFO.tone} />
                   </svg>
-                  <h3 className="text-2xl font-semibold">{FUTURE_AI.name}</h3>
-                  <span className="rounded-full border border-white/25 px-2.5 py-0.5 text-xs font-medium" style={{ color: "#ff8a98" }}>Em planejamento</span>
+                  <h3 className="text-2xl font-semibold">{RUTE_INFO.name}</h3>
+                  <span className="rounded-full border border-white/25 px-2.5 py-0.5 text-xs font-medium" style={{ color: "#7ee0a0" }}>Disponível</span>
                 </div>
-                <p className="mt-4 max-w-xl text-sm text-muted">{FUTURE_AI.text}</p>
-                <p className="mt-3 text-xs text-muted">Ainda não está disponível. Quando chegar, nasce desligada e só funciona com a chave real do provedor e a autorização do escritório.</p>
+                <p className="mt-4 max-w-xl text-sm text-muted">{RUTE_INFO.text}</p>
+                <p className="mt-3 text-xs text-muted">Nasce desligada em cada escritório e só funciona com a chave real do provedor e a autorização de quem administra.</p>
               </div>
               <ul className="space-y-2.5 text-sm">
-                {FUTURE_AI.items.map((it) => <li key={it} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full" style={{ background: FUTURE_AI.tone }} aria-hidden />{it}</li>)}
+                {RUTE_INFO.items.map((it) => <li key={it} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full" style={{ background: RUTE_INFO.tone }} aria-hidden />{it}</li>)}
               </ul>
             </div>
           </article>
@@ -208,9 +208,9 @@ export default function ProdutoHome() {
       <section className="mx-auto max-w-5xl px-4 pb-24">
         <SectionTitle eyebrow="Em construção" title="E o sistema continua evoluindo." text="Próximas entregas já planejadas:" />
         <ul className="mt-8 grid gap-3 md:grid-cols-2">
-          {upcoming.map((p) => (
-            <li key={p.id} className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-5 py-4 text-sm">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden /> {p.title}
+          {upcoming.map((t) => (
+            <li key={t} className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-5 py-4 text-sm">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden /> {t}
             </li>
           ))}
         </ul>

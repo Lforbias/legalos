@@ -9,8 +9,8 @@ test("site /produto: páginas públicas abrem sem login, imagens carregam e as a
   // futuro: deixa claro que ainda não existe
   const ai = page.getByTestId("future-ai");
   await expect(ai).toContainText("RUTE");
-  await expect(ai).toContainText("Em planejamento");
-  await expect(ai).toContainText("Ainda não está disponível");
+  await expect(ai).toContainText("Disponível");
+  await expect(ai).toContainText("Nasce desligada");
 
   // seção do aplicativo (PWA): só o que existe; os avisos no celular são opcionais e sem dados de cliente
   const pwa = page.getByTestId("produto-pwa");

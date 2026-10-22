@@ -322,6 +322,30 @@ export const PHASES_6: Phase[] = [
   { id: "6.0-F9", title: "Ações de maior risco, sempre com confirmação", status: "feita" },
 ];
 
+/** Fila da 7.0 (só ideias aprovadas para a fila; nada construído). Detalhes em docs/roadmap-7.0.0.md. */
+export const PHASES_7: Phase[] = [
+  { id: "7.0-F1", title: "RUTE por voz (falar e ouvir, mãos livres)", status: "a fazer" },
+  { id: "7.0-F2", title: "Resumo da manhã de cada pessoa", status: "a fazer" },
+  { id: "7.0-F3", title: "Preparar audiência (roteiro em rascunho)", status: "a fazer" },
+  { id: "7.0-F4", title: "Conferir peça antes de protocolar", status: "a fazer" },
+  { id: "7.0-F5", title: "Notícia ao cliente em linguagem simples, também por WhatsApp (com aprovação)", status: "a fazer" },
+  { id: "7.0-F6", title: "Assinatura de contrato e procuração no sistema", status: "a fazer" },
+  { id: "7.0-F7", title: "Pedido de documentos por link ao cliente", status: "a fazer" },
+  { id: "7.0-F8", title: "Pesquisa de satisfação no fim do processo", status: "a fazer" },
+  { id: "7.0-F9", title: "Painel de sobrecarga e rodízio de férias", status: "a fazer" },
+  { id: "7.0-F10", title: "Placar do mês (opcional)", status: "a fazer" },
+  { id: "7.0-F11", title: "Previsão de caixa", status: "a fazer" },
+  { id: "7.0-F12", title: "Repasse de valores ao cliente", status: "a fazer" },
+  { id: "7.0-F13", title: "Cobrança escalonada (desligada até autorização)", status: "a fazer" },
+  { id: "7.0-F14", title: "Linha do tempo do cliente", status: "a fazer" },
+  { id: "7.0-F15", title: "Alerta de prazo parecido e conflito de audiência", status: "a fazer" },
+  { id: "7.0-F16", title: "Modo audiência no celular", status: "a fazer" },
+  { id: "7.0-F17", title: "Busca única", status: "a fazer" },
+  { id: "7.0-F18", title: "Relatório mensal automático para a sócia", status: "a fazer" },
+  { id: "7.0-F19", title: "RUTE faz tarefas pequenas sozinha (criar tarefa para si, marcar como feita, anotar, abrir telas), com interruptor por ação e histórico", status: "a fazer" },
+];
+
+/** Ações que dependem da equipe (sem código). Tire da lista quando forem feitas. */
 export const TEAM_TODO: string[] = [
   "6.0: validar com contas reais o que só foi testado contra simuladores e documentação: conexão do Claude, do ChatGPT e do Gemini ao /api/mcp (cada um tem regras de plano e de administrador próprias) e as chamadas do assistente embutido aos provedores.",
   "6.0: em RUTE → Situação, ligar a conexão de IAs com o consentimento, informar a chave do provedor do assistente (ou definir ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY no servidor) e cadastrar a biblioteca do escritório antes de liberar para a equipe.",
