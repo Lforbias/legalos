@@ -10,6 +10,8 @@ import { formatCnj } from "@/lib/validation/br-documents";
 import { uuidSchema } from "@/lib/validation/common";
 import { CASE_STATUS_LABEL } from "@/modules/cases/schemas";
 import { getPortalCase } from "@/server/services/portal.service";
+import { formatDate } from "@/lib/dates/format";
+import { approvedUpdatesForPortalCase } from "@/server/services/portal-plus.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Processo" };
@@ -21,6 +23,7 @@ export default async function PortalCasePage({ params }: { params: Promise<{ id:
   const data = await getPortalCase(ctx, id.data).catch((e) => (e instanceof NotFoundError || e instanceof ForbiddenError ? null : Promise.reject(e)));
   if (!data) notFound();
   const { case: c, documents } = data;
+  const updates = await approvedUpdatesForPortalCase(ctx, c.id);
   return (
     <div className="space-y-4">
       <Link href="/portal" className="text-sm text-primary-text hover:underline">← Voltar</Link>
@@ -33,6 +36,15 @@ export default async function PortalCasePage({ params }: { params: Promise<{ id:
           <p><span className="text-muted">Fase:</span> {c.phase ?? "—"}</p>
           <p><span className="text-muted">Assunto:</span> {c.subject ?? "—"}</p>
         </CardBody>
+      </Card>
+      <Card>
+        <CardHeader title="Como está o seu processo" description="Textos revisados pela equipe, em linguagem simples." />
+        {updates.length === 0 ? <p className="p-6 text-center text-sm text-muted">Ainda não há atualizações para mostrar.</p> : null}
+        <ul className="divide-y divide-border">
+          {updates.map((u) => (
+            <li key={u.id} className="px-4 py-3 text-sm"><p>{u.plainText}</p><p className="mt-1 text-xs text-muted">{u.approvedAt ? formatDate(u.approvedAt, "America/Sao_Paulo") : ""}</p></li>
+          ))}
+        </ul>
       </Card>
       <Card>
         <CardHeader title="Documentos compartilhados" />

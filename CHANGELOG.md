@@ -3,6 +3,17 @@
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.
 
+## 5.0.0
+Calculadoras, portal em linguagem simples, cobrança Pix/boleto, triagem com minuta, copiloto e metas. Migração nova: `20261217000000_calc_5_0` (10 tabelas). Sem rotina nova no agendador.
+
+- F1 `/calculos`: atrasados JF (INPC + SELIC), TJSP (tabela/SELIC/híbrido), atualização trabalhista (TR → IPCA-E → SELIC) e rescisão, prazos; salvo no processo; CSV, Excel e memorial; índices do escritório em `/calculos/indices` (lançar, carregar tabela TJSP e reajuste INSS, sincronizar BCB). Sem índice, o cálculo para e diz o que falta.
+- F2 portal: andamento em linguagem simples com aprovação humana, pendências do cliente e mensagens (`/portal-equipe`).
+- F3 `/financeiro/cobranca` e `/financeiro/exito`: cobrança Pix/boleto no Asaas do escritório, aviso em `/api/webhooks/fees/<escritório>` (token próprio), baixa automática idempotente, contratos de êxito.
+- F4 triagem na página da intimação: regras ou IA, ciência presumida (art. 224, §2º CPC), minuta em rascunho, validar (opcional: criar prazo em rascunho).
+- F5 `/copiloto`: transcrição (texto ou áudio via Gemini) → resumo, ações, tarefas e documentos em rascunho; tarefas só após revisão.
+- F6 `/equipe/metas`: metas mensais, progresso, carga por peso e distribuição sugerida (confirmada por pessoa).
+- Limites conhecidos: Asaas e Gemini só testados contra simuladores (use o sandbox do Asaas primeiro); calculadoras são apoio, não substituem CálcJF/PJe-Calc; reajuste do INSS de 2026, IPCA-E, TR e salário mínimo precisam ser lançados pelo escritório; a regra de mês inicial da SELIC está descrita no memorial de cada cálculo; células do Excel saem como texto; a triagem por regras só reconhece os atos da tabela; nenhuma mensagem sai para o cliente sem pessoa.
+
 ## 4.0.0
 Chat no nível do ChatGuru. Migração nova: `20261216000000_chat_4_0`. Sem rotina nova: tudo roda dentro de `chat-extras` (a cada minuto).
 

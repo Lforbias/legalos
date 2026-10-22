@@ -35,6 +35,7 @@ export type AsaasPayment = {
   dueDate: string; // AAAA-MM-DD
   paymentDate?: string | null;
   invoiceUrl?: string | null;
+  bankSlipUrl?: string | null;
   billingType?: string | null;
   externalReference?: string | null;
   deleted?: boolean;
@@ -85,6 +86,13 @@ export const asaas = {
   getSubscription: (cfg: AsaasConfig, id: string, f?: Fetch) => call<AsaasSubscription>(cfg, "GET", `/subscriptions/${encodeURIComponent(id)}`, undefined, f),
   deleteSubscription: (cfg: AsaasConfig, id: string, f?: Fetch) => call<{ deleted?: boolean }>(cfg, "DELETE", `/subscriptions/${encodeURIComponent(id)}`, undefined, f),
   getPayment: (cfg: AsaasConfig, id: string, f?: Fetch) => call<AsaasPayment>(cfg, "GET", `/payments/${encodeURIComponent(id)}`, undefined, f),
+  /** Cobrança avulsa (honorários do escritório). billingType PIX ou BOLETO. */
+  createPayment: (cfg: AsaasConfig, d: { customer: string; billingType: "PIX" | "BOLETO"; value: number; dueDate: string; description: string; externalReference: string }, f?: Fetch) =>
+    call<AsaasPayment>(cfg, "POST", "/payments", d, f),
+  deletePayment: (cfg: AsaasConfig, id: string, f?: Fetch) => call<{ deleted?: boolean }>(cfg, "DELETE", `/payments/${encodeURIComponent(id)}`, undefined, f),
+  getPixQrCode: (cfg: AsaasConfig, id: string, f?: Fetch) => call<{ encodedImage: string; payload: string; expirationDate?: string }>(cfg, "GET", `/payments/${encodeURIComponent(id)}/pixQrCode`, undefined, f),
+  findCustomerByReference: (cfg: AsaasConfig, ref: string, f?: Fetch) => call<{ data: { id: string }[] }>(cfg, "GET", `/customers?externalReference=${encodeURIComponent(ref)}&limit=1`, undefined, f),
+  ping: (cfg: AsaasConfig, f?: Fetch) => call<{ data: unknown[] }>(cfg, "GET", "/customers?limit=1", undefined, f),
   listSubscriptionPayments: (cfg: AsaasConfig, id: string, f?: Fetch) =>
     call<{ data: AsaasPayment[] }>(cfg, "GET", `/subscriptions/${encodeURIComponent(id)}/payments?limit=20`, undefined, f),
 };

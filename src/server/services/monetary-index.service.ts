@@ -40,7 +40,7 @@ export async function syncOfficialIndexes(ctx: TenantContext, opts: { years?: nu
   assertCan(ctx, "organization:manage");
   const doFetch: FetchLike = opts.fetchImpl ?? ((u, i) => fetch(u, i));
   const today = todayYmd(ctx.timezone);
-  const startYear = Number(today.slice(0, 4)) - Math.min(Math.max(opts.years ?? 6, 1), 20);
+  const startYear = Number(today.slice(0, 4)) - Math.min(Math.max(opts.years ?? 6, 1), 35);
   const br = (ymd: string) => `${ymd.slice(8, 10)}/${ymd.slice(5, 7)}/${ymd.slice(0, 4)}`;
   const result: Record<string, { saved: number; error?: string }> = {};
   for (const series of INDEX_SERIES) {

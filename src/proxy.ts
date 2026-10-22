@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 
 // /api/cron e /api/v1 não usam cookie de sessão: autenticam por conta própria (segredo do agendador / chave de API).
-const PUBLIC_PREFIXES = ["/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/billing/asaas/webhook", "/api/whatsapp/webhook"];
+const PUBLIC_PREFIXES = ["/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook"];
 
 /**
  * Proxy (middleware do Next 16): correlation id + redirecionamento rápido de visitantes sem cookie.

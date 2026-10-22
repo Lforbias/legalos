@@ -5,10 +5,13 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardHeader } from "@/components/ui/card";
 import { formatDate } from "@/lib/dates/format";
+import { formatYmd } from "@/lib/dates/ymd";
 import { formatBytes } from "@/lib/format/phone";
 import { formatCnj } from "@/lib/validation/br-documents";
 import { CASE_STATUS_LABEL } from "@/modules/cases/schemas";
 import { hasPortalAccess, listPortalCases, listPortalDocuments } from "@/server/services/portal.service";
+import { MyMessageForm, MyPendingActions } from "@/modules/portal/plus-ui";
+import { listMyMessages, listMyPendings } from "@/server/services/portal-plus.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Portal do cliente" };
@@ -18,11 +21,24 @@ export default async function PortalHome() {
   if (!(await hasPortalAccess(ctx))) {
     return <Alert tone="warning">Seu acesso ao portal não está ativo. Entre em contato com o escritório.</Alert>;
   }
-  const [cases, documents] = await Promise.all([listPortalCases(ctx), listPortalDocuments(ctx)]);
+  const [cases, documents, pendings, messages] = await Promise.all([listPortalCases(ctx), listPortalDocuments(ctx), listMyPendings(ctx), listMyMessages(ctx)]);
   const tz = organization.timezone;
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold tracking-tight">Seus processos e documentos</h1>
+      {pendings.length > 0 ? (
+        <Card>
+          <CardHeader title="O que o escritório precisa de você" description="Pendências para o andamento do seu caso." />
+          <ul className="divide-y divide-border">
+            {pendings.map((p) => (
+              <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
+                <span>{p.title}{p.description ? <span className="block text-xs text-muted">{p.description}</span> : null}{p.dueDate ? <span className="block text-xs text-muted">Até {formatYmd(p.dueDate.toISOString().slice(0, 10))}</span> : null}</span>
+                {p.status === "OPEN" ? <MyPendingActions id={p.id} /> : <Badge>Aguardando conferência da equipe</Badge>}
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
       <Card>
         <CardHeader title="Processos" description="Resumo dos processos que o escritório compartilhou com você." />
         {cases.length === 0 ? <p className="p-6 text-center text-sm text-muted">Nenhum processo compartilhado até o momento.</p> : null}
@@ -54,6 +70,18 @@ export default async function PortalHome() {
             </li>
           ))}
         </ul>
+      </Card>
+    <Card>
+        <CardHeader title="Falar com a equipe" description="Escreva sua dúvida. A equipe responde por aqui." />
+        <div className="space-y-3 p-4">
+          {messages.map((m) => (
+            <div key={m.id} className={`max-w-[85%] rounded-lg px-3 py-2 text-sm ${m.fromClient ? "ml-auto bg-primary/10" : "bg-surface-2"}`}>
+              <p className="whitespace-pre-wrap">{m.body}</p>
+              <p className="mt-1 text-[11px] text-muted">{m.fromClient ? "Você" : "Equipe"} · {formatDate(m.createdAt, tz)}</p>
+            </div>
+          ))}
+          <MyMessageForm />
+        </div>
       </Card>
     </div>
   );

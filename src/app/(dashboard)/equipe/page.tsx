@@ -31,6 +31,8 @@ export default async function TeamPage() {
     <div className="mx-auto max-w-6xl space-y-6">
       <PageHeader title="Equipe e produtividade" description="Carga de trabalho por responsável e registro de horas. Os números vêm de tarefas, prazos e lançamentos reais; itens de processos sigilosos que você não vê não entram na contagem." />
 
+      {team ? <p className="text-sm"><Link href="/equipe/metas" className="text-primary-text hover:underline">Metas mensais e distribuição por peso →</Link></p> : null}
+
       {team ? (
         <Card className="overflow-x-auto">
           <CardHeader title="Carga de trabalho" description={`Em aberto hoje; horas dos últimos ${team.days} dias.`} />

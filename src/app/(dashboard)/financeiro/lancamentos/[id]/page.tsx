@@ -22,6 +22,9 @@ import { can } from "@/server/context";
 import { billingAvailability, billingHistoryForEntry } from "@/server/services/chat-billing.service";
 import { getEntry, listAccounts } from "@/server/services/finance.service";
 import { BillNowButton } from "@/modules/whatsapp/billing-ui";
+import { ChargesCard } from "@/modules/finance/fee-ui";
+import { listFeeCharges } from "@/server/services/fee-charge.service";
+import { db } from "@/lib/db/client";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Lançamento" };
@@ -62,6 +65,8 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
   const showBilling = entry.kind === "RECEIVABLE" && entry.type === "FEE" && open;
   const canBill = canWrite && can(ctx, "whatsapp:write");
   const [billAv, billHist] = showBilling ? await Promise.all([billingAvailability(ctx, entry.id), billingHistoryForEntry(ctx, entry.id)]) : [null, []];
+  const feeCfg = entry.kind === "RECEIVABLE" ? await db.feeAsaasConfig.findUnique({ where: { organizationId: ctx.organizationId }, select: { enabled: true } }) : null;
+  const charges = entry.kind === "RECEIVABLE" ? await listFeeCharges(ctx, entry.id) : [];
   const sign = entry.kind === "RECEIVABLE" ? "Recebido" : "Pago";
   return (
     <div className="mx-auto max-w-4xl">
@@ -110,6 +115,13 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
           <CardBody>
             <PaymentForm entryId={entry.id} accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} defaultAccountId={entry.accountId ?? ""} remaining={remaining} today={today} />
           </CardBody>
+        </Card>
+      ) : null}
+
+      {entry.kind === "RECEIVABLE" && entry.status !== "CANCELED" && (open || charges.length > 0) ? (
+        <Card className="mt-4">
+          <CardHeader title="Cobrança por Pix e boleto" description="Gerada na conta Asaas do escritório. A baixa é automática quando o cliente paga." />
+          <CardBody><ChargesCard entryId={entry.id} enabled={!!feeCfg?.enabled && open} canWrite={canWrite} rows={charges.map((c) => ({ id: c.id, billingType: c.billingType, value: c.value, status: c.status, invoiceUrl: c.invoiceUrl, boletoUrl: c.boletoUrl, pixPayload: c.pixPayload, pixImage: c.pixImage }))} /></CardBody>
         </Card>
       ) : null}
 

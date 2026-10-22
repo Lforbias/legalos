@@ -620,3 +620,13 @@ Plano em `docs/roadmap-4.0.0.md`. Migração `20261216000000_chat_4_0`. Estado: 
 - Só com simulador (confirmar em produção): índices do Banco Central (o sandbox bloqueia o acesso), IA (chave do provedor), números por QR-Code, mensagens agendadas e envio pela Meta.
 - Limites honestos: IA não consulta base de jurisprudência (gera mapa de pesquisa e remove números de processo); anexos de documentos do Astrea não existem no backup (só link); relatório "por dia" usa UTC.
 - `rotate-keys` passou a cobrir credenciais de tribunais e cofre de clientes (lacuna da 3.0 corrigida).
+
+## Versão 5.0.0 (implementada)
+Plano em `docs/roadmap-5.0.0.md`. Migração `20261217000000_calc_5_0` (tabelas `calculations`, `portal_updates`, `client_pendings`, `portal_messages`, `fee_asaas_configs`, `fee_charges`, `fee_contracts`, `notice_triages`, `service_sessions`, `work_goals`). Estado: F1–F6 feitas.
+- **F1 Cálculos:** motores em `src/lib/calc/*` (aritmética de ponto fixo com BigInt), serviço `calculation.service.ts`, telas `/calculos`, `/calculos/novo`, `/calculos/[id]`, `/calculos/indices`, exportação `/api/calculos/[id]/export`. Permissões: ver `cases:read`, salvar `cases:write`, índices `finance:manage`. Tabela TJSP embutida até 2026-07; reajuste INSS até 2025.
+- **F2 Portal:** `portal-plus.service.ts`; andamento só visível após aprovação e com processo compartilhado; mensagens limitadas a 20/hora por cliente.
+- **F3 Cobrança:** `fee-charge.service.ts` (chave do Asaas cifrada, `FeeWebhookAuthError`, baixa idempotente), rota pública `/api/webhooks/fees/[orgId]`; nasce desligada.
+- **F4 Triagem:** `notice-triage.service.ts` + `src/lib/notices/triage-rules.ts`; prazo criado nasce em rascunho.
+- **F5 Copiloto:** `service-session.service.ts`; IA recebe o texto com dados sensíveis mascarados; áudio por `/api/copiloto/audio` (Gemini, 2 créditos).
+- **F6 Metas:** `goals.service.ts`; peso = pontos do tipo de tarefa (sem tipo = 1); distribuição só sugere, aplicação exige `tasks:write`.
+- Testes: `src/tests/unit/calc-engines.test.ts`, `src/tests/integration/f5-50-core.test.ts` e `f5-50-fees.test.ts`.

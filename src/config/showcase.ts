@@ -1,12 +1,12 @@
 /**
  * Conteúdo da página pública /produto. REGRA: só o que existe e foi verificado; nada de cliente, depoimento, preço ou número inventado.
- * Os números abaixo foram conferidos no código e nos testes em 2026-10-21 (atualizar a cada entrega, junto com src/lib/updates.ts).
+ * Os números abaixo foram conferidos no código e nos testes em 2026-10-22 (atualizar a cada entrega, junto com src/lib/updates.ts).
  */
 export const FACTS = {
   spaces: 3,
   permissions: 41,
-  tables: 109,
-  tests: 745,
+  tables: 119,
+  tests: 785,
   e2e: 48,
 } as const;
 

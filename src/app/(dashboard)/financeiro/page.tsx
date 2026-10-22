@@ -45,7 +45,7 @@ export default async function FinancePage() {
       <PageHeader
         title="Financeiro"
         description="Contas a receber e a pagar, baixas e fluxo de caixa. Valores em reais, calculados sem arredondamento de ponto flutuante."
-        actions={can(ctx, "finance:write") ? <Link href="/financeiro/lancamentos/novo" className={bv({})}><Plus className="h-4 w-4" aria-hidden /> Novo lançamento</Link> : undefined}
+        actions={<div className="flex flex-wrap gap-2"><Link href="/financeiro/exito" className={bv({ variant: "secondary" })}>Contratos de êxito</Link>{can(ctx, "finance:manage") ? <Link href="/financeiro/cobranca" className={bv({ variant: "secondary" })}>Cobrança Pix/boleto</Link> : null}{can(ctx, "finance:write") ? <Link href="/financeiro/lancamentos/novo" className={bv({})}><Plus className="h-4 w-4" aria-hidden /> Novo lançamento</Link> : null}</div>}
       />
       <FinanceNav current="visao" />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

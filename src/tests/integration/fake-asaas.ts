@@ -23,7 +23,7 @@ export function startFakeAsaas() {
       const body = raw ? (JSON.parse(raw) as Record<string, unknown>) : null;
       requests.push({ method: req.method ?? "", path, body, token: req.headers["access_token"] as string | undefined });
       const send = (status: number, json: unknown) => { res.writeHead(status, { "content-type": "application/json" }); res.end(JSON.stringify(json)); };
-      if (req.headers["access_token"] !== "chave-de-teste") return send(401, { errors: [{ description: "Chave inválida" }] });
+      if (!String(req.headers["access_token"] ?? "").startsWith("chave-de-teste")) return send(401, { errors: [{ description: "Chave inválida" }] });
       if (state.down) return send(500, { errors: [{ description: "indisponível" }] });
       if (state.failNext && state.failNext.match.test(`${req.method} ${path}`)) {
         const f = state.failNext;
@@ -31,6 +31,25 @@ export function startFakeAsaas() {
         return send(f.status, { errors: [{ description: f.description }] });
       }
       let m: RegExpMatchArray | null;
+      if (req.method === "GET" && path === "/customers") {
+        const ref = url.searchParams.get("externalReference");
+        const data = [...customers.entries()].filter(([, c]) => !ref || c.externalReference === ref).map(([id]) => ({ id }));
+        return send(200, { data });
+      }
+      if (req.method === "POST" && path === "/payments") {
+        const id = nextId("pay");
+        const p: FakePayment & { bankSlipUrl?: string } = { id, customer: String(body?.customer), subscription: "", value: Number(body?.value), status: "PENDING", dueDate: String(body?.dueDate), invoiceUrl: `https://sandbox.asaas.com/i/${id}`, billingType: String(body?.billingType), bankSlipUrl: body?.billingType === "BOLETO" ? `https://sandbox.asaas.com/b/${id}` : undefined };
+        payments.set(id, p);
+        return send(200, p);
+      }
+      if ((m = path.match(/^\/payments\/([^/]+)\/pixQrCode$/)) && req.method === "GET") return send(200, { encodedImage: "aVZCT1J3MEtHZ28=", payload: `00020126PIX${m[1]}`, expirationDate: "2030-01-01" });
+      if ((m = path.match(/^\/payments\/([^/]+)$/)) && req.method === "DELETE") {
+        const p = payments.get(m[1]!);
+        if (!p) return send(404, { errors: [{ description: "Cobrança não encontrada" }] });
+        p.deleted = true;
+        p.status = "DELETED";
+        return send(200, { deleted: true });
+      }
       if (req.method === "POST" && path === "/customers") {
         const id = nextId("cus");
         customers.set(id, body ?? {});

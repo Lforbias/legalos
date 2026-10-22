@@ -10,6 +10,17 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "5.0.0", when: "2026-10-22", title: "Versão 5.0.0: calculadoras, portal em linguagem simples, cobrança Pix/boleto, triagem com minuta, copiloto e metas", migration: "20261217000000_calc_5_0",
+    items: [
+      "Cálculos (menu Cálculos): atrasados da Justiça Federal (INPC e SELIC), débito do TJSP (tabela, SELIC ou híbrido), atualização trabalhista (ADC 58), verbas rescisórias e prazos. Salvo no processo, com planilha Excel/CSV e memorial. Índices do Banco Central sincronizados; tabela do TJSP e reajuste do INSS carregáveis; o que faltar o escritório lança e o sistema nunca inventa índice. É ferramenta de apoio: confira com a decisão e o cálculo oficial.",
+      "Portal do cliente: andamento em linguagem simples (rascunho → revisão humana → só então o cliente vê), pendências do cliente (ele marca como feita, a equipe confirma) e mensagens para a equipe, com aviso ao responsável.",
+      "Cobrança de honorários por Pix e boleto pelo Asaas do escritório, com baixa automática pelo aviso do Asaas (token próprio, idempotente). Contratos de êxito: valor esperado e geração do honorário quando o êxito ocorre. Nasce desligada; teste primeiro no sandbox.",
+      "Triagem de publicações com minuta: o que exige, ato e prazo calculado (ciência presumida pelo DJe) e minuta em rascunho, por regras ou com IA (chave real, IA ligada). Validar é humano; o prazo criado nasce como rascunho.",
+      "Copiloto de atendimento: cole a transcrição (ou envie o áudio para o Gemini) e receba resumo, ações que podem caber, tarefas e documentos. Só vira tarefa o que uma pessoa marcar e revisar. Nada é enviado ao cliente.",
+      "Metas mensais por pessoa e da equipe (tarefas, pontos, prazos, horas) e carga de trabalho por peso (pontos do tipo de tarefa), com sugestão de distribuição das tarefas sem responsável que uma pessoa confirma.",
+    ],
+  },
+  {
     id: "4.0.0", when: "2026-10-21", title: "Versão 4.0.0: Chat no nível do ChatGuru — robô 2.0, campanhas, transcrição, relatórios e segurança", migration: "20261216000000_chat_4_0",
     items: [
       "Etiquetas prontas (por área, origem e responsável), menção a colega nas notas, encaminhar mensagem a até 10 chats, biblioteca de arquivos, checklists enviáveis e status de chat.",
@@ -279,12 +290,12 @@ export const PHASES_4: Phase[] = [
 ];
 
 export const PHASES_5: Phase[] = [
-  { id: "5.0-F1", title: "Calculadoras no sistema (atrasados JF, débitos TJSP, trabalhista e prazos)", status: "a fazer" },
-  { id: "5.0-F2", title: "Portal do cliente com andamento em linguagem simples", status: "a fazer" },
-  { id: "5.0-F3", title: "Cobrança de honorários por Pix e boleto com baixa automática", status: "a fazer" },
-  { id: "5.0-F4", title: "Triagem de publicações com minuta (IA, com validação humana)", status: "a fazer" },
-  { id: "5.0-F5", title: "Copiloto de atendimento (transcrição, resumo e ações)", status: "a fazer" },
-  { id: "5.0-F6", title: "Metas e carga de trabalho por pessoa", status: "a fazer" },
+  { id: "5.0-F1", title: "Calculadoras no sistema (atrasados JF, débitos TJSP, trabalhista e prazos)", status: "feita" },
+  { id: "5.0-F2", title: "Portal do cliente com andamento em linguagem simples", status: "feita" },
+  { id: "5.0-F3", title: "Cobrança de honorários por Pix e boleto com baixa automática", status: "feita" },
+  { id: "5.0-F4", title: "Triagem de publicações com minuta (IA, com validação humana)", status: "feita" },
+  { id: "5.0-F5", title: "Copiloto de atendimento (transcrição, resumo e ações)", status: "feita" },
+  { id: "5.0-F6", title: "Metas e carga de trabalho por pessoa", status: "feita" },
 ];
 
 /** Ações que dependem da equipe (sem código). Tire da lista quando forem feitas. */

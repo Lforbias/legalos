@@ -213,6 +213,16 @@ model Organization {
   announcements           Announcement[]
 
   @@map("organizations")
+  calculations     Calculation[]
+  portalUpdates    PortalUpdate[]
+  clientPendings   ClientPending[]
+  portalMessages   PortalMessage[]
+  feeAsaasConfig   FeeAsaasConfig?
+  feeCharges       FeeCharge[]
+  feeContracts     FeeContract[]
+  noticeTriages    NoticeTriage[]
+  serviceSessions  ServiceSession[]
+  workGoals        WorkGoal[]
 }
 
 model Role {
@@ -3085,4 +3095,225 @@ model WhatsappTranscript {
 
   @@index([organizationId])
   @@map("whatsapp_transcripts")
+}
+
+// =====================================================================================================
+// 5.0 — calculadoras, portal em linguagem simples, cobrança por Pix/boleto, triagem com minuta, copiloto, metas
+// =====================================================================================================
+
+/// 5.0-F1: cálculo salvo (atrasados JF, débitos TJSP, verbas trabalhistas, rescisão, prazos). Guarda entrada e resultado.
+model Calculation {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  caseId         String?  @map("case_id") @db.Uuid
+  kind           String
+  title          String
+  input          Json
+  result         Json
+  total          Decimal  @db.Decimal(14, 2)
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, caseId])
+  @@index([organizationId, createdAt])
+  @@map("calculations")
+}
+
+/// 5.0-F2: texto de andamento em linguagem simples para o cliente. Só aparece no portal depois de aprovado por uma pessoa.
+model PortalUpdate {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  caseId         String    @map("case_id") @db.Uuid
+  sourceEventId  String?   @map("source_event_id") @db.Uuid
+  originalText   String    @map("original_text")
+  plainText      String    @map("plain_text")
+  status         String    @default("DRAFT")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  approvedById   String?   @map("approved_by_id") @db.Uuid
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, caseId, createdAt])
+  @@map("portal_updates")
+}
+
+/// 5.0-F2: pendência que o cliente precisa resolver (levar documento, assinar etc.), visível no portal.
+model ClientPending {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  clientId       String    @map("client_id") @db.Uuid
+  caseId         String?   @map("case_id") @db.Uuid
+  title          String
+  description    String?
+  dueDate        DateTime? @map("due_date") @db.Date
+  status         String    @default("OPEN")
+  clientNote     String?   @map("client_note")
+  doneAt         DateTime? @map("done_at") @db.Timestamptz(3)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, clientId, status])
+  @@map("client_pendings")
+}
+
+/// 5.0-F2: mensagens entre o cliente (portal) e a equipe.
+model PortalMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  clientId       String    @map("client_id") @db.Uuid
+  caseId         String?   @map("case_id") @db.Uuid
+  fromClient     Boolean   @map("from_client")
+  authorId       String?   @map("author_id") @db.Uuid
+  body           String
+  readAt         DateTime? @map("read_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, clientId, createdAt])
+  @@map("portal_messages")
+}
+
+/// 5.0-F3: conta Asaas DO ESCRITÓRIO (chave cifrada) para cobrar honorários por Pix e boleto. Nasce desligada.
+model FeeAsaasConfig {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @unique @map("organization_id") @db.Uuid
+  apiKeyEnc      String   @map("api_key_enc")
+  webhookToken   String   @map("webhook_token")
+  sandbox        Boolean  @default(true)
+  enabled        Boolean  @default(false)
+  accountId      String?  @map("account_id") @db.Uuid
+  updatedById    String?  @map("updated_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("fee_asaas_configs")
+}
+
+/// 5.0-F3: cobrança (Pix ou boleto) gerada para um honorário a receber. A baixa vem do aviso do Asaas.
+model FeeCharge {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  entryId         String    @map("entry_id") @db.Uuid
+  clientId        String    @map("client_id") @db.Uuid
+  asaasPaymentId  String    @unique @map("asaas_payment_id")
+  billingType     String    @map("billing_type")
+  value           Decimal   @db.Decimal(14, 2)
+  dueDate         DateTime  @map("due_date") @db.Date
+  status          String    @default("PENDING")
+  invoiceUrl      String?   @map("invoice_url")
+  boletoUrl       String?   @map("boleto_url")
+  pixPayload      String?   @map("pix_payload")
+  pixImage        String?   @map("pix_image")
+  paidAt          DateTime? @map("paid_at") @db.Timestamptz(3)
+  createdById     String?   @map("created_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, entryId])
+  @@index([organizationId, status])
+  @@map("fee_charges")
+}
+
+/// 5.0-F3: contrato de êxito (honorário só quando o processo render) — o que deve entrar quando terminar.
+model FeeContract {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  clientId       String    @map("client_id") @db.Uuid
+  caseId         String?   @map("case_id") @db.Uuid
+  title          String
+  percent        Decimal?  @db.Decimal(7, 4)
+  fixedAmount    Decimal?  @map("fixed_amount") @db.Decimal(14, 2)
+  baseNote       String?   @map("base_note")
+  expectedBase   Decimal?  @map("expected_base") @db.Decimal(14, 2)
+  status         String    @default("ACTIVE")
+  triggeredAt    DateTime? @map("triggered_at") @db.Timestamptz(3)
+  triggeredBase  Decimal?  @map("triggered_base") @db.Decimal(14, 2)
+  entryId        String?   @map("entry_id") @db.Uuid
+  notes          String?
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@index([organizationId, caseId])
+  @@map("fee_contracts")
+}
+
+/// 5.0-F4: triagem de uma publicação: o que ela exige, prazo calculado e minuta em rascunho. Sempre validada por uma pessoa.
+model NoticeTriage {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  noticeId       String    @unique @map("notice_id") @db.Uuid
+  summary        String
+  requirement    String
+  actKey         String?   @map("act_key")
+  days           Int?
+  countType      String?   @map("count_type")
+  dueDate        DateTime? @map("due_date") @db.Date
+  minuta         String?
+  source         String    @default("RULES")
+  status         String    @default("DRAFT")
+  deadlineId     String?   @map("deadline_id") @db.Uuid
+  validatedById  String?   @map("validated_by_id") @db.Uuid
+  validatedAt    DateTime? @map("validated_at") @db.Timestamptz(3)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, status])
+  @@map("notice_triages")
+}
+
+/// 5.0-F5: sessão do copiloto de atendimento (transcrição → resumo, ações cabíveis, tarefas e documentos sugeridos).
+model ServiceSession {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  clientId       String?   @map("client_id") @db.Uuid
+  caseId         String?   @map("case_id") @db.Uuid
+  title          String
+  transcript     String
+  summary        String?
+  actions        Json      @default("[]")
+  tasks          Json      @default("[]")
+  documents      Json      @default("[]")
+  status         String    @default("DRAFT")
+  tokens         Int       @default(0)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  reviewedAt     DateTime? @map("reviewed_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@map("service_sessions")
+}
+
+/// 5.0-F6: meta mensal por pessoa (ou da equipe, com user_id nulo).
+model WorkGoal {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  month          String
+  metric         String
+  target         Decimal  @db.Decimal(10, 2)
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, month])
+  @@map("work_goals")
 }

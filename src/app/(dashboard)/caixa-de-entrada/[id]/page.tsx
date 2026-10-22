@@ -20,6 +20,9 @@ import { listActiveMembers } from "@/server/services/members";
 import { getNotice } from "@/server/services/notice.service";
 import { suggestAvailability } from "@/server/services/notice-desk.service";
 import { SuggestPanel } from "@/modules/inbox/suggest-panel";
+import { TriagePanel } from "@/modules/inbox/triage-panel";
+import { getTriage, triageAvailability } from "@/server/services/notice-triage.service";
+import { ACTS } from "@/lib/calc/prazos";
 import { listTeams } from "@/server/services/inbox-flow.service";
 import { FlowButtons, NotesPanel, TagsEditor, TeamAssignControl } from "@/modules/inbox/flow-controls";
 import { todayYmd } from "@/lib/dates/ymd";
@@ -48,6 +51,8 @@ export default async function NoticePage({ params }: { params: Promise<{ id: str
   if (n.caseId) q.set("processo", n.caseId);
   const p = n.parsed;
   const sug = await suggestAvailability(ctx);
+  const tri = await getTriage(ctx, n.id);
+  const triAv = triageAvailability(ctx);
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -70,6 +75,12 @@ export default async function NoticePage({ params }: { params: Promise<{ id: str
           <Card>
             <CardHeader title="Teor" />
             <CardBody><p className="whitespace-pre-wrap text-sm">{n.content}</p></CardBody>
+          </Card>
+          <Card>
+            <CardHeader title="Triagem com minuta" description="O que exige, prazo calculado e minuta em rascunho. Sempre validada por uma pessoa." />
+            <CardBody>
+              <TriagePanel key={`${tri?.status}:${tri?.minuta?.length ?? 0}:${tri?.source}`} noticeId={n.id} canWrite={canWrite && open} canAi={triAv.canAi} canDeadline={can(ctx, "deadlines:write")} hasCase={Boolean(n.caseId)} dueFmt={tri?.dueDate ? formatYmd(tri.dueDate) : null} triage={tri ? { summary: tri.summary, requirement: tri.requirement, actLabel: tri.actKey ? ACTS.find((a) => a.key === tri.actKey)?.label ?? null : null, days: tri.days, countType: tri.countType, dueDate: tri.dueDate, minuta: tri.minuta ?? "", source: tri.source, status: tri.status } : null} />
+            </CardBody>
           </Card>
           <Card>
             <CardHeader title="Providências" description="Tarefas e prazos criados a partir desta intimação." />

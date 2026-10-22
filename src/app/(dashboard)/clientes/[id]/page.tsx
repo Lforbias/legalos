@@ -30,6 +30,8 @@ import { clientMessageTarget } from "@/server/services/chat-send.service";
 import { conversationsOfClient } from "@/server/services/chat-links.service";
 import { VaultPanel } from "@/modules/vault/vault-panel";
 import { listClientCredentials, VAULT_SYSTEMS } from "@/server/services/client-vault.service";
+import { ClientPendingsPanel } from "@/modules/portal/plus-ui";
+import { listPendingsForClient } from "@/server/services/portal-plus.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Cliente" };
@@ -153,7 +155,17 @@ export default async function ClientDetailPage({ params, searchParams }: { param
 
       {tab === "portal" ? await (async () => {
         const access = await listPortalAccess(ctx, client.id);
-        return <PortalPanel clientId={client.id} canManage accounts={access.accounts.map((a) => ({ id: a.id, name: a.name, email: a.email }))} invitations={access.invitations.map((i) => ({ id: i.id, email: i.email }))} />;
+        const pend = await listPendingsForClient(ctx, client.id);
+        return (
+          <div className="space-y-6">
+            <PortalPanel clientId={client.id} canManage accounts={access.accounts.map((a) => ({ id: a.id, name: a.name, email: a.email }))} invitations={access.invitations.map((i) => ({ id: i.id, email: i.email }))} />
+            <div>
+              <h2 className="mb-2 text-sm font-semibold">Pendências do cliente</h2>
+              <ClientPendingsPanel clientId={client.id} canWrite={can(ctx, "clients:write")} rows={pend.map((x) => ({ id: x.id, title: x.title, description: x.description, status: x.status, dueDate: x.dueDate ? x.dueDate.toISOString().slice(0, 10) : null, clientNote: x.clientNote }))} />
+              <p className="mt-3 text-sm"><Link className="underline" href={`/portal-equipe/${client.id}`}>Abrir as mensagens deste cliente pelo portal</Link></p>
+            </div>
+          </div>
+        );
       })() : null}
 
       {tab === "cofre" ? await (async () => {

@@ -29,3 +29,6 @@ Origem: conversa de 2026-10-21 sobre "o que mais poderíamos fazer". Não é com
 - Vender o LegalOS para outros escritórios: página de planos, cadastro com teste grátis, marca própria por escritório.
 
 Regras que valem para toda a 5.0: IA só com chave real e sempre com aprovação humana; nada fala com cliente sem autorização humana; toda automação tem chave liga/desliga; nada de dados inventados.
+
+## Estado (2026-10-22)
+F1 a F6 **feitas** (ver `CHANGELOG.md` 5.0.0 e `PHASES_5`). Migração `20261217000000_calc_5_0`. Pendências do lado da equipe: lançar índices (BCB, reajuste INSS 2026, IPCA-E, TR, salário mínimo), configurar Asaas no sandbox antes da produção, `GEMINI_API_KEY`/chave de IA se quiser triagem com IA, transcrição e copiloto.

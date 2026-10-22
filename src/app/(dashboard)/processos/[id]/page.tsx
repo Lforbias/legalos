@@ -53,6 +53,10 @@ import { indexCoverage } from "@/server/services/monetary-index.service";
 import { listCaseOptions } from "@/server/services/case.service";
 import { LinkedDocumentsCard } from "@/modules/documents/linked-ui";
 import { listLinkedDocuments } from "@/server/services/linked-document.service";
+import { PlainUpdatesPanel } from "@/modules/portal/plus-ui";
+import { listPortalUpdatesForCase } from "@/server/services/portal-plus.service";
+import { listCalculations } from "@/server/services/calculation.service";
+import { CALC_KINDS, CALC_KIND_LABEL } from "@/modules/calculos/schemas";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Processo" };
@@ -113,6 +117,7 @@ export default async function CaseDetailPage({
     ...(canDocs ? [{ key: "documentos", label: "Documentos" }] : []),
     ...(canPetitions ? [{ key: "peticoes", label: "Petições" }] : []),
     ...(can(ctx, "finance:read") ? [{ key: "honorarios", label: "Honorários" }] : []),
+    ...(can(ctx, "cases:write") ? [{ key: "portal", label: "Portal do cliente" }] : []),
     { key: "recursos", label: "Recursos e apensos" },
     { key: "valores", label: "Valores" },
     { key: "historico", label: "Histórico" },
@@ -135,6 +140,8 @@ export default async function CaseDetailPage({
   const linkOptions = tab === "recursos" && canWrite ? (await listCaseOptions(ctx)).filter((o) => o.id !== c.id) : [];
   const valuation = tab === "valores" ? await getValuation(ctx, c.id) : null;
   const coverage = tab === "valores" ? await indexCoverage(ctx) : [];
+  const caseCalcs = tab === "valores" ? await listCalculations(ctx, { caseId: c.id }) : [];
+  const portalUpdates = tab === "portal" ? await listPortalUpdatesForCase(ctx, c.id) : [];
   const history = tab === "historico" ? await consolidatedHistory(ctx, c.id) : null;
   const responsible = c.members.find((m) => m.role === "RESPONSIBLE");
 
@@ -456,8 +463,35 @@ export default async function CaseDetailPage({
         </div>
       ) : null}
 
+      {tab === "portal" ? (
+        <Card>
+          <CardHeader title="Andamentos em linguagem simples" description="O cliente só vê o que uma pessoa da equipe aprovar." />
+          <CardBody><PlainUpdatesPanel caseId={c.id} shared={c.sharedWithPortal} canWrite={can(ctx, "cases:write")} rows={portalUpdates.map((u) => ({ id: u.id, originalText: u.originalText, plainText: u.plainText, status: u.status }))} /></CardBody>
+        </Card>
+      ) : null}
+
       {tab === "valores" && valuation ? (
         <div className="space-y-4">
+          <Card>
+            <CardHeader title="Cálculos do processo" description="Atrasados, débitos, verbas e prazos calculados e salvos neste processo. Ferramenta de apoio." />
+            <CardBody>
+              {caseCalcs.length === 0 ? <p className="text-sm text-muted">Nenhum cálculo salvo neste processo.</p> : (
+                <ul className="mb-3 divide-y divide-border">
+                  {caseCalcs.map((x) => (
+                    <li key={x.id} className="flex flex-wrap justify-between gap-2 py-2 text-sm">
+                      <Link href={`/calculos/${x.id}`} className="font-medium hover:underline">{x.title}</Link>
+                      <span className="text-xs text-muted">{x.kind !== "PRAZO" ? formatMoneyBR(x.total) : "prazo"} · {x.createdAt.toLocaleDateString("pt-BR")}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {can(ctx, "cases:write") ? (
+                <div className="flex flex-wrap gap-2">
+                  {CALC_KINDS.map((k) => <Link key={k} href={`/calculos/novo?tipo=${k}&processo=${c.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>{CALC_KIND_LABEL[k]}</Link>)}
+                </div>
+              ) : null}
+            </CardBody>
+          </Card>
           <Card>
             <CardHeader title="Valor da causa e provisão corrigidos" description={`Correção monetária até ${formatYmd(valuation.today)}${valuation.index ? ` pelo ${INDEX_LABEL[valuation.index as keyof typeof INDEX_LABEL]}` : ""}. Estimativa de apoio: usa os índices mensais cadastrados e NÃO substitui o cálculo oficial do juízo.`} />
             <CardBody>
