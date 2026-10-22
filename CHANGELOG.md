@@ -3,6 +3,17 @@
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.
 
+## 4.0.0
+Chat no nível do ChatGuru. Migração nova: `20261216000000_chat_4_0`. Sem rotina nova: tudo roda dentro de `chat-extras` (a cada minuto).
+
+- F1/F2/F4 etiquetas prontas, menção a colega, encaminhar a até 10 chats, biblioteca de arquivos, checklists enviáveis, status de chat e encerramento automático por inatividade (só encerra; não escreve ao cliente).
+- F5/F9 diálogos do robô (tempo sem resposta, aniversário, audiência/perícia da Agenda ligada ao cliente, horário), entrega ao advogado responsável e intenções por pontuação de palavras. Tudo desligado por padrão; opt-out respeitado; fora da janela só modelo aprovado.
+- F6 relatórios por status, chats adicionados, tempo por usuário e acessos; resumo por e-mail (só números; exige SMTP).
+- F7 campanhas: rascunho → aprovação humana → envio gradual (20 por minuto), máx. 500, modelo obrigatório na Meta, relatório por destinatário.
+- F8 pesquisa de satisfação opcional ao encerrar. F9 transcrição de áudio via Gemini (2 créditos; `GEMINI_API_KEY`).
+- F10 IP permitido (CIDR; trava anti-bloqueio), saída por inatividade (mín. 10 min), sessões da equipe e módulos por plano (`mod:campanhas`, `mod:ia`, `mod:cofre` em `Plan.features`; plano sem `mod:` libera tudo).
+- Limites conhecidos: Gemini só testado contra simulador; status das campanhas só muda no envio (não pelo recibo de leitura); a lista de conversas ainda não mostra o status de chat (só dentro da conversa); relatórios por dia em UTC; F11 depende de telas do ChatGuru ainda não vistas.
+
 ## 2.0.0
 Fechamento da 2.0. Migrações novas: `20261208000000_f3_kanban`, `20261209000000_f4_financeiro`, `20261210000000_f5_processo`, `20261211000000_f7_documentos_link`, `20261212000000_f8_varios_numeros`, `20261213000000_f9_chat_extras`, `20261214000000_f10_ia`, `20261215000000_f11_cofre`.
 

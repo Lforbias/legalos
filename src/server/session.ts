@@ -6,6 +6,7 @@ import { db } from "@/lib/db/client";
 import { mfaBlockedFor } from "@/lib/mfa-policy";
 import type { RequestMeta, TenantContext } from "@/server/context";
 import { getSessionByToken, type ValidSession } from "@/server/services/auth.service";
+import { checkOrgAccess } from "@/server/services/org-security.service";
 import { resolveTenantContext } from "@/server/services/tenant.service";
 
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
@@ -54,6 +55,8 @@ export async function requireSession(): Promise<ValidSession> {
 export type Tenant = {
   /** O escritório exige 2FA e esta pessoa ainda não ativou: só a tela de ativação é permitida. */
   mfaBlocked: boolean;
+  /** Segurança da conta: acesso fora dos IPs permitidos ("ip") ou sessão parada além do limite ("idle"). */
+  accessBlocked: "ip" | "idle" | null;
   session: ValidSession;
   ctx: TenantContext;
   organization: { id: string; name: string; slug: string; timezone: string };
@@ -92,19 +95,23 @@ const loadTenant = cache(async (): Promise<Tenant | null> => {
     const m = await db.userMfa.findUnique({ where: { userId: session.user.id }, select: { enabledAt: true } });
     mfaBlocked = mfaBlockedFor(organization.requireMfa, ctx.roleKey, Boolean(m?.enabledAt));
   }
-  return { mfaBlocked, session, ctx, organization: { id: organization.id, name: organization.name, slug: organization.slug, timezone: organization.timezone } };
+  const verdict = await checkOrgAccess(organization.id, meta.ipAddress ?? null, session.lastSeenAt);
+  if (verdict === "idle") await db.session.updateMany({ where: { id: session.id, revokedAt: null }, data: { revokedAt: new Date() } });
+  return { mfaBlocked, accessBlocked: verdict === "ok" ? null : verdict, session, ctx, organization: { id: organization.id, name: organization.name, slug: organization.slug, timezone: organization.timezone } };
 });
 
 /** Para rotas de API: devolve null (sem acesso) enquanto a pessoa não cumprir a exigência de 2FA do escritório. */
 export async function getTenant(): Promise<Tenant | null> {
   const t = await loadTenant();
-  return t && !t.mfaBlocked ? t : null;
+  return t && !t.mfaBlocked && !t.accessBlocked ? t : null;
 }
 
 export async function requireTenant(): Promise<Tenant> {
   const session = await getSession();
   if (!session) redirect("/login");
   const tenant = await loadTenant();
+  if (tenant?.accessBlocked === "idle") redirect("/login?motivo=inatividade");
+  if (tenant?.accessBlocked === "ip") redirect("/acesso-bloqueado");
   if (tenant?.mfaBlocked) redirect("/exigir-2fa");
   if (!tenant) {
     const suspended = await db.membership.findFirst({ where: { userId: session.user.id, status: "ACTIVE", organization: { deletedAt: null, suspendedAt: { not: null } } }, select: { id: true } });

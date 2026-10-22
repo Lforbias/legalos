@@ -35,7 +35,7 @@ export async function restartNumberQrAction(id: string): Promise<ActionState> {
 }
 
 // ---- chaves e formulários ----
-export async function setExtrasSettingsAction(input: { scheduledEnabled?: boolean; npsEnabled?: boolean; aiSummaryEnabled?: boolean; npsQuestion?: string }): Promise<ActionState> {
+export async function setExtrasSettingsAction(input: Partial<Record<"scheduledEnabled" | "npsEnabled" | "aiSummaryEnabled" | "archiveEnabled" | "npsAutoOnClose" | "campaignsEnabled" | "delegateEnabled" | "intentsEnabled" | "transcribeEnabled", boolean>> & { npsQuestion?: string; archiveDays?: number }): Promise<ActionState> {
   return runAction(async () => { const { ctx } = await requireTenant(); await setExtrasSettings(ctx, input); done("/atendimento/configuracoes"); return undefined; });
 }
 export async function saveFormAction(id: string | null, input: { name: string; fields: { fieldId: string; required: boolean }[]; active?: boolean }): Promise<ActionState<{ id: string }>> {

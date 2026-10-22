@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
+import { logger } from "@/lib/logging/logger";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { deleteObject, putObject } from "@/lib/storage/local-storage";
 import { markAsRead, sendTemplate as apiSendTemplate, WhatsappApiError, type OutKind } from "@/lib/whatsapp/client";
@@ -219,6 +220,8 @@ export async function addNote(ctx: TenantContext, conversationId: string, text: 
   const body = cleanText(text);
   await loadConversation(ctx, conversationId);
   const m = await db.whatsappMessage.create({ data: { organizationId: ctx.organizationId, conversationId, direction: "NOTE", type: "text", body, status: "NOTE", authorId: ctx.userId } });
+  const { notifyMentions } = await import("./chat-tools.service"); // menção a colega (@nome): só avisa dentro do sistema
+  await notifyMentions(ctx, conversationId, body);
   return { id: m.id };
 }
 
@@ -236,7 +239,12 @@ export async function assignConversation(ctx: TenantContext, conversationId: str
 export async function setConversationStatus(ctx: TenantContext, conversationId: string, status: "OPEN" | "CLOSED") {
   assertCan(ctx, "whatsapp:write");
   await loadConversation(ctx, conversationId);
+  const before = await db.whatsappConversation.findUnique({ where: { id: conversationId }, select: { status: true } });
   await db.whatsappConversation.update({ where: { id: conversationId }, data: { status } });
+  if (status === "CLOSED" && before?.status !== "CLOSED") {
+    const { autoSurveyOnClose } = await import("./chat-extras.service"); // NPS automático ao encerrar (só com a chave ligada)
+    await autoSurveyOnClose(ctx.organizationId, conversationId, ctx.userId).catch((e) => logger.warn("chat.auto_survey_failed", { error: e instanceof Error ? e.message : String(e) }));
+  }
 }
 
 export async function linkClient(ctx: TenantContext, conversationId: string, clientId: string | null) {

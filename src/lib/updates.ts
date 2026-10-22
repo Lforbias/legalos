@@ -10,6 +10,18 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "4.0.0", when: "2026-10-21", title: "Versão 4.0.0: Chat no nível do ChatGuru — robô 2.0, campanhas, transcrição, relatórios e segurança", migration: "20261216000000_chat_4_0",
+    items: [
+      "Etiquetas prontas (por área, origem e responsável), menção a colega nas notas, encaminhar mensagem a até 10 chats, biblioteca de arquivos, checklists enviáveis e status de chat.",
+      "Encerramento automático de conversas paradas (só encerra, não escreve ao cliente) e pesquisa de satisfação opcional ao encerrar.",
+      "Robô 2.0: diálogos (reenvio por tempo sem resposta, parabéns, aviso de audiência/perícia, resposta sobre horário) e entrega da conversa ao advogado responsável; intenções por pontuação de palavras (sem IA). Tudo nasce desligado e respeita quem pediu para parar.",
+      "Campanhas em massa controladas: rascunho, aprovação humana, envio gradual, no máximo 500 clientes, modelo obrigatório na API oficial, relatório por destinatário. Desligadas por padrão.",
+      "Transcrição de áudio pelo Gemini (2 créditos por áudio; precisa de GEMINI_API_KEY, da chave do Chat e da IA ligada).",
+      "Relatórios novos (por status, chats adicionados, tempo por usuário, acessos) e resumo agendado por e-mail com números do período.",
+      "Segurança da conta: IP permitido (com trava anti-bloqueio), saída por inatividade, sessões da equipe; módulos por plano (campanhas, IA, cofre).",
+    ],
+  },
+  {
     id: "2.0.0", when: "2026-10-21", title: "Versão 2.0.0: Kanban, financeiro, processo, Astrea, Chat completo, IA e cofre de clientes", migration: "20261208000000_f3_kanban … 20261215000000_f11_cofre",
     items: [
       "Kanban de gestão e pacotes de tarefas; financeiro com fluxo anual, faturas e boleto; processo com honorário, apensos, recursos, provisão e correção por índices oficiais.",
@@ -253,16 +265,16 @@ export const PHASES_3: Phase[] = [
 ];
 
 export const PHASES_4: Phase[] = [
-  { id: "4.0-F1", title: "Etiquetas pré-definidas, menção a colega e encaminhar a vários chats", status: "a fazer" },
-  { id: "4.0-F2", title: "Biblioteca de arquivos e checklists enviáveis no chat", status: "a fazer" },
-  { id: "4.0-F3", title: "Vários números de WhatsApp com status e reconexão", status: "a fazer" },
-  { id: "4.0-F4", title: "Status de chat e arquivamento automático", status: "a fazer" },
-  { id: "4.0-F5", title: "Bot 2.0: horário, audiência/perícia, aniversário, timer e delegador", status: "a fazer" },
-  { id: "4.0-F6", title: "Relatórios de atendimento e exportação agendada", status: "a fazer" },
-  { id: "4.0-F7", title: "Campanhas em massa controladas", status: "a fazer" },
-  { id: "4.0-F8", title: "NPS pós-atendimento", status: "a fazer" },
-  { id: "4.0-F9", title: "Intenções, transcrição e resumo por IA", status: "a fazer" },
-  { id: "4.0-F10", title: "Módulos por plano e segurança da conta", status: "a fazer" },
+  { id: "4.0-F1", title: "Etiquetas pré-definidas, menção a colega e encaminhar a vários chats", status: "feita" },
+  { id: "4.0-F2", title: "Biblioteca de arquivos e checklists enviáveis no chat", status: "feita" },
+  { id: "4.0-F3", title: "Vários números de WhatsApp com status e reconexão", status: "feita" },
+  { id: "4.0-F4", title: "Status de chat e arquivamento automático", status: "feita" },
+  { id: "4.0-F5", title: "Bot 2.0: horário, audiência/perícia, aniversário, timer e delegador", status: "feita" },
+  { id: "4.0-F6", title: "Relatórios de atendimento e exportação agendada", status: "feita" },
+  { id: "4.0-F7", title: "Campanhas em massa controladas", status: "feita" },
+  { id: "4.0-F8", title: "NPS pós-atendimento", status: "feita" },
+  { id: "4.0-F9", title: "Intenções, transcrição e resumo por IA", status: "feita" },
+  { id: "4.0-F10", title: "Módulos por plano e segurança da conta", status: "feita" },
   { id: "4.0-F11", title: "Completar com o que aparecer nas telas ainda não vistas do ChatGuru", status: "a fazer" },
 ];
 
@@ -289,6 +301,10 @@ export const PHASES_6: Phase[] = [
 ];
 
 export const TEAM_TODO: string[] = [
+  "4.0: fornecer a chave do Gemini (GEMINI_API_KEY, opcional GEMINI_MODEL) para a transcrição de áudio e conferir o modelo na conta Google; só foi testada contra simulador.",
+  "4.0: rodar install-cron.sh de novo não é necessário (tudo roda dentro da rotina chat-extras), mas conferir em Developer → Rotinas que ela está rodando a cada minuto.",
+  "4.0: antes de ligar campanhas, diálogos ou intenções, revisar os textos e começar com poucos clientes; mensagem em massa pode gerar bloqueio no WhatsApp.",
+  "4.0: o resumo por e-mail só sai com o envio de e-mail (SMTP) configurado; sem ele nada é enfileirado.",
   "Manter a cobrança pelo WhatsApp DESLIGADA até a Dra. Talita autorizar.",
   "Trocar a chave de API do ChatGuru (ela apareceu no chat) e, depois, reinstalar o agendador no servidor (install-cron.sh) para ativar a rotina chat-sla.",
   "Configurar fila e atendente de cada área em Configurações do Chat → Triagem por área; depois ligar SLA e regras.",

@@ -7,11 +7,16 @@ import { safeNext } from "@/server/action-helpers";
 
 export const metadata: Metadata = { title: "Entrar" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; invite?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; invite?: string; motivo?: string }> }) {
   const sp = await searchParams;
   if (await getSession()) redirect(sp.invite ? `/accept-invite?token=${encodeURIComponent(sp.invite)}` : safeNext(sp.next));
   return (
     <>
+      {sp.motivo === "inatividade" ? (
+        <Alert tone="info" className="mb-4">
+          Você saiu automaticamente por ficar um tempo sem usar o sistema. Entre novamente.
+        </Alert>
+      ) : null}
       {sp.invite ? (
         <Alert tone="info" className="mb-4">
           Entre com a conta do e-mail convidado para aceitar o convite.

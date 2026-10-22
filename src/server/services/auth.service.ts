@@ -177,6 +177,8 @@ export async function completeMfaLogin(challengeToken: string, code: string, met
 export type ValidSession = {
   id: string;
   activeOrganizationId: string | null;
+  /** Último uso da sessão ANTES desta requisição (para a saída por inatividade). */
+  lastSeenAt: Date;
   user: PublicUser;
 };
 
@@ -190,7 +192,7 @@ export async function getSessionByToken(token: string): Promise<ValidSession | n
     await db.session.update({ where: { id: session.id }, data: { lastSeenAt: new Date() } });
   }
   const { disabledAt: _d, ...user } = session.user;
-  return { id: session.id, activeOrganizationId: session.activeOrganizationId, user };
+  return { id: session.id, activeOrganizationId: session.activeOrganizationId, lastSeenAt: session.lastSeenAt, user };
 }
 
 export async function logout(token: string, meta: RequestMeta) {

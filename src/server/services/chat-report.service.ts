@@ -2,6 +2,8 @@ import { db } from "@/lib/db/client";
 import { ValidationError } from "@/lib/permissions/check";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
+import { enqueueMail } from "./mail-outbox.service";
+import { logger } from "@/lib/logging/logger";
 
 /**
  * Relatórios e exportação do LegalOS Chat. Tudo calculado das mensagens reais (nada estimado).
@@ -29,8 +31,11 @@ export type ChatReport = {
 /** Tempo até a primeira resposta HUMANA (mensagem de saída não automática) depois da primeira mensagem do cliente no período. */
 export async function chatReport(ctx: TenantContext, range: ChatReportRange): Promise<ChatReport> {
   assertCan(ctx, "whatsapp:manage");
+  return computeChatReport(ctx.organizationId, range);
+}
+
+export async function computeChatReport(org: string, range: ChatReportRange): Promise<ChatReport> {
   checkRange(range);
-  const org = ctx.organizationId;
   const [msgs, convs, accounts] = await Promise.all([
     db.whatsappMessage.findMany({ where: { organizationId: org, createdAt: { gte: range.from, lt: range.to } }, orderBy: { createdAt: "asc" }, select: { conversationId: true, direction: true, automatic: true, createdAt: true, conversation: { select: { accountId: true, assignedToId: true } } } }),
     db.whatsappConversation.findMany({ where: { organizationId: org, OR: [{ lastMessageAt: { gte: range.from, lt: range.to } }, { createdAt: { gte: range.from, lt: range.to } }] }, select: { id: true, accountId: true, status: true, assignedToId: true, lastInboundAt: true } }),
@@ -120,4 +125,129 @@ export async function exportAllCsv(ctx: TenantContext, range: ChatReportRange, a
   const rows = await db.whatsappMessage.findMany({ where, orderBy: { createdAt: "asc" }, select: SEL });
   await audit({ action: "whatsapp.export_all", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "whatsapp_export", metadata: { messages: rows.length, from: range.from.toISOString(), to: range.to.toISOString(), accountId: accountId ?? null }, meta: ctx.meta });
   return { filename: `chat-${range.from.toISOString().slice(0, 10)}_${range.to.toISOString().slice(0, 10)}.csv`, csv: toCsv(rows), count: rows.length };
+}
+
+
+// ======================= 4.0-F6: relatórios novos =======================
+
+export type ChatReportExtra = {
+  byStatus: { statusId: string | null; name: string; conversations: number; messages: number }[];
+  added: { day: string; count: number }[];
+  addedByNumber: { accountId: string; label: string; count: number }[];
+  responseByUser: { userId: string; name: string; replies: number; avgFirstResponseMinutes: number | null }[];
+  logins: { userId: string; name: string; logins: number; lastLoginAt: Date | null }[];
+};
+
+/** Mensagens por status do chat, chats adicionados por dia/número, tempo de 1ª resposta por usuário e acessos (logins) da equipe. */
+export async function chatReportExtra(ctx: TenantContext, range: ChatReportRange): Promise<ChatReportExtra> {
+  assertCan(ctx, "whatsapp:manage");
+  checkRange(range);
+  const org = ctx.organizationId;
+  const [statuses, convs, msgs, accounts, members] = await Promise.all([
+    db.whatsappChatStatus.findMany({ where: { organizationId: org }, select: { id: true, name: true } }),
+    db.whatsappConversation.findMany({ where: { organizationId: org, OR: [{ createdAt: { gte: range.from, lt: range.to } }, { lastMessageAt: { gte: range.from, lt: range.to } }] }, select: { id: true, createdAt: true, accountId: true, chatStatusId: true } }),
+    db.whatsappMessage.findMany({ where: { organizationId: org, createdAt: { gte: range.from, lt: range.to }, direction: { in: ["IN", "OUT"] } }, orderBy: { createdAt: "asc" }, select: { conversationId: true, direction: true, automatic: true, authorId: true, createdAt: true } }),
+    db.whatsappAccount.findMany({ where: { organizationId: org }, select: { id: true, label: true } }),
+    db.membership.findMany({ where: { organizationId: org, status: "ACTIVE" }, select: { userId: true, user: { select: { name: true } } } }),
+  ]);
+  const sname = new Map(statuses.map((s) => [s.id, s.name]));
+  const convStatus = new Map(convs.map((c) => [c.id, c.chatStatusId]));
+  const by = new Map<string | null, { c: number; m: number }>();
+  for (const c of convs) { const v = by.get(c.chatStatusId) ?? { c: 0, m: 0 }; v.c++; by.set(c.chatStatusId, v); }
+  for (const m of msgs) { const k = convStatus.get(m.conversationId) ?? null; const v = by.get(k) ?? { c: 0, m: 0 }; v.m++; by.set(k, v); }
+  const created = convs.filter((c) => c.createdAt >= range.from && c.createdAt < range.to);
+  const day = new Map<string, number>();
+  const num = new Map<string, number>();
+  for (const c of created) { const k = c.createdAt.toISOString().slice(0, 10); day.set(k, (day.get(k) ?? 0) + 1); num.set(c.accountId, (num.get(c.accountId) ?? 0) + 1); }
+  const label = new Map(accounts.map((a) => [a.id, a.label]));
+  const uname = new Map(members.map((m) => [m.userId, m.user.name]));
+  const firstIn = new Map<string, Date>(), answered = new Set<string>();
+  const resp = new Map<string, { n: number; waits: number[] }>();
+  for (const m of msgs) {
+    if (m.direction === "IN" && !firstIn.has(m.conversationId)) firstIn.set(m.conversationId, m.createdAt);
+    else if (m.direction === "OUT" && !m.automatic && m.authorId) {
+      const r = resp.get(m.authorId) ?? { n: 0, waits: [] };
+      r.n++;
+      if (firstIn.has(m.conversationId) && !answered.has(m.conversationId)) { answered.add(m.conversationId); r.waits.push((m.createdAt.getTime() - firstIn.get(m.conversationId)!.getTime()) / 60_000); }
+      resp.set(m.authorId, r);
+    }
+  }
+  const logins = await db.auditLog.groupBy({ by: ["userId"], where: { action: "auth.login", result: "SUCCESS", createdAt: { gte: range.from, lt: range.to }, userId: { in: members.map((m) => m.userId) } }, _count: true, _max: { createdAt: true } });
+  return {
+    byStatus: [...by].map(([id, v]) => ({ statusId: id, name: id ? sname.get(id) ?? "Status" : "Sem status", conversations: v.c, messages: v.m })).sort((a, b) => b.messages - a.messages),
+    added: [...day].map(([d, count]) => ({ day: d, count })).sort((a, b) => a.day.localeCompare(b.day)),
+    addedByNumber: [...num].map(([id, count]) => ({ accountId: id, label: label.get(id) ?? "Número", count })).sort((a, b) => b.count - a.count),
+    responseByUser: [...resp].map(([id, v]) => ({ userId: id, name: uname.get(id) ?? "Usuário", replies: v.n, avgFirstResponseMinutes: v.waits.length ? Math.round((v.waits.reduce((a, b) => a + b, 0) / v.waits.length) * 10) / 10 : null })).sort((a, b) => b.replies - a.replies),
+    logins: logins.filter((l) => l.userId).map((l) => ({ userId: l.userId!, name: uname.get(l.userId!) ?? "Usuário", logins: l._count, lastLoginAt: l._max.createdAt })).sort((a, b) => b.logins - a.logins),
+  };
+}
+
+// ======================= exportação agendada por e-mail =======================
+
+export const FREQUENCY_LABEL: Record<string, string> = { DAILY: "Todo dia", WEEKLY: "Toda segunda-feira", MONTHLY: "Todo dia 1º do mês" };
+const EMAIL_RE = /^[^<>@\s,;]+@[^<>@\s,;]+\.[^<>@\s,;]+$/;
+
+export async function getReportSchedule(ctx: TenantContext) {
+  assertCan(ctx, "whatsapp:manage");
+  const s = await db.whatsappReportSchedule.findUnique({ where: { organizationId: ctx.organizationId } });
+  return { enabled: s?.enabled ?? false, frequency: s?.frequency ?? "WEEKLY", recipients: s?.recipients ?? [], lastSentAt: s?.lastSentAt ?? null };
+}
+
+export async function saveReportSchedule(ctx: TenantContext, input: { enabled: boolean; frequency: string; recipients: string[] }) {
+  assertCan(ctx, "whatsapp:manage");
+  if (!(input.frequency in FREQUENCY_LABEL)) throw new ValidationError("Frequência inválida.", { frequency: ["Frequência inválida."] });
+  const rec = [...new Set(input.recipients.map((r) => r.trim().toLowerCase()).filter(Boolean))];
+  if (rec.length > 10) throw new ValidationError("No máximo 10 e-mails.", { recipients: ["Máximo 10."] });
+  for (const r of rec) if (!EMAIL_RE.test(r)) throw new ValidationError(`“${r}” não parece um e-mail válido.`, { recipients: [`E-mail inválido: ${r}`] });
+  if (input.enabled && rec.length === 0) throw new ValidationError("Informe ao menos um e-mail.", { recipients: ["Informe ao menos um e-mail."] });
+  const data = { enabled: input.enabled, frequency: input.frequency, recipients: rec };
+  await db.whatsappReportSchedule.upsert({ where: { organizationId: ctx.organizationId }, create: { organizationId: ctx.organizationId, ...data }, update: data });
+  await audit({ action: "whatsapp.report_schedule", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "whatsapp_report", metadata: { ...data, recipients: rec.length }, meta: ctx.meta });
+}
+
+function reportText(orgName: string, label: string, r: ChatReport): string {
+  const fr = r.firstResponse.avgMinutes === null ? "sem dados" : `${r.firstResponse.avgMinutes} min (média)`;
+  return [
+    `Resumo do atendimento — ${orgName}`, label, "",
+    `Conversas: ${r.totals.conversations} (${r.totals.open} abertas, ${r.totals.closed} encerradas)`,
+    `Mensagens: ${r.totals.messagesIn} recebidas, ${r.totals.messagesOut} enviadas`,
+    `Sem resposta humana: ${r.totals.unanswered}`,
+    `Tempo até a 1ª resposta: ${fr}`, "",
+    "Por atendente:", ...r.byAgent.slice(0, 10).map((a) => `- ${a.name}: ${a.conversations} conversas, ${a.messagesOut} mensagens`), "",
+    "Este e-mail traz só números do período (sem nomes de clientes nem conteúdo de conversas). Para o detalhe, abra Atendimento > Relatórios no LegalOS.",
+  ].join("\n");
+}
+
+/** Rotina: envia o resumo do período anterior. Diário (após 7h), segunda-feira (semana anterior) ou dia 1º (mês anterior). Uma vez por período e e-mail. */
+export async function runReportSchedules(now = new Date()): Promise<{ orgs: number; queued: number }> {
+  const res = { orgs: 0, queued: 0 };
+  const all = await db.whatsappReportSchedule.findMany({ where: { enabled: true } });
+  for (const s of all) {
+    try {
+      const org = await db.organization.findFirst({ where: { id: s.organizationId, deletedAt: null }, select: { name: true, timezone: true } });
+      if (!org) continue;
+      const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: org.timezone, hour: "2-digit", hour12: false }).format(now)) % 24;
+      if (hour < 7) continue;
+      const { todayYmd, addDays, weekday, ymdToDate } = await import("@/lib/dates/ymd");
+      const today = todayYmd(org.timezone, now);
+      let fromY: string, label: string;
+      if (s.frequency === "DAILY") { fromY = addDays(today, -1); label = `Dia ${fromY.split("-").reverse().join("/")}`; }
+      else if (s.frequency === "WEEKLY") { if (weekday(today) !== 1) continue; fromY = addDays(today, -7); label = `Semana de ${fromY.split("-").reverse().join("/")} a ${addDays(today, -1).split("-").reverse().join("/")}`; }
+      else { if (!today.endsWith("-01")) continue; const [y, m] = today.split("-").map(Number) as [number, number]; fromY = m === 1 ? `${y - 1}-12-01` : `${y}-${String(m - 1).padStart(2, "0")}-01`; label = `Mês ${fromY.slice(5, 7)}/${fromY.slice(0, 4)}`; }
+      // limites em UTC a partir da data local (diferença de fuso de poucas horas é aceitável para um resumo)
+      const range = { from: ymdToDate(fromY), to: ymdToDate(today) };
+      const report = await computeChatReport(s.organizationId, range);
+      const text = reportText(org.name, label, report);
+      let any = false;
+      for (const to of s.recipients) {
+        const q = await enqueueMail({ organizationId: s.organizationId, kind: "chat.report", to, subject: `Resumo do atendimento — ${label}`, text, dedupeKey: `chat.report:${s.organizationId}:${fromY}:${s.frequency}:${to}` });
+        if (q.queued) { res.queued++; any = true; }
+      }
+      if (any) await db.whatsappReportSchedule.update({ where: { organizationId: s.organizationId }, data: { lastSentAt: now } });
+      res.orgs++;
+    } catch (e) {
+      logger.error("whatsapp.report_schedule_failed", { organizationId: s.organizationId, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
+  return res;
 }

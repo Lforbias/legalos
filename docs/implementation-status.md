@@ -537,8 +537,13 @@ Não vistos por falta de acesso: criação de peça (créditos do Astrea acabara
 - Testes: `notice-desk.test.ts` (6) e E2E da Caixa de entrada ampliado. Total: 542 testes, 34 E2E.
 
 
-## Versão 4.0.0 (planejada)
-Plano em `docs/roadmap-4.0.0.md`: inventário do ChatGuru (leitura apenas, 2026-10-21) comparado ao LegalOS, com 11 fases. Nenhuma implementada ainda. Lista em `PHASES_4` (`src/lib/updates.ts`), exibida em /admin/developer.
+## Versão 4.0.0 (implementada, fase F11 pendente)
+Plano em `docs/roadmap-4.0.0.md`. Migração `20261216000000_chat_4_0`. Estado: F1–F10 feitas; F11 (telas do ChatGuru ainda não vistas) a fazer. Lista em `PHASES_4` (`src/lib/updates.ts`).
+- **Serviços:** `chat-tools.service.ts` (etiquetas prontas, menção, encaminhar, biblioteca, checklists, status, arquivamento), `chat-dialogs.service.ts` (diálogos TIMER/BIRTHDAY/HEARING/HOURS, entrega ao responsável, intenções por pontuação), `chat-campaigns.service.ts` (rascunho → aprovação → lote de 20/min), `chat-transcribe.service.ts` + `lib/ai/gemini.ts` (Gemini, 2 créditos por áudio, cache por mensagem), `chat-report.service.ts` (`chatReportExtra`, resumo agendado por e-mail), `org-security.service.ts` (IP permitido, inatividade, sessões, módulos por plano).
+- **Rotina:** tudo dentro de `runChatExtras` (cada parte isolada: falha numa não derruba as outras). Sem job novo.
+- **Segurança:** `loadTenant` aplica IP/inatividade (`accessBlocked`); `/acesso-bloqueado`; ligar a restrição de IP exige o IP de quem configura na lista; módulos por plano via `Plan.features` com prefixo `mod:` (sem nenhum `mod:` = tudo liberado).
+- **Testes:** `f4-chat-40.test.ts` (13).
+- **Não verificado / limites:** Gemini só contra simulador (modelo padrão `gemini-2.5-flash` não conferido na conta real); status de campanha muda no envio, não pelo recibo; lista de conversas não exibe o status de chat; relatório por dia em UTC; resumo por e-mail sem anexo (a fila de e-mail não suporta anexos).
 
 
 ## 2.0-F14 — Avisos no celular (push)

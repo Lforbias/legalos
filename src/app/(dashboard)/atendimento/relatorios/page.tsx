@@ -9,7 +9,8 @@ import { addDays, todayYmd } from "@/lib/dates/ymd";
 import { ymdRange } from "@/lib/dates/range";
 import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
-import { chatReport } from "@/server/services/chat-report.service";
+import { chatReport, chatReportExtra, getReportSchedule } from "@/server/services/chat-report.service";
+import { ReportSchedulePanel } from "@/modules/whatsapp/tools-ui";
 import { npsReport } from "@/server/services/chat-extras.service";
 import { listNumbers } from "@/server/services/whatsapp-numbers.service";
 
@@ -28,17 +29,19 @@ export default async function ChatReportsPage({ searchParams }: { searchParams: 
   const range = ymdRange(from, to);
   let rep: Awaited<ReturnType<typeof chatReport>> | null = null;
   let nps: Awaited<ReturnType<typeof npsReport>> | null = null;
+  let extra: Awaited<ReturnType<typeof chatReportExtra>> | null = null;
   let err: string | null = null;
   if (!range) err = "Datas inválidas.";
   else {
     try {
-      [rep, nps] = await Promise.all([chatReport(ctx, range), npsReport(ctx, range)]);
+      [rep, nps, extra] = await Promise.all([chatReport(ctx, range), npsReport(ctx, range), chatReportExtra(ctx, range)]);
     } catch (e) {
       if (e instanceof ValidationError) err = e.message;
       else throw e;
     }
   }
   const numbers = await listNumbers(ctx);
+  const schedule = await getReportSchedule(ctx);
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4" data-testid="chat-reports">
       <PageHeader title="Relatórios do Chat" description="Números reais das conversas e mensagens do período." actions={<Link className="text-sm underline" href="/atendimento">Voltar às conversas</Link>} />
@@ -92,6 +95,50 @@ export default async function ChatReportsPage({ searchParams }: { searchParams: 
           </Card>
         </>
       ) : null}
+      {extra ? (
+        <>
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader title="Mensagens por status do chat" description="Etapa em que cada conversa do período está agora." />
+              <CardBody>
+                {extra.byStatus.length === 0 ? <p className="text-sm text-muted">Sem movimento no período.</p> : (
+                  <table className="w-full text-sm"><thead><tr className="text-left text-xs text-muted"><th>Status</th><th>Conversas</th><th>Mensagens</th></tr></thead>
+                    <tbody>{extra.byStatus.map((x) => <tr key={x.statusId ?? "none"}><td>{x.name}</td><td>{x.conversations}</td><td>{x.messages}</td></tr>)}</tbody></table>
+                )}
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader title="Chats adicionados" description="Conversas novas no período, por número." />
+              <CardBody>
+                <p className="mb-2 text-sm">Total: {extra.added.reduce((s, d) => s + d.count, 0)}</p>
+                <table className="w-full text-sm"><tbody>{extra.addedByNumber.map((n) => <tr key={n.accountId}><td>{n.label}</td><td>{n.count}</td></tr>)}</tbody></table>
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader title="Tempo de resposta por usuário" description="Média até a primeira resposta humana, por quem respondeu." />
+              <CardBody>
+                {extra.responseByUser.length === 0 ? <p className="text-sm text-muted">Sem respostas no período.</p> : (
+                  <table className="w-full text-sm"><thead><tr className="text-left text-xs text-muted"><th>Usuário</th><th>Respostas</th><th>1ª resposta (média)</th></tr></thead>
+                    <tbody>{extra.responseByUser.map((u) => <tr key={u.userId}><td>{u.name}</td><td>{u.replies}</td><td>{min(u.avgFirstResponseMinutes)}</td></tr>)}</tbody></table>
+                )}
+              </CardBody>
+            </Card>
+            <Card>
+              <CardHeader title="Acessos da equipe" description="Entradas no sistema no período." />
+              <CardBody>
+                {extra.logins.length === 0 ? <p className="text-sm text-muted">Nenhum acesso registrado.</p> : (
+                  <table className="w-full text-sm"><thead><tr className="text-left text-xs text-muted"><th>Usuário</th><th>Acessos</th><th>Último</th></tr></thead>
+                    <tbody>{extra.logins.map((u) => <tr key={u.userId}><td>{u.name}</td><td>{u.logins}</td><td>{u.lastLoginAt ? u.lastLoginAt.toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short", timeZone: ctx.timezone }) : "—"}</td></tr>)}</tbody></table>
+                )}
+              </CardBody>
+            </Card>
+          </div>
+        </>
+      ) : null}
+      <Card>
+        <CardHeader title="Resumo por e-mail" description="Receba os números do período anterior automaticamente." />
+        <CardBody><ReportSchedulePanel s={{ enabled: schedule.enabled, frequency: schedule.frequency, recipients: schedule.recipients, lastSentAt: schedule.lastSentAt?.toISOString() ?? null }} /></CardBody>
+      </Card>
       {nps ? (
         <Card>
           <CardHeader title="Satisfação (NPS)" />

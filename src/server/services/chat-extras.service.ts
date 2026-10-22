@@ -19,18 +19,35 @@ const DEFAULT_QUESTION = "De 0 a 10, o quanto você recomendaria o nosso atendim
 
 // ======================= chaves =======================
 
+const BOOL_KEYS = ["scheduledEnabled", "npsEnabled", "aiSummaryEnabled", "archiveEnabled", "npsAutoOnClose", "campaignsEnabled", "delegateEnabled", "intentsEnabled", "transcribeEnabled"] as const;
+export type ExtrasBoolKey = (typeof BOOL_KEYS)[number];
+
 export async function getExtrasSettings(ctx: TenantContext) {
   assertCan(ctx, "whatsapp:read");
   const s = await db.whatsappExtrasSettings.findUnique({ where: { organizationId: ctx.organizationId } });
-  return { scheduledEnabled: s?.scheduledEnabled ?? false, npsEnabled: s?.npsEnabled ?? false, aiSummaryEnabled: s?.aiSummaryEnabled ?? false, npsQuestion: s?.npsQuestion ?? DEFAULT_QUESTION };
+  return {
+    scheduledEnabled: s?.scheduledEnabled ?? false,
+    npsEnabled: s?.npsEnabled ?? false,
+    aiSummaryEnabled: s?.aiSummaryEnabled ?? false,
+    archiveEnabled: s?.archiveEnabled ?? false,
+    archiveDays: s?.archiveDays ?? 7,
+    npsAutoOnClose: s?.npsAutoOnClose ?? false,
+    campaignsEnabled: s?.campaignsEnabled ?? false,
+    delegateEnabled: s?.delegateEnabled ?? false,
+    intentsEnabled: s?.intentsEnabled ?? false,
+    transcribeEnabled: s?.transcribeEnabled ?? false,
+    npsQuestion: s?.npsQuestion ?? DEFAULT_QUESTION,
+  };
 }
 
-export async function setExtrasSettings(ctx: TenantContext, v: { scheduledEnabled?: boolean; npsEnabled?: boolean; aiSummaryEnabled?: boolean; npsQuestion?: string }) {
+export async function setExtrasSettings(ctx: TenantContext, v: Partial<Record<ExtrasBoolKey, boolean>> & { npsQuestion?: string; archiveDays?: number }) {
   assertCan(ctx, "whatsapp:manage");
-  const data: { scheduledEnabled?: boolean; npsEnabled?: boolean; aiSummaryEnabled?: boolean; npsQuestion?: string } = {};
-  if (typeof v.scheduledEnabled === "boolean") data.scheduledEnabled = v.scheduledEnabled;
-  if (typeof v.npsEnabled === "boolean") data.npsEnabled = v.npsEnabled;
-  if (typeof v.aiSummaryEnabled === "boolean") data.aiSummaryEnabled = v.aiSummaryEnabled;
+  const data: Record<string, boolean | number | string> = {};
+  for (const k of BOOL_KEYS) if (typeof v[k] === "boolean") data[k] = v[k]!;
+  if (v.archiveDays !== undefined) {
+    if (!Number.isInteger(v.archiveDays) || v.archiveDays < 1 || v.archiveDays > 365) throw new ValidationError("Informe de 1 a 365 dias.", { archiveDays: ["Informe de 1 a 365 dias."] });
+    data.archiveDays = v.archiveDays;
+  }
   if (v.npsQuestion !== undefined) {
     const q = v.npsQuestion.replace(/\r\n/g, "\n").trim();
     if (q.length < 10 || q.length > 500) throw new ValidationError("A pergunta deve ter de 10 a 500 caracteres.", { npsQuestion: ["A pergunta deve ter de 10 a 500 caracteres."] });
@@ -181,6 +198,18 @@ export async function askSurvey(ctx: TenantContext, conversationId: string) {
   return row;
 }
 
+/** NPS automático ao encerrar: só com "Pesquisa de satisfação" E "Enviar ao encerrar" ligadas, e se a janela permitir texto. Uma pesquisa por conversa aberta. */
+export async function autoSurveyOnClose(organizationId: string, conversationId: string, userId: string | null) {
+  const s = await db.whatsappExtrasSettings.findUnique({ where: { organizationId }, select: { npsEnabled: true, npsAutoOnClose: true, npsQuestion: true } });
+  if (!s?.npsEnabled || !s.npsAutoOnClose) return false;
+  if (await db.whatsappSurvey.findFirst({ where: { conversationId, status: "ASKED", askedAt: { gte: new Date(Date.now() - 7 * 86_400_000) } }, select: { id: true } })) return false;
+  const r = await systemSendText(organizationId, conversationId, s.npsQuestion).catch(() => null);
+  if (!r || r.status !== "SENT") return false;
+  await db.whatsappSurvey.create({ data: { organizationId, conversationId, askedById: userId } });
+  await audit({ action: "whatsapp.survey_auto", organizationId, userId, resourceType: "whatsapp_conversation", resourceId: conversationId });
+  return true;
+}
+
 /** Chamada pelo recebimento: se há pesquisa aberta e o cliente respondeu só um número de 0 a 10, registra a nota. */
 export async function recordSurveyAnswer(organizationId: string, conversationId: string, text: string | null, now = new Date()): Promise<boolean> {
   const m = /^\s*(10|[0-9])\s*[.!]?\s*$/.exec(text ?? "");
@@ -261,9 +290,27 @@ export async function formStatus(ctx: TenantContext, conversationId: string, for
 
 export { listFields };
 
-/** Rotina do agendador (a cada minuto): mensagens agendadas vencidas + lembretes de retorno. */
+/** Rotina do agendador (a cada minuto): mensagens agendadas, lembretes, arquivamento, diálogos do robô, campanhas e resumo por e-mail. Cada parte é isolada: uma falha não derruba as outras. */
 export async function runChatExtras() {
-  const sent = await runScheduledMessages();
-  const reminders = await runFollowUpReminders();
-  return { ...(typeof sent === "object" ? sent : {}), ...(typeof reminders === "object" ? reminders : {}) } as Record<string, number>;
+  const out: Record<string, number> = {};
+  const part = async (prefix: string, fn: () => Promise<unknown>) => {
+    try {
+      const r = await fn();
+      if (r && typeof r === "object") for (const [k, v] of Object.entries(r)) { if (typeof v === "number") out[`${prefix}${k}`] = v; }
+    } catch (e) {
+      out[`${prefix}erro`] = 1;
+      logger.error("chat.extras_part_failed", { part: prefix, error: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  const { runAutoArchive } = await import("./chat-tools.service");
+  const { runDialogs } = await import("./chat-dialogs.service");
+  const { runCampaigns } = await import("./chat-campaigns.service");
+  const { runReportSchedules } = await import("./chat-report.service");
+  await part("", runScheduledMessages);
+  await part("", runFollowUpReminders);
+  await part("arquivo_", () => runAutoArchive(new Date()));
+  await part("dialogos_", () => runDialogs());
+  await part("campanhas_", () => runCampaigns());
+  await part("resumo_", () => runReportSchedules());
+  return out;
 }

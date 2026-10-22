@@ -70,7 +70,7 @@ describe("API pública v1 e chaves de API", () => {
 
   it("o token só aparece na criação: o banco guarda apenas o hash", async () => {
     const rows = await db.apiKey.findMany({ where: { organizationId: A.org.id } });
-    const secret = tokenAll.split("_")[2] as string;
+    const secret = tokenAll.split("_").slice(2).join("_");
     expect(rows.length).toBeGreaterThanOrEqual(2);
     for (const r of rows) {
       expect(r.keyHash).not.toContain(secret);
@@ -211,6 +211,6 @@ describe("API pública v1 e chaves de API", () => {
   it("auditoria registra criação e revogação sem o token", async () => {
     const logs = await db.auditLog.findMany({ where: { organizationId: A.org.id, action: { in: ["apikey.create", "apikey.revoke"] } } });
     expect(logs.length).toBeGreaterThanOrEqual(3);
-    expect(JSON.stringify(logs)).not.toContain(tokenAll.split("_")[2] as string);
+    expect(JSON.stringify(logs)).not.toContain(tokenAll.split("_").slice(2).join("_"));
   });
 });

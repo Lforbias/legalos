@@ -25,6 +25,12 @@ import { listFields, listLabels } from "@/server/services/chat-meta.service";
 import { listNumbers, MAX_NUMBERS } from "@/server/services/whatsapp-numbers.service";
 import { getExtrasSettings, listForms } from "@/server/services/chat-extras.service";
 import { ExtrasSettingsPanel, FormsPanel, NumbersPanel } from "@/modules/whatsapp/extras-ui";
+import { CampaignsPanel, DialogsPanel, Extras40Switches, IntentsPanel, ToolsAdminPanel } from "@/modules/whatsapp/tools-ui";
+import { listCampaigns } from "@/server/services/chat-campaigns.service";
+import { listDialogRuns, listDialogs, listIntents } from "@/server/services/chat-dialogs.service";
+import { listChatStatuses, listChecklists, listLibrary } from "@/server/services/chat-tools.service";
+import { db } from "@/lib/db/client";
+import { hasModule } from "@/server/services/org-security.service";
 import { AccountActions, AwayForm, ConnectForm, FieldsPanel, LabelsPanel, QrConnect, QrPanel, QueuesPanel, QuickReplies, SyncTemplates } from "@/modules/whatsapp/settings-ui";
 
 export const metadata: Metadata = { title: "Configurações do Chat" };
@@ -43,6 +49,9 @@ export default async function AtendimentoConfigPage() {
   const sla = account ? await getSla(ctx) : null;
   const numbers = account ? await listNumbers(ctx) : [];
   const [extras, forms] = account ? await Promise.all([getExtrasSettings(ctx), listForms(ctx)]) : [null, []];
+  const tools = account ? await Promise.all([listChatStatuses(ctx), listChecklists(ctx), listLibrary(ctx), listDialogs(ctx), listDialogRuns(ctx, 15), listIntents(ctx)]) : null;
+  const campaignsOn = account ? await hasModule(ctx.organizationId, "campanhas") : false;
+  const [campaigns, campClients] = account && campaignsOn ? await Promise.all([listCampaigns(ctx), db.client.findMany({ where: { organizationId: ctx.organizationId, deletedAt: null, phone: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true }, take: 2000 })]) : [[], []];
   const keyOk = whatsappKeyAvailable();
   const hookOk = webhookConfigured();
   const isQr = account?.provider === "QR";
@@ -162,6 +171,32 @@ export default async function AtendimentoConfigPage() {
               <CardHeader title="Agendamento e pesquisa de satisfação" description="Mensagens agendadas pela equipe e NPS. Nascem desligados." />
               <CardBody><ExtrasSettingsPanel s={extras} /></CardBody>
             </Card>
+          ) : null}
+          {extras && tools ? (
+            <>
+              <Card>
+                <CardHeader title="Novidades da 4.0 — liga e desliga" description="Arquivamento automático, entrega ao responsável, intenções, campanhas e transcrição. Tudo nasce desligado." />
+                <CardBody><Extras40Switches s={{ archiveEnabled: extras.archiveEnabled, archiveDays: extras.archiveDays, npsAutoOnClose: extras.npsAutoOnClose, campaignsEnabled: extras.campaignsEnabled, delegateEnabled: extras.delegateEnabled, intentsEnabled: extras.intentsEnabled, transcribeEnabled: extras.transcribeEnabled }} /></CardBody>
+              </Card>
+              <Card>
+                <CardHeader title="Etiquetas prontas, status, checklists e biblioteca" description="Ferramentas para o atendimento do dia a dia." />
+                <CardBody><ToolsAdminPanel d={{ statuses: tools[0].map((x) => ({ id: x.id, name: x.name, color: x.color })), checklists: tools[1].map((x) => ({ id: x.id, title: x.title, items: x.items })), library: tools[2].map((x) => ({ id: x.id, title: x.title, fileName: x.fileName, sizeBytes: x.sizeBytes })) }} /></CardBody>
+              </Card>
+              <Card>
+                <CardHeader title="Robô 2.0 — diálogos" description="Reenvio por tempo, aniversário, aviso de audiência e resposta sobre horário." />
+                <CardBody><DialogsPanel dialogs={tools[3].map((d) => ({ id: d.id, kind: d.kind, name: d.name, active: d.active, text: d.text, templateId: d.templateId, config: (d.config ?? {}) as Record<string, unknown> }))} templates={templates.filter((t) => t.status === "APPROVED").map((t) => ({ id: t.id, name: t.name }))} runs={tools[4].map((r) => ({ id: r.id, status: r.status, message: r.message, createdAt: r.createdAt.toISOString() }))} /></CardBody>
+              </Card>
+              <Card>
+                <CardHeader title="Robô 2.0 — intenções" description="Reconhece o assunto da mensagem por pontuação de palavras (sem IA)." />
+                <CardBody><IntentsPanel intents={tools[5].map((i) => ({ id: i.id, name: i.name, active: i.active, threshold: i.threshold, terms: (Array.isArray(i.terms) ? i.terms : []) as { term: string; weight: number }[], actionsCount: Array.isArray(i.actions) ? i.actions.length : 0 }))} labels={labels.map((l) => ({ id: l.id, name: l.name }))} agents={agents.map((a) => ({ id: a.id, name: a.name }))} queues={queues.filter((q) => q.active).map((q) => ({ id: q.id, name: q.name }))} /></CardBody>
+              </Card>
+              <Card>
+                <CardHeader title="Campanhas em massa" description="Envio controlado: rascunho, aprovação humana e envio gradual." />
+                <CardBody>
+                  {campaignsOn ? <CampaignsPanel campaigns={campaigns.map((c) => ({ id: c.id, name: c.name, status: c.status, text: c.text, createdAt: c.createdAt.toISOString(), counts: c.counts }))} clients={campClients} templates={templates.filter((t) => t.status === "APPROVED").map((t) => ({ id: t.id, name: t.name }))} enabled={extras.campaignsEnabled} canApprove={can(ctx, "whatsapp:manage")} isMeta={!isQr} /> : <Alert tone="info">O módulo “Campanhas em massa” não está incluído no plano do escritório.</Alert>}
+                </CardBody>
+              </Card>
+            </>
           ) : null}
           <Card>
             <CardHeader title="Formulários de atendimento" description="Listas de campos para preencher durante o atendimento (ex.: triagem por área)." />

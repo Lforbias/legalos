@@ -7,6 +7,7 @@ import { audit } from "./audit.service";
 import { buildCaseContext } from "./ai.service";
 import { uploadDocument } from "./document.service";
 import { assertAiAllowed } from "./plan.service";
+import { assertModule } from "./org-security.service";
 
 /**
  * 2.0-F10 — IA aplicada: resumo de conversa do Chat, pesquisa de jurisprudência (mapa de pesquisa, NUNCA precedente inventado)
@@ -21,6 +22,7 @@ async function gate(ctx: TenantContext) {
   if (!provider) throw new ConflictError("O assistente de IA não está configurado neste sistema (falta a chave do provedor).");
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { aiEnabled: true } });
   if (!org?.aiEnabled) throw new ConflictError("O assistente de IA está desligado neste escritório. Peça a quem administra as integrações para ligá-lo.");
+  await assertModule(ctx.organizationId, "ia");
   await assertAiAllowed(ctx.organizationId, aiMonthlyTokenLimit());
   return provider;
 }

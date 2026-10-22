@@ -1780,6 +1780,7 @@ model WhatsappConversation {
   leadId         String?   @map("lead_id") @db.Uuid
   queueId        String?   @map("queue_id") @db.Uuid
   assignedAt     DateTime? @map("assigned_at") @db.Timestamptz(3)
+  chatStatusId   String?   @map("chat_status_id") @db.Uuid
   assignedToId   String?   @map("assigned_to_id") @db.Uuid
   status         String    @default("OPEN")
   lastMessageAt  DateTime? @map("last_message_at") @db.Timestamptz(3)
@@ -2893,6 +2894,14 @@ model WhatsappExtrasSettings {
   npsEnabled       Boolean  @default(false) @map("nps_enabled")
   npsQuestion      String   @default("De 0 a 10, o quanto você recomendaria o nosso atendimento a um amigo? Responda apenas com o número.") @map("nps_question")
   aiSummaryEnabled Boolean  @default(false) @map("ai_summary_enabled")
+  archiveEnabled   Boolean  @default(false) @map("archive_enabled")
+  archiveDays      Int      @default(7) @map("archive_days")
+  archiveLastRunAt DateTime? @map("archive_last_run_at") @db.Timestamptz(3)
+  npsAutoOnClose   Boolean  @default(false) @map("nps_auto_on_close")
+  campaignsEnabled Boolean  @default(false) @map("campaigns_enabled")
+  delegateEnabled  Boolean  @default(false) @map("delegate_enabled")
+  intentsEnabled   Boolean  @default(false) @map("intents_enabled")
+  transcribeEnabled Boolean @default(false) @map("transcribe_enabled")
   updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("whatsapp_extras_settings")
@@ -2918,4 +2927,162 @@ model ClientCredential {
 
   @@index([organizationId, clientId])
   @@map("client_credentials")
+}
+
+// ======================= 4.0 — Chat (comparação com o ChatGuru) =======================
+
+model WhatsappLibraryFile {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  title          String
+  fileName       String   @map("file_name")
+  mime           String
+  sizeBytes      Int      @map("size_bytes")
+  storageKey     String   @map("storage_key")
+  active         Boolean  @default(true)
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@map("whatsapp_library_files")
+}
+
+model WhatsappChecklist {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  title          String
+  items          String[]
+  active         Boolean  @default(true)
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@map("whatsapp_checklists")
+}
+
+model WhatsappChatStatus {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  color          String   @default("#64748b")
+  position       Int      @default(0)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@map("whatsapp_chat_statuses")
+}
+
+model WhatsappDialog {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  kind           String
+  name           String
+  active         Boolean  @default(false)
+  config         Json     @default("{}")
+  text           String
+  templateId     String?  @map("template_id") @db.Uuid
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId, kind])
+  @@map("whatsapp_dialogs")
+}
+
+model WhatsappDialogRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  dialogId       String   @map("dialog_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  conversationId String?  @map("conversation_id") @db.Uuid
+  key            String
+  status         String
+  message        String?
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([dialogId, key])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("whatsapp_dialog_runs")
+}
+
+model WhatsappIntent {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  terms          Json     @default("[]")
+  threshold      Int      @default(3)
+  actions        Json     @default("[]")
+  active         Boolean  @default(false)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@map("whatsapp_intents")
+}
+
+model WhatsappCampaign {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  status         String    @default("DRAFT")
+  text           String
+  templateId     String?   @map("template_id") @db.Uuid
+  accountId      String?   @map("account_id") @db.Uuid
+  scheduledAt    DateTime? @map("scheduled_at") @db.Timestamptz(3)
+  approvedById   String?   @map("approved_by_id") @db.Uuid
+  approvedAt     DateTime? @map("approved_at") @db.Timestamptz(3)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(3)
+
+  @@index([organizationId, status])
+  @@map("whatsapp_campaigns")
+}
+
+model WhatsappCampaignRecipient {
+  id          String    @id @default(uuid()) @db.Uuid
+  campaignId  String    @map("campaign_id") @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  clientId    String?   @map("client_id") @db.Uuid
+  waId        String    @map("wa_id")
+  name        String
+  status      String    @default("PENDING")
+  error       String?
+  waMessageId String?   @map("wa_message_id")
+  sentAt      DateTime? @map("sent_at") @db.Timestamptz(3)
+
+  @@unique([campaignId, waId])
+  @@index([campaignId, status])
+  @@map("whatsapp_campaign_recipients")
+}
+
+model WhatsappReportSchedule {
+  organizationId String    @id @map("organization_id") @db.Uuid
+  enabled        Boolean   @default(false)
+  frequency      String    @default("WEEKLY")
+  recipients     String[]
+  lastSentAt     DateTime? @map("last_sent_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("whatsapp_report_schedules")
+}
+
+model OrgSecuritySettings {
+  organizationId    String   @id @map("organization_id") @db.Uuid
+  ipAllowlist       String[] @map("ip_allowlist")
+  ipEnforced        Boolean  @default(false) @map("ip_enforced")
+  idleLogoutMinutes Int?     @map("idle_logout_minutes")
+  updatedById       String?  @map("updated_by_id") @db.Uuid
+  updatedAt         DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("org_security_settings")
+}
+
+model WhatsappTranscript {
+  messageId      String   @id @map("message_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  text           String
+  model          String
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@map("whatsapp_transcripts")
 }

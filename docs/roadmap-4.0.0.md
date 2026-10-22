@@ -74,3 +74,6 @@ Telas percorridas: início, painel, funis, respostas rápidas, chatbots (diálog
 | 4.0-F11 | Completar com o que aparecer nas telas ainda não vistas (histórico de mensagens, dispositivos seguros) | — |
 
 Regras que valem para toda a 4.0: nada envia mensagem a cliente sem autorização humana; toda automação tem chave liga/desliga; cobrança pelo WhatsApp continua desligada até a Dra. Talita autorizar. Parte dos itens (C8, C13, C18, C19) já está na 2.0.0 e só sai daqui quando a 2.0 for entregue.
+
+## Estado (2026-10-21)
+F1 a F10: **feitas** (migração `20261216000000_chat_4_0`, testes em `f4-chat-40.test.ts`). F11: **a fazer** (depende das telas ainda não vistas do ChatGuru). Transcrição de áudio usa Gemini (2 créditos por áudio) e só foi testada contra simulador. Detalhes e limites em `docs/implementation-status.md`.

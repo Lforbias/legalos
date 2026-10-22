@@ -3,6 +3,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions
 import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
 import { RateLimiter } from "@/lib/security/rate-limit";
 import { assertCan, can, type TenantContext } from "@/server/context";
+import { assertModule } from "./org-security.service";
 import { audit } from "./audit.service";
 import { requireMfa } from "./certificate.service";
 import { verifySecondFactor } from "./mfa.service";
@@ -46,6 +47,7 @@ export async function listClientCredentials(ctx: TenantContext, clientId: string
 
 export async function saveClientCredential(ctx: TenantContext, clientId: string, id: string | null, input: { system: string; label: string; login: string; password: string; notes?: string }) {
   assertCan(ctx, "vault:manage");
+  await assertModule(ctx.organizationId, "cofre");
   const k = key();
   await requireMfa(ctx.userId);
   await client(ctx, clientId);
@@ -81,6 +83,7 @@ export async function deleteClientCredential(ctx: TenantContext, id: string) {
 /** Abre a credencial: exige `vault:read`, 2FA ativo e o código do 2FA digitado agora. Registra quem abriu. */
 export async function revealClientCredential(ctx: TenantContext, id: string, code: string): Promise<{ login: string; password: string; notes: string; system: string; label: string }> {
   assertCan(ctx, "vault:read");
+  await assertModule(ctx.organizationId, "cofre");
   const k = key();
   await requireMfa(ctx.userId);
   if (!limiter.check(ctx.userId)) throw new ConflictError("Muitas tentativas. Aguarde alguns minutos.");

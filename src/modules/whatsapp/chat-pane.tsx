@@ -13,6 +13,7 @@ import { Avatar } from "./avatar";
 import { EmojiPicker } from "./emoji-picker";
 import { SidePanel, type PanelView } from "./side-panel";
 import { ConversationExtras, type ConversationExtrasData } from "./extras-ui";
+import { ConversationTools, TranscribeButton, type ConvToolsData } from "./tools-ui";
 import { MetaPanel, type FieldOpt, type LabelOpt } from "./meta-panel";
 import { ChatActions, MessageActions, type Can, type Links, type Panel } from "./links-panel";
 import { addNoteAction, assignAction, linkClientAction, searchClientsAction, sendMessageAction, sendTemplateAction, setStatusAction, transferQueueAction } from "./actions";
@@ -46,7 +47,7 @@ function Ticks({ status }: { status: string }) {
   return <CheckCheck className="h-3.5 w-3.5" style={status === "READ" ? { color: "var(--wa-tick)" } : undefined} aria-hidden />;
 }
 
-function Bubble({ m, actions }: { m: MessageView; actions?: React.ReactNode }) {
+function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; actions?: React.ReactNode; transcript?: string | null; canTranscribe?: boolean }) {
   const mine = m.direction === "OUT";
   const note = m.direction === "NOTE";
   const isImage = m.hasMedia && m.mediaMime?.startsWith("image/");
@@ -67,6 +68,7 @@ function Bubble({ m, actions }: { m: MessageView; actions?: React.ReactNode }) {
       ) : m.hasMedia ? (
         <a href={`/api/whatsapp/media/${m.id}`} className="mb-1 block underline" download>📎 {m.mediaName ?? "arquivo"}</a>
       ) : null}
+      {m.type === "audio" && m.hasMedia && m.direction === "IN" ? <TranscribeButton messageId={m.id} initial={transcript ?? null} enabled={!!canTranscribe} /> : null}
       {m.body ? <p className="whitespace-pre-wrap break-words">{m.body}</p> : null}
       {m.direction === "IN" && m.error ? <p className="mt-1 text-[11px] text-warning">{m.error}</p> : null}
       <div className={`mt-0.5 flex items-center justify-end gap-1 text-[11px] ${note ? "" : "text-[var(--wa-meta)]"}`}>
@@ -78,7 +80,7 @@ function Bubble({ m, actions }: { m: MessageView; actions?: React.ReactNode }) {
   );
 }
 
-export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData }) {
+export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras, tools, transcripts, canTranscribe }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData; tools?: ConvToolsData; transcripts?: Record<string, string>; canTranscribe?: boolean }) {
   const router = useRouter();
   const [text, setText] = React.useState("");
   const [note, setNote] = React.useState(false);
@@ -232,7 +234,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           {grouped.map((g) => (
             <div key={g.key} className="space-y-1.5">
               <div className="sticky top-0 z-[1] flex justify-center py-1"><span className="rounded-md bg-surface/90 px-3 py-0.5 text-xs font-medium text-muted shadow-sm">{g.label}</span></div>
-              {g.items.map((m) => <Bubble key={m.id} m={m} actions={chat.canWrite && m.direction !== "NOTE" ? <MessageActions messageId={m.id} excerpt={m.body ?? ""} hasMedia={m.hasMedia} links={links} can={chat.can} onPanel={openPanel} onDone={setMsg} /> : undefined} />)}
+              {g.items.map((m) => <Bubble key={m.id} m={m} transcript={transcripts?.[m.id]} canTranscribe={canTranscribe} actions={chat.canWrite && m.direction !== "NOTE" ? <MessageActions messageId={m.id} excerpt={m.body ?? ""} hasMedia={m.hasMedia} links={links} can={chat.can} onPanel={openPanel} onDone={setMsg} /> : undefined} />)}
             </div>
           ))}
           <div ref={endRef} />
@@ -309,7 +311,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           phone={chat.phone}
           data={side}
           controls={controls}
-          extras={extras ? <ConversationExtras d={extras} /> : null}
+          extras={extras || tools ? <>{extras ? <ConversationExtras d={extras} /> : null}{tools ? <ConversationTools d={tools} /> : null}</> : null}
           meta={chat.canWrite && meta ? <MetaPanel key={JSON.stringify([meta.selected, meta.values])} chatId={chat.id} labels={meta.labels} selected={meta.selected} fields={meta.fields} values={meta.values} onMsg={setMsg} /> : null}
           actions={chat.canWrite ? <ChatActions key={`${panel?.kind ?? "-"}:${panel?.messageId ?? ""}:${panelN}`} chatId={chat.id} title={chat.title} links={links} can={chat.can} team={team} me={chat.me} panel={panel} setPanel={openPanel} onMsg={setMsg} /> : <p className="px-3 pb-3 text-xs text-muted">Sem permissão para criar a partir da conversa.</p>}
         />

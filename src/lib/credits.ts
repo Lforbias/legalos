@@ -4,6 +4,7 @@
  */
 export const CREDIT_ACTIONS = {
   "petition.submit": { label: "Protocolo real de petição", cost: 5 },
+  "audio.transcribe": { label: "Transcrição de áudio (Gemini)", cost: 2 },
 } as const;
 export type CreditAction = keyof typeof CREDIT_ACTIONS;
 export const CREDIT_EXPIRY_WARN_DAYS = 7;

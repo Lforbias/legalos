@@ -23,6 +23,9 @@ import { listNumbers } from "@/server/services/whatsapp-numbers.service";
 import { getExtrasSettings, formStatus, listFollowUps, listForms, listScheduled } from "@/server/services/chat-extras.service";
 import { listAgents } from "@/server/services/chat-queue.service";
 import type { ConversationExtrasData } from "@/modules/whatsapp/extras-ui";
+import type { ConvToolsData } from "@/modules/whatsapp/tools-ui";
+import { listChatStatuses, listChecklists, listLibrary } from "@/server/services/chat-tools.service";
+import { transcriptsFor } from "@/server/services/chat-transcribe.service";
 
 export const metadata: Metadata = { title: "LegalOS Chat" };
 export const dynamic = "force-dynamic";
@@ -88,6 +91,24 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
       followUps: followUps.map((f) => ({ id: f.id, dueAt: f.dueAt.toISOString(), note: f.note, assigneeId: f.assigneeId })),
       scheduled: scheduled.slice(0, 8).map((m) => ({ id: m.id, body: m.body, sendAt: m.sendAt.toISOString(), status: m.status, error: m.error })),
       survey, forms: statuses.map((x) => ({ id: x.id, name: x.name, filled: x.filled, total: x.total, missingRequired: x.missingRequired })),
+    };
+  }
+  let tools: ConvToolsData | null = null;
+  let transcripts: Record<string, string> = {};
+  let canTranscribe = false;
+  if (opened) {
+    const [statuses, checklists, library, st] = await Promise.all([listChatStatuses(ctx), listChecklists(ctx, true), listLibrary(ctx, true), getExtrasSettings(ctx)]);
+    const row = await db.whatsappConversation.findFirst({ where: { id: opened.conversation.id, organizationId: ctx.organizationId }, select: { chatStatusId: true } });
+    const audioIds = opened.messages.filter((m) => m.type === "audio" && m.direction === "IN").map((m) => m.id);
+    transcripts = audioIds.length ? await transcriptsFor(ctx, audioIds).catch(() => ({})) : {};
+    canTranscribe = st.transcribeEnabled && can(ctx, "ai:use");
+    const fwd = opened.messages.filter((m) => m.direction !== "NOTE" && (m.body ?? "").trim()).slice(-8).reverse().map((m) => ({ id: m.id, label: `${m.direction === "IN" ? "Cliente" : "Equipe"}: ${(m.body ?? "").replace(/\s+/g, " ").slice(0, 50)}` }));
+    tools = {
+      conversationId: opened.conversation.id, canWrite: writer, statusId: row?.chatStatusId ?? null,
+      statuses: statuses.map((x) => ({ id: x.id, name: x.name, color: x.color })),
+      checklists: checklists.map((c) => ({ id: c.id, title: c.title })), library: library.map((f) => ({ id: f.id, title: f.title })),
+      forwardable: fwd,
+      others: list.filter((c) => c.id !== opened.conversation.id && c.status === "OPEN").slice(0, 40).map((c) => ({ id: c.id, name: c.client?.name ?? c.contactName ?? formatWaId(c.waId) })),
     };
   }
   const qs = (o: Record<string, string | undefined>) => {
@@ -215,6 +236,9 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               quick={quick}
               side={side}
               extras={extras ?? undefined}
+              tools={tools ?? undefined}
+              transcripts={transcripts}
+              canTranscribe={canTranscribe}
               templates={templates.map((t) => ({ id: t.id, name: t.name, language: t.language, body: t.body, variableCount: t.variableCount }))}
             />
           ) : (

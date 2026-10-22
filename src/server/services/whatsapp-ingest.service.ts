@@ -8,6 +8,7 @@ import { AWAY_COOLDOWN_MS, TYPE_LABEL } from "@/lib/whatsapp/constants";
 import { isOutsideHours } from "@/lib/whatsapp/hours";
 import { phoneCandidates } from "@/lib/whatsapp/phone";
 import { runInboundAutomations } from "./chat-automation.service";
+import { runInboundDialogs } from "./chat-dialogs.service";
 import { runBot } from "./chat-bot.service";
 import { handleBillingReply } from "./chat-billing.service";
 import { autoAssign } from "./chat-queue.service";
@@ -118,6 +119,7 @@ export async function ingestMessage(account: IngestAccount, m: IngestMessage): P
   if (distributing && (created || conv.status === "CLOSED" || !conv.assignedToId)) await autoAssign(account.organizationId, conv.id).catch((e) => logger.warn("whatsapp.auto_assign_failed", { error: e instanceof Error ? e.message : String(e) }));
   const now = new Date();
   await runInboundAutomations(account, conv.id, { created, text: m.text, messageKey: m.waMessageId, now });
+  await runInboundDialogs(account, conv.id, { text: m.text, messageKey: m.waMessageId, now });
   await runBot(account.organizationId, conv.id, { created, reopened: !created && conv.status === "CLOSED", text: m.text, now });
   await maybeAway(account, conv.id, conv.lastAwayAt, m.waId, now);
 }
