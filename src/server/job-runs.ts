@@ -9,6 +9,7 @@ export const JOBS = {
   mni: { label: "Sincronização PJe/MNI", everyMin: 30, manual: true },
   billing: { label: "Rotina de assinaturas (cobrança da plataforma)", everyMin: 60, manual: false },
   "chat-sla": { label: "SLA de resposta do Chat (avisos internos)", everyMin: 5, manual: true },
+  "chat-extras": { label: "Mensagens agendadas e lembretes de retorno do Chat", everyMin: 1, manual: true },
   "push-due": { label: "Avisos no celular (prazos e tarefas a vencer)", everyMin: 15, manual: true },
   "petition-queue": { label: "Fila de protocolos agendados", everyMin: 1, manual: true },
   monitoring: { label: "Alertas do monitoramento de intimações", everyMin: 30, manual: true },

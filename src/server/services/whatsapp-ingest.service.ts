@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { recordSurveyAnswer } from "@/server/services/chat-extras.service";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { deleteObject, putObject } from "@/lib/storage/local-storage";
@@ -110,6 +111,8 @@ export async function ingestMessage(account: IngestAccount, m: IngestMessage): P
     where: { id: conv.id },
     data: { status: "OPEN", unreadCount: { increment: 1 }, lastInboundAt: m.timestamp, lastMessageAt: m.timestamp, lastPreview: preview, ...(m.contactName ? { contactName: m.contactName } : {}) },
   });
+  // Pesquisa de satisfação: resposta só com nota (0 a 10) fica registrada e não aciona robô nem automações.
+  if (!created && (await recordSurveyAnswer(account.organizationId, conv.id, m.text).catch(() => false))) return;
   // LegalOS Chat: conversa nova, reaberta ou sem responsável entra na fila e é distribuída.
   const distributing = (await db.whatsappAccount.findUnique({ where: { id: account.id }, select: { autoAssignEnabled: true } }))?.autoAssignEnabled ?? true;
   if (distributing && (created || conv.status === "CLOSED" || !conv.assignedToId)) await autoAssign(account.organizationId, conv.id).catch((e) => logger.warn("whatsapp.auto_assign_failed", { error: e instanceof Error ? e.message : String(e) }));
@@ -129,7 +132,7 @@ async function maybeAway(account: IngestAccount, conversationId: string, lastAwa
   const claimed = await db.whatsappConversation.updateMany({ where: { id: conversationId, OR: [{ lastAwayAt: null }, { lastAwayAt: { lt: new Date(now.getTime() - AWAY_COOLDOWN_MS) } }] }, data: { lastAwayAt: now } });
   if (claimed.count !== 1) return;
   try {
-    const t = await getTransport(account.organizationId);
+    const t = await getTransport(account.organizationId, account.id);
     const id = await t.sendText(waId, account.awayMessage);
     await db.whatsappMessage.create({ data: { organizationId: account.organizationId, conversationId, direction: "OUT", type: "text", body: account.awayMessage, status: "SENT", waMessageId: id, automatic: true } });
   } catch (e) {

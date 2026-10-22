@@ -10,7 +10,7 @@ function arg(name: string): string | undefined {
 }
 const flag = (name: string) => process.argv.includes(`--${name}`);
 
-const USO = `Uso: npm run import:astrea -- --dir <pasta do backup> --email <seu e-mail no LegalOS> [--org <id do escritório>] [--only clientes,processos,prazos,tarefas,agenda,intimacoes,andamentos,financeiro] [--dry-run] [--report relatorio.json]
+const USO = `Uso: npm run import:astrea -- --dir <pasta do backup> --email <seu e-mail no LegalOS> [--org <id do escritório>] [--only clientes,processos,prazos,tarefas,agenda,intimacoes,andamentos,documentos,financeiro] [--dry-run] [--report relatorio.json]
 
   --dry-run   Simula: lê tudo, valida e mostra o relatório, sem gravar nada.
   Pode ser executado de novo com segurança: o que já foi importado é pulado.`;

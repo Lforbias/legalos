@@ -3,6 +3,14 @@
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.
 
+## 2.0.0
+Fechamento da 2.0. Migrações novas: `20261208000000_f3_kanban`, `20261209000000_f4_financeiro`, `20261210000000_f5_processo`, `20261211000000_f7_documentos_link`, `20261212000000_f8_varios_numeros`, `20261213000000_f9_chat_extras`, `20261214000000_f10_ia`, `20261215000000_f11_cofre`.
+
+- F3 Kanban de gestão e pacotes de tarefas; F4 fluxo anual, faturas e boleto; F5 honorário, apensos, recursos, provisão e correção por índices oficiais (BCB, sincronização a confirmar no servidor); F7 documentos do Astrea como link.
+- F8 até 5 números por escritório (cada conversa responde pelo número que a recebeu). F9 retornos combinados, mensagens agendadas e NPS (desligados por padrão), formulários, relatórios e exportação CSV auditada; nova rotina `chat-extras` (rodar `install-cron.sh`).
+- F10 IA com chave real: resumo de conversa (chave própria), mapa de pesquisa de jurisprudência (números de processo removidos) e minuta de peça com aviso. F11 cofre de senhas de clientes (2FA a cada abertura, auditado), modelos de perfil com mínimo de acesso e revisão de acessos.
+- Correção: `rotate-keys` agora também re-cifra credenciais de tribunais (3.0) e o cofre de clientes.
+
 ## 3.0.0 (em construção)
 Ver `docs/roadmap-3.0.0.md` (comparação com o LegalMail).
 

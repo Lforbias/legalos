@@ -41,6 +41,18 @@ import { ConversationsCard } from "@/modules/whatsapp/conversations-card";
 import { SendClientCard } from "@/modules/whatsapp/send-client-card";
 import { caseMessageTargets } from "@/server/services/chat-send.service";
 import { conversationsOfCase } from "@/server/services/chat-links.service";
+import { RunPackageCard } from "@/modules/kanban/packages-ui";
+import { listPackages, listRunsForCase } from "@/server/services/workflow-package.service";
+import { listBoards } from "@/server/services/kanban.service";
+import { todayYmd } from "@/lib/dates/ymd";
+import { APPEAL_STATUS_LABEL, DEGREE_LABEL, FEE_KIND_LABEL } from "@/modules/cases/case-extras-schemas";
+import { AppealForm, EditableAppeal, FeeForm, IndexTools, LinkForm, RemoveAppeal, RemoveFee, RemoveLink, ValuationForm } from "@/modules/cases/more-ui";
+import { INDEX_LABEL, INDEX_SERIES } from "@/lib/finance/correction";
+import { consolidatedHistory, getValuation, listAppeals, listCaseFees, listCaseLinks } from "@/server/services/case-extras.service";
+import { indexCoverage } from "@/server/services/monetary-index.service";
+import { listCaseOptions } from "@/server/services/case.service";
+import { LinkedDocumentsCard } from "@/modules/documents/linked-ui";
+import { listLinkedDocuments } from "@/server/services/linked-document.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Processo" };
@@ -100,6 +112,10 @@ export default async function CaseDetailPage({
     ...(canNotices ? [{ key: "intimacoes", label: "Intimações" }] : []),
     ...(canDocs ? [{ key: "documentos", label: "Documentos" }] : []),
     ...(canPetitions ? [{ key: "peticoes", label: "Petições" }] : []),
+    ...(can(ctx, "finance:read") ? [{ key: "honorarios", label: "Honorários" }] : []),
+    { key: "recursos", label: "Recursos e apensos" },
+    { key: "valores", label: "Valores" },
+    { key: "historico", label: "Histórico" },
     { key: "equipe", label: "Equipe", count: c.members.length },
   ];
   const sp = await searchParams;
@@ -113,6 +129,13 @@ export default async function CaseDetailPage({
   const caseNotes = tab === "notas" ? await listCaseNotes(ctx, c.id) : null;
   const noteHistory = tab === "notas" ? await listNoteHistory(ctx, c.id) : [];
   const customDefs = tab === "resumo" ? await listCustomFields(ctx) : [];
+  const feesData = tab === "honorarios" && can(ctx, "finance:read") ? await listCaseFees(ctx, c.id) : null;
+  const appealsData = tab === "recursos" ? await listAppeals(ctx, c.id) : null;
+  const linksData = tab === "recursos" ? await listCaseLinks(ctx, c.id) : null;
+  const linkOptions = tab === "recursos" && canWrite ? (await listCaseOptions(ctx)).filter((o) => o.id !== c.id) : [];
+  const valuation = tab === "valores" ? await getValuation(ctx, c.id) : null;
+  const coverage = tab === "valores" ? await indexCoverage(ctx) : [];
+  const history = tab === "historico" ? await consolidatedHistory(ctx, c.id) : null;
   const responsible = c.members.find((m) => m.role === "RESPONSIBLE");
 
   return (
@@ -254,6 +277,18 @@ export default async function CaseDetailPage({
         </Card>
       ) : null}
 
+      {tab === "tarefas" && canTasks && can(ctx, "tasks:write") ? (
+        <div className="mb-4">
+          <RunPackageCard
+            caseId={c.id}
+            packages={(await listPackages(ctx, { onlyActive: true })).map((p) => ({ id: p.id, name: p.name, steps: p.steps.map((st) => ({ id: st.id, title: st.title, ask: st.ask ?? "" })) }))}
+            boards={(await listBoards(ctx)).map((b) => ({ id: b.id, name: b.name }))}
+            today={todayYmd(ctx.timezone)}
+            history={(await listRunsForCase(ctx, c.id)).map((r) => ({ id: r.id, name: r.name, taskCount: r.taskCount, when: formatDateTime(r.createdAt) }))}
+          />
+        </div>
+      ) : null}
+
       {tab === "tarefas" && canTasks ? (
         <Card>
           <CardHeader
@@ -320,6 +355,14 @@ export default async function CaseDetailPage({
 
       {tab === "andamentos" ? <Timeline caseId={c.id} ctx={ctx} tz={tz} source={sp.fonte} canWrite={canWrite} /> : null}
 
+      {tab === "documentos" && canDocs ? (
+        <LinkedDocumentsCard
+          caseId={c.id}
+          canWrite={can(ctx, "documents:write")}
+          rows={(await listLinkedDocuments(ctx, { caseId: c.id })).map((d) => ({ id: d.id, name: d.name, url: d.url, kind: d.kind, source: d.source, when: formatDateTime(d.originalAt ?? d.createdAt) }))}
+        />
+      ) : null}
+
       {tab === "documentos" ? (
         <DocumentsPanel
           owner={{ caseId: c.id }}
@@ -345,6 +388,128 @@ export default async function CaseDetailPage({
               </div>
             ))}
             {casePetitions.items.length === 0 ? <p className="text-sm text-muted">Nenhuma petição para este processo.</p> : null}
+          </CardBody>
+        </Card>
+      ) : null}
+
+
+      {tab === "honorarios" && feesData ? (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="Honorários do processo" description={`Contratado em valor fixo: ${formatMoneyBR(feesData.contractedFixed)}. Lançado no financeiro: ${formatMoneyBR(feesData.finance.receivable.total)} (recebido ${formatMoneyBR(feesData.finance.receivable.paid)}, a receber ${formatMoneyBR(feesData.finance.receivable.remaining)}).`} />
+            <CardBody>
+              {feesData.fees.length === 0 ? <p className="text-sm text-muted">Nenhum honorário registrado.</p> : null}
+              <ul className="divide-y divide-border">
+                {feesData.fees.map((f) => (
+                  <li key={f.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                    <div><Badge>{FEE_KIND_LABEL[f.kind as keyof typeof FEE_KIND_LABEL] ?? f.kind}</Badge> <span className="ml-1 font-medium">{f.description}</span>{f.notes ? <p className="text-xs text-muted">{f.notes}</p> : null}</div>
+                    <div className="flex items-center gap-3"><span className="tabular-nums">{f.amount ? formatMoneyBR(f.amount) : ""}{f.amount && f.percent ? " + " : ""}{f.percent ? `${f.percent}%` : ""}</span>{canWrite && can(ctx, "finance:write") ? <RemoveFee caseId={c.id} id={f.id} /> : null}</div>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-3 text-xs text-muted">Os valores a receber e as parcelas ficam em <Link className="text-primary-text hover:underline" href={`/financeiro/lancamentos?processo=${c.id}`}>Financeiro › Lançamentos</Link>.</p>
+            </CardBody>
+          </Card>
+          {canWrite && can(ctx, "finance:write") ? (
+            <Card><CardHeader title="Registrar honorário" /><CardBody><FeeForm caseId={c.id} /></CardBody></Card>
+          ) : null}
+        </div>
+      ) : null}
+
+      {tab === "recursos" && appealsData && linksData ? (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="Recursos por grau" />
+            <CardBody>
+              {appealsData.length === 0 ? <p className="text-sm text-muted">Nenhum recurso registrado.</p> : null}
+              <ul className="divide-y divide-border">
+                {appealsData.map((a) => (
+                  <li key={a.id} className="space-y-2 py-2 text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div><Badge>{DEGREE_LABEL[a.degree as keyof typeof DEGREE_LABEL] ?? a.degree}</Badge> <span className="ml-1 font-medium">{a.appealType}</span>{a.number ? ` · ${a.number}` : ""}{a.court ? ` · ${a.court}` : ""}</div>
+                      <Badge tone={a.status === "PENDENTE" ? "warning" : a.status === "PROVIDO" || a.status === "PARCIAL" ? "success" : "neutral"}>{APPEAL_STATUS_LABEL[a.status as keyof typeof APPEAL_STATUS_LABEL] ?? a.status}</Badge>
+                    </div>
+                    <p className="text-xs text-muted">{a.filedOn ? `Interposto em ${formatYmd(a.filedOn)}` : "Sem data de interposição"}{a.judgedOn ? ` · julgado em ${formatYmd(a.judgedOn)}` : ""}{a.notes ? ` · ${a.notes}` : ""}</p>
+                    {canWrite ? <div className="flex gap-2"><EditableAppeal caseId={c.id} row={{ id: a.id, degree: a.degree, appealType: a.appealType, number: a.number ?? "", court: a.court ?? "", filedOn: a.filedOn ?? "", status: a.status, judgedOn: a.judgedOn ?? "", notes: a.notes ?? "" }} /><RemoveAppeal caseId={c.id} id={a.id} /></div> : null}
+                  </li>
+                ))}
+              </ul>
+            </CardBody>
+          </Card>
+          {canWrite ? <Card><CardHeader title="Adicionar recurso" /><CardBody><AppealForm caseId={c.id} /></CardBody></Card> : null}
+
+          <Card>
+            <CardHeader title="Apensos e processos relacionados" description="O vínculo vale nos dois sentidos. Processos sigilosos que você não pode ver não aparecem." />
+            <CardBody>
+              {linksData.length === 0 ? <p className="text-sm text-muted">Nenhum processo vinculado.</p> : null}
+              <ul className="divide-y divide-border">
+                {linksData.map((l) => (
+                  <li key={l.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
+                    <div><Badge>{l.role}</Badge> <Link className="ml-1 font-medium text-primary-text hover:underline" href={`/processos/${l.other.id}`}>{l.other.title}</Link>{l.other.number ? ` · ${formatCnj(l.other.number)}` : ""}{l.notes ? <p className="text-xs text-muted">{l.notes}</p> : null}</div>
+                    {canWrite ? <RemoveLink caseId={c.id} id={l.id} /> : null}
+                  </li>
+                ))}
+              </ul>
+              {canWrite ? <div className="mt-4 border-t border-border pt-4"><LinkForm caseId={c.id} options={linkOptions.map((o) => ({ id: o.id, label: `${o.title}${o.number ? ` (${formatCnj(o.number)})` : ""}` }))} /></div> : null}
+            </CardBody>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === "valores" && valuation ? (
+        <div className="space-y-4">
+          <Card>
+            <CardHeader title="Valor da causa e provisão corrigidos" description={`Correção monetária até ${formatYmd(valuation.today)}${valuation.index ? ` pelo ${INDEX_LABEL[valuation.index as keyof typeof INDEX_LABEL]}` : ""}. Estimativa de apoio: usa os índices mensais cadastrados e NÃO substitui o cálculo oficial do juízo.`} />
+            <CardBody>
+              <dl className="grid gap-4 sm:grid-cols-2">
+                {([["Valor da causa", valuation.claim], ["Provisão", valuation.provision]] as const).map(([label, p]) => (
+                  <div key={label}>
+                    <dt className="text-xs text-muted">{label}</dt>
+                    <dd className="mt-0.5 text-sm">
+                      {!p ? <span className="text-muted">Não informado</span> : (
+                        <>
+                          <p>Original: <span className="tabular-nums">{formatMoneyBR(p.original)}</span> <span className="text-xs text-muted">(base {formatYmd(p.baseDate)})</span></p>
+                          {p.result.ok ? <p className="font-medium">Corrigido: <span className="tabular-nums" data-testid={`corrected-${label}`}>{formatMoneyBR(p.result.corrected)}</span> <span className="text-xs font-normal text-muted">fator {p.result.factor} · {p.result.months} meses</span></p>
+                            : "reason" in p.result ? <p className="text-warning">{p.result.reason}</p>
+                            : <p className="text-warning">Falta o índice de {p.result.missing.length} {p.result.missing.length === 1 ? "mês" : "meses"} ({p.result.missing.slice(0, 6).join(", ")}{p.result.missing.length > 6 ? "…" : ""}). Atualize os índices ou lance-os manualmente abaixo.</p>}
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </CardBody>
+          </Card>
+          {canWrite ? (
+            <Card>
+              <CardHeader title="Definir provisão e índice" />
+              <CardBody>
+                <ValuationForm caseId={c.id} indexes={INDEX_SERIES.map((i) => ({ value: i, label: INDEX_LABEL[i] }))} initial={{ claimBaseDate: valuation.claimBaseDate ?? "", provisionValue: valuation.provision?.original.replace(".", ",") ?? "", provisionBaseDate: valuation.provisionBaseDate ?? "", correctionIndex: valuation.index ?? "" }} />
+              </CardBody>
+            </Card>
+          ) : null}
+          <Card>
+            <CardHeader title="Índices disponíveis" description={coverage.map((x) => `${x.series}: ${x.months} meses${x.last ? ` (até ${x.last})` : ""}`).join(" · ")} />
+            <CardBody><IndexTools caseId={c.id} canManage={can(ctx, "organization:manage")} canFinance={can(ctx, "finance:manage")} series={INDEX_SERIES.map((i) => ({ value: i, label: INDEX_LABEL[i] }))} /></CardBody>
+          </Card>
+        </div>
+      ) : null}
+
+      {tab === "historico" && history ? (
+        <Card>
+          <CardHeader title="Histórico consolidado" description="Tudo do processo numa linha só: registros, tarefas, prazos, intimações, petições, recursos, documentos e lançamentos. Cada fonte aparece conforme as suas permissões." />
+          <CardBody>
+            {history.length === 0 ? <p className="text-sm text-muted">Sem registros.</p> : null}
+            <ol className="relative space-y-3 border-l border-border pl-5">
+              {history.map((h, i) => (
+                <li key={i} className="relative text-sm">
+                  <span className="absolute -left-[25px] top-1.5 h-2 w-2 rounded-full bg-primary" aria-hidden />
+                  <div className="flex flex-wrap items-center gap-2"><Badge>{h.source}</Badge><span className="text-xs text-muted">{formatDateTime(new Date(h.at))}</span></div>
+                  <p className="mt-0.5">{h.href ? <Link className="text-primary-text hover:underline" href={h.href}>{h.title}</Link> : h.title}</p>
+                  {h.detail ? <p className="text-xs text-muted">{h.detail}</p> : null}
+                </li>
+              ))}
+            </ol>
           </CardBody>
         </Card>
       ) : null}

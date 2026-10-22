@@ -156,7 +156,7 @@ export async function connectQr(ctx: TenantContext, input: { label: string; risk
   if (input.riskAck !== true) throw new ValidationError("Confirme que entendeu os riscos.", { riskAck: ["É preciso confirmar que você entendeu os riscos desta conexão."] });
   const label = input.label.trim();
   if (!label || label.length > 80) throw new ValidationError("Informe um nome de até 80 caracteres.", { label: ["Nome obrigatório."] });
-  const existing = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { id: true, provider: true } });
+  const existing = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true } });
   if (existing) await stopQrSession(existing.id, { logout: false });
   const data = { label, provider: "QR", phoneNumberId: null, tokenEnc: null, wabaId: null, enabled: true, qrState: "CONNECTING", qrCode: null, riskAckAt: new Date(), riskAckById: ctx.userId, lastStatus: null, lastMessage: null };
   const acc = existing
@@ -171,7 +171,7 @@ export type QrStatus = { state: string; qrDataUrl: string | null; phone: string 
 
 export async function getQrStatus(ctx: TenantContext): Promise<QrStatus> {
   assertCan(ctx, "whatsapp:manage");
-  const a = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { provider: true, qrState: true, qrCode: true, qrPhone: true, lastMessage: true, qrUpdatedAt: true } });
+  const a = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { provider: true, qrState: true, qrCode: true, qrPhone: true, lastMessage: true, qrUpdatedAt: true } });
   if (!a || a.provider !== "QR") throw new NotFoundError("A conexão por QR-Code não está configurada.");
   const qrDataUrl = a.qrState === "QR" && a.qrCode ? await QRCode.toDataURL(a.qrCode, { margin: 1, width: 280, errorCorrectionLevel: "M" }) : null;
   return { state: a.qrState, qrDataUrl, phone: a.qrPhone, message: a.lastMessage, updatedAt: a.qrUpdatedAt };
@@ -180,7 +180,7 @@ export async function getQrStatus(ctx: TenantContext): Promise<QrStatus> {
 /** Sai da sessão (o aparelho perde o vínculo) e apaga as chaves. Conversas e mensagens ficam. Para voltar, é preciso ler um QR-Code novo. */
 export async function disconnectQr(ctx: TenantContext) {
   assertCan(ctx, "whatsapp:manage");
-  const a = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { id: true, provider: true } });
+  const a = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true } });
   if (!a || a.provider !== "QR") throw new NotFoundError("A conexão por QR-Code não está configurada.");
   await stopQrSession(a.id, { logout: true });
   await audit({ action: "whatsapp.qr_disconnect", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "whatsapp_account", resourceId: a.id, meta: ctx.meta });
@@ -189,7 +189,7 @@ export async function disconnectQr(ctx: TenantContext) {
 /** Gera um QR-Code novo (descarta a sessão anterior). */
 export async function restartQr(ctx: TenantContext) {
   assertCan(ctx, "whatsapp:manage");
-  const a = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { id: true, provider: true, enabled: true } });
+  const a = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true, enabled: true } });
   if (!a || a.provider !== "QR") throw new NotFoundError("A conexão por QR-Code não está configurada.");
   if (!a.enabled) throw new ConflictError("O atendimento está desligado. Ligue-o antes de gerar o QR-Code.");
   await stopQrSession(a.id, { logout: true });

@@ -1,6 +1,7 @@
 import { db } from "@/lib/db/client";
 import { ALL_PERMISSIONS, isPermissionKey } from "@/lib/permissions/catalog";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError, isSubset } from "@/lib/permissions/check";
+import { ROLE_TEMPLATES, SENSITIVE_PERMISSIONS } from "@/lib/permissions/templates";
 import { slugify } from "@/lib/validation/slug";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
@@ -103,4 +104,39 @@ export async function deleteRole(ctx: TenantContext, roleId: string) {
     resourceId: role.id,
     meta: ctx.meta,
   });
+}
+
+// ======================= 2.0-F11: modelos com o mínimo de acesso e revisão de acessos =======================
+
+export function listRoleTemplates(ctx: TenantContext) {
+  assertCan(ctx, "members:read");
+  return ROLE_TEMPLATES;
+}
+
+/** Cria um perfil personalizado a partir de um modelo. Vale a regra anti-escalonamento (só concede o que você mesmo tem). */
+export async function createRoleFromTemplate(ctx: TenantContext, templateKey: string) {
+  assertCan(ctx, "roles:manage");
+  const t = ROLE_TEMPLATES.find((x) => x.key === templateKey);
+  if (!t) throw new NotFoundError("Modelo não encontrado.");
+  if (await db.role.findFirst({ where: { organizationId: ctx.organizationId, name: t.name }, select: { id: true } })) throw new ConflictError(`Já existe um perfil chamado “${t.name}”.`);
+  return createRole(ctx, { name: t.name, description: t.description, permissions: t.permissions });
+}
+
+export type AccessReviewRow = { userId: string; name: string; email: string; role: string; sensitive: string[]; mfaEnabled: boolean; atRisk: boolean };
+
+/** Quem tem acessos sensíveis e se tem 2FA ligado. `atRisk` = acesso sensível sem 2FA. Somente leitura; exige `roles:manage`. */
+export async function accessReview(ctx: TenantContext): Promise<{ rows: AccessReviewRow[]; owners: number }> {
+  assertCan(ctx, "roles:manage");
+  const members = await db.membership.findMany({ where: { organizationId: ctx.organizationId, status: "ACTIVE", user: { disabledAt: null } }, select: { userId: true, user: { select: { name: true, email: true } }, role: { select: { key: true, name: true, permissions: true } } } });
+  const mfa = await db.userMfa.findMany({ where: { userId: { in: members.map((m) => m.userId) }, enabledAt: { not: null } }, select: { userId: true } });
+  const has = new Set(mfa.map((x) => x.userId));
+  const rows = members
+    .filter((m) => m.role.key !== "CLIENT")
+    .map((m) => {
+      const sensitive = SENSITIVE_PERMISSIONS.filter((p) => m.role.permissions.includes(p));
+      const mfaEnabled = has.has(m.userId);
+      return { userId: m.userId, name: m.user.name, email: m.user.email, role: m.role.name, sensitive, mfaEnabled, atRisk: sensitive.length > 0 && !mfaEnabled };
+    })
+    .sort((a, b) => Number(b.atRisk) - Number(a.atRisk) || b.sensitive.length - a.sensitive.length || a.name.localeCompare(b.name));
+  return { rows, owners: members.filter((m) => m.role.key === "OWNER").length };
 }

@@ -10,8 +10,8 @@ export function requireCertKey(): Buffer {
 }
 
 /** Credenciais da API oficial (Meta) do escritório, com o token decifrado. Nunca devolvido ao navegador. */
-export async function loadAuth(organizationId: string) {
-  const a = await db.whatsappAccount.findUnique({ where: { organizationId } });
+export async function loadAuth(organizationId: string, accountId?: string) {
+  const a = await db.whatsappAccount.findFirst({ where: accountId ? { id: accountId, organizationId } : { organizationId, isPrimary: true } });
   if (!a) throw new ConflictError("O WhatsApp ainda não foi conectado neste escritório.");
   if (!a.enabled) throw new ConflictError("O WhatsApp está desligado neste escritório.");
   if (a.provider !== "META" || !a.phoneNumberId || !a.tokenEnc) throw new ConflictError("Este escritório usa a conexão por QR-Code; esta operação é só da API oficial da Meta.");

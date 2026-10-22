@@ -19,6 +19,7 @@ import {
   mapPublication,
   mapTask,
   mapHistory,
+  mapLinkedDocument,
   HISTORY_SKIPPED_TYPES,
   partyRoleFromQualification,
   type Row,
@@ -27,7 +28,7 @@ import { parseNoticeText } from "@/lib/notices/parse";
 import { audit } from "@/server/services/audit.service";
 
 export const SOURCE = "astrea";
-export const ENTITIES = ["clientes", "processos", "prazos", "tarefas", "agenda", "intimacoes", "andamentos", "financeiro"] as const;
+export const ENTITIES = ["clientes", "processos", "prazos", "tarefas", "agenda", "intimacoes", "andamentos", "documentos", "financeiro"] as const;
 export type ImportEntity = (typeof ENTITIES)[number];
 
 export type EntityReport = { lidos: number; importados: number; jaImportados: number; ignorados: Record<string, number>; avisos: Record<string, number> };
@@ -547,6 +548,44 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     log(`andamentos: ${r.importados} novos, ${r.jaImportados} já importados`);
   }
 
+  // ======================= DOCUMENTOS (links; Documentos.csv) =======================
+  if (only.has("documentos")) {
+    const r = rep();
+    report.entidades.documentos = r;
+    const done = await loadMap(organizationId, "linked_doc");
+    const rows: Prisma.LinkedDocumentCreateManyInput[] = [];
+    const maps: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
+    for (const row of readCsv(dir, "Documentos")) {
+      r.lidos++;
+      const d = mapLinkedDocument(row);
+      if (!d) {
+        bump(r.ignorados, "arquivo anexado sem link (o backup não traz o conteúdo)");
+        continue;
+      }
+      if (done.has(d.externalId)) {
+        r.jaImportados++;
+        continue;
+      }
+      const caseId = d.caseCode ? (caseMap.get(d.caseCode) ?? null) : null;
+      const clientId = d.clientCode ? (clientMap.get(d.clientCode) ?? null) : null;
+      if (!d.isModel && !caseId && !clientId) {
+        bump(r.ignorados, "sem processo ou cliente importado");
+        continue;
+      }
+      const id = randomUUID();
+      r.importados++;
+      rows.push({ id, organizationId, caseId, clientId: caseId ? null : clientId, name: d.name, url: d.url, kind: d.kind, isModel: d.isModel, source: "ASTREA", originalAt: d.originalYmd ? dateAt(d.originalYmd) : null, createdById: d.userCode ? (userByCode.get(d.userCode) ?? null) : null });
+      maps.push({ organizationId, source: SOURCE, entity: "linked_doc", externalId: d.externalId, internalId: id });
+    }
+    if (!dryRun) {
+      for (const part of chunks(rows, 500)) {
+        const ids = new Set(part.map((p) => p.id));
+        await db.$transaction([db.linkedDocument.createMany({ data: part }), db.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
+      }
+    }
+    log(`documentos: ${r.importados} links novos`);
+  }
+
   // ======================= FINANCEIRO =======================
   if (only.has("financeiro")) {
     const r = rep();
@@ -706,7 +745,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
   }
 
   report.naoImportado = [
-    "Documentos: o backup traz apenas links (Google Docs etc.), não os arquivos.",
+    "Documentos: entram só os que têm link (Google Docs, Drive, URL), como links. Arquivos anexados no Astrea não vêm no backup.",
     "Financeiro: faturas (agrupadores) e a planilha Honorários/Despesas (espelham as Entradas); transferências entre contas (vazias no backup).",
     "Comentários avulsos, timesheets e listas de tarefa. Do histórico só entram andamentos e anotações manuais (o resto já existe como tarefas, prazos, intimações e agenda).",
     "Contatos que não são clientes nem partes de processos importados.",

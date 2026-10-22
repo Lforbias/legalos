@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { DeleteTemplateButton } from "@/modules/templates/template-row-actions";
 import { can } from "@/server/context";
 import { listTemplates } from "@/server/services/template.service";
+import { listLinkedModels } from "@/server/services/linked-document.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Modelos de documentos" };
@@ -17,6 +18,7 @@ export default async function TemplatesPage() {
   const { ctx } = await requireTenant();
   if (!can(ctx, "documents:read")) return <AccessDenied />;
   const templates = await listTemplates(ctx);
+  const linkedModels = await listLinkedModels(ctx);
   const manage = can(ctx, "templates:manage");
   return (
     <div className="mx-auto max-w-5xl">
@@ -61,6 +63,19 @@ export default async function TemplatesPage() {
           </ul>
         </Card>
       )}
+      {linkedModels.length > 0 ? (
+        <Card className="mt-4">
+          <div className="border-b border-border p-4">
+            <h2 className="text-sm font-semibold">Modelos importados do Astrea (links)</h2>
+            <p className="text-xs text-muted">São links para os modelos que estavam no Astrea. Para gerar documentos aqui, crie um modelo acima colando o texto.</p>
+          </div>
+          <ul className="divide-y divide-border">
+            {linkedModels.map((m) => (
+              <li key={m.id} className="px-4 py-2.5 text-sm"><a href={m.url} target="_blank" rel="noopener noreferrer" className="text-primary-text hover:underline">{m.name}</a></li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
     </div>
   );
 }

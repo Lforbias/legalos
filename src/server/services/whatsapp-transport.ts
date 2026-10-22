@@ -25,8 +25,8 @@ const wrap = async (fn: () => Promise<string>): Promise<string> => {
 };
 
 /** Meio de envio do escritório: API oficial da Meta ou sessão por QR-Code. */
-export async function getTransport(organizationId: string): Promise<Transport> {
-  const a = await db.whatsappAccount.findUnique({ where: { organizationId }, select: { id: true, provider: true, enabled: true } });
+export async function getTransport(organizationId: string, accountId?: string): Promise<Transport> {
+  const a = await db.whatsappAccount.findFirst({ where: accountId ? { id: accountId, organizationId } : { organizationId, isPrimary: true }, select: { id: true, provider: true, enabled: true } });
   if (!a) throw new ConflictError("O WhatsApp ainda não foi conectado neste escritório.");
   if (!a.enabled) throw new ConflictError("O WhatsApp está desligado neste escritório.");
   if (a.provider === "QR") {
@@ -37,7 +37,7 @@ export async function getTransport(organizationId: string): Promise<Transport> {
       sendFile: (waId, f) => wrap(async () => qrMessageId(a.id, await enqueueSend(a.id, (s) => s.sendMedia(waId, { kind: f.kind, buffer: f.buffer, mime: f.mime, filename: f.name, caption: f.caption })))),
     };
   }
-  const { auth, cfg } = await loadAuth(organizationId);
+  const { auth, cfg } = await loadAuth(organizationId, a.id);
   return {
     provider: "META",
     accountId: a.id,

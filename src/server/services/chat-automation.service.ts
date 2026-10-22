@@ -112,7 +112,7 @@ export async function deleteAutomation(ctx: TenantContext, id: string) {
 
 // ---------------- execução ----------------
 
-type Conv = { id: string; waId: string; contactName: string | null; clientName: string | null; clientId: string | null; caseId: string | null };
+type Conv = { id: string; accountId: string; waId: string; contactName: string | null; clientName: string | null; clientId: string | null; caseId: string | null };
 
 async function runActions(organizationId: string, conv: Conv, ruleName: string, ruleId: string, ev: ChatEvent, actions: ChatAction[]) {
   const who = conv.clientName ?? conv.contactName ?? formatWaId(conv.waId);
@@ -157,7 +157,7 @@ async function runActions(organizationId: string, conv: Conv, ruleName: string, 
         const recent = await db.whatsappMessage.count({ where: { conversationId: conv.id, organizationId, direction: "OUT", automatic: true, createdAt: { gt: new Date(Date.now() - REPLY_WINDOW_MS) } } });
         if (recent >= REPLY_CAP) throw new Error("limite de respostas automáticas atingido (proteção contra repetição)");
         const text = subst(a.text);
-        const t = await getTransport(organizationId);
+        const t = await getTransport(organizationId, conv.accountId);
         const id = await t.sendText(conv.waId, text);
         await db.whatsappMessage.create({ data: { organizationId, conversationId: conv.id, direction: "OUT", type: "text", body: text, status: "SENT", waMessageId: id, automatic: true } });
         done.push("resposta enviada");
@@ -181,9 +181,9 @@ export async function runChatAutomations(organizationId: string, conversationId:
   try {
     const rules = await db.whatsappAutomation.findMany({ where: { organizationId, trigger: ev.trigger, active: true }, orderBy: { createdAt: "asc" }, take: 20 });
     if (rules.length === 0) return 0;
-    const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { id: true, waId: true, contactName: true, clientId: true, caseId: true, client: { select: { name: true } } } });
+    const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { id: true, accountId: true, waId: true, contactName: true, clientId: true, caseId: true, client: { select: { name: true } } } });
     if (!c) return 0;
-    const conv: Conv = { id: c.id, waId: c.waId, contactName: c.contactName, clientName: c.client?.name ?? null, clientId: c.clientId, caseId: c.caseId };
+    const conv: Conv = { id: c.id, accountId: c.accountId, waId: c.waId, contactName: c.contactName, clientName: c.client?.name ?? null, clientId: c.clientId, caseId: c.caseId };
     const text = ev.text ? norm(ev.text) : "";
     for (const rule of rules) {
       if (rule.trigger === "KEYWORD" && !(text && parseKeywords(rule.triggerValue).some((k) => text.includes(norm(k))))) continue;
@@ -225,7 +225,7 @@ export async function runInboundAutomations(
 
 /** Executa uma lista de ações sobre uma conversa (usado também pelo menu de triagem). Nunca lança. */
 export async function runActionsOnConversation(organizationId: string, conversationId: string, name: string, sourceId: string, ev: ChatEvent, actions: ChatAction[]): Promise<{ done: string[]; failed: string[] }> {
-  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { id: true, waId: true, contactName: true, clientId: true, caseId: true, client: { select: { name: true } } } });
+  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { id: true, accountId: true, waId: true, contactName: true, clientId: true, caseId: true, client: { select: { name: true } } } });
   if (!c) return { done: [], failed: ["conversa não encontrada"] };
-  return runActions(organizationId, { id: c.id, waId: c.waId, contactName: c.contactName, clientName: c.client?.name ?? null, clientId: c.clientId, caseId: c.caseId }, name, sourceId, ev, actions);
+  return runActions(organizationId, { id: c.id, accountId: c.accountId, waId: c.waId, contactName: c.contactName, clientName: c.client?.name ?? null, clientId: c.clientId, caseId: c.caseId }, name, sourceId, ev, actions);
 }

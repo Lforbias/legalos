@@ -22,6 +22,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 17 * * * *   root $S/cron-call.sh billing
 7 * * * *    root $S/cron-call.sh whatsapp-billing
 */5 * * * *  root $S/cron-call.sh chat-sla
+* * * * *  root $S/cron-call.sh chat-extras
 */15 * * * * root $S/cron-call.sh push-due
 * * * * *    root $S/cron-call.sh petition-queue
 */30 * * * * root $S/cron-call.sh monitoring

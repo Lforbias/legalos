@@ -17,12 +17,12 @@ import { sanitizeFileName } from "./document.service";
 export type ConversationFilter = "mine" | "unassigned" | "open" | "closed";
 
 const listSelect = {
-  id: true, waId: true, contactName: true, status: true, lastMessageAt: true, lastInboundAt: true, lastPreview: true, unreadCount: true,
+  id: true, waId: true, contactName: true, status: true, lastMessageAt: true, lastInboundAt: true, lastPreview: true, unreadCount: true, accountId: true, account: { select: { label: true, isPrimary: true } },
   client: { select: { id: true, name: true } }, case: { select: { id: true, number: true, title: true } }, lead: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } }, queue: { select: { id: true, name: true } },
   labels: { select: { label: { select: { id: true, name: true, color: true } } }, orderBy: { label: { name: "asc" } } },
 } satisfies Prisma.WhatsappConversationSelect;
 
-export async function listConversations(ctx: TenantContext, filter: ConversationFilter = "open", search?: string, queueId?: string, labelId?: string) {
+export async function listConversations(ctx: TenantContext, filter: ConversationFilter = "open", search?: string, queueId?: string, labelId?: string, accountId?: string) {
   assertCan(ctx, "whatsapp:read");
   const where: Prisma.WhatsappConversationWhereInput = { organizationId: ctx.organizationId };
   if (filter === "closed") where.status = "CLOSED";
@@ -30,6 +30,7 @@ export async function listConversations(ctx: TenantContext, filter: Conversation
   if (filter === "mine") where.assignedToId = ctx.userId;
   if (filter === "unassigned") where.assignedToId = null;
   if (queueId) where.queueId = queueId;
+  if (accountId) where.accountId = accountId;
   if (labelId) where.labels = { some: { labelId } };
   const q = search?.trim().slice(0, 80);
   if (q) {
@@ -55,7 +56,7 @@ async function loadConversation(ctx: TenantContext, id: string) {
 export async function openConversation(ctx: TenantContext, id: string) {
   assertCan(ctx, "whatsapp:read");
   const c = await loadConversation(ctx, id);
-  const qr = (await providerOf(ctx.organizationId)) === "QR";
+  const qr = (await providerOf(ctx.organizationId, c.accountId)) === "QR";
   const messages = await db.whatsappMessage.findMany({
     where: { conversationId: id, organizationId: ctx.organizationId },
     orderBy: { createdAt: "desc" },
@@ -103,8 +104,8 @@ function assertWindow(provider: "META" | "QR", lastInboundAt: Date | null) {
   if (!isWindowOpen(lastInboundAt)) throw new ConflictError("Passaram mais de 24 horas desde a última mensagem do cliente. Pelas regras do WhatsApp, agora só é possível enviar um modelo aprovado.");
 }
 
-async function providerOf(organizationId: string): Promise<"META" | "QR"> {
-  const a = await db.whatsappAccount.findUnique({ where: { organizationId }, select: { provider: true } });
+async function providerOf(organizationId: string, accountId?: string): Promise<"META" | "QR"> {
+  const a = await db.whatsappAccount.findFirst({ where: accountId ? { id: accountId, organizationId } : { organizationId, isPrimary: true }, select: { provider: true } });
   if (!a) throw new ConflictError("O WhatsApp ainda não foi conectado neste escritório.");
   return a.provider === "QR" ? "QR" : "META";
 }
@@ -137,8 +138,8 @@ export async function sendMessage(ctx: TenantContext, conversationId: string, te
   assertCan(ctx, "whatsapp:write");
   const body = cleanText(text);
   const c = await loadConversation(ctx, conversationId);
-  assertWindow(await providerOf(ctx.organizationId), c.lastInboundAt);
-  const tr = await getTransport(ctx.organizationId);
+  assertWindow(await providerOf(ctx.organizationId, c.accountId), c.lastInboundAt);
+  const tr = await getTransport(ctx.organizationId, c.accountId);
   const d = await deliver(() => tr.sendText(c.waId, body));
   const m = await saveOut({ organizationId: ctx.organizationId, conversationId, direction: "OUT", type: "text", body, status: d.status, error: d.error, waMessageId: d.waMessageId, authorId: ctx.userId });
   await touch(conversationId, body, "text", m.createdAt);
@@ -164,7 +165,7 @@ function sniffOk(mime: string, b: Buffer): boolean {
 export async function sendFile(ctx: TenantContext, conversationId: string, file: { name: string; buffer: Buffer }, caption?: string | null) {
   assertCan(ctx, "whatsapp:write");
   const c = await loadConversation(ctx, conversationId);
-  assertWindow(await providerOf(ctx.organizationId), c.lastInboundAt);
+  assertWindow(await providerOf(ctx.organizationId, c.accountId), c.lastInboundAt);
   const name = sanitizeFileName(file.name);
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   const mime = IMG_MIMES[ext] ?? DOC_MIMES[ext];
@@ -177,7 +178,7 @@ export async function sendFile(ctx: TenantContext, conversationId: string, file:
   if (file.buffer.length > max) throw new ValidationError("Arquivo grande demais para este tipo no WhatsApp.", { file: [`Limite de ${Math.round(max / 1024 / 1024)} MB para este tipo.`] });
   const cap = caption?.trim() ? cleanText(caption) : null;
   await assertStorageAvailable(ctx.organizationId, file.buffer.length);
-  const tr = await getTransport(ctx.organizationId);
+  const tr = await getTransport(ctx.organizationId, c.accountId);
   const key = `${ctx.organizationId}/${randomUUID()}`;
   await putObject(key, file.buffer);
   try {
@@ -199,13 +200,13 @@ function fillTemplate(body: string, params: string[]): string {
 export async function sendTemplateMessage(ctx: TenantContext, conversationId: string, templateId: string, rawParams: string[]) {
   assertCan(ctx, "whatsapp:write");
   const c = await loadConversation(ctx, conversationId);
-  if ((await providerOf(ctx.organizationId)) === "QR") throw new ConflictError("Modelos de mensagem existem só na conexão oficial da Meta. Na conexão por QR-Code, escreva a mensagem normalmente.");
+  if ((await providerOf(ctx.organizationId, c.accountId)) === "QR") throw new ConflictError("Modelos de mensagem existem só na conexão oficial da Meta. Na conexão por QR-Code, escreva a mensagem normalmente.");
   const t = await db.whatsappTemplate.findFirst({ where: { id: templateId, organizationId: ctx.organizationId } });
   if (!t) throw new NotFoundError("Modelo não encontrado.");
   if (t.status !== "APPROVED") throw new ConflictError("Este modelo não está aprovado pela Meta.");
   const params = rawParams.map((p) => p.replace(/\s+/g, " ").trim());
   if (params.length !== t.variableCount || params.some((p) => !p || p.length > 500)) throw new ValidationError("Preencha todas as variáveis do modelo.", { params: [`Este modelo usa ${t.variableCount} variável(is), de até 500 caracteres cada.`] });
-  const { auth, cfg } = await loadAuth(ctx.organizationId);
+  const { auth, cfg } = await loadAuth(ctx.organizationId, c.accountId);
   const d = await deliver(() => apiSendTemplate(cfg, auth, c.waId, { name: t.name, language: t.language, params }));
   const text = fillTemplate(t.body, params);
   const m = await db.whatsappMessage.create({ data: { organizationId: ctx.organizationId, conversationId, direction: "OUT", type: "template", body: text, status: d.status, error: d.error, waMessageId: d.waMessageId, authorId: ctx.userId } });
@@ -260,11 +261,11 @@ export async function searchClientsForLink(ctx: TenantContext, q: string) {
 }
 
 /** Inicia uma conversa para falar com um cliente que ainda não escreveu: só é possível por modelo aprovado. */
-export async function startConversation(ctx: TenantContext, input: { phone: string; clientId?: string | null }) {
+export async function startConversation(ctx: TenantContext, input: { phone: string; clientId?: string | null; accountId?: string | null }) {
   assertCan(ctx, "whatsapp:write");
   const waId = normalizeWaId(input.phone);
   if (!waId) throw new ValidationError("Telefone inválido.", { phone: ["Informe DDD e número (ex.: 71 99999-8888)."] });
-  const { account } = await loadAuth(ctx.organizationId);
+  const { account } = await loadAuth(ctx.organizationId, input.accountId ?? undefined);
   let clientId: string | null = null;
   if (input.clientId) {
     const cl = await db.client.findFirst({ where: { id: input.clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true, name: true } });
@@ -298,9 +299,9 @@ export async function teamForAssignment(ctx: TenantContext) {
 
 /** Janela de 24 h aberta? Na conexão por QR-Code não existe janela. */
 export async function windowAllowsText(organizationId: string, conversationId: string): Promise<boolean> {
-  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { lastInboundAt: true } });
+  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { lastInboundAt: true, accountId: true } });
   if (!c) throw new NotFoundError("Conversa não encontrada.");
-  return (await providerOf(organizationId)) === "QR" || isWindowOpen(c.lastInboundAt);
+  return (await providerOf(organizationId, c.accountId)) === "QR" || isWindowOpen(c.lastInboundAt);
 }
 
 async function afterSystemSend(conversationId: string, text: string, type: string, at: Date) {
@@ -310,11 +311,11 @@ async function afterSystemSend(conversationId: string, text: string, type: strin
 
 /** Texto enviado pelo sistema (marcado como automático). Respeita a janela de 24 h da Meta. */
 export async function systemSendText(organizationId: string, conversationId: string, text: string) {
-  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { waId: true, lastInboundAt: true } });
+  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { waId: true, lastInboundAt: true, accountId: true } });
   if (!c) throw new NotFoundError("Conversa não encontrada.");
-  assertWindow(await providerOf(organizationId), c.lastInboundAt);
+  assertWindow(await providerOf(organizationId, c.accountId), c.lastInboundAt);
   const body = text.trim().slice(0, MAX_TEXT);
-  const tr = await getTransport(organizationId);
+  const tr = await getTransport(organizationId, c.accountId);
   const d = await deliver(() => tr.sendText(c.waId, body));
   const m = await saveOut({ organizationId, conversationId, direction: "OUT", type: "text", body, status: d.status, error: d.error, waMessageId: d.waMessageId, automatic: true });
   await afterSystemSend(conversationId, body, "text", m.createdAt);
@@ -323,14 +324,14 @@ export async function systemSendText(organizationId: string, conversationId: str
 
 /** Modelo aprovado enviado pelo sistema (único jeito de iniciar conversa fora da janela, na API oficial). */
 export async function systemSendTemplate(organizationId: string, conversationId: string, templateId: string, rawParams: string[]) {
-  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { waId: true } });
+  const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { waId: true, accountId: true } });
   if (!c) throw new NotFoundError("Conversa não encontrada.");
-  if ((await providerOf(organizationId)) === "QR") throw new ConflictError("Modelos existem só na conexão oficial da Meta.");
+  if ((await providerOf(organizationId, c.accountId)) === "QR") throw new ConflictError("Modelos existem só na conexão oficial da Meta.");
   const t = await db.whatsappTemplate.findFirst({ where: { id: templateId, organizationId } });
   if (!t || t.status !== "APPROVED") throw new ConflictError("Modelo inexistente ou não aprovado pela Meta.");
   const params = rawParams.slice(0, t.variableCount).map((p) => p.replace(/\s+/g, " ").trim().slice(0, 500) || "-");
   if (params.length !== t.variableCount) throw new ValidationError("O modelo usa mais variáveis do que o sistema oferece.", { template: [`Este modelo usa ${t.variableCount} variável(is); a cobrança oferece até 5.`] });
-  const { auth, cfg } = await loadAuth(organizationId);
+  const { auth, cfg } = await loadAuth(organizationId, c.accountId);
   const d = await deliver(() => apiSendTemplate(cfg, auth, c.waId, { name: t.name, language: t.language, params }));
   const text = fillTemplate(t.body, params);
   const m = await saveOut({ organizationId, conversationId, direction: "OUT", type: "template", body: text, status: d.status, error: d.error, waMessageId: d.waMessageId, automatic: true });

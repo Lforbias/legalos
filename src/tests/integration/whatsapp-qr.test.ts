@@ -215,7 +215,7 @@ describe("atendimento por WhatsApp — conexão por QR-Code (driver FALSO)", () 
 
   it("trocar para a API oficial desliga o QR; remover apaga tudo", async () => {
     await connectAccount(A.ctx, { label: "Oficial", phoneNumberId: "100200301", token: WA_TOKEN });
-    const acc = await db.whatsappAccount.findUniqueOrThrow({ where: { organizationId: A.org.id } });
+    const acc = await db.whatsappAccount.findFirstOrThrow({ where: { organizationId: A.org.id, isPrimary: true } });
     expect(acc.provider).toBe("META");
     expect(acc.qrState).toBe("DISCONNECTED");
     expect(acc.riskAckAt).toBeNull();

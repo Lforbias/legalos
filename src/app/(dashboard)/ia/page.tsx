@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { AskPanel } from "@/modules/ai/ask-panel";
 import { EnableToggle } from "@/modules/ai/enable-toggle";
+import { DraftPanel, JurisPanel } from "@/modules/ai/tools-ui";
 import { can } from "@/server/context";
 import { aiStatus } from "@/server/services/ai.service";
 import { listCaseOptions } from "@/server/services/case.service";
@@ -41,6 +42,12 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
           </CardBody>
         </Card>
         <AskPanel cases={cases} initialCaseId={sp.processo ?? ""} disabledReason={disabledReason} />
+        {!disabledReason ? (
+          <>
+            <Card><CardHeader title="Pesquisa de jurisprudência (mapa de pesquisa)" description="Teses, termos de busca e o que conferir. Não afirma precedentes." /><CardBody><JurisPanel cases={cases} /></CardBody></Card>
+            {can(ctx, "petitions:write") ? <Card><CardHeader title="Minuta de peça" description="Rascunho para o advogado revisar. Nada é protocolado." /><CardBody><DraftPanel cases={cases} /></CardBody></Card> : null}
+          </>
+        ) : null}
       </div>
     </div>
   );

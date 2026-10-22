@@ -43,7 +43,7 @@ const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
 );
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="text-xs text-muted">{children}</p>;
 
-export function SidePanel({ title, phone, data, meta, actions, controls }: { title: string; phone: string; data: PanelView; meta: React.ReactNode; actions: React.ReactNode; controls?: React.ReactNode }) {
+export function SidePanel({ title, phone, data, meta, actions, controls, extras }: { title: string; phone: string; data: PanelView; meta: React.ReactNode; actions: React.ReactNode; controls?: React.ReactNode; extras?: React.ReactNode }) {
   const [tab, setTab] = React.useState<Tab>("contato");
   const d = data;
   const counts: Partial<Record<Tab, number>> = {
@@ -108,6 +108,7 @@ export function SidePanel({ title, phone, data, meta, actions, controls }: { tit
               ) : null}
             </Section>
             {meta}
+            {extras}
           </>
         ) : null}
 

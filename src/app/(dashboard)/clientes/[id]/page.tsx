@@ -28,6 +28,8 @@ import { ConversationsCard } from "@/modules/whatsapp/conversations-card";
 import { SendClientCard } from "@/modules/whatsapp/send-client-card";
 import { clientMessageTarget } from "@/server/services/chat-send.service";
 import { conversationsOfClient } from "@/server/services/chat-links.service";
+import { VaultPanel } from "@/modules/vault/vault-panel";
+import { listClientCredentials, VAULT_SYSTEMS } from "@/server/services/client-vault.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Cliente" };
@@ -59,6 +61,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     ...(canCases ? [{ key: "processos", label: "Processos" }] : []),
     ...(canDocs ? [{ key: "documentos", label: "Documentos" }] : []),
     ...(can(ctx, "clients:write") && can(ctx, "members:invite") ? [{ key: "portal", label: "Portal" }] : []),
+    ...(can(ctx, "vault:read") || can(ctx, "vault:manage") ? [{ key: "cofre", label: "Cofre" }] : []),
   ];
   const requested = (await searchParams).aba ?? "resumo";
   const tab = tabs.some((t) => t.key === requested) ? requested : "resumo";
@@ -151,6 +154,11 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       {tab === "portal" ? await (async () => {
         const access = await listPortalAccess(ctx, client.id);
         return <PortalPanel clientId={client.id} canManage accounts={access.accounts.map((a) => ({ id: a.id, name: a.name, email: a.email }))} invitations={access.invitations.map((i) => ({ id: i.id, email: i.email }))} />;
+      })() : null}
+
+      {tab === "cofre" ? await (async () => {
+        const items = await listClientCredentials(ctx, client.id);
+        return <VaultPanel clientId={client.id} systems={VAULT_SYSTEMS} canRead={can(ctx, "vault:read")} canManage={can(ctx, "vault:manage")} items={items.map((c) => ({ id: c.id, system: c.system, label: c.label, updatedAt: c.updatedAt.toISOString(), lastRevealedAt: c.lastRevealedAt?.toISOString() ?? null, lastRevealedBy: c.lastRevealedBy }))} />;
       })() : null}
 
       {tab === "documentos" ? (

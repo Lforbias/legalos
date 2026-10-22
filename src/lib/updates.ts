@@ -10,6 +10,17 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "2.0.0", when: "2026-10-21", title: "Versão 2.0.0: Kanban, financeiro, processo, Astrea, Chat completo, IA e cofre de clientes", migration: "20261208000000_f3_kanban … 20261215000000_f11_cofre",
+    items: [
+      "Kanban de gestão e pacotes de tarefas; financeiro com fluxo anual, faturas e boleto; processo com honorário, apensos, recursos, provisão e correção por índices oficiais.",
+      "Documentos do Astrea importados como link; importação de andamentos.",
+      "Chat: até 5 números por escritório, retornos combinados, mensagens agendadas e NPS (desligados por padrão), formulários, relatórios e exportação em CSV com auditoria.",
+      "IA (precisa da chave do provedor): resumo de conversa, mapa de pesquisa de jurisprudência (nunca inventa precedente) e minuta de peça para revisão.",
+      "Cofre de senhas de clientes (só Proprietário/Administrador; senha só abre com o código do 2FA e fica registrada), modelos de perfil com o mínimo de acesso e revisão de acessos sensíveis.",
+      "Troca de chaves (rotate-keys) agora também protege credenciais de tribunais e o cofre de clientes.",
+    ],
+  },
+  {
     id: "3.0-F6", when: "2026-10-21", title: "LegalMail: sistema por tribunal e registro de conectores", migration: "20261207000000_legalmail_f6",
     items: [
       "Configurações → Sistemas dos tribunais: o escritório diz qual sistema atende cada tribunal (PJe, eproc, e-SAJ, PROJUDI). Nada é presumido.",
@@ -211,18 +222,18 @@ export const PHASES_2: Phase[] = [
   { id: "2.0-F1", title: "Tratamento de publicações", status: "feita" },
   { id: "2.0-F13", title: "Painel do developer", status: "feita" },
   { id: "2.0-F2", title: "Indicadores e central de alertas", status: "feita" },
-  { id: "2.0-F3", title: "Kanban de gestão e workflows do escritório", status: "a fazer" },
-  { id: "2.0-F4", title: "Financeiro: fluxo de caixa, contas, faturas", status: "a fazer" },
-  { id: "2.0-F5", title: "Processo mais rico (honorário, apensos, recursos, provisão)", status: "a fazer" },
+  { id: "2.0-F3", title: "Kanban de gestão e workflows do escritório", status: "feita" },
+  { id: "2.0-F4", title: "Financeiro: fluxo de caixa, contas, faturas", status: "feita" },
+  { id: "2.0-F5", title: "Processo mais rico (honorário, apensos, recursos, provisão)", status: "feita" },
   { id: "2.0-F6", title: "Pequenos itens (aniversariantes, 2FA obrigatório, exportar Excel, enviar por WhatsApp)", status: "feita" },
-  { id: "2.0-F7", title: "Migração Astrea (modelos, certificado, andamentos)", status: "a fazer" },
-  { id: "2.0-F8", title: "Chat: vários números e relatórios", status: "a fazer" },
-  { id: "2.0-F9", title: "Chat: follow-ups, agendadas, NPS, exportação, formulários", status: "a fazer" },
-  { id: "2.0-F10", title: "IA com chave real (resumo, jurisprudência, peças)", status: "a fazer" },
-  { id: "2.0-F11", title: "Cofre de credenciais de clientes e perfis mínimos", status: "a fazer" },
+  { id: "2.0-F7", title: "Migração Astrea (modelos, certificado, andamentos)", status: "feita" },
+  { id: "2.0-F8", title: "Chat: vários números e relatórios", status: "feita" },
+  { id: "2.0-F9", title: "Chat: follow-ups, agendadas, NPS, exportação, formulários", status: "feita" },
+  { id: "2.0-F10", title: "IA com chave real (resumo, jurisprudência, peças)", status: "feita" },
+  { id: "2.0-F11", title: "Cofre de credenciais de clientes e perfis mínimos", status: "feita" },
   { id: "2.0-F14", title: "Avisos no celular (push) de tarefas e prazos a vencer", status: "feita" },
   { id: "2.0-F15", title: "Comunicados do developer: enviar aviso no celular e no sistema para todos os escritórios, um escritório ou uma pessoa", status: "feita" },
-  { id: "2.0-F12", title: "Fechamento: revisão geral e versão 2.0.0", status: "a fazer" },
+  { id: "2.0-F12", title: "Fechamento: revisão geral e versão 2.0.0", status: "feita" },
 ];
 
 export const PHASES_3: Phase[] = [
@@ -288,7 +299,9 @@ export const TEAM_TODO: string[] = [
   "Ciclo completo no Asaas sandbox.",
   "Importar andamentos do Astrea (--only andamentos --dry-run, conferir, depois --yes).",
   "3.0: validar em ambiente real o que só foi testado com simuladores: protocolo MNI (homologação do tribunal), Google Drive (credenciais próprias do escritório), classificação por IA (chave do provedor) e o painel de monitoramento; reinstalar o agendador (install-cron.sh) para a rotina monitoring.",
-  "Fornecer a chave do provedor de IA quando chegar a F10.",
+  "Fornecer a chave do provedor de IA (ANTHROPIC_API_KEY) e ligar a IA em Integrações; depois ligar o resumo de conversa em Configurações do Chat.",
+  "Rodar install-cron.sh de novo (nova rotina chat-extras, a cada minuto) para mensagens agendadas e lembretes de retorno.",
+  "Conferir no servidor a sincronização dos índices do Banco Central (correção monetária) e importar documentos do Astrea (--only documentos,andamentos).",
   "Gerar as chaves VAPID, colocar no .env.production (VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT), reiniciar o app e rodar install-cron.sh (passo a passo em docs/push.md); depois ligar os avisos do escritório em Minha conta.",
   "Publicação automática: seguir docs/deploy-github.md (repositório privado, chave de deploy, 4 segredos no GitHub, ambiente production com aprovação) e acompanhar a primeira publicação.",
   "Testar o aviso no celular real: Android (Chrome) e iPhone (app instalado na tela inicial).",

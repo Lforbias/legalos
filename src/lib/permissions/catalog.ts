@@ -81,6 +81,8 @@ export const PERMISSION_GROUPS = [
       { key: "ai:use", label: "Usar assistente de IA" },
       { key: "integrations:manage", label: "Gerenciar integrações" },
       { key: "certificates:manage", label: "Cofre de certificados digitais (enviar, revogar e ver usos)" },
+      { key: "vault:manage", label: "Cofre de senhas de clientes: cadastrar, trocar e apagar" },
+      { key: "vault:read", label: "Cofre de senhas de clientes: ver a senha (pede o código do 2FA e fica registrado)" },
       { key: "portal:access", label: "Acessar o portal do cliente (cliente externo)" },
     ],
   },

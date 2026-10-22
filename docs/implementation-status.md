@@ -608,3 +608,10 @@ Plano em `docs/roadmap-4.0.0.md`: inventário do ChatGuru (leitura apenas, 2026-
 - **F7** `monitoring.service.ts` (`getMonitoringOverview`, `runMonitoringCheck`), página `/monitoramento`, rota `/api/cron/monitoring` (job `monitoring`, a cada 30 min; **reinstalar `install-cron.sh`**). Fonte parada = ligada e sem execução há mais de 36 h. Alerta `MONITORING_ALERT` deduplicado por fonte+última execução.
 - **F6** `court_system_maps` (`20261207000000`), `src/lib/connectors/registry.ts`, `court-system-map.service.ts`, página `/configuracoes/tribunais`. `assertConnectorFor` recusa petição em tribunal mapeado para sistema sem conector; sem mapa, nada muda.
 - **Não validado em ambiente real:** protocolo MNI em tribunal, Google (credenciais do escritório), IA (chave), monitoramento em produção. **F11** aguarda as telas do LegalMail.
+
+## 2.0.0 — fechamento (2026-10-21)
+- Verificado: 732 testes de integração/unidade passando, `tsc`, `eslint` e `next build` limpos. Não rodei os E2E (Playwright) desta entrega.
+- Fases F3, F4, F5, F7, F8, F9, F10, F11 e F12 concluídas (ver `docs/roadmap-2.0.0.md` e `CHANGELOG.md`). Migrações: `20261208000000_f3_kanban` até `20261215000000_f11_cofre`.
+- Só com simulador (confirmar em produção): índices do Banco Central (o sandbox bloqueia o acesso), IA (chave do provedor), números por QR-Code, mensagens agendadas e envio pela Meta.
+- Limites honestos: IA não consulta base de jurisprudência (gera mapa de pesquisa e remove números de processo); anexos de documentos do Astrea não existem no backup (só link); relatório "por dia" usa UTC.
+- `rotate-keys` passou a cobrir credenciais de tribunais e cofre de clientes (lacuna da 3.0 corrigida).

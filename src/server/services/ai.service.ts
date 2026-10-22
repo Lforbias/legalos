@@ -49,10 +49,10 @@ Regras obrigatórias:
 4. Prazos marcados como RASCUNHO ainda não foram validados por um advogado: deixe isso claro. Você não calcula nem confirma prazos fatais.
 5. Suas respostas são apoio de trabalho e precisam de revisão de um advogado; não dê garantias de resultado.`;
 
-type Built = { context: string; refs: AiReference[] };
+export type Built = { context: string; refs: AiReference[] };
 
 /** Monta o contexto SÓ com o que este usuário já pode ver (processo visível + permissões de cada módulo). */
-async function buildCaseContext(ctx: TenantContext, caseId: string): Promise<Built> {
+export async function buildCaseContext(ctx: TenantContext, caseId: string): Promise<Built> {
   await assertCaseVisible(ctx, caseId);
   const org = ctx.organizationId;
   const c = await db.case.findFirstOrThrow({ where: { id: caseId, organizationId: org }, include: { parties: { orderBy: { createdAt: "asc" } } } });

@@ -118,7 +118,7 @@ async function deliverOne(organizationId: string, e: EntryRow, c: ClientRow | nu
   const waId = c.phone ? normalizeWaId(c.phone) : null;
   if (!waId) return skip("cliente sem telefone válido no cadastro");
   if (await db.whatsappBillingOptout.findUnique({ where: { organizationId_waId: { organizationId, waId } }, select: { waId: true } })) return skip("o cliente pediu para não receber lembretes");
-  const account = await db.whatsappAccount.findUnique({ where: { organizationId }, select: { id: true, enabled: true } });
+  const account = await db.whatsappAccount.findFirst({ where: { organizationId, isPrimary: true }, select: { id: true, enabled: true } });
   if (!account?.enabled) return skip("WhatsApp desligado ou não conectado");
   const found = await db.whatsappConversation.findUnique({ where: { accountId_waId: { accountId: account.id, waId } }, select: { id: true } });
   const conv = found ?? (await db.whatsappConversation.create({ data: { organizationId, accountId: account.id, waId, clientId: c.id, status: "CLOSED" }, select: { id: true } }));
@@ -159,7 +159,7 @@ export async function billingAvailability(ctx: TenantContext, entryId: string): 
   if (!c) return { ok: false, reason: "Vincule um cliente ao lançamento." };
   const waId = c.phone ? normalizeWaId(c.phone) : null;
   if (!waId) return { ok: false, reason: "O cliente não tem telefone válido no cadastro." };
-  const acc = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { enabled: true } });
+  const acc = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { enabled: true } });
   if (!acc?.enabled) return { ok: false, reason: "O WhatsApp não está conectado/ligado." };
   if (await db.whatsappBillingOptout.findUnique({ where: { organizationId_waId: { organizationId: ctx.organizationId, waId } } })) return { ok: false, reason: "O cliente pediu para não receber lembretes." };
   const recent = await db.whatsappBillingSend.findFirst({ where: { entryId, offsetDays: null, status: "SENT", createdAt: { gt: new Date(Date.now() - 24 * 3600_000) } }, select: { id: true } });

@@ -61,7 +61,7 @@ export type SlaRunResult = { orgs: number; alerts: number; notified: number; ema
 /** Rotina agendada (a cada poucos minutos). Idempotente: o alerta é único por conversa + mensagem do cliente. */
 export async function runSlaCheck(now = new Date()): Promise<SlaRunResult> {
   const out: SlaRunResult = { orgs: 0, alerts: 0, notified: 0, emails: 0, noRecipient: 0 };
-  const orgs = await db.whatsappSlaSettings.findMany({ where: { enabled: true, organization: { whatsappAccount: { enabled: true } } } });
+  const orgs = await db.whatsappSlaSettings.findMany({ where: { enabled: true, organization: { whatsappAccounts: { some: { enabled: true } } } } });
   for (const s of orgs) {
     out.orgs++;
     try {

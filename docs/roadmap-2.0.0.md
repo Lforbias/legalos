@@ -12,19 +12,19 @@ Regras: sem dado, integração ou IA falsos; nada enviado ao cliente sem autoriz
 |---|---|---|---|
 | 2.0-F1 | Tratamento de publicações: contadores do dia, aviso de nome não monitorado, escolha de quem recebe, sugestão de providência por IA com aprovação humana (tratar/descartar/distribuir já existiam) | E1 | **feita** |
 | 2.0-F2 | Painel de indicadores (atrasados por tipo, movimentação 7/30/60/90 dias, evolução da carteira, processos por cliente, pessoais) e central de alertas com abas e ação direta | E4, E5 | **concluído e verificado** (565 testes, 40 E2E) |
-| 2.0-F3 | Quadro Kanban de gestão e workflows do escritório (contrato novo, encerramento com acordo, encerramento por condenação) | E2, E3 | a fazer |
-| 2.0-F4 | Financeiro: fluxo de caixa anual por categoria (realizado/previsto), saldo do dia, parcelas, várias contas, faturas a faturar/emitidas, boleto no fluxo | E9 | a fazer |
-| 2.0-F5 | Processo mais rico: honorário no processo, apensos, recursos por grau, valor da causa e provisão corrigidos, histórico consolidado | E8 | a fazer |
+| 2.0-F3 | Quadro Kanban de gestão e workflows do escritório (contrato novo, encerramento com acordo, encerramento por condenação) | E2, E3 | **concluído** |
+| 2.0-F4 | Financeiro: fluxo de caixa anual por categoria (realizado/previsto), saldo do dia, parcelas, várias contas, faturas a faturar/emitidas, boleto no fluxo | E9 | **concluído** |
+| 2.0-F5 | Processo mais rico: honorário no processo, apensos, recursos por grau, valor da causa e provisão corrigidos, histórico consolidado | E8 | **concluído** |
 | 2.0-F6 | Pequenos itens: aniversariantes, equipes, 2FA obrigatório por escritório, exportação geral para Excel, botão "enviar por WhatsApp" no processo e no financeiro | E10–E12 | **concluída** (equipes e cobrança no financeiro já existiam) |
-| 2.0-F7 | Migração Astrea: modelos de documento, certificado digital, andamentos | E13, E14 | a fazer |
-| 2.0-F8 | Chat: vários números no mesmo chat e relatórios do chat | Bloco 2 | a fazer |
-| 2.0-F9 | Chat: follow-ups e mensagens agendadas, NPS, exportação de conversas, formulários | Bloco 2 | a fazer |
-| 2.0-F10 | IA (com chave real): resumo de conversa (ligar/desligar), jurisprudência por chat, geração de peças (a base de IA, MCP e assistente passa a ser planejada em `docs/roadmap-6.0.0.md`) | E6, E7 | a fazer |
-| 2.0-F11 | Segurança: cofre de credenciais de clientes e perfis com o mínimo de acesso | Bloco 5 | a fazer |
+| 2.0-F7 | Migração Astrea: modelos de documento, certificado digital, andamentos | E13, E14 | **concluído** |
+| 2.0-F8 | Chat: vários números no mesmo chat e relatórios do chat | Bloco 2 | **concluído** |
+| 2.0-F9 | Chat: follow-ups e mensagens agendadas, NPS, exportação de conversas, formulários | Bloco 2 | **concluído** |
+| 2.0-F10 | IA (com chave real): resumo de conversa (ligar/desligar), jurisprudência por chat, geração de peças (a base de IA, MCP e assistente passa a ser planejada em `docs/roadmap-6.0.0.md`) | E6, E7 | **concluído** |
+| 2.0-F11 | Segurança: cofre de credenciais de clientes e perfis com o mínimo de acesso | Bloco 5 | **concluído** |
 | 2.0-F13 | Painel de developer (só o dono da plataforma): saúde e rotinas, API/chaves/webhooks, auditoria e erros, testes de integração e interruptores | `/admin/developer` | **concluído e verificado** (551 testes, 36 E2E) |
 | 2.0-F14 | Avisos no celular (push/PWA): tarefa ou prazo a vencer notifica o aparelho (Android; iPhone com o app instalado), por pessoa, com antecedência escolhida, interruptor geral e aviso sem dados sensíveis | pedido em 2026-10-21 | **concluído** (docs/push.md) |
 | 2.0-F15 | Comunicados do developer: no painel do developer, escrever um comunicado (novidade, manutenção, alerta) e enviar por aviso no celular (push) e no sino do sistema, para todos os escritórios, um escritório ou uma pessoa; com histórico, agendamento opcional, texto revisado antes de enviar, limite de frequência e auditoria. Reaproveita a infraestrutura da F14 (chaves VAPID, aparelhos ativados). Respeita quem desligou os avisos. **Agendamento ficou para uma próxima versão.** | pedido em 2026-10-21 | **concluído** |
-| 2.0-F12 | Fechamento: revisão geral, testes completos, `package.json` 2.0.0, CHANGELOG, guia de atualização | — | a fazer |
+| 2.0-F12 | Fechamento: revisão geral, testes completos, `package.json` 2.0.0, CHANGELOG, guia de atualização | — | **concluído** |
 
 ## Ações da equipe (sem código)
 

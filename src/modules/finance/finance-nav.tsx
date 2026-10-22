@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 
 const ITEMS = [
   { key: "visao", label: "Visão geral", href: "/financeiro" },
+  { key: "anual", label: "Fluxo anual", href: "/financeiro/anual" },
+  { key: "faturas", label: "Faturas", href: "/financeiro/faturas" },
   { key: "lancamentos", label: "Lançamentos", href: "/financeiro/lancamentos" },
   { key: "cadastros", label: "Cadastros", href: "/financeiro/cadastros" },
 ] as const;

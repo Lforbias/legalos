@@ -12,6 +12,7 @@ import { Menu } from "@/components/ui/menu";
 import { Avatar } from "./avatar";
 import { EmojiPicker } from "./emoji-picker";
 import { SidePanel, type PanelView } from "./side-panel";
+import { ConversationExtras, type ConversationExtrasData } from "./extras-ui";
 import { MetaPanel, type FieldOpt, type LabelOpt } from "./meta-panel";
 import { ChatActions, MessageActions, type Can, type Links, type Panel } from "./links-panel";
 import { addNoteAction, assignAction, linkClientAction, searchClientsAction, sendMessageAction, sendTemplateAction, setStatusAction, transferQueueAction } from "./actions";
@@ -77,7 +78,7 @@ function Bubble({ m, actions }: { m: MessageView; actions?: React.ReactNode }) {
   );
 }
 
-export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView }) {
+export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData }) {
   const router = useRouter();
   const [text, setText] = React.useState("");
   const [note, setNote] = React.useState(false);
@@ -308,6 +309,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           phone={chat.phone}
           data={side}
           controls={controls}
+          extras={extras ? <ConversationExtras d={extras} /> : null}
           meta={chat.canWrite && meta ? <MetaPanel key={JSON.stringify([meta.selected, meta.values])} chatId={chat.id} labels={meta.labels} selected={meta.selected} fields={meta.fields} values={meta.values} onMsg={setMsg} /> : null}
           actions={chat.canWrite ? <ChatActions key={`${panel?.kind ?? "-"}:${panel?.messageId ?? ""}:${panelN}`} chatId={chat.id} title={chat.title} links={links} can={chat.can} team={team} me={chat.me} panel={panel} setPanel={openPanel} onMsg={setMsg} /> : <p className="px-3 pb-3 text-xs text-muted">Sem permissão para criar a partir da conversa.</p>}
         />

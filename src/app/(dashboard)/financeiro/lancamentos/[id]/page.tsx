@@ -14,6 +14,7 @@ import { fromCents, toCents } from "@/lib/finance/money";
 import { NotFoundError } from "@/lib/permissions/check";
 import { uuidSchema } from "@/lib/validation/common";
 import { formatMoneyBR } from "@/lib/validation/money";
+import { BoletoForm } from "@/modules/finance/invoice-ui";
 import { PaymentForm } from "@/modules/finance/payment-form";
 import { CancelEntryButton, ReversePaymentButton } from "@/modules/finance/reason-action";
 import { ENTRY_KIND_LABEL, ENTRY_STATUS_LABEL, ENTRY_TYPE_LABEL } from "@/modules/finance/schemas";
@@ -108,6 +109,15 @@ export default async function EntryPage({ params }: { params: Promise<{ id: stri
           <CardHeader title={entry.kind === "RECEIVABLE" ? "Registrar recebimento" : "Registrar pagamento"} description="A baixa pode ser parcial. O valor não pode passar do saldo em aberto." />
           <CardBody>
             <PaymentForm entryId={entry.id} accounts={accounts.map((a) => ({ id: a.id, name: a.name }))} defaultAccountId={entry.accountId ?? ""} remaining={remaining} today={today} />
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {entry.kind === "RECEIVABLE" && entry.status !== "CANCELED" && canWrite ? (
+        <Card className="mt-4">
+          <CardHeader title="Boleto" description="Dados do boleto gerado fora do sistema." />
+          <CardBody>
+            <BoletoForm entryId={entry.id} code={entry.boletoCode ?? ""} url={entry.boletoUrl ?? ""} />
           </CardBody>
         </Card>
       ) : null}

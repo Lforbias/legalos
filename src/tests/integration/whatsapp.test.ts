@@ -54,7 +54,7 @@ describe("atendimento por WhatsApp (Meta simulada)", () => {
     await expect(connectAccount(A.ctx, { label: "Atendimento", phoneNumberId: "abc", token: WA_TOKEN })).rejects.toBeInstanceOf(ValidationError);
     const r = await connectAccount(A.ctx, { label: "Atendimento", phoneNumberId: PNID, wabaId: "555666", token: WA_TOKEN });
     expect(r.displayPhone).toContain("99999-0000");
-    const raw = await db.whatsappAccount.findUniqueOrThrow({ where: { organizationId: A.org.id } });
+    const raw = await db.whatsappAccount.findFirstOrThrow({ where: { organizationId: A.org.id, isPrimary: true } });
     expect(raw.tokenEnc).not.toContain(WA_TOKEN);
     const view = await getAccount(A.ctx);
     expect(JSON.stringify(view)).not.toContain(WA_TOKEN);
@@ -290,7 +290,7 @@ describe("atendimento por WhatsApp (Meta simulada)", () => {
   });
 
   it("desligar para de receber; remover apaga tudo (exige 2FA)", async () => {
-    await db.whatsappAccount.update({ where: { organizationId: A.org.id }, data: { enabled: false } });
+    await db.whatsappAccount.updateMany({ where: { organizationId: A.org.id }, data: { enabled: false } });
     const before = await db.whatsappMessage.count({ where: { organizationId: A.org.id } });
     await post(inbound(PNID, { id: "wamid.IN8", from: MARIA, text: "desligado" }));
     expect(await db.whatsappMessage.count({ where: { organizationId: A.org.id } })).toBe(before);

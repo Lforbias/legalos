@@ -4,7 +4,7 @@
 set -uo pipefail
 source "$(dirname "$0")/lib.sh"
 job="${1:-}"
-case "$job" in webhooks|djen|mni|mail|billing|whatsapp-billing|chat-sla|push-due|petition-queue|monitoring) ;; *) die "uso: cron-call.sh webhooks|djen|mni|mail|billing|whatsapp-billing|chat-sla|push-due|petition-queue|monitoring" ;; esac
+case "$job" in webhooks|djen|mni|mail|billing|whatsapp-billing|chat-sla|chat-extras|push-due|petition-queue|monitoring) ;; *) die "uso: cron-call.sh webhooks|djen|mni|mail|billing|whatsapp-billing|chat-sla|chat-extras|push-due|petition-queue|monitoring" ;; esac
 secret="$(env_get CRON_SECRET)"; url="$(env_get APP_URL)"
 [ -n "$secret" ] && [ -n "$url" ] || die "CRON_SECRET/APP_URL ausentes no $ENV_FILE"
 # curl lê o cabeçalho de um arquivo temporário (o segredo não aparece na lista de processos)

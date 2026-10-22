@@ -22,6 +22,9 @@ import { getBillingSettings, listBillingSends, listOptouts } from "@/server/serv
 import { listAutomationRuns, listAutomations } from "@/server/services/chat-automation.service";
 import { AutomationsPanel } from "@/modules/whatsapp/automations-ui";
 import { listFields, listLabels } from "@/server/services/chat-meta.service";
+import { listNumbers, MAX_NUMBERS } from "@/server/services/whatsapp-numbers.service";
+import { getExtrasSettings, listForms } from "@/server/services/chat-extras.service";
+import { ExtrasSettingsPanel, FormsPanel, NumbersPanel } from "@/modules/whatsapp/extras-ui";
 import { AccountActions, AwayForm, ConnectForm, FieldsPanel, LabelsPanel, QrConnect, QrPanel, QueuesPanel, QuickReplies, SyncTemplates } from "@/modules/whatsapp/settings-ui";
 
 export const metadata: Metadata = { title: "Configurações do Chat" };
@@ -38,6 +41,8 @@ export default async function AtendimentoConfigPage() {
   const switches = account ? await getSwitches(ctx) : null;
   const [billing, billingSends, optouts] = account ? await Promise.all([getBillingSettings(ctx), listBillingSends(ctx), listOptouts(ctx)]) : [null, [], []];
   const sla = account ? await getSla(ctx) : null;
+  const numbers = account ? await listNumbers(ctx) : [];
+  const [extras, forms] = account ? await Promise.all([getExtrasSettings(ctx), listForms(ctx)]) : [null, []];
   const keyOk = whatsappKeyAvailable();
   const hookOk = webhookConfigured();
   const isQr = account?.provider === "QR";
@@ -81,6 +86,10 @@ export default async function AtendimentoConfigPage() {
       ) : null}
       {account ? (
         <>
+          <Card>
+            <CardHeader title="Números do escritório" description="Vários números no mesmo Chat. Cada conversa fica no número que a recebeu." action={<Badge tone="info">{numbers.length} de {MAX_NUMBERS}</Badge>} />
+            <CardBody><NumbersPanel numbers={numbers.map((n) => ({ id: n.id, label: n.label, provider: n.provider, isPrimary: n.isPrimary, enabled: n.enabled, phone: n.phone, qrState: n.qrState, conversations: n.conversations }))} max={MAX_NUMBERS} /></CardBody>
+          </Card>
           {switches ? (
             <Card>
               <CardHeader title="Liga e desliga das automações" description="Controle central de tudo o que o Chat faz sozinho." />
@@ -147,6 +156,16 @@ export default async function AtendimentoConfigPage() {
                 runs={runs.map((r) => ({ id: r.id, status: r.status, message: r.message, createdAt: r.createdAt.toISOString(), automation: r.automation.name, who: r.conversation.client?.name ?? r.conversation.contactName ?? formatWaId(r.conversation.waId) }))}
               />
             </CardBody>
+          </Card>
+          {extras ? (
+            <Card>
+              <CardHeader title="Agendamento e pesquisa de satisfação" description="Mensagens agendadas pela equipe e NPS. Nascem desligados." />
+              <CardBody><ExtrasSettingsPanel s={extras} /></CardBody>
+            </Card>
+          ) : null}
+          <Card>
+            <CardHeader title="Formulários de atendimento" description="Listas de campos para preencher durante o atendimento (ex.: triagem por área)." />
+            <CardBody><FormsPanel forms={forms.map((f) => ({ id: f.id, name: f.name, active: f.active, fields: f.fields.map((x) => ({ fieldId: x.fieldId, name: x.name, required: x.required })) }))} fields={fields.filter((f) => f.active).map((f) => ({ id: f.id, name: f.name }))} /></CardBody>
           </Card>
           <Card>
             <CardHeader title="Etiquetas" description="Marcadores coloridos para organizar e filtrar as conversas." />

@@ -27,7 +27,7 @@ const firstName = (n: string) => n.trim().split(/\s+/)[0] ?? n;
 async function availability(ctx: TenantContext, phone: string | null): Promise<string | null> {
   if (!can(ctx, "whatsapp:write")) return "Seu perfil não permite enviar mensagens pelo WhatsApp.";
   if (!phone || !normalizeWaId(phone)) return "O cliente não tem telefone válido no cadastro.";
-  const acc = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { enabled: true } });
+  const acc = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { enabled: true } });
   if (!acc?.enabled) return "O WhatsApp não está conectado/ligado neste escritório.";
   return null;
 }

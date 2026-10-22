@@ -250,7 +250,7 @@ async function integrationItems(ctx: TenantContext): Promise<AlertItem[]> {
     for (const c of certs) out.push({ id: `cert-${c.id}`, title: c.notAfter.getTime() <= now ? `Certificado vencido: ${c.label}` : `Certificado vence em breve: ${c.label}`, sub: null, when: c.notAfter, whenKind: "date", href: "/certificados", action: "Ver certificados", tone: c.notAfter.getTime() <= now ? "danger" : "warning", badge: c.notAfter.getTime() <= now ? "Vencido" : "Vence em 30 dias" });
   }
   if (can(ctx, "whatsapp:manage")) {
-    const acc = await db.whatsappAccount.findUnique({ where: { organizationId: org }, select: { enabled: true, lastStatus: true, lastMessage: true, lastCheckAt: true } });
+    const acc = await db.whatsappAccount.findFirst({ where: { organizationId: org, isPrimary: true }, select: { enabled: true, lastStatus: true, lastMessage: true, lastCheckAt: true } });
     if (acc && acc.enabled && acc.lastStatus && acc.lastStatus !== "OK") out.push({ id: "wa-acc", title: "O número do WhatsApp está com problema", sub: acc.lastMessage, when: acc.lastCheckAt, whenKind: "datetime", href: "/atendimento/configuracoes", action: "Abrir configurações", tone: "danger", badge: "Atenção" });
   }
   return out;

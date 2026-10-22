@@ -569,3 +569,28 @@ export function mapHistory(r: Row): HistoryDraft | null {
     userCode: clean(r["Responsável"]),
   };
 }
+
+// ---------------- documentos por link (Documentos.csv) ----------------
+
+export type LinkedDocDraft = { externalId: string; name: string; url: string; kind: "GOOGLE_DOCS" | "DRIVE" | "URL"; isModel: boolean; caseCode: string; clientCode: string; userCode: string; originalYmd: string | null };
+
+/** Só entra quem tem link http(s). Anexos de arquivo (DTE_FILE) não têm link: o backup não traz o conteúdo. */
+export function mapLinkedDocument(r: Row): LinkedDocDraft | null {
+  const externalId = clean(r["Código"]);
+  const url = clean(r["Link do documento"]);
+  if (!externalId || !/^https:\/\//i.test(url)) return null;
+  let host = "";
+  try { host = new URL(url).hostname; } catch { return null; }
+  const kind = host === "docs.google.com" ? "GOOGLE_DOCS" : host === "drive.google.com" ? "DRIVE" : "URL";
+  return {
+    externalId,
+    name: truncate(clean(r["Descrição"]) || "Documento sem título", 200),
+    url: truncate(url, 1000),
+    kind,
+    isModel: clean(r["Origem"]) === "STANDARD_DOCUMENT_MODEL",
+    caseCode: clean(r["Código do processo"]),
+    clientCode: clean(r["Código do cliente"]),
+    userCode: clean(r["Quem criou"]),
+    originalYmd: parseDateTime(r["Data de criação"])?.ymd ?? null,
+  };
+}

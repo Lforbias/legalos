@@ -64,7 +64,8 @@ type Answer = { q: string; a: string };
 async function say(organizationId: string, conversationId: string, waId: string, text: string): Promise<boolean> {
   const sent = await db.whatsappMessage.count({ where: { conversationId, organizationId, direction: "OUT", automatic: true, createdAt: { gt: new Date(Date.now() - SESSION_TTL_MS) } } });
   if (sent >= DAILY_CAP) return false; // proteção contra repetição
-  const t = await getTransport(organizationId);
+  const acc = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { accountId: true } });
+  const t = await getTransport(organizationId, acc?.accountId);
   const id = await t.sendText(waId, text);
   await db.whatsappMessage.create({ data: { organizationId, conversationId, direction: "OUT", type: "text", body: text, status: "SENT", waMessageId: id, automatic: true } });
   return true;

@@ -30,7 +30,7 @@ export type AccountView = {
 
 export async function getAccount(ctx: TenantContext): Promise<AccountView | null> {
   assertCan(ctx, "whatsapp:read");
-  const a = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId } });
+  const a = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true } });
   if (!a) return null;
   return { id: a.id, label: a.label, provider: a.provider === "QR" ? "QR" : "META", qrState: a.qrState, qrPhone: a.qrPhone, riskAckAt: a.riskAckAt, phoneNumberId: a.phoneNumberId, wabaId: a.wabaId, displayPhone: a.displayPhone, enabled: a.enabled, awayEnabled: a.awayEnabled, awayMessage: a.awayMessage, openFrom: a.openFrom, openUntil: a.openUntil, openDays: a.openDays, lastStatus: a.lastStatus, lastMessage: a.lastMessage, lastCheckAt: a.lastCheckAt };
 }
@@ -59,7 +59,7 @@ export async function connectAccount(ctx: TenantContext, input: ConnectInput) {
     if (e instanceof WhatsappApiError) throw new ValidationError(`Não foi possível validar na Meta: ${e.message}`, { token: [e.message] });
     throw e;
   }
-  const existing = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { id: true, provider: true } });
+  const existing = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true } });
   if (existing?.provider === "QR") await stopQrSession(existing.id, { logout: true });
   const data = { label, provider: "META", qrState: "DISCONNECTED", qrCode: null, qrPhone: null, riskAckAt: null, riskAckById: null, phoneNumberId, wabaId, displayPhone, tokenEnc: sealBytes(Buffer.from(token, "utf8"), key), enabled: true, lastStatus: "OK", lastMessage: "Credenciais conferidas na Meta.", lastCheckAt: new Date() };
   try {
@@ -76,7 +76,7 @@ export async function connectAccount(ctx: TenantContext, input: ConnectInput) {
 
 export async function setAccountEnabled(ctx: TenantContext, enabled: boolean) {
   assertCan(ctx, "whatsapp:manage");
-  const acc = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { id: true, provider: true } });
+  const acc = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true } });
   if (!acc) throw new NotFoundError("O WhatsApp não está conectado.");
   await db.whatsappAccount.update({ where: { id: acc.id }, data: { enabled } });
   if (acc.provider === "QR") {
@@ -90,7 +90,7 @@ export async function setAccountEnabled(ctx: TenantContext, enabled: boolean) {
 export async function removeAccount(ctx: TenantContext) {
   assertCan(ctx, "whatsapp:manage");
   await requireMfa(ctx.userId);
-  const acc = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { id: true, provider: true } });
+  const acc = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true } });
   if (!acc) throw new NotFoundError("O WhatsApp não está conectado.");
   if (acc.provider === "QR") await stopQrSession(acc.id, { logout: true });
   await db.whatsappAccount.delete({ where: { id: acc.id } });
@@ -107,7 +107,7 @@ export async function updateSettings(ctx: TenantContext, i: SettingsInput) {
   const msg = i.awayMessage?.replace(/\r\n/g, "\n").trim() || null;
   if (msg && msg.length > 1000) throw new ValidationError("Mensagem longa demais.", { awayMessage: ["Máximo de 1000 caracteres."] });
   if (i.awayEnabled && !msg) throw new ValidationError("Escreva a mensagem de ausência.", { awayMessage: ["Informe a mensagem."] });
-  const r = await db.whatsappAccount.updateMany({ where: { organizationId: ctx.organizationId }, data: { awayEnabled: i.awayEnabled, awayMessage: msg, openFrom: i.openFrom, openUntil: i.openUntil, openDays: days } });
+  const r = await db.whatsappAccount.updateMany({ where: { organizationId: ctx.organizationId, isPrimary: true }, data: { awayEnabled: i.awayEnabled, awayMessage: msg, openFrom: i.openFrom, openUntil: i.openUntil, openDays: days } });
   if (r.count !== 1) throw new NotFoundError("O WhatsApp não está conectado.");
   await audit({ action: "whatsapp.settings_update", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "whatsapp_account", meta: ctx.meta });
 }
@@ -164,7 +164,7 @@ export async function listTemplatesLocal(ctx: TenantContext, onlyApproved = true
 /** Busca os modelos da conta na Meta e substitui a lista local. Só o que está APROVADO pode ser enviado. */
 export async function syncTemplates(ctx: TenantContext) {
   assertCan(ctx, "whatsapp:manage");
-  const acc = await db.whatsappAccount.findUnique({ where: { organizationId: ctx.organizationId }, select: { provider: true } });
+  const acc = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { provider: true } });
   if (acc?.provider === "QR") throw new ConflictError("Modelos de mensagem existem só na conexão oficial da Meta.");
   const { account, auth, cfg } = await loadAuth(ctx.organizationId);
   if (!account.wabaId) throw new ConflictError("Informe o ID da conta do WhatsApp Business (WABA) ao conectar para sincronizar modelos.");

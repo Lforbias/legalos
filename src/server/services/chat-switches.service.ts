@@ -25,7 +25,7 @@ export async function getSwitches(ctx: TenantContext): Promise<SwitchesView> {
   const [billing, bot, acc, total, active] = await Promise.all([
     db.whatsappBillingSettings.findUnique({ where: { organizationId: org }, select: { enabled: true } }),
     db.whatsappBot.findUnique({ where: { organizationId: org }, select: { enabled: true, options: true } }),
-    db.whatsappAccount.findUnique({ where: { organizationId: org }, select: { awayEnabled: true, awayMessage: true, autoAssignEnabled: true } }),
+    db.whatsappAccount.findFirst({ where: { organizationId: org, isPrimary: true }, select: { awayEnabled: true, awayMessage: true, autoAssignEnabled: true } }),
     db.whatsappAutomation.count({ where: { organizationId: org } }),
     db.whatsappAutomation.count({ where: { organizationId: org, active: true } }),
   ]);
@@ -52,13 +52,13 @@ export async function setSwitch(ctx: TenantContext, key: SwitchKey, on: boolean)
       await db.whatsappBot.update({ where: { organizationId: org }, data: { enabled: on } });
     }
   } else if (key === "away") {
-    const acc = await db.whatsappAccount.findUnique({ where: { organizationId: org }, select: { awayMessage: true } });
+    const acc = await db.whatsappAccount.findFirst({ where: { organizationId: org, isPrimary: true }, select: { awayMessage: true } });
     if (!acc) throw new NotFoundError("O WhatsApp não está conectado.");
     if (on && !acc.awayMessage) throw new ConflictError("Escreva a mensagem de ausência antes de ligar.");
-    await db.whatsappAccount.update({ where: { organizationId: org }, data: { awayEnabled: on } });
+    await db.whatsappAccount.updateMany({ where: { organizationId: org }, data: { awayEnabled: on } });
   } else if (key === "autoAssign") {
     const r = await db.whatsappAccount.updateMany({ where: { organizationId: org }, data: { autoAssignEnabled: on } });
-    if (r.count !== 1) throw new NotFoundError("O WhatsApp não está conectado.");
+    if (r.count < 1) throw new NotFoundError("O WhatsApp não está conectado.");
   } else {
     await db.whatsappAutomation.updateMany({ where: { organizationId: org }, data: { active: on } });
   }

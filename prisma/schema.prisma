@@ -131,7 +131,10 @@ model Organization {
   creditGrants            CreditGrant[]
   creditUsages            CreditUsage[]
   courtCredentials        CourtCredential[]
+  clientCredentials       ClientCredential[]
   courtSystemMaps         CourtSystemMap[]
+  kanbanBoards            KanbanBoard[]
+  workflowPackages        WorkflowPackage[]
   googleIntegration       GoogleIntegration?
   documentClassifications DocumentClassification[]
   suspendedAt      DateTime?          @map("suspended_at") @db.Timestamptz(3)
@@ -182,8 +185,13 @@ model Organization {
   financeCategories       FinanceCategory[]
   costCenters             CostCenter[]
   financeEntries          FinanceEntry[]
+  feeInvoices             FeeInvoice[]
+  caseFees                CaseFee[]
+  caseLinks               CaseLink[]
+  linkedDocuments         LinkedDocument[]
+  caseAppeals             CaseAppeal[]
   financePayments         FinancePayment[]
-  whatsappAccount         WhatsappAccount?
+  whatsappAccounts        WhatsappAccount[]
   whatsappConversations   WhatsappConversation[]
   whatsappMessages        WhatsappMessage[]
   whatsappQuickReplies    WhatsappQuickReply[]
@@ -403,10 +411,12 @@ model Client {
   parties               CaseParty[]
   documents             Document[]
   tasks                 Task[]
+  kanbanCards           KanbanCard[]
   agendaEvents          AgendaEvent[]
   whatsappConversations WhatsappConversation[]
 
   @@map("clients")
+  vaultCredentials ClientCredential[]
 }
 
 model ClientContact {
@@ -458,6 +468,7 @@ model Case {
   whatsappConversations WhatsappConversation[] @relation("WhatsappCase")
   documents             Document[]
   tasks                 Task[]
+  kanbanCards           KanbanCard[]
   deadlines             Deadline[]
   courtNotices          CourtNotice[]
   agendaEvents          AgendaEvent[]
@@ -469,6 +480,13 @@ model Case {
   /// 3.0-F1: valores dos campos personalizados, chaveados por CustomFieldDef.key.
   customFields          Json                   @default("{}") @map("custom_fields")
   caseNotes             CaseNote[]
+  /// 2.0-F5: provisão e correção monetária (estimativa; índices em monetary_indices).
+  provisionValue        Decimal?               @map("provision_value") @db.Decimal(14, 2)
+  provisionBaseDate     DateTime?              @map("provision_base_date") @db.Date
+  claimBaseDate         DateTime?              @map("claim_base_date") @db.Date
+  correctionIndex       String?                @map("correction_index")
+  fees                  CaseFee[]
+  appeals               CaseAppeal[]
 
   @@index([organizationId, archivedAt])
   @@map("cases")
@@ -1298,6 +1316,9 @@ model FinanceEntry {
   groupId          String?            @map("group_id") @db.Uuid
   installmentNo    Int?               @map("installment_no")
   installmentTotal Int?               @map("installment_total")
+  boletoCode       String?            @map("boleto_code")
+  boletoUrl        String?            @map("boleto_url")
+  invoiceId        String?            @map("invoice_id") @db.Uuid
   canceledAt       DateTime?          @map("canceled_at") @db.Timestamptz(3)
   canceledReason   String?            @map("canceled_reason")
   canceledById     String?            @map("canceled_by_id") @db.Uuid
@@ -1307,9 +1328,31 @@ model FinanceEntry {
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   payments     FinancePayment[]
+  invoice      FeeInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, dueDate])
   @@map("finance_entries")
+}
+
+model FeeInvoice {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  number         Int
+  clientId       String    @map("client_id") @db.Uuid
+  issuedOn       DateTime  @map("issued_on") @db.Date
+  total          Decimal   @db.Decimal(14, 2)
+  notes          String?
+  canceledAt     DateTime? @map("canceled_at") @db.Timestamptz(3)
+  canceledReason String?   @map("canceled_reason")
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  entries      FinanceEntry[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, clientId])
+  @@map("fee_invoices")
 }
 
 model FinancePayment {
@@ -1689,7 +1732,9 @@ model MailOutbox {
 
 model WhatsappAccount {
   id                String    @id @default(uuid()) @db.Uuid
-  organizationId    String    @unique @map("organization_id") @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  /// 2.0-F8: vários números por escritório. O principal (is_primary) é o que as telas de configuração editam; os demais são números adicionais.
+  isPrimary         Boolean   @default(true) @map("is_primary")
   label             String
   phoneNumberId     String?   @unique @map("phone_number_id")
   wabaId            String?   @map("waba_id")
@@ -1720,6 +1765,7 @@ model WhatsappAccount {
   conversations WhatsappConversation[]
   qrAuth        WhatsappQrAuth[]
 
+  @@index([organizationId])
   @@map("whatsapp_accounts")
 }
 
@@ -1757,6 +1803,9 @@ model WhatsappConversation {
   automationRuns WhatsappAutomationRun[]
   botSession     WhatsappBotSession?
   slaAlerts      WhatsappSlaAlert[]
+  followUps      WhatsappFollowUp[]
+  scheduled      WhatsappScheduledMessage[]
+  surveys        WhatsappSurvey[]
 
   @@unique([accountId, waId])
   @@index([clientId])
@@ -1907,6 +1956,7 @@ model WhatsappField {
 
   organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   values       WhatsappFieldValue[]
+  formFields   WhatsappFormField[]
 
   @@map("whatsapp_fields")
 }
@@ -2513,4 +2563,359 @@ model CourtSystemMap {
 
   @@unique([organizationId, jtr])
   @@map("court_system_maps")
+}
+
+model KanbanBoard {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  archivedAt     DateTime? @map("archived_at") @db.Timestamptz(3)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  columns      KanbanColumn[]
+  cards        KanbanCard[]
+
+  @@index([organizationId])
+  @@map("kanban_boards")
+}
+
+model KanbanColumn {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  boardId        String   @map("board_id") @db.Uuid
+  name           String
+  position       Int      @default(0)
+  isDone         Boolean  @default(false) @map("is_done")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  board KanbanBoard  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards KanbanCard[]
+
+  @@index([boardId, position])
+  @@map("kanban_columns")
+}
+
+model KanbanCard {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  boardId        String    @map("board_id") @db.Uuid
+  columnId       String    @map("column_id") @db.Uuid
+  title          String
+  description    String?
+  assigneeId     String?   @map("assignee_id") @db.Uuid
+  dueDate        DateTime? @map("due_date") @db.Date
+  caseId         String?   @map("case_id") @db.Uuid
+  clientId       String?   @map("client_id") @db.Uuid
+  position       Int       @default(0)
+  closedAt       DateTime? @map("closed_at") @db.Timestamptz(3)
+  runId          String?   @map("run_id") @db.Uuid
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  board  KanbanBoard       @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  column KanbanColumn      @relation(fields: [columnId], references: [id])
+  case   Case?             @relation(fields: [caseId], references: [id])
+  client Client?           @relation(fields: [clientId], references: [id])
+  events KanbanCardEvent[]
+
+  @@index([boardId, columnId, position])
+  @@index([organizationId])
+  @@map("kanban_cards")
+}
+
+model KanbanCardEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  cardId         String   @map("card_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  kind           String
+  text           String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  card KanbanCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+
+  @@index([cardId, createdAt])
+  @@map("kanban_card_events")
+}
+
+model WorkflowPackage {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  seedKey        String?   @map("seed_key")
+  name           String
+  description    String?
+  active         Boolean   @default(true)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  steps        WorkflowPackageStep[]
+  runs         WorkflowPackageRun[]
+
+  @@index([organizationId])
+  @@map("workflow_packages")
+}
+
+model WorkflowPackageStep {
+  id             String       @id @default(uuid()) @db.Uuid
+  organizationId String       @map("organization_id") @db.Uuid
+  packageId      String       @map("package_id") @db.Uuid
+  position       Int          @default(0)
+  title          String
+  description    String?
+  dueDays        Int          @default(1) @map("due_days")
+  priority       TaskPriority @default(NORMAL)
+  assigneeId     String?      @map("assignee_id") @db.Uuid
+  ask            String?
+
+  package WorkflowPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([packageId, position])
+  @@map("workflow_package_steps")
+}
+
+model WorkflowPackageRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  packageId      String   @map("package_id") @db.Uuid
+  caseId         String?  @map("case_id") @db.Uuid
+  clientId       String?  @map("client_id") @db.Uuid
+  baseDate       DateTime @map("base_date") @db.Date
+  taskCount      Int      @default(0) @map("task_count")
+  cardId         String?  @map("card_id") @db.Uuid
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  package WorkflowPackage @relation(fields: [packageId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, packageId, caseId])
+  @@map("workflow_package_runs")
+}
+
+/// 2.0-F5: honorários combinados no processo (contratual, êxito, sucumbência).
+model CaseFee {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  caseId         String    @map("case_id") @db.Uuid
+  kind           String
+  description    String
+  amount         Decimal?  @db.Decimal(14, 2)
+  percent        Decimal?  @db.Decimal(5, 2)
+  notes          String?
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  case         Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("case_fees")
+}
+
+/// 2.0-F5: apensos e processos relacionados (par único, vale nos dois sentidos).
+model CaseLink {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  caseId         String   @map("case_id") @db.Uuid
+  relatedCaseId  String   @map("related_case_id") @db.Uuid
+  kind           String
+  notes          String?
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, caseId])
+  @@index([organizationId, relatedCaseId])
+  @@map("case_links")
+}
+
+/// 2.0-F5: recursos por grau de jurisdição.
+model CaseAppeal {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  caseId         String    @map("case_id") @db.Uuid
+  degree         String
+  appealType     String    @map("appeal_type")
+  number         String?
+  court          String?
+  filedOn        DateTime? @map("filed_on") @db.Date
+  status         String    @default("PENDENTE")
+  judgedOn       DateTime? @map("judged_on") @db.Date
+  notes          String?
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  case         Case         @relation(fields: [caseId], references: [id], onDelete: Cascade)
+
+  @@index([caseId])
+  @@map("case_appeals")
+}
+
+/// 2.0-F5: índices mensais de correção. organization_id nulo = oficial (sincronizado do BCB); preenchido = lançamento manual do escritório (tem prioridade).
+model MonetaryIndex {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  series         String
+  month          DateTime @db.Date
+  ratePercent    Decimal  @map("rate_percent") @db.Decimal(12, 6)
+  source         String
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([series, month])
+  @@map("monetary_indices")
+}
+
+/// 2.0-F7: documento guardado fora do sistema (Google Docs, Drive, link). Só o link; o arquivo continua onde está.
+model LinkedDocument {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  caseId         String?   @map("case_id") @db.Uuid
+  clientId       String?   @map("client_id") @db.Uuid
+  name           String
+  url            String
+  kind           String
+  isModel        Boolean   @default(false) @map("is_model")
+  source         String    @default("MANUAL")
+  originalAt     DateTime? @map("original_at") @db.Timestamptz(3)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, caseId])
+  @@index([organizationId, clientId])
+  @@map("linked_documents")
+}
+
+/// 2.0-F9: lembrete de retorno (follow-up) numa conversa. Não envia nada: só avisa a equipe.
+model WhatsappFollowUp {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  assigneeId     String?   @map("assignee_id") @db.Uuid
+  dueAt          DateTime  @map("due_at") @db.Timestamptz(3)
+  note           String
+  doneAt         DateTime? @map("done_at") @db.Timestamptz(3)
+  notifiedAt     DateTime? @map("notified_at") @db.Timestamptz(3)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, dueAt])
+  @@index([conversationId])
+  @@map("whatsapp_follow_ups")
+}
+
+/// 2.0-F9: mensagem programada por uma pessoa para um horário. Só sai se a chave "Mensagens agendadas" estiver ligada.
+model WhatsappScheduledMessage {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  body           String
+  sendAt         DateTime  @map("send_at") @db.Timestamptz(3)
+  status         String    @default("PENDING")
+  error          String?
+  processedAt    DateTime? @map("processed_at") @db.Timestamptz(3)
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([status, sendAt])
+  @@index([conversationId])
+  @@map("whatsapp_scheduled_messages")
+}
+
+/// 2.0-F9: pesquisa de satisfação (NPS) enviada por uma pessoa; a resposta 0–10 do cliente é registrada.
+model WhatsappSurvey {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  conversationId String    @map("conversation_id") @db.Uuid
+  status         String    @default("ASKED")
+  askedById      String?   @map("asked_by_id") @db.Uuid
+  askedAt        DateTime  @default(now()) @map("asked_at") @db.Timestamptz(3)
+  answeredAt     DateTime? @map("answered_at") @db.Timestamptz(3)
+  score          Int?
+  comment        String?
+
+  conversation WhatsappConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, askedAt])
+  @@index([conversationId, status])
+  @@map("whatsapp_surveys")
+}
+
+/// 2.0-F9: formulário de atendimento = lista ordenada de campos já existentes do Chat, com obrigatoriedade.
+model WhatsappForm {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  name           String
+  active         Boolean  @default(true)
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  fields WhatsappFormField[]
+
+  @@index([organizationId])
+  @@map("whatsapp_forms")
+}
+
+model WhatsappFormField {
+  formId   String  @map("form_id") @db.Uuid
+  fieldId  String  @map("field_id") @db.Uuid
+  required Boolean @default(false)
+  position Int     @default(0)
+
+  form  WhatsappForm  @relation(fields: [formId], references: [id], onDelete: Cascade)
+  field WhatsappField @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@id([formId, fieldId])
+  @@map("whatsapp_form_fields")
+}
+
+/// 2.0-F9: chaves do Chat (tudo desligado até uma pessoa ligar).
+model WhatsappExtrasSettings {
+  organizationId   String   @id @map("organization_id") @db.Uuid
+  scheduledEnabled Boolean  @default(false) @map("scheduled_enabled")
+  npsEnabled       Boolean  @default(false) @map("nps_enabled")
+  npsQuestion      String   @default("De 0 a 10, o quanto você recomendaria o nosso atendimento a um amigo? Responda apenas com o número.") @map("nps_question")
+  aiSummaryEnabled Boolean  @default(false) @map("ai_summary_enabled")
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("whatsapp_extras_settings")
+}
+
+/// 2.0-F11 — cofre de credenciais de clientes (ex.: Meu INSS, gov.br). Segredo cifrado; só abre com permissão + segundo fator.
+model ClientCredential {
+  id              String    @id @default(uuid()) @db.Uuid
+  organizationId  String    @map("organization_id") @db.Uuid
+  clientId        String    @map("client_id") @db.Uuid
+  system          String
+  label           String
+  secretEnc       String    @map("secret_enc")
+  createdById     String?   @map("created_by_id") @db.Uuid
+  updatedById     String?   @map("updated_by_id") @db.Uuid
+  lastRevealedAt  DateTime? @map("last_revealed_at") @db.Timestamptz(3)
+  lastRevealedById String?  @map("last_revealed_by_id") @db.Uuid
+  createdAt       DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, clientId])
+  @@map("client_credentials")
 }

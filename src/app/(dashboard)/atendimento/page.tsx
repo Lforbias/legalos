@@ -5,6 +5,7 @@ import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { db } from "@/lib/db/client";
 import { formatWaId } from "@/lib/whatsapp/phone";
 import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
@@ -18,6 +19,10 @@ import { labelStyle } from "@/modules/whatsapp/label-style";
 import { AutoRefresh } from "@/modules/whatsapp/auto-refresh";
 import { ChatPane } from "@/modules/whatsapp/chat-pane";
 import { conversationPanel } from "@/server/services/chat-panel.service";
+import { listNumbers } from "@/server/services/whatsapp-numbers.service";
+import { getExtrasSettings, formStatus, listFollowUps, listForms, listScheduled } from "@/server/services/chat-extras.service";
+import { listAgents } from "@/server/services/chat-queue.service";
+import type { ConversationExtrasData } from "@/modules/whatsapp/extras-ui";
 
 export const metadata: Metadata = { title: "LegalOS Chat" };
 export const dynamic = "force-dynamic";
@@ -38,7 +43,7 @@ function listTime(d: Date | null, tz: string): string {
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function AtendimentoPage({ searchParams }: { searchParams: Promise<{ f?: string; c?: string; q?: string; fila?: string; etq?: string }> }) {
+export default async function AtendimentoPage({ searchParams }: { searchParams: Promise<{ f?: string; c?: string; q?: string; fila?: string; etq?: string; num?: string }> }) {
   const { ctx } = await requireTenant();
   if (!can(ctx, "whatsapp:read")) return <AccessDenied />;
   const sp = await searchParams;
@@ -61,12 +66,30 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   const labelId = sp.etq && UUID.test(sp.etq) && labels.some((x) => x.id === sp.etq) ? sp.etq : undefined;
   const writer = can(ctx, "whatsapp:write");
   const available = writer ? await myAvailability(ctx) : true;
-  const list = await listConversations(ctx, filter, sp.q, queueId, labelId);
+  const numbers = await listNumbers(ctx);
+  const multi = numbers.length > 1;
+  const numId = sp.num && UUID.test(sp.num) && numbers.some((n) => n.id === sp.num) ? sp.num : undefined;
+  const list = await listConversations(ctx, filter, sp.q, queueId, labelId, numId);
   const selectedId = sp.c && UUID.test(sp.c) ? sp.c : null;
   const opened = selectedId ? await openConversation(ctx, selectedId).catch(() => null) : null;
   const [team, quick, templates] = opened ? await Promise.all([teamForAssignment(ctx), listQuickReplies(ctx), listTemplatesLocal(ctx)]) : [[], [], []];
   const [fields, cmeta] = opened ? await Promise.all([listFields(ctx, true), conversationMeta(ctx, opened.conversation.id)]) : [[], { labelIds: [] as string[], values: {} as Record<string, string> }];
   const side = opened ? JSON.parse(JSON.stringify(await conversationPanel(ctx, opened.conversation.id))) : null;
+  let extras: ConversationExtrasData | null = null;
+  if (opened) {
+    const [settings, followUps, scheduled, forms, agents, survey] = await Promise.all([
+      getExtrasSettings(ctx), listFollowUps(ctx, { conversationId: opened.conversation.id }), listScheduled(ctx, opened.conversation.id), listForms(ctx, true), listAgents(ctx).catch(() => [] as { id: string; name: string }[]),
+      db.whatsappSurvey.findFirst({ where: { conversationId: opened.conversation.id, organizationId: ctx.organizationId }, orderBy: { askedAt: "desc" }, select: { status: true, score: true } }),
+    ]);
+    const statuses = await Promise.all(forms.map((f) => formStatus(ctx, opened.conversation.id, f.id)));
+    extras = {
+      conversationId: opened.conversation.id, canWrite: writer, scheduledEnabled: settings.scheduledEnabled, npsEnabled: settings.npsEnabled, aiSummaryEnabled: settings.aiSummaryEnabled, canAi: can(ctx, "ai:use"), me: ctx.userId,
+      agents: agents.map((a) => ({ id: a.id, name: a.name })),
+      followUps: followUps.map((f) => ({ id: f.id, dueAt: f.dueAt.toISOString(), note: f.note, assigneeId: f.assigneeId })),
+      scheduled: scheduled.slice(0, 8).map((m) => ({ id: m.id, body: m.body, sendAt: m.sendAt.toISOString(), status: m.status, error: m.error })),
+      survey, forms: statuses.map((x) => ({ id: x.id, name: x.name, filled: x.filled, total: x.total, missingRequired: x.missingRequired })),
+    };
+  }
   const qs = (o: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
     for (const [k, v] of Object.entries(o)) if (v) p.set(k, v);
@@ -80,9 +103,10 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
     <div className="flex h-full min-h-0 flex-col" data-testid="atendimento">
       <AutoRefresh />
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-3 py-1.5 text-xs">
-        <span className="font-semibold">LegalOS Chat <span className="font-normal text-muted">· Número {account.displayPhone ?? account.label}{account.enabled ? "" : " (desligado)"}</span></span>
+        <span className="font-semibold">LegalOS Chat <span className="font-normal text-muted">· {multi ? `${numbers.length} números` : `Número ${account.displayPhone ?? account.label}`}{account.enabled ? "" : " (desligado)"}</span></span>
         <div className="flex items-center gap-3">
           {writer ? <AvailabilityButton available={available} /> : null}
+          {manage ? <Link className="underline" href="/atendimento/relatorios">Relatórios</Link> : null}
           {manage ? <Link className="underline" href="/atendimento/configuracoes">Configurações</Link> : null}
         </div>
       </div>
@@ -93,6 +117,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
             <input type="hidden" name="f" value={filter} />
             {queueId ? <input type="hidden" name="fila" value={queueId} /> : null}
             {labelId ? <input type="hidden" name="etq" value={labelId} /> : null}
+            {numId ? <input type="hidden" name="num" value={numId} /> : null}
             <div className="relative">
               <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted" aria-hidden="true" />
               <input name="q" defaultValue={sp.q ?? ""} aria-label="Buscar conversa" placeholder="Buscar nome, telefone ou campo" className="h-8 w-full rounded-full border border-border bg-surface-2 pl-8 pr-3 text-sm" />
@@ -100,17 +125,23 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
           </form>
           <div className="flex flex-wrap gap-1 border-b border-border p-2">
             {FILTERS.map((f) => (
-              <Link key={f.key} href={qs({ f: f.key, q: sp.q, fila: queueId, etq: labelId })} className={`rounded-full px-2.5 py-1 text-xs ${f.key === filter ? "bg-primary text-primary-fg" : "bg-surface-2 hover:bg-border"}`}>{f.label}</Link>
+              <Link key={f.key} href={qs({ f: f.key, q: sp.q, fila: queueId, etq: labelId, num: numId })} className={`rounded-full px-2.5 py-1 text-xs ${f.key === filter ? "bg-primary text-primary-fg" : "bg-surface-2 hover:bg-border"}`}>{f.label}</Link>
             ))}
           </div>
+          {multi ? (
+            <div className="flex flex-wrap gap-1 border-b border-border p-2" data-testid="wa-number-filter" aria-label="Número do WhatsApp">
+              <Link href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId })} className={`rounded-md px-2 py-1 text-xs ${!numId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>Todos os números</Link>
+              {numbers.filter((n) => n.enabled || n.id === numId).map((n) => <Link key={n.id} href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: n.id })} className={`rounded-md px-2 py-1 text-xs ${n.id === numId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>{n.label}</Link>)}
+            </div>
+          ) : null}
           {queues.length > 0 || labels.length > 0 ? (
             <details className="border-b border-border" open={activeFilters > 0}>
               <summary className="flex cursor-pointer items-center gap-1 px-3 py-1.5 text-xs text-muted hover:bg-surface-2"><SlidersHorizontal className="h-3.5 w-3.5" aria-hidden="true" /> Filtros{activeFilters > 0 ? ` (${activeFilters})` : ""}</summary>
               {queues.length > 0 ? (
                 <div className="flex flex-wrap gap-1 p-2" data-testid="wa-queue-filter">
-                  <Link href={qs({ f: filter, q: sp.q, etq: labelId })} className={`rounded-md px-2 py-1 text-xs ${!queueId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>Todas as filas</Link>
+                  <Link href={qs({ f: filter, q: sp.q, etq: labelId, num: numId })} className={`rounded-md px-2 py-1 text-xs ${!queueId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>Todas as filas</Link>
                   {queues.map((x) => (
-                    <Link key={x.id} href={qs({ f: filter, q: sp.q, fila: x.id, etq: labelId })} className={`rounded-md px-2 py-1 text-xs ${x.id === queueId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>
+                    <Link key={x.id} href={qs({ f: filter, q: sp.q, fila: x.id, etq: labelId, num: numId })} className={`rounded-md px-2 py-1 text-xs ${x.id === queueId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>
                       {x.name}{x.waiting > 0 ? ` (${x.waiting} na espera)` : ""}
                     </Link>
                   ))}
@@ -118,9 +149,9 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               ) : null}
               {labels.length > 0 ? (
                 <div className="flex flex-wrap gap-1 p-2" data-testid="wa-label-filter">
-                  <Link href={qs({ f: filter, q: sp.q, fila: queueId })} className={`rounded-full border border-transparent px-2 py-0.5 text-xs ${!labelId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>Todas as etiquetas</Link>
+                  <Link href={qs({ f: filter, q: sp.q, fila: queueId, num: numId })} className={`rounded-full border border-transparent px-2 py-0.5 text-xs ${!labelId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>Todas as etiquetas</Link>
                   {labels.map((l) => (
-                    <Link key={l.id} href={qs({ f: filter, q: sp.q, fila: queueId, etq: l.id })} className={`rounded-full border px-2 py-0.5 text-xs ${l.id === labelId ? "font-semibold" : "opacity-80 hover:opacity-100"}`} style={l.id === labelId ? labelStyle(l.color) : { borderColor: l.color }}>{l.name}</Link>
+                    <Link key={l.id} href={qs({ f: filter, q: sp.q, fila: queueId, etq: l.id, num: numId })} className={`rounded-full border px-2 py-0.5 text-xs ${l.id === labelId ? "font-semibold" : "opacity-80 hover:opacity-100"}`} style={l.id === labelId ? labelStyle(l.color) : { borderColor: l.color }}>{l.name}</Link>
                   ))}
                 </div>
               ) : null}
@@ -133,7 +164,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               const name = c.client?.name ?? c.contactName ?? formatWaId(c.waId);
               return (
                 <li key={c.id}>
-                  <Link href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, c: c.id })} className={`flex gap-3 border-b border-border px-3 py-2.5 text-sm hover:bg-surface-2 ${c.id === selectedId ? "bg-surface-2" : ""}`}>
+                  <Link href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId, c: c.id })} className={`flex gap-3 border-b border-border px-3 py-2.5 text-sm hover:bg-surface-2 ${c.id === selectedId ? "bg-surface-2" : ""}`}>
                     <Avatar name={name} size={40} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
@@ -146,6 +177,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
                         <span className={`rounded px-1.5 py-0.5 font-semibold uppercase ${c.status === "OPEN" ? "bg-success/15 text-success" : "bg-surface-2 text-muted"}`}>{c.status === "OPEN" ? "Em atendimento" : "Encerrada"}</span>
+                        {multi ? <span className="rounded bg-surface-2 px-1.5 py-0.5 text-muted" data-testid="wa-number-chip">{c.account.label}</span> : null}
                         <span className="truncate text-muted">{c.assignedTo?.name ?? "Sem responsável"}{c.queue ? ` · ${c.queue.name}` : ""}</span>
                         {c.labels.map(({ label }) => <span key={label.id} className="rounded-full border px-1.5" style={labelStyle(label.color)}>{label.name}</span>)}
                       </div>
@@ -182,6 +214,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               queues={queues.filter((x) => x.active).map((x) => ({ id: x.id, name: x.name }))}
               quick={quick}
               side={side}
+              extras={extras ?? undefined}
               templates={templates.map((t) => ({ id: t.id, name: t.name, language: t.language, body: t.body, variableCount: t.variableCount }))}
             />
           ) : (

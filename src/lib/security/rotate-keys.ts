@@ -4,12 +4,12 @@ import { decryptSecret, encryptSecret } from "./totp";
 
 export type KeyPair = { old: Buffer; next: Buffer };
 export type RotateInput = { mfa?: KeyPair; cert?: KeyPair };
-export type RotateReport = { mfa: { userMfa: number; webhooks: number } | null; cert: { certificates: number; connections: number; whatsapp: number } | null; applied: boolean };
+export type RotateReport = { mfa: { userMfa: number; webhooks: number } | null; cert: { certificates: number; connections: number; whatsapp: number; courtCredentials: number; clientCredentials: number } | null; applied: boolean };
 
 /**
  * Troca as chaves de cifra em repouso SEM perder dados: abre cada segredo com a chave antiga e regrava com a nova.
  * MFA_ENCRYPTION_KEY protege: segredos do 2FA e segredos de webhooks. CERT_ENCRYPTION_KEY protege: certificados
- * (arquivo e senha), as credenciais das conexões PJe/MNI e o token do WhatsApp. Tudo ou nada: numa única transação; se QUALQUER segredo não
+ * (arquivo e senha), as credenciais das conexões PJe/MNI, as credenciais dos tribunais por usuário, o cofre de senhas de clientes e o token do WhatsApp. Tudo ou nada: numa única transação; se QUALQUER segredo não
  * abrir com a chave antiga, nada é gravado (evita meia-troca). Com `apply: false` só confere e conta.
  */
 export async function rotateKeys(db: PrismaClient, input: RotateInput, opts: { apply: boolean }): Promise<RotateReport> {
@@ -81,7 +81,24 @@ export async function rotateKeys(db: PrismaClient, input: RotateInput, opts: { a
         failures.push(`WhatsApp QR ${q.accountId}/${q.key}: não abre com a chave de cofre antiga`);
       }
     }
-    report.cert = { certificates: nCerts, connections: conns.length, whatsapp: wa.filter((w) => w.tokenEnc).length + qr.length };
+    const [courtCreds, clientCreds] = await Promise.all([db.courtCredential.findMany({ select: { id: true, secretEnc: true } }), db.clientCredential.findMany({ select: { id: true, secretEnc: true } })]);
+    for (const c of courtCreds) {
+      try {
+        const v = sealBytes(openBytes(c.secretEnc, old), next);
+        work.push((tx) => tx.courtCredential.update({ where: { id: c.id }, data: { secretEnc: v } }));
+      } catch {
+        failures.push(`credencial de tribunal ${c.id}: não abre com a chave de cofre antiga`);
+      }
+    }
+    for (const c of clientCreds) {
+      try {
+        const v = sealBytes(openBytes(c.secretEnc, old), next);
+        work.push((tx) => tx.clientCredential.update({ where: { id: c.id }, data: { secretEnc: v } }));
+      } catch {
+        failures.push(`cofre de cliente ${c.id}: não abre com a chave de cofre antiga`);
+      }
+    }
+    report.cert = { certificates: nCerts, connections: conns.length, whatsapp: wa.filter((w) => w.tokenEnc).length + qr.length, courtCredentials: courtCreds.length, clientCredentials: clientCreds.length };
   }
 
   if (failures.length) throw new Error(`Nada foi alterado. Segredos que não abrem com a chave antiga:\n- ${failures.join("\n- ")}`);
