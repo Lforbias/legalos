@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Bot, Pencil } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +81,11 @@ export default async function ClientDetailPage({ params, searchParams }: { param
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={TONE[client.status]}>{CLIENT_STATUS_LABEL[client.status]}</Badge>
+            {can(ctx, "ai:use") ? (
+              <Link href={`/rute?aba=assistente&cliente=${client.id}`} className={buttonVariants({ variant: "secondary" })}>
+                <Bot className="h-4 w-4" aria-hidden /> RUTE
+              </Link>
+            ) : null}
             {can(ctx, "clients:write") ? (
               <Link href={`/clientes/${client.id}/editar`} className={buttonVariants({ variant: "secondary" })}>
                 <Pencil className="h-4 w-4" aria-hidden /> Editar

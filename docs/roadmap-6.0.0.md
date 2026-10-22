@@ -7,6 +7,8 @@ Origem: pedido da Dra. Talita em 2026-10-21. Duas frentes que andam juntas:
 1. **Servidor MCP do LegalOS**: Claude, ChatGPT, Gemini e qualquer cliente compatível passam a consultar (e, com confirmação, propor ações) dentro do LegalOS, com as mesmas permissões de quem conectou.
 2. **Aba própria "RUTE"** no menu principal (separada de Chat e Financeiro): o centro onde se conecta a IA, se vê o que ela fez e se conversa com um assistente embutido.
 
+**STATUS: F1–F9 construídas e testadas em 2026-10-22** (ver CHANGELOG 6.0.0). Falta validar com contas reais de Claude, ChatGPT e Gemini.
+
 Decisões tomadas (2026-10-21): foco nas duas frentes; aba com assistente embutido **e** passo a passo para IAs externas; a IA **lê e propõe, e só grava com confirmação humana**; é um ramo novo (6.0.0), sem mexer nas fases restantes da 2.0. A F10 da 2.0 (IA com chave real) passa a ser entregue por esta versão.
 
 ## Base que já existe (não refazer)

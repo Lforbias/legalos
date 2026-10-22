@@ -5,8 +5,8 @@
 export const FACTS = {
   spaces: 3,
   permissions: 41,
-  tables: 119,
-  tests: 785,
+  tables: 129,
+  tests: 830,
   e2e: 48,
 } as const;
 

@@ -13,6 +13,8 @@ export const API_SCOPES = {
   "deadlines:read": { label: "Ler prazos", permission: "deadlines:read" },
   "notices:read": { label: "Ler intimações", permission: "inbox:read" },
   "notices:write": { label: "Registrar intimações", permission: "inbox:write" },
+  "mcp:read": { label: "RUTE: consultar dados (somente leitura)", permission: "ai:use" },
+  "mcp:propose": { label: "RUTE: propor ações (só valem após confirmação humana)", permission: "ai:use" },
 } as const satisfies Record<string, { label: string; permission: PermissionKey }>;
 export type ApiScope = keyof typeof API_SCOPES;
 export const API_SCOPE_LIST = Object.keys(API_SCOPES) as ApiScope[];

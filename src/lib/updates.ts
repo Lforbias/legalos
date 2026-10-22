@@ -10,6 +10,17 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "6.0.0", when: "2026-10-22", title: "Versão 6.0.0: RUTE, a IA do LegalOS (conecte Claude, ChatGPT e Gemini; assistente embutido; propostas com confirmação)", migration: "20261218000000_rute_6_0",
+    items: [
+      "Nova aba RUTE no menu. Tudo nasce desligado; quem administra as integrações liga cada recurso (conexão de IAs externas, propostas, assistente) e tem uma parada de emergência que corta tudo na hora.",
+      "Servidor MCP (/api/mcp): Claude, ChatGPT, Gemini e outros consultam processos, clientes, andamentos, prazos, tarefas, intimações, agenda e a biblioteca do escritório, sempre como a pessoa que conectou (mesmas permissões e mesmo sigilo). CPF, CNPJ e e-mails saem ocultados. Conecta por login com consentimento (OAuth, exige verificação em duas etapas) ou por chave de API; há passo a passo, botão de testar conexão e lista de conexões com revogar.",
+      "Propostas da IA com confirmação humana: tarefa, prazo em rascunho, anotação, minuta, andamento, petição em rascunho e envio de petição para revisão. Nada é criado até uma pessoa revisar, editar e aprovar; ações de maior risco pedem confirmação reforçada. Nunca protocola e nada fala com cliente.",
+      "Assistente embutido (Claude, Gemini ou OpenAI, com a chave do escritório ou do sistema): conversa privada de cada pessoa, com referências do que consultou. Botão RUTE nas telas de processo e de cliente abre a conversa já com o contexto, sem enviar nada sozinho.",
+      "Biblioteca do escritório (instruções e modelos por área) lida pela IA, e pacote .zip de skill para enviar ao Claude.",
+      "Governança: limite mensal do escritório e por pessoa conforme o perfil, relatório de uso em tokens, histórico do que a IA fez, retenção configurável das conversas e relatório de LGPD (o que saiu para IAs, por cliente e processo) com CSV. O texto das perguntas nunca é guardado no histórico.",
+    ],
+  },
+  {
     id: "5.0.0", when: "2026-10-22", title: "Versão 5.0.0: calculadoras, portal em linguagem simples, cobrança Pix/boleto, triagem com minuta, copiloto e metas", migration: "20261217000000_calc_5_0",
     items: [
       "Cálculos (menu Cálculos): atrasados da Justiça Federal (INPC e SELIC), débito do TJSP (tabela, SELIC ou híbrido), atualização trabalhista (ADC 58), verbas rescisórias e prazos. Salvo no processo, com planilha Excel/CSV e memorial. Índices do Banco Central sincronizados; tabela do TJSP e reajuste do INSS carregáveis; o que faltar o escritório lança e o sistema nunca inventa índice. É ferramenta de apoio: confira com a decisão e o cálculo oficial.",
@@ -300,18 +311,20 @@ export const PHASES_5: Phase[] = [
 
 /** Ações que dependem da equipe (sem código). Tire da lista quando forem feitas. */
 export const PHASES_6: Phase[] = [
-  { id: "6.0-F1", title: "Servidor MCP somente leitura (Claude, ChatGPT, Gemini consultam o LegalOS)", status: "a fazer" },
-  { id: "6.0-F2", title: "Conectar as IAs: consentimento, passo a passo e conexões ativas", status: "a fazer" },
-  { id: "6.0-F3", title: "Propostas da IA com confirmação humana", status: "a fazer" },
-  { id: "6.0-F4", title: "Aba própria da RUTE no menu", status: "a fazer" },
-  { id: "6.0-F5", title: "Assistente embutido com vários provedores", status: "a fazer" },
-  { id: "6.0-F6", title: "IA nas telas de processo e cliente", status: "a fazer" },
-  { id: "6.0-F7", title: "Biblioteca do escritório (instruções e modelos por área)", status: "a fazer" },
-  { id: "6.0-F8", title: "Governança: limites, uso, retenção e LGPD", status: "a fazer" },
-  { id: "6.0-F9", title: "Ações de maior risco, sempre com confirmação", status: "a fazer" },
+  { id: "6.0-F1", title: "Servidor MCP somente leitura (Claude, ChatGPT, Gemini consultam o LegalOS)", status: "feita" },
+  { id: "6.0-F2", title: "Conectar as IAs: consentimento, passo a passo e conexões ativas", status: "feita" },
+  { id: "6.0-F3", title: "Propostas da IA com confirmação humana", status: "feita" },
+  { id: "6.0-F4", title: "Aba própria da RUTE no menu", status: "feita" },
+  { id: "6.0-F5", title: "Assistente embutido com vários provedores", status: "feita" },
+  { id: "6.0-F6", title: "IA nas telas de processo e cliente", status: "feita" },
+  { id: "6.0-F7", title: "Biblioteca do escritório (instruções e modelos por área)", status: "feita" },
+  { id: "6.0-F8", title: "Governança: limites, uso, retenção e LGPD", status: "feita" },
+  { id: "6.0-F9", title: "Ações de maior risco, sempre com confirmação", status: "feita" },
 ];
 
 export const TEAM_TODO: string[] = [
+  "6.0: validar com contas reais o que só foi testado contra simuladores e documentação: conexão do Claude, do ChatGPT e do Gemini ao /api/mcp (cada um tem regras de plano e de administrador próprias) e as chamadas do assistente embutido aos provedores.",
+  "6.0: em RUTE → Situação, ligar a conexão de IAs com o consentimento, informar a chave do provedor do assistente (ou definir ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY no servidor) e cadastrar a biblioteca do escritório antes de liberar para a equipe.",
   "4.0: fornecer a chave do Gemini (GEMINI_API_KEY, opcional GEMINI_MODEL) para a transcrição de áudio e conferir o modelo na conta Google; só foi testada contra simulador.",
   "4.0: rodar install-cron.sh de novo não é necessário (tudo roda dentro da rotina chat-extras), mas conferir em Developer → Rotinas que ela está rodando a cada minuto.",
   "4.0: antes de ligar campanhas, diálogos ou intenções, revisar os textos e começar com poucos clientes; mensagem em massa pode gerar bloqueio no WhatsApp.",

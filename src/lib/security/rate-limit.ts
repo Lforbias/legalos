@@ -49,4 +49,6 @@ export const limiters = {
   invitation: new RateLimiter(30 * mult, 60 * 60_000),
   apiKey: new RateLimiter(120 * mult, 60_000),
   apiAuthFail: new RateLimiter(30 * mult, 60_000),
+  mcp: new RateLimiter(90 * mult, 60_000),
+  oauth: new RateLimiter(30 * mult, 60_000),
 };

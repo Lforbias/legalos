@@ -3,6 +3,15 @@
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.
 
+## 6.0.0
+RUTE, a IA do LegalOS. Migração nova: `20261218000000_rute_6_0` (10 tabelas). Sem rotina nova no agendador (retenção roda de forma preguiçosa).
+
+- F1 `/api/mcp` (MCP sobre HTTP, só JSON): ferramentas de leitura (hoje, clientes, processos, andamentos, prazos, tarefas, intimações, agenda, biblioteca) e de proposta; sempre como a pessoa que conectou; CPF/CNPJ/e-mail ocultados; resultado marcado como dado, não instrução.
+- F2 conexão: OAuth 2.1 (cadastro dinâmico, código + PKCE S256, token de 1 h, renovação de 30 dias com rotação, metadados RFC 8414/9728, tela `/oauth/authorize` com consentimento e 2FA) e chave `lgos_` com escopos `mcp:read`/`mcp:propose`; passo a passo, testar conexão, revogar.
+- F3/F9 propostas (`aiProposal`): tarefa, prazo (rascunho), anotação, minuta, andamento, petição (rascunho) e envio para revisão; aprovação humana com edição; ações de maior risco exigem confirmação reforçada; nunca protocola.
+- F4 aba `/rute` (situação, conexões, propostas, assistente, biblioteca, histórico, governança). F5 assistente com adaptadores Claude/Gemini/OpenAI (chamada de ferramentas). F6 botão RUTE em processo e cliente. F7 biblioteca + pacote .zip de skill. F8 limites, uso, retenção, parada de emergência e relatório de LGPD (CSV).
+- Limites conhecidos: Claude, ChatGPT e Gemini só conferidos contra a documentação oficial e simuladores (cada um tem regras de plano/administrador próprias); adaptadores de provedor testados contra servidores falsos; sem streaming/SSE (só resposta JSON); o relatório de uso é em tokens (sem conversão em reais); a retenção apaga de forma preguiçosa ao abrir a aba ou conversar.
+
 ## 5.0.0
 Calculadoras, portal em linguagem simples, cobrança Pix/boleto, triagem com minuta, copiloto e metas. Migração nova: `20261217000000_calc_5_0` (10 tabelas). Sem rotina nova no agendador.
 

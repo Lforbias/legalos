@@ -164,6 +164,11 @@ export default async function CaseDetailPage({
                 <Bot className="h-4 w-4" aria-hidden /> Perguntar à IA
               </Link>
             ) : null}
+            {can(ctx, "ai:use") ? (
+              <Link href={`/rute?aba=assistente&caso=${c.id}`} className={buttonVariants({ variant: "secondary" })}>
+                <Bot className="h-4 w-4" aria-hidden /> RUTE
+              </Link>
+            ) : null}
             {showDatajud ? <DatajudSyncButton caseId={c.id} /> : null}
             {mni ? <MniConsultButton caseId={c.id} label={mni.label} /> : null}
             {mni && can(ctx, "documents:write") ? <MniAutosButton caseId={c.id} label={mni.label} /> : null}

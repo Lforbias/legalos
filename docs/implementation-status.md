@@ -630,3 +630,13 @@ Plano em `docs/roadmap-5.0.0.md`. Migração `20261217000000_calc_5_0` (tabelas 
 - **F5 Copiloto:** `service-session.service.ts`; IA recebe o texto com dados sensíveis mascarados; áudio por `/api/copiloto/audio` (Gemini, 2 créditos).
 - **F6 Metas:** `goals.service.ts`; peso = pontos do tipo de tarefa (sem tipo = 1); distribuição só sugere, aplicação exige `tasks:write`.
 - Testes: `src/tests/unit/calc-engines.test.ts`, `src/tests/integration/f5-50-core.test.ts` e `f5-50-fees.test.ts`.
+
+## Versão 6.0.0 (implementada) — RUTE
+Plano em `docs/roadmap-6.0.0.md`. Migração `20261218000000_rute_6_0` (tabelas `rute_settings`, `mcp_oauth_clients`, `mcp_oauth_codes`, `mcp_oauth_tokens`, `ai_proposals`, `ai_tool_logs`, `assistant_conversations`, `assistant_messages`, `office_instructions`, `ai_send_logs`). Estado: F1–F9 feitas.
+- **F1 MCP:** `src/lib/mcp/protocol.ts` (JSON-RPC, resposta JSON, sem SSE), `src/app/api/mcp/route.ts` (401 com `WWW-Authenticate: Bearer resource_metadata`, Origin validada, limite 90/min, interruptor e parada de emergência), `rute-tools.service.ts` (ferramentas de leitura e de proposta; exige `ai:use`, permissão da ferramenta, sigilo; saída mascarada; registra `ai_tool_logs` e `ai_send_logs` sem o texto).
+- **F2 Conexão:** `mcp-auth.service.ts` (OAuth: cadastro dinâmico, código + PKCE S256, token 1 h, renovação 30 dias com rotação, reuso de código derruba tokens; chave `lgos_` com escopos `mcp:read`/`mcp:propose`), rotas `/api/oauth/register`, `/api/oauth/token`, `/.well-known/oauth-protected-resource[/api/mcp]`, `/.well-known/oauth-authorization-server`, tela `/oauth/authorize` (exige login, 2FA, `ai:use`, MCP ligado).
+- **F3/F9 Propostas:** `rute-proposal.service.ts` (7 tipos; risco ALTO exige `confirmHighRisk`; aprova com a permissão de quem aprova; nunca protocola; validade 14 dias; 30 pendentes por pessoa).
+- **F4/F5/F6:** página `/rute?aba=…`, `rute-assistant.service.ts` + `src/lib/ai/tool-chat.ts` (Claude, Gemini, OpenAI), botão RUTE em processo e cliente (abre com contexto, sem enviar).
+- **F7 Biblioteca:** `rute-library.service.ts` (edição exige `organization:manage`), `/api/rute/skill` (.zip). **F8 Governança:** `rute-governance.service.ts`, `/api/rute/lgpd` (CSV), limites (plano, escritório, por perfil por pessoa), retenção preguiçosa (`purgeExpired`).
+- **Não validado com contas reais:** conectores do Claude, ChatGPT e Gemini; chamadas aos provedores (só servidores falsos).
+- Testes: `src/tests/integration/f6-60-core.test.ts` (37) e `f6-60-http.test.ts` (8).
