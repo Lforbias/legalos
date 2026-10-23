@@ -267,7 +267,7 @@ function proposalSchema(kind: (typeof KIND_LIST)[number], descriptions: Record<s
   return schema;
 }
 const proposeTool = (name: string, title: string, kind: (typeof KIND_LIST)[number], permission: PermissionKey, description: string, properties: Record<string, unknown>, _required: string[]): ToolDef => ({
-  name, title, scope: "propose", permission, description: `${description} NÃO cria nada de verdade: registra uma proposta que uma pessoa precisa confirmar em RUTE → Propostas.`,
+  name, title, scope: "propose", permission, description: `${description} NÃO cria nada de verdade: registra uma proposta que uma pessoa precisa confirmar no cartão da conversa ou em RUTE → Propostas.`,
   input: proposalSchema(kind, properties), schema: z.record(z.string(), z.unknown()),
   subject: (a) => ({ caseId: typeof a.caseId === "string" ? a.caseId : undefined }),
   run: async (ctx, a, origin) => createProposal(ctx, { via: origin.via, connection: origin.connection }, { kind, payload: a }),
