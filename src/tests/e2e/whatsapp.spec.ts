@@ -274,7 +274,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
 
   // Atribuir a mim e filtrar "Minhas".
-  await page.getByLabel("Responsável").selectOption({ label: `Dona zap${id} (eu)` });
+  await page.getByLabel("Responsável", { exact: true }).selectOption({ label: `Dona zap${id} (eu)` });
   await expect(page.getByTestId("wa-list").locator("li", { hasText: "Maria Teste" }).getByText(`Dona zap${id}`)).toBeVisible();
   await page.getByRole("link", { name: "Minhas" }).click();
   await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toBeVisible();

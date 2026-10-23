@@ -9,6 +9,48 @@ export type Release = { id: string; when: string; title: string; items: string[]
 
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
+  { id: "datajud-diagnostico", when: "2026-10-23", title: "DataJud: falhas identificadas e último teste visível", items: ["Testes e consultas distinguem tempo esgotado, rede, acesso recusado, limite de consultas e respostas inválidas/incompletas. A tela mostra o último teste e diferencia habilitação de disponibilidade. Falhas não registram sincronização concluída nem importam respostas parciais. Consultas MNI usam os namespaces dos parâmetros declarados no contrato público do TJPR; acesso real continua sujeito às permissões do tribunal."] },
+  {
+    id: "autos-fila-box-fluxo", when: "2026-10-23", title: "Autos em fila e validação do ciclo da BOX", migration: "20261222000000_autos_queue",
+    items: [
+      "Download de autos em lotes automáticos, persistido no banco: progresso, retomada após interrupções, três tentativas por falha e reenvio manual. Arquivos já recebidos são preservados; arquivos ignorados não bloqueiam os próximos lotes.",
+      "Notificações de conclusão/falha e autorização conferida a cada execução. A página de autos permite acompanhar a fila ao retornar.",
+      "Fluxo da BOX verificado com dados de teste: recebimento, distribuição, tarefa, prazo com validação humana, documentos, conclusão, histórico e notificações. Testes não equivalem a homologação de tribunal real.",
+    ],
+  },
+  {
+    id: "tribunais-mni-condicional", when: "2026-10-23", title: "Conexões por sistema e contrato MNI 2.2.2", migration: "20261221000000_court_connectors",
+    items: ["Sistema por processo, ambiente e inspeção do WSDL limitam as operações ao contrato cadastrado. eproc, e-SAJ e PROJUDI são condicionados à disponibilidade de MNI 2.2.2; MNI 3.0 e interfaces proprietárias não estão implementados. Perfil SCMPP/TJPR atende apenas movimentações públicas. Nenhum novo tribunal foi homologado nesta entrega."],
+  },
+  {
+    id: "datajud-chave-escritorio", when: "2026-10-23", title: "DataJud: chave e teste de conexão em Integrações", migration: "20261220000000_datajud_org",
+    items: ["Guarde a chave pública do CNJ com cifra por escritório, teste a autenticação e ligue a consulta sem precisar editar o servidor. A chave não volta ao navegador nem à auditoria. Configuração do servidor continua disponível como alternativa."],
+  },
+  {
+    id: "box-operacao", when: "2026-10-23", title: "BOX: leitura integrada, autos, automações e etapas", migration: "20261219000000_box_operation",
+    items: [
+      "Leitor integrado preserva filtros e página; teor, notas, providências e contexto do processo juntos.",
+      "Autos digitais com índice paginado, busca, favoritos pessoais, prévia autenticada e estado da sincronização MNI.",
+      "Automações com condições E/OU e distribuição/etiquetas de intimações na mesma transação da tarefa.",
+      "Etapas personalizáveis de tarefas, incluindo Aguardando protocolo, mantendo status-base e métricas consistentes.",
+      "Painel de operação e auditoria do histórico importado. Captura/protocolo reais aguardam acesso de homologação; conectores ausentes permanecem identificados.",
+    ],
+  },
+  {
+    id: "box-filtros-lotes", when: "2026-10-22", title: "Box: paginação, filtros e ações em lote",
+    items: [
+      "Caixa com páginas de 25, 50 ou 100 itens, ordem crescente/decrescente e filtros por tipo, origem, órgão, recebimento e publicação. Filtros são preservados ao mudar de página ou caixa.",
+      "Selecionar até 100 intimações da página, revisar e confirmar distribuição para pessoa/equipe, adição de etiquetas, adormecimento ou tratamento. O lote é atômico e auditado: alterações concorrentes ou falta de acesso recusam tudo. Distribuição respeita o sigilo também para os destinatários.",
+      "A lista de etiquetas passa a respeitar o sigilo dos processos; a tabela mostra a origem de cada intimação.",
+    ],
+  },
+  {
+    id: "box-leitura-origem", when: "2026-10-22", title: "Box: leitura das publicações e indicadores de origem",
+    items: [
+      "Publicações com HTML são apresentadas como texto legível, preservando o original. Box e Monitoramento separam capturas DJEN/PJe de outras importações e usam o mesmo período no fuso do escritório.",
+      "Diagnóstico de tarefas migradas do Astrea sinaliza comentários de conclusão com tarefa ainda aberta, sem alterar dados. Conferir CSV de origem e reaberturas antes de corrigir.",
+    ],
+  },
   {
     id: "6.0.0", when: "2026-10-22", title: "Versão 6.0.0: RUTE, a IA do LegalOS (conecte Claude, ChatGPT e Gemini; assistente embutido; propostas com confirmação)", migration: "20261218000000_rute_6_0",
     items: [
@@ -283,7 +325,7 @@ export const PHASES_3: Phase[] = [
   { id: "3.0-F9", title: "Certificado com usuários autorizados e webhooks de protocolo", status: "feita" },
   { id: "3.0-F10", title: "Créditos e custos", status: "feita" },
   { id: "3.0-F6b", title: "Credenciais por tribunal e usuário no cofre", status: "feita" },
-  { id: "3.0-F11", title: "Completar com o que aparecer nas telas do LegalMail", status: "a fazer" },
+  { id: "3.0-F11", title: "Completar com o que aparecer nas telas do LegalMail", status: "em andamento" },
 ];
 
 export const PHASES_4: Phase[] = [
@@ -348,6 +390,7 @@ export const PHASES_7: Phase[] = [
 
 /** Ações que dependem da equipe (sem código). Tire da lista quando forem feitas. */
 export const TEAM_TODO: string[] = [
+  "Box: executar audit:astrea-tasks no escritório migrado e conferir os candidatos com o CSV do Astrea e o histórico de reaberturas antes de corrigir qualquer status.",
   "6.0: validar com contas reais o que só foi testado contra simuladores e documentação: conexão do Claude, do ChatGPT e do Gemini ao /api/mcp (cada um tem regras de plano e de administrador próprias) e as chamadas do assistente embutido aos provedores.",
   "6.0: em RUTE → Situação, ligar a conexão de IAs com o consentimento, informar a chave do provedor do assistente (ou definir ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY no servidor) e cadastrar a biblioteca do escritório antes de liberar para a equipe.",
   "4.0: fornecer a chave do Gemini (GEMINI_API_KEY, opcional GEMINI_MODEL) para a transcrição de áudio e conferir o modelo na conta Google; só foi testada contra simulador.",

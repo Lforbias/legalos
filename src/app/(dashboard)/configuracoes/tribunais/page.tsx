@@ -21,9 +21,9 @@ export default async function CourtSystemsPage() {
   const [rows, report] = await Promise.all([listSystemMap(ctx), getReadinessReport(ctx)]);
   return (
     <div className="space-y-4">
-      <Alert tone="info">Diga qual sistema atende cada tribunal do escritório. Nada é presumido: tribunal sem definição segue o comportamento atual (conexão PJe/MNI cadastrada). Tribunal definido como sistema sem conector recusa consulta e protocolo automáticos, com aviso claro.</Alert>
-      {report.blocked > 0 ? <Alert tone="warning">{report.blocked} tribunal(is) definido(s) em sistema sem conector: o protocolo e a consulta automáticos ficam indisponíveis para eles.</Alert> : null}
-      {report.mapConflict > 0 ? <Alert tone="warning">{report.mapConflict} tribunal(is) têm conexão PJe/MNI ativa mas estão definidos em outro sistema; a conexão não será usada.</Alert> : null}
+      <Alert tone="info">Diga qual sistema atende cada tribunal do escritório. Nada é presumido: o sistema pode ser definido no processo ou usado como padrão deste mapa. O adaptador atual atende apenas MNI 2.2.2, com contrato compatível verificado por conexão.</Alert>
+      {report.blocked > 0 ? <Alert tone="warning">{report.blocked} tribunal(is) sem conexão compatível ativa: configure e verifique o serviço antes de consultar ou protocolar.</Alert> : null}
+      {report.mapConflict > 0 ? <Alert tone="warning">{report.mapConflict} tribunal(is) têm conexão ativa que não corresponde ao sistema ou contrato configurado; a conexão não será usada.</Alert> : null}
       <Card>
         <CardHeader title="Prontidão dos conectores" description="O que o LegalOS faz de fato em cada sistema." />
         <CardBody>

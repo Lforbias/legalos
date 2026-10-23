@@ -33,7 +33,8 @@ function buildCsp(nonce: string): string {
 export function proxy(request: NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const nonce = btoa(crypto.randomUUID());
-  const csp = buildCsp(nonce);
+  const preview = /^\/api\/documents\/[0-9a-f-]{36}$/i.test(request.nextUrl.pathname) && request.nextUrl.searchParams.get("inline") === "1";
+  const csp = preview ? "default-src 'none'; frame-ancestors 'self'" : buildCsp(nonce);
   const headers = new Headers(request.headers);
   headers.set("x-request-id", requestId);
   headers.set("x-nonce", nonce);
@@ -50,7 +51,7 @@ export function proxy(request: NextRequest) {
     return res;
   }
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (!isPublic && !request.cookies.has(SESSION_COOKIE)) {
+  if (!isPublic && !preview && !request.cookies.has(SESSION_COOKIE)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + search)}`;

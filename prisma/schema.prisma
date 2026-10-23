@@ -122,6 +122,7 @@ model Organization {
   currency                String                   @default("BRL")
   settings                Json                     @default("{}")
   aiEnabled               Boolean                  @default(false) @map("ai_enabled")
+  datajudApiKeyEnc        String?                  @map("datajud_api_key_enc")
   datajudEnabled          Boolean                  @default(false) @map("datajud_enabled")
   /// 3.0-F5: permite agendar o protocolo de petições aprovadas (nasce desligado).
   petitionScheduleEnabled Boolean                  @default(false) @map("petition_schedule_enabled")
@@ -461,6 +462,7 @@ model Case {
   organizationId String     @map("organization_id") @db.Uuid
   number         String?
   legacyNumber   String?    @map("legacy_number")
+  courtSystem    String?    @map("court_system")
   title          String
   area           String?
   court          String?
@@ -600,6 +602,7 @@ model Document {
   petitionAttachments PetitionAttachment[]
   texts               DocumentText[]
   driveLink           DocumentDriveLink?
+  bookmarks           DocumentBookmark[]
   classifications     DocumentClassification[]
 
   @@unique([organizationId, externalKey])
@@ -662,6 +665,8 @@ model Task {
   createdById    String?      @map("created_by_id") @db.Uuid
   completedAt    DateTime?    @map("completed_at") @db.Timestamptz(3)
   sourceNoticeId String?      @map("source_notice_id") @db.Uuid
+  stageId        String?      @map("stage_id") @db.Uuid
+  stage          TaskStage?   @relation(fields: [stageId], references: [id], onDelete: Restrict)
   typeId         String?      @map("type_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -1174,6 +1179,9 @@ model WorkflowRule {
   organizationId  String           @map("organization_id") @db.Uuid
   name            String
   trigger         WorkflowTrigger
+  conditions      Json             @default("{\"mode\":\"ALL\",\"items\":[]}")
+  noticeAssigneeId String?          @map("notice_assignee_id") @db.Uuid
+  noticeTags      String[]         @default([]) @map("notice_tags")
   taskTitle       String           @map("task_title")
   taskDescription String?          @map("task_description")
   dueDays         Int              @default(0) @map("due_days")
@@ -1549,6 +1557,14 @@ model CourtConnection {
   organizationId String    @map("organization_id") @db.Uuid
   label          String
   jtr            String
+  system         String    @default("pje-mni")
+  authProfile    String    @default("STATIC") @map("auth_profile")
+  environment    String    @default("UNSPECIFIED")
+  wsdlUrl        String?   @map("wsdl_url")
+  wsdlActions    Json      @default("{}") @map("wsdl_actions")
+  wsdlStatus     String?   @map("wsdl_status")
+  wsdlCheckedAt  DateTime? @map("wsdl_checked_at") @db.Timestamptz(3)
+  wsdlOperations String[]  @default([]) @map("wsdl_operations")
   endpointUrl    String    @map("endpoint_url")
   authMode       String    @map("auth_mode")
   certificateId  String?   @map("certificate_id") @db.Uuid
@@ -3498,4 +3514,53 @@ model AiSendLog {
   @@index([organizationId, createdAt])
   @@index([organizationId, clientId])
   @@map("ai_send_logs")
+}
+
+/// Favorito pessoal: não concede acesso ao documento nem ao processo.
+model DocumentBookmark {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, userId, documentId])
+  @@map("document_bookmarks")
+}
+
+/// Etapa operacional personalizável; status-base mantém métricas e conclusão consistentes.
+model TaskStage {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  name String
+  status TaskStatus @default(WAITING)
+  position Int @default(0)
+  active Boolean @default(true)
+  tasks Task[]
+  @@unique([organizationId, name])
+  @@map("task_stages")
+}
+
+model AutosDownloadJob {
+  initialCount Int @default(0) @map("initial_count")
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  caseId String @map("case_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  status String @default("QUEUED")
+  attempts Int @default(0)
+  listed Int @default(0)
+  imported Int @default(0)
+  remaining Int @default(0)
+  skipped Int @default(0)
+  excludedIds String[] @default([]) @map("excluded_ids")
+  error String?
+  nextRunAt DateTime @default(now()) @map("next_run_at") @db.Timestamptz(3)
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+  leaseToken String? @map("lease_token") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([status, nextRunAt])
+  @@index([organizationId, caseId, createdAt])
+  @@map("autos_download_jobs")
 }

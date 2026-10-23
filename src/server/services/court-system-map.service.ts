@@ -1,3 +1,4 @@
+import { connectionSupports } from "@/lib/connectors/capabilities";
 import { db } from "@/lib/db/client";
 import { readinessOf, type Capability } from "@/lib/connectors/registry";
 import { COURT_SYSTEMS, getCourtSystem } from "@/lib/court-systems";
@@ -14,13 +15,13 @@ export async function listSystemMap(ctx: TenantContext) {
   assertCan(ctx, "integrations:manage");
   const [maps, conns] = await Promise.all([
     db.courtSystemMap.findMany({ where: { organizationId: ctx.organizationId } }),
-    db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, enabled: true }, select: { jtr: true } }),
+    db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, enabled: true }, select: { jtr: true, authProfile: true, system: true, wsdlStatus: true, wsdlOperations: true } }),
   ]);
   const mapBy = new Map(maps.map((m) => [m.jtr, m.system]));
   const hasMni = new Set(conns.map((c) => c.jtr));
   return listTribunals().map((t) => {
     const system = mapBy.get(t.jtr) ?? null;
-    return { jtr: t.jtr, label: t.label, system, readiness: system ? readinessOf(system) : null, mniConnection: hasMni.has(t.jtr) };
+    return { jtr: t.jtr, label: t.label, system, readiness: system ? readinessOf(system) : null, mniConnection: hasMni.has(t.jtr), compatibleConnection: conns.some(c => c.jtr === t.jtr && (!system || c.system === system) && connectionSupports(c, "consultarProcesso")) };
   });
 }
 
@@ -47,6 +48,11 @@ export async function assertConnectorFor(organizationId: string, jtr: string | n
   const system = await systemForJtr(organizationId, jtr);
   if (!system) return;
   const r = readinessOf(system);
+  if (system !== "pje-mni") {
+    const conns = await db.courtConnection.findMany({ where: { organizationId, jtr, system, enabled: true } });
+    const operation = capability === "petition" ? "entregarManifestacaoProcessual" : "consultarProcesso";
+    if (!conns.some(c => connectionSupports(c, operation))) throw new ConflictError(`Este tribunal está configurado como ${r.label} e não tem conector compatível configurado para esta operação. Verifique a conexão MNI 2.2.2 ou use o sistema do tribunal.`);
+  }
   if (r.state === "NO_CONNECTOR" || r.state === "UNKNOWN" || !r.capabilities.includes(capability)) {
     throw new ConflictError(`Este tribunal está configurado como ${r.label}, que ainda não tem conector no LegalOS. Use o sistema do tribunal.`);
   }
@@ -60,8 +66,8 @@ export async function getReadinessReport(ctx: TenantContext) {
     const courts = mapped.filter((r) => r.system === s.key);
     return { system: s.key, label: s.label, courts: courts.length, readiness: readinessOf(s.key) };
   });
-  const blocked = mapped.filter((r) => r.readiness && (r.readiness.state === "NO_CONNECTOR" || r.readiness.state === "UNKNOWN")).length;
+  const blocked = mapped.filter(r => !r.compatibleConnection).length;
   const mniWithoutMap = rows.filter((r) => r.mniConnection && !r.system).length;
-  const mapConflict = rows.filter((r) => r.mniConnection && r.system && r.system !== "pje-mni").length;
+  const mapConflict = rows.filter(r => r.mniConnection && r.system && !r.compatibleConnection).length;
   return { mapped: mapped.length, blocked, mniWithoutMap, mapConflict, bySystem };
 }

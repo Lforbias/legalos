@@ -152,6 +152,7 @@ export default async function CaseDetailPage({
         description={c.number ? `Nº ${formatCnj(c.number)}` : c.legacyNumber ? `Nº ${c.legacyNumber}` : "Processo sem número"}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            {canDocs ? <Link href={`/processos/${c.id}/autos`} className={buttonVariants({ variant: "secondary" })}>Autos digitais</Link> : null}
             {c.confidential ? (
               <Badge tone="warning">
                 <Lock className="mr-1 h-3 w-3" aria-hidden /> Sigiloso

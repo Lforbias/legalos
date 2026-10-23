@@ -1,5 +1,6 @@
 import { db } from "@/lib/db/client";
 import { assertCan, type TenantContext } from "@/server/context";
+import { getNoticeActivity } from "./notice-activity.service";
 import { notify } from "./notification.service";
 
 /** Fonte parada: monitoramento ligado sem rodar há mais que isso (cron roda a cada 30 min). */
@@ -37,16 +38,9 @@ export async function getMonitoringOverview(ctx: TenantContext, now = new Date()
     kind: row.kind, id: row.id, label: row.label, detail: row.detail, enabled: row.enabled,
     health: classifySource(row, now), lastSyncAt: row.lastSyncAt, message: row.message,
   })) satisfies SourceRow[];
-  const since = new Date(now.getTime() - 7 * 24 * HOUR);
-  const imported = await db.courtNotice.findMany({ where: { organizationId: ctx.organizationId, source: "IMPORTED", deletedAt: null, createdAt: { gte: since } }, select: { createdAt: true } });
-  const byDay = new Map<string, number>();
-  for (let i = 6; i >= 0; i--) byDay.set(new Date(now.getTime() - i * 24 * HOUR).toISOString().slice(0, 10), 0);
-  for (const n of imported) {
-    const k = n.createdAt.toISOString().slice(0, 10);
-    if (byDay.has(k)) byDay.set(k, (byDay.get(k) ?? 0) + 1);
-  }
+  const activity = await getNoticeActivity(ctx, 7, now);
   const problems = sources.filter((s) => s.health === "ERROR" || s.health === "STALE").length;
-  return { sources, problems, importedByDay: [...byDay].map(([day, count]) => ({ day, count })), importedTotal: imported.length, staleHours: STALE_HOURS };
+  return { sources, problems, registeredByDay: activity.byDay, registeredTotal: activity.total, bySource: activity.bySource, staleHours: STALE_HOURS };
 }
 
 /** Avisa quem administra integrações quando uma fonte falha ou para. Idempotente por fonte + última execução. */

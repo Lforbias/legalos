@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db/client";
 import { countNewNotices, getBoxDashboard } from "@/server/services/box.service";
+import { getNoticeActivity } from "@/server/services/notice-activity.service";
 import { addMember, makeOrgWithOwner } from "./helpers";
 
 describe("painel do LegalOS Box", () => {
@@ -44,6 +45,28 @@ describe("painel do LegalOS Box", () => {
     expect(d.integrations).toBeNull();
     expect(d.captures).toBeNull();
     expect(d.certificates).toBeNull();
+  });
+
+  it("não apresenta histórico importado como captura e mantém totais, fuso e sigilo", async () => {
+    const C = await makeOrgWithOwner("box-activity-C");
+    const D = await makeOrgWithOwner("box-activity-D");
+    const member = await addMember(C.org.id, "LAWYER", "box-activity-law");
+    const now = new Date("2026-10-23T02:00:00Z");
+    const secret = await db.case.create({ data: { organizationId: C.org.id, title: "Captura restrita", confidential: true } });
+    const stamp = { source: "IMPORTED", createdAt: new Date("2026-10-23T01:00:00Z") };
+    await notice(C.org.id, "Histórico antigo importado hoje", { ...stamp, receivedAt: new Date("2023-01-01") });
+    await notice(C.org.id, "Captura DJEN", { ...stamp, externalKey: "djen:box-regression" });
+    await notice(C.org.id, "Captura sigilosa", { ...stamp, externalKey: "mni:box-regression", caseId: secret.id });
+    await notice(C.org.id, "Fora do período", { ...stamp, createdAt: new Date("2026-10-16T02:59:59Z") });
+    await notice(D.org.id, "Captura de outro escritório", { ...stamp, externalKey: "djen:box-other" });
+    const activity = await getNoticeActivity(C.ctx, 7, now);
+    const visible = await getNoticeActivity(member.ctx, 7, now);
+    expect(activity.bySource.captured - visible.bySource.captured).toBe(1);
+    expect(activity.bySource.otherImports).toBe(1);
+    expect(activity.byDay.at(-1)?.day).toBe("2026-10-22");
+    expect(activity.total).toBe(activity.bySource.captured + activity.bySource.otherImports + activity.bySource.manual);
+    expect(visible.bySource.captured).toBe(1);
+    expect((await getNoticeActivity(D.ctx, 7, now)).bySource.captured).toBe(1);
   });
 
   it("sigilo: advogado sem vínculo não vê a intimação do processo sigiloso na contagem nem no painel", async () => {

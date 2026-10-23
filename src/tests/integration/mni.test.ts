@@ -7,7 +7,8 @@ import { computeCnjCheck } from "@/lib/validation/br-documents";
 import { totpCode, totpStep } from "@/lib/security/totp";
 import { confirmEnrollment, startEnrollment } from "@/server/services/mfa.service";
 import { uploadCertificate } from "@/server/services/certificate.service";
-import { consultCaseMni, createConnection, deleteConnection, listConnections, setConnectionEnabled, importAutosMni, runMniAll, syncAvisos } from "@/server/services/mni.service";
+import { connectionForCase, consultCaseMni, createConnection, deleteConnection, listConnections, setConnectionEnabled, importAutosMni, runMniAll, syncAvisos } from "@/server/services/mni.service";
+import { enqueueAutos, latestAutosJob, runAutosQueue } from "@/server/services/autos-queue.service";
 import { createCase } from "@/server/services/case.service";
 import { makeTestPfx } from "../fixtures/make-pfx";
 import { autosContentXml, autosListXml, avisosXml, faultXml, processoXml } from "../fixtures/mni-samples";
@@ -165,6 +166,7 @@ describe("conector PJe/MNI (Etapa 1) — tribunal SIMULADO só nos testes", () =
   });
   it("autos: baixa documentos do tribunal para o processo, sem duplicar, pulando sigilosos/não suportados", async () => {
     const proc = await createCase(A.ctx, { ...caseBase, title: "Autos", number: mkCnj("0007777") });
+    await db.courtConnection.updateMany({ where: { organizationId: A.org.id, jtr: "5.05" }, data: { enabled: false } });
     await createConnection(A.ctx, { label: "TRT5 autos", jtr: "5.05", endpointUrl: endpoint, authMode: "PASSWORD", document: CPF, password: "senha-pje" });
     mode = "ok";
     requests.length = 0;
@@ -188,4 +190,35 @@ describe("conector PJe/MNI (Etapa 1) — tribunal SIMULADO só nos testes", () =
     // outro escritório não alcança
     await expect(importAutosMni(B.ctx, proc.id)).rejects.toBeInstanceOf(NotFoundError);
   });
+  it("roteia por sistema do processo, exige contrato e recusa conexões ambíguas", async () => {
+    const proc = await createCase(A.ctx, { ...caseBase, number: mkCnj("0008899", "8", "26"), courtSystem: "eproc" });
+    const base = { jtr: "8.26", endpointUrl: endpoint, authMode: "PASSWORD" as const, document: "integracao", password: "segredo", environment: "HOMOLOGATION" as const };
+    const eproc = await createConnection(A.ctx, { ...base, label: "eproc teste", system: "eproc" });
+    const projudi = await createConnection(A.ctx, { ...base, label: "projudi teste", system: "projudi" });
+    await expect(setConnectionEnabled(A.ctx, eproc.id, true)).rejects.toBeInstanceOf(ConflictError);
+    expect(await connectionForCase(A.ctx, proc.id)).toBeNull();
+    await db.courtConnection.updateMany({ where: { id: { in: [eproc.id, projudi.id] } }, data: { enabled: true, wsdlStatus: "COMPATIBLE", wsdlOperations: ["consultarProcesso"] } });
+    expect(await connectionForCase(A.ctx, proc.id)).toMatchObject({ id: eproc.id, system: "eproc" });
+    expect(await connectionForCase(A.ctx, proc.id, "entregarManifestacaoProcessual")).toBeNull();
+    await db.case.update({ where: { id: proc.id }, data: { courtSystem: "projudi" } });
+    expect(await connectionForCase(A.ctx, proc.id)).toMatchObject({ id: projudi.id });
+    await db.courtConnection.update({ where: { id: eproc.id }, data: { system: "projudi" } });
+    await expect(connectionForCase(A.ctx, proc.id)).rejects.toBeInstanceOf(ConflictError);
+    await expect(connectionForCase(B.ctx, proc.id)).rejects.toBeInstanceOf(NotFoundError);
+  });
+
+  it("fila baixa lotes reais do tribunal simulado e não fica presa em arquivos ignorados", async () => {
+    const proc = await createCase(A.ctx, { ...caseBase, title: "Fila de autos", number: mkCnj("0009998"), courtSystem: "eproc" });
+    const conn = await createConnection(A.ctx, { label: "eproc fila", jtr: "5.05", endpointUrl: endpoint, system: "eproc", authMode: "PASSWORD", document: "integracao", password: "teste" });
+    await db.courtConnection.update({ where: { id: conn.id }, data: { enabled: true, wsdlStatus: "COMPATIBLE", wsdlOperations: ["consultarProcesso"] } });
+    mode = "ok";
+    await enqueueAutos(A.ctx, proc.id);
+    for (let i = 0; i < 8; i++) {
+      await runAutosQueue({ importer: (ctx, id, _post, excluded, skip) => importAutosMni(ctx, id, undefined, excluded, skip, 1) });
+      if ((await latestAutosJob(A.ctx, proc.id))?.status === "COMPLETED") break;
+    }
+    expect(await latestAutosJob(A.ctx, proc.id)).toMatchObject({ status: "COMPLETED", imported: 3, remaining: 0, skipped: 3 });
+    expect(await db.document.count({ where: { caseId: proc.id } })).toBe(3);
+  });
+
 });

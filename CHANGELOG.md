@@ -1,4 +1,39 @@
+## DataJud — chave por escritório (2026-10-23)
+
+Migração aditiva: `20261220000000_datajud_org`.
+
+- Campo de chave pública do DataJud em Integrações, guardada com AES-GCM e incluída na rotação de MFA_ENCRYPTION_KEY. Não volta ao navegador nem aparece em auditoria.
+- Cada escritório usa sua configuração; a variável DATAJUD_API_KEY permanece como alternativa do servidor. Ligar/desligar é independente de guardar a chave.
+- Teste de autenticação sem consultar dados de processos (size 0 / match_none). Consulta de andamentos continua respeitando o sigilo e evitando duplicatas.
+
+## BOX — leitura, autos e operação (2026-10-23)
+
+Migração aditiva: `20261219000000_box_operation`. Não altera status de tarefas existentes nem ativa integrações.
+
+- Leitura integrada da caixa: lista à esquerda, teor e providências ao centro, notas/contexto à direita. Filtros e paginação preservados; controles existentes reutilizados.
+- Autos digitais por processo: índice paginado, busca por nome/descrição/texto extraído (inclusive versões anteriores), favoritos pessoais, download, prévia autenticada de PDF/PNG/JPEG e evidência da última sincronização MNI. Outros formatos continuam como anexo. Prévia aplica as mesmas permissões e sigilo do download.
+- Automações com até 10 condições combinadas por E/OU, comparações sem distinção de acento/caixa e ações opcionais de distribuição individual/etiquetas para intimações. Distribuição, etiquetas e tarefa ficam na mesma transação; destinatários passam pela conferência de sigilo. Execuções ignoradas/falhas seguem registradas.
+- Etapas de tarefas personalizáveis (ex.: Aguardando protocolo), ordenação e desativação. Status-base fixo preserva a semântica de conclusão e os indicadores. Troca de etapa registra histórico; seleção de status padrão limpa a etapa.
+- Box → Operação e auditoria reúne saúde das fontes, separação de histórico/captura, situação real dos conectores e diagnóstico somente leitura da migração do Astrea.
+- Homologação externa pendente: usuário ainda não dispõe de OAB/credenciais/ambiente de teste. MNI continua sem validação real; eproc/e-SAJ/PROJUDI continuam sem conector. Nenhum protocolo real foi enviado.
+
 # Changelog
+
+## Box — filtros, paginação e ações em lote
+
+- Compatibilidade do build: wrapper da API v1 passa a exigir o contexto de rota fornecido pelo Next.js; testes diretos passam contexto explícito.
+
+- Caixa com paginação (25/50/100), ordenação e filtros por tipo, origem, tribunal/órgão, recebimento e publicação. Intervalos inclusivos e validados; filtros preservados na paginação e troca de caixa.
+- Distribuição para pessoa/equipe, adição de etiquetas sem remover as anteriores, adormecimento e tratamento de até 100 intimações selecionadas. Revisão antes da confirmação, transação atômica, auditoria por item, notificações e proteção contra versões antigas/concorrência.
+- Destinatários precisam ser ativos, ter acesso à caixa e enxergar todos os processos do lote.
+- Corrigida a consulta de etiquetas para respeitar sigilo; coluna de origem distingue DJEN/PJe de outras importações.
+
+## Box — leitura e origem das intimações
+
+- O teor das publicações exibe quebras e destaques como texto legível, sem executar HTML nem modificar o original no banco.
+- Box e Monitoramento distinguem capturas identificadas do DJEN/PJe das demais importações (incluindo histórico e API) e registros manuais/arquivo. Gráficos e totais usam o mesmo período no fuso do escritório, por data de entrada no LegalOS.
+- Removido o corte silencioso de 20 mil registros no gráfico do Box; contagens respeitam sigilo e escritório.
+- Novo `npm run audit:astrea-tasks -- --org <id>`: diagnóstico somente leitura de tarefas importadas ainda abertas cujo comentário registra conclusão antiga. São indícios para conferência com o CSV e histórico de reabertura, nunca correções automáticas.
 
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.

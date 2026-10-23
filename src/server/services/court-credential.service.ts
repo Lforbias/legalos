@@ -1,3 +1,4 @@
+import { connectionSupports } from "@/lib/connectors/capabilities";
 import { db } from "@/lib/db/client";
 import { checkRequirements, COURT_SYSTEMS, getCourtSystem, type AuthMode } from "@/lib/court-systems";
 import { isKnownJtr } from "@/lib/mni/tribunals";
@@ -100,8 +101,10 @@ export async function verifyMyCredential(ctx: TenantContext, id: string) {
   const problems = checkRequirements({ system: c.system, authMode: c.authMode, document: secret.document, password: secret.password, certificateId: c.certificateId });
   if (c.authMode !== "PASSWORD" && c.certificateId) await assertCertificateUsable(ctx, c.certificateId).catch((e: Error) => problems.push(e.message));
   const sys = getCourtSystem(c.system);
-  const status = problems.length ? "PENDENTE" : sys?.connector ? "PRONTA" : "SEM_CONECTOR";
-  const message = problems.length ? problems.join(" ") : sys?.connector ? "Credencial completa. A validade no tribunal só se confirma ao usar." : `Credencial completa, mas ainda não há conector para ${sys?.label ?? c.system}.`;
+  const connections = c.system !== "pje-mni" ? await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, system: c.system, enabled: true, ...(c.courtCode ? { jtr: c.courtCode } : {}) } }) : [];
+  const configured = c.system === "pje-mni" ? Boolean(sys?.connector) : connections.some(row => connectionSupports(row, "consultarProcesso"));
+  const status = problems.length ? "PENDENTE" : configured ? "PRONTA" : "SEM_CONECTOR";
+  const message = problems.length ? problems.join(" ") : configured ? "Credencial completa. A validade no tribunal só se confirma ao usar." : `Credencial completa, mas não há conexão MNI compatível configurada para ${sys?.label ?? c.system}.`;
   await db.courtCredential.update({ where: { id }, data: { checkedAt: new Date(), checkStatus: status, checkMessage: message.slice(0, 300) } });
   return { status, message };
 }

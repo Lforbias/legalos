@@ -16,11 +16,11 @@ import { notify } from "./notification.service";
 type Status = (typeof import("@/modules/tasks/schemas").TASK_STATUSES)[number];
 
 /** Tarefas sem processo são do escritório; as vinculadas a processo respeitam o sigilo do processo. */
-function taskVisibility(ctx: TenantContext): Prisma.TaskWhereInput {
+export function taskVisibility(ctx: TenantContext): Prisma.TaskWhereInput {
   return { OR: [{ caseId: null }, { case: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } }] };
 }
 
-export type TaskFilters = { labelId?: string; typeId?: string; q?: string; status?: Status; assigneeId?: string; caseId?: string; clientId?: string; overdue?: boolean; includeClosed?: boolean };
+export type TaskFilters = { stageId?: string; labelId?: string; typeId?: string; q?: string; status?: Status; assigneeId?: string; caseId?: string; clientId?: string; overdue?: boolean; includeClosed?: boolean };
 
 export async function listTasks(ctx: TenantContext, f: TaskFilters = {}) {
   assertCan(ctx, "tasks:read");
@@ -30,6 +30,7 @@ export async function listTasks(ctx: TenantContext, f: TaskFilters = {}) {
   if (f.assigneeId) and.push({ assigneeId: f.assigneeId });
   if (f.caseId) and.push({ caseId: f.caseId });
   if (f.labelId) and.push({ labels: { some: { labelId: f.labelId } } });
+  if (f.stageId) and.push({ stageId: f.stageId });
   if (f.typeId) and.push({ typeId: f.typeId });
   if (f.clientId) and.push({ clientId: f.clientId });
   if (f.overdue) and.push({ status: { in: ["TODO", "IN_PROGRESS", "WAITING"] }, dueDate: { lt: new Date(`${todayYmd(ctx.timezone)}T00:00:00Z`) } });
@@ -42,7 +43,7 @@ export async function listTasks(ctx: TenantContext, f: TaskFilters = {}) {
       where,
       orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "asc" }],
       take: 300,
-      include: { case: { select: { id: true, title: true } }, client: { select: { id: true, name: true } }, type: { select: { name: true, points: true } }, labels: { select: { label: { select: { id: true, name: true, color: true } } } } },
+      include: { stage: { select: { id: true, name: true } }, case: { select: { id: true, title: true } }, client: { select: { id: true, name: true } }, type: { select: { name: true, points: true } }, labels: { select: { label: { select: { id: true, name: true, color: true } } } } },
     }),
   ]);
   const names = await userNames(ctx, rows.map((r) => r.assigneeId));
@@ -54,6 +55,7 @@ export async function getTask(ctx: TenantContext, id: string) {
   const t = await db.task.findFirst({
     where: { AND: [{ id, organizationId: ctx.organizationId, deletedAt: null }, taskVisibility(ctx)] },
     include: {
+      stage: { select: { id: true, name: true } },
       case: { select: { id: true, title: true, number: true } },
       client: { select: { id: true, name: true } },
       comments: { orderBy: { createdAt: "asc" }, take: 200 },
@@ -117,7 +119,7 @@ export async function updateTask(ctx: TenantContext, id: string, raw: TaskInput)
   await db.$transaction(async (tx) => {
     await tx.task.update({
       where: { id },
-      data: { ...data, completedAt: data.status === "DONE" ? (current.completedAt ?? new Date()) : null },
+      data: { ...data, ...(data.status !== current.status ? { stageId: null } : {}), completedAt: data.status === "DONE" ? (current.completedAt ?? new Date()) : null },
     });
     const changes: string[] = [];
     if (data.title !== current.title) changes.push(`Título: “${current.title}” → “${data.title}”`);
@@ -140,13 +142,13 @@ export async function updateTask(ctx: TenantContext, id: string, raw: TaskInput)
 export async function changeTaskStatus(ctx: TenantContext, id: string, status: Status) {
   assertCan(ctx, "tasks:write");
   const t = await getTask(ctx, id);
-  if (t.status === status) return;
+  if (t.status === status && !t.stageId) return;
   await db.$transaction(async (tx) => {
-    await tx.task.update({ where: { id }, data: { status, completedAt: status === "DONE" ? new Date() : null } });
-    if (t.caseId && (status === "DONE" || t.status === "DONE")) {
+    await tx.task.update({ where: { id }, data: { status, stageId: null, completedAt: status === "DONE" ? (t.completedAt ?? new Date()) : null } });
+    if (t.caseId && t.status !== status && (status === "DONE" || t.status === "DONE")) {
       await logCaseEvent(tx, ctx, t.caseId, { kind: status === "DONE" ? "TASK_DONE" : "TASK_REOPENED", title: `${status === "DONE" ? "Tarefa concluída" : "Tarefa reaberta"}: ${t.title}` });
     }
-    await recordTaskEvent(tx, ctx, id, "status", `Situação: ${TASK_STATUS_LABEL[t.status]} → ${TASK_STATUS_LABEL[status]}`);
+    await recordTaskEvent(tx, ctx, id, "status", t.stage ? `Etapa ${t.stage.name} removida; situação: ${TASK_STATUS_LABEL[status]}` : `Situação: ${TASK_STATUS_LABEL[t.status]} → ${TASK_STATUS_LABEL[status]}`);
     await audit(
       { action: "task.status", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "task", resourceId: id, metadata: { from: t.status, to: status, label: TASK_STATUS_LABEL[status] }, meta: ctx.meta },
       tx,

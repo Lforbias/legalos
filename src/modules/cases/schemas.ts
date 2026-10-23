@@ -28,6 +28,7 @@ export const CASE_AREAS = ["Cível", "Trabalhista", "Previdenciário", "Penal", 
 export const caseSchema = z.object({
   number: text(30).refine((v) => v === "" || isValidCnj(v), "Número CNJ inválido. Verifique os dígitos (NNNNNNN-DD.AAAA.J.TR.OOOO)."),
   legacyNumber: text(60),
+  courtSystem: z.enum(["", "pje-mni", "eproc", "esaj", "projudi"]).optional(),
   title: z.string().trim().min(3, "Informe um título para o processo.").max(200),
   area: text(60),
   court: text(120),
@@ -80,6 +81,7 @@ export function toCaseData(input: CaseInput) {
   return {
     number: input.number ? formatCnj(input.number) : null,
     legacyNumber: emptyToNull(input.legacyNumber),
+    ...(input.courtSystem === undefined ? {} : { courtSystem: input.courtSystem || null }),
     title: input.title.trim(),
     area: emptyToNull(input.area),
     court: emptyToNull(input.court),

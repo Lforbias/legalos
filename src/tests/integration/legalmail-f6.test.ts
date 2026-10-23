@@ -16,9 +16,9 @@ describe("3.0-F6 — sistema por tribunal e registro de conectores", () => {
     assistant = await addMember(A.org.id, "ASSISTANT", "l3f6-ass");
   });
 
-  it("registro: só o PJe/MNI tem conector e nenhum está validado em tribunal real", () => {
+  it("registro: os sistemas têm adaptador MNI condicional e nenhum está validado em tribunal real", () => {
     expect(readinessOf("pje-mni").state).toBe("UNVALIDATED");
-    for (const s of ["eproc", "esaj", "projudi"]) expect(readinessOf(s).state).toBe("NO_CONNECTOR");
+    for (const s of ["eproc", "esaj", "projudi"]) expect(readinessOf(s).state).toBe("UNVALIDATED");
     expect(readinessOf("xyz").state).toBe("UNKNOWN");
     expect(getConnector("pje-mni")?.capabilities).toContain("petition");
     expect(allReadiness()).toHaveLength(COURT_SYSTEMS.length);
@@ -38,7 +38,7 @@ describe("3.0-F6 — sistema por tribunal e registro de conectores", () => {
     expect(await systemForJtr(A.org.id, "8.05")).toBe("esaj");
     expect(await db.courtSystemMap.count({ where: { organizationId: A.org.id, jtr: "8.05" } })).toBe(1);
     const row = (await listSystemMap(A.ctx)).find((r) => r.jtr === "8.05")!;
-    expect(row.readiness?.state).toBe("NO_CONNECTOR");
+    expect(row.readiness?.state).toBe("UNVALIDATED");
     expect((await listSystemMap(B.ctx)).find((r) => r.jtr === "8.05")!.system).toBeNull();
   });
 
@@ -56,10 +56,10 @@ describe("3.0-F6 — sistema por tribunal e registro de conectores", () => {
     await setCourtSystem(A.ctx, "8.26", "pje-mni");
     const r = await getReadinessReport(A.ctx);
     expect(r.mapped).toBe(2);
-    expect(r.blocked).toBe(1);
+    expect(r.blocked).toBe(2);
     await setCourtSystem(A.ctx, "8.05", null);
     expect(await systemForJtr(A.org.id, "8.05")).toBeNull();
-    expect((await getReadinessReport(A.ctx)).blocked).toBe(0);
+    expect((await getReadinessReport(A.ctx)).blocked).toBe(1);
     await expect(assertConnectorFor(A.org.id, "8.05", "petition")).resolves.toBeUndefined();
   });
 
