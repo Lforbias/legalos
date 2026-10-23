@@ -1,3 +1,4 @@
+import { OPERATION_KINDS, OPERATION_SCHEMAS, prepareOperation, executeOperation, type OperationKind } from "./rute-operations.service";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { calculateDeadline } from "@/lib/deadlines/calculator";
@@ -25,6 +26,7 @@ const clip = (max: number) => z.string().trim().max(max);
 const ymd = z.string().refine(isYmd, "Data inválida (use AAAA-MM-DD).");
 
 export const KINDS = {
+  ...OPERATION_KINDS,
   TASK: { label: "Tarefa", risk: "LOW", permission: "tasks:write" },
   DEADLINE: { label: "Prazo (rascunho)", risk: "LOW", permission: "deadlines:write" },
   NOTE: { label: "Anotação no processo", risk: "LOW", permission: "cases:write" },
@@ -36,7 +38,8 @@ export const KINDS = {
 export type ProposalKind = keyof typeof KINDS;
 export const KIND_LIST = Object.keys(KINDS) as ProposalKind[];
 
-const SCHEMAS = {
+export const PROPOSAL_SCHEMAS = {
+  ...OPERATION_SCHEMAS,
   TASK: z.object({ title: clip(200).min(3), description: clip(4000).optional().default(""), priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).optional().default("NORMAL"), dueDate: ymd.optional().or(z.literal("")).default(""), assigneeId: uuid.optional().or(z.literal("")).default(""), caseId: uuid.optional().or(z.literal("")).default(""), clientId: uuid.optional().or(z.literal("")).default("") }),
   DEADLINE: z.object({ caseId: uuid, title: clip(200).min(3), kind: clip(80).optional().default(""), startDate: ymd, days: z.coerce.number().int().min(1).max(3650), countType: z.enum(["BUSINESS", "CALENDAR"]), notes: clip(2000).optional().default("") }),
   NOTE: z.object({ caseId: uuid, title: clip(120).optional().default(""), body: clip(8000).min(3) }),
@@ -52,7 +55,7 @@ const MAX_PENDING = 30;
 export type ProposalOrigin = { via: "MCP" | "ASSISTANT" | "API"; connection?: string | null };
 
 function parsePayload(kind: ProposalKind, raw: unknown): Record<string, unknown> {
-  const r = SCHEMAS[kind].safeParse(raw);
+  const r = PROPOSAL_SCHEMAS[kind].safeParse(raw);
   if (!r.success) {
     const fields: Record<string, string[]> = {};
     for (const i of r.error.issues) (fields[i.path.join(".") || "_"] ??= []).push(i.message);
@@ -66,12 +69,16 @@ function parsePayload(kind: ProposalKind, raw: unknown): Record<string, unknown>
 /** Cria a proposta. `ctx` é a pessoa em nome de quem a IA age: precisa ter a permissão da ação e enxergar o processo. */
 export async function createProposal(ctx: TenantContext, origin: ProposalOrigin, input: { kind: string; title?: string; payload: unknown }) {
   await assertRuteOn(ctx.organizationId, "proposals");
-  if (!(input.kind in KINDS)) throw new ValidationError("Tipo de proposta inválido.");
+  if (!Object.hasOwn(KINDS, input.kind)) throw new ValidationError("Tipo de proposta inválido.");
   const kind = input.kind as ProposalKind;
   assertCan(ctx, KINDS[kind].permission);
   const payload = parsePayload(kind, input.payload);
   let caseId: string | null = typeof payload.caseId === "string" && payload.caseId ? payload.caseId : null;
-  const clientId: string | null = typeof payload.clientId === "string" && payload.clientId ? payload.clientId : null;
+  let clientId: string | null = typeof payload.clientId === "string" && payload.clientId ? payload.clientId : null;
+  if (Object.hasOwn(OPERATION_KINDS, kind)) {
+    const links = await prepareOperation(ctx, kind as OperationKind, payload);
+    caseId = links.caseId ?? caseId; clientId = links.clientId ?? clientId;
+  }
   if (kind === "PROTOCOLO_PREPARO") {
     const p = await db.petitionFiling.findFirst({ where: { id: payload.petitionId as string, organizationId: ctx.organizationId }, select: { caseId: true, title: true, status: true } });
     if (!p) throw new NotFoundError("Petição não encontrada.");
@@ -97,7 +104,7 @@ async function expireOld(orgId: string) {
   await db.aiProposal.updateMany({ where: { organizationId: orgId, status: "PENDING", expiresAt: { lt: new Date() } }, data: { status: "EXPIRED", decidedAt: new Date() } });
 }
 
-export type ProposalView = { id: string; kind: ProposalKind; kindLabel: string; risk: "LOW" | "HIGH"; title: string; payload: Record<string, unknown>; via: string; connection: string | null; caseId: string | null; caseTitle: string | null; status: string; proposerId: string; proposerName: string; createdAt: Date; expiresAt: Date; decisionNote: string | null; resultId: string | null };
+export type ProposalView = { id: string; kind: ProposalKind; kindLabel: string; risk: "LOW" | "HIGH"; title: string; payload: Record<string, unknown>; via: string; connection: string | null; caseId: string | null; caseTitle: string | null; status: string; proposerId: string; proposerName: string; createdAt: Date; expiresAt: Date; decisionNote: string | null; resultId: string | null; resultType: string | null };
 
 async function toViews(ctx: TenantContext, rows: Awaited<ReturnType<typeof db.aiProposal.findMany>>): Promise<ProposalView[]> {
   const caseIds = [...new Set(rows.map((r) => r.caseId).filter((x): x is string => !!x))];
@@ -107,7 +114,7 @@ async function toViews(ctx: TenantContext, rows: Awaited<ReturnType<typeof db.ai
   const names = new Map(users.map((u) => [u.id, u.name]));
   return rows
     .filter((r) => !r.caseId || vis.has(r.caseId))
-    .map((r) => ({ id: r.id, kind: r.kind as ProposalKind, kindLabel: KINDS[r.kind as ProposalKind]?.label ?? r.kind, risk: KINDS[r.kind as ProposalKind]?.risk ?? "HIGH", title: r.title, payload: r.payload as Record<string, unknown>, via: r.via, connection: r.connection, caseId: r.caseId, caseTitle: r.caseId ? (vis.get(r.caseId) ?? null) : null, status: r.status, proposerId: r.userId, proposerName: names.get(r.userId) ?? "—", createdAt: r.createdAt, expiresAt: r.expiresAt, decisionNote: r.decisionNote, resultId: r.resultId }));
+    .map((r) => ({ id: r.id, kind: r.kind as ProposalKind, kindLabel: KINDS[r.kind as ProposalKind]?.label ?? r.kind, risk: KINDS[r.kind as ProposalKind]?.risk ?? "HIGH", title: r.title, payload: r.payload as Record<string, unknown>, via: r.via, connection: r.connection, caseId: r.caseId, caseTitle: r.caseId ? (vis.get(r.caseId) ?? null) : null, status: r.status, proposerId: r.userId, proposerName: names.get(r.userId) ?? "—", createdAt: r.createdAt, expiresAt: r.expiresAt, decisionNote: r.decisionNote, resultId: r.resultId, resultType: r.resultType }));
 }
 
 /** Quem vê a proposta: quem a originou e quem tem permissão para executar aquela ação (e enxerga o processo). */
@@ -124,7 +131,11 @@ export async function listProposals(ctx: TenantContext, f: { status?: "PENDING" 
 }
 
 export async function getProposal(ctx: TenantContext, id: string): Promise<ProposalView> {
-  const v = (await listProposals(ctx)).find((p) => p.id === id);
+  assertCan(ctx, "ai:use");
+  await expireOld(ctx.organizationId);
+  const row = await db.aiProposal.findFirst({ where: { id, organizationId: ctx.organizationId } });
+  if (!row || !Object.hasOwn(KINDS, row.kind) || (row.userId !== ctx.userId && (!KINDS[row.kind as ProposalKind] || !can(ctx, KINDS[row.kind as ProposalKind].permission)))) throw new NotFoundError("Proposta não encontrada.");
+  const [v] = await toViews(ctx, [row]);
   if (!v) throw new NotFoundError("Proposta não encontrada.");
   return v;
 }
@@ -133,12 +144,17 @@ export async function updateProposal(ctx: TenantContext, id: string, payload: un
   const p = await getProposal(ctx, id);
   if (p.status !== "PENDING") throw new ConflictError("Esta proposta já foi decidida.");
   assertCan(ctx, KINDS[p.kind].permission);
-  const clean = parsePayload(p.kind, { ...p.payload, ...(payload as object) });
+  const changes = payload as Record<string, unknown>;
+  for (const key of ["caseId", "clientId", "taskId", "eventId", "petitionId", "expectedUpdatedAt", "targetTitle"]) {
+    if (Object.hasOwn(changes, key) && changes[key] !== p.payload[key]) throw new ValidationError("O registro de destino e a versão da proposta não podem ser alterados. Crie uma nova proposta.");
+  }
+  const clean = parsePayload(p.kind, { ...p.payload, ...changes });
   await db.aiProposal.update({ where: { id }, data: { payload: clean as never, title: (typeof clean.title === "string" && clean.title ? clean.title : p.title).slice(0, 200) } });
   await audit({ action: "rute.proposal_edit", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "ai_proposal", resourceId: id, meta: ctx.meta });
 }
 
 async function execute(ctx: TenantContext, kind: ProposalKind, p: Record<string, unknown>, id: string): Promise<{ type: string; id: string }> {
+  if (Object.hasOwn(OPERATION_KINDS, kind)) return executeOperation(ctx, kind as OperationKind, p);
   const tag = `\n\n(Proposta da RUTE confirmada por uma pessoa.)`;
   switch (kind) {
     case "TASK": {
@@ -173,6 +189,7 @@ async function execute(ctx: TenantContext, kind: ProposalKind, p: Record<string,
     }
   }
   void id;
+  throw new ValidationError("Tipo de proposta não implementado.");
 }
 
 /** Aprovação humana. Itens de risco alto exigem `confirmHighRisk`. O resultado nasce com a permissão de QUEM APROVA. */

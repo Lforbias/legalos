@@ -112,6 +112,9 @@ curl -H "Authorization: Bearer $LEGALOS_KEY" \
   https://SEU-DOMINIO/api/v1/tools/indicadores_escritorio
 ```
 
-As sete ferramentas `propor_*` apenas registram uma proposta pendente de decisão humana no LegalOS. A origem é registrada como API; nenhuma delas envia mensagem ao cliente ou protocola no tribunal. Esta API de ferramentas não depende de chave Gemini/Claude/OpenAI, pois a aplicação externa pode chamar diretamente o serviço autorizado.
+As quinze ferramentas `propor_*` apenas registram uma proposta pendente de decisão humana no LegalOS. A origem é registrada como API; nenhuma delas envia mensagem ao cliente ou protocola no tribunal. Esta API de ferramentas não depende de chave Gemini/Claude/OpenAI, pois a aplicação externa pode chamar diretamente o serviço autorizado.
 
 Catálogo completo, limites e cobertura por módulo: [Inventário de RUTE, REST e MCP](inventario-api-mcp.md).
+
+
+O catálogo atual possui 35 ferramentas compartilhadas. Além das consultas, há propostas para cadastro/atualização básica de clientes, edição/comentário/situação de tarefas e criação/edição/cancelamento de compromissos. `capacidades`, `listar_propostas` e `ver_proposta` permitem descobrir e acompanhar operações. A confirmação pode ser feita pela pessoa no chat interno do LegalOS. Campos de destino e versão não podem ser modificados pela edição de uma proposta; alterações concorrentes exigem nova proposta.

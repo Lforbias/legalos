@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Alert } from "@/components/ui/alert";
@@ -8,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/form";
 import { useRun } from "@/modules/kanban/use-run";
+import { InlineProposal } from "./inline-proposal";
 import { createConversationAction, deleteConversationAction, sendMessageAction } from "./actions";
 
 export type Msg = { id: string; role: string; content: string; refs: { type: string; name?: string; id?: string; title?: string; ok?: boolean }[] };
@@ -52,9 +52,9 @@ export function Chat({ conversationId, caseId, clientId, messages, contextLabel,
             {m.role === "assistant" && m.refs.length ? (
               <p className="mt-1 flex flex-wrap gap-1 text-[11px] text-muted">
                 {m.refs.filter((r) => r.type === "tool").map((r, i) => <Badge key={i} tone={r.ok ? "neutral" : "warning"}>{r.name}</Badge>)}
-                {m.refs.filter((r) => r.type === "proposal").map((r) => <Link key={r.id} href="/rute?aba=propostas" className="underline">Proposta: {r.title}</Link>)}
               </p>
             ) : null}
+            {m.role === "assistant" ? m.refs.filter(r => r.type === "proposal" && r.id).map(r => <InlineProposal key={r.id} id={r.id!} />) : null}
           </div>
         ))}
         {pending ? <p className="text-xs text-muted">Consultando…</p> : null}

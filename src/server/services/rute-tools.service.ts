@@ -11,7 +11,7 @@ import { listMembers } from "./membership.service";
 import { getEvent, listEvents } from "./agenda.service";
 import { caseVisibility } from "./case.service";
 import { apiGetCase, apiGetClient, apiGetNotice, apiListClients, apiListDeadlines, apiListNotices } from "./public-api.service";
-import { createProposal, KIND_LIST } from "./rute-proposal.service";
+import { createProposal, getProposal, listProposals, KIND_LIST, PROPOSAL_SCHEMAS } from "./rute-proposal.service";
 import { assertRuteOn } from "./rute-settings.service";
 import { getTask, listTasks } from "./task.service";
 
@@ -22,7 +22,7 @@ import { getTask, listTasks } from "./task.service";
  */
 
 export type ToolScope = "read" | "propose";
-export type Origin = { via: "MCP" | "ASSISTANT" | "API"; connection: string | null; provider: string };
+export type Origin = { via: "MCP" | "ASSISTANT" | "API"; connection: string | null; provider: string; allowedScopes?: ReadonlySet<ToolScope> };
 type Subject = { clientId?: string; caseId?: string };
 type Json = Record<string, unknown>;
 
@@ -50,6 +50,30 @@ async function visibleCaseIds(ctx: TenantContext, where: object, take = 50) {
 }
 
 const TOOLS: ToolDef[] = [
+  {
+    name: "capacidades", title: "Capacidades disponíveis", scope: "read", permission: "ai:use",
+    description: "Descobre as ferramentas disponíveis para esta pessoa e conexão, permissões e argumentos. Use para explicar o que pode consultar e fazer. Ações de escrita são propostas para confirmação humana.",
+    input: { type: "object", properties: {} }, schema: z.object({}),
+    run: async (ctx, _args, origin) => ({ ferramentas: toolCatalog(ctx, origin.allowedScopes ?? new Set(["read", "propose"])).map(t => ({ nome: t.name, titulo: t.title, tipo: t.scope, permissao: t.permission, argumentos: Object.keys(t.inputSchema.properties), obrigatorios: t.inputSchema.required ?? [] })), propostas_exigem_confirmacao: true }),
+  },
+  {
+    name: "listar_propostas", title: "Listar propostas", scope: "read", permission: "ai:use",
+    description: "Consulta propostas pendentes ou decididas visíveis à pessoa. Use para acompanhar se uma ação foi aprovada e executada.",
+    input: { type: "object", properties: { status: S("PENDING ou DECIDED"), limit: { type: "integer", minimum: 1, maximum: 50 } } }, schema: z.object({ status: z.enum(["PENDING", "DECIDED"]).optional(), limit: lim }),
+    run: async (ctx, a) => {
+      const rows = await listProposals(ctx, { status: a.status as "PENDING" | "DECIDED" | undefined });
+      return { propostas: rows.slice(0, Number(a.limit ?? 20)).map(p => ({ id: p.id, titulo: p.title, tipo: p.kindLabel, situacao: p.status, resultado_id: p.resultId, resultado_tipo: p.resultType })), limitado: rows.length > Number(a.limit ?? 20) };
+    },
+  },
+  {
+    name: "ver_proposta", title: "Ver proposta e resultado", scope: "read", permission: "ai:use",
+    description: "Consulta uma proposta visível, sua situação e o resultado. Não aprova nem executa ações.",
+    input: { type: "object", properties: { id: S("id da proposta") }, required: ["id"] }, schema: z.object({ id: uuid }),
+    run: async (ctx, a) => {
+      const p = await getProposal(ctx, a.id as string);
+      return { id: p.id, titulo: p.title, tipo: p.kindLabel, situacao: p.status, resultado_id: p.resultId, resultado_tipo: p.resultType, motivo: p.decisionNote, dados: p.payload };
+    },
+  },
   {
     name: "indicadores_escritorio", title: "Indicadores do escritório", scope: "read", permission: "ai:use",
     description: "Totais exatos da visão geral do escritório: membros ativos, clientes ativos, processos em andamento e suspensos, prazos, minhas tarefas e intimações. Use para perguntas 'quantos', contagens e estatísticas; não conte uma lista limitada. Cada indicador respeita a permissão do módulo e a visibilidade dos processos.",
@@ -155,8 +179,8 @@ const TOOLS: ToolDef[] = [
   {
     name: "listar_tarefas", title: "Listar tarefas", scope: "read", permission: "tasks:read",
     description: "Tarefas em aberto (ou de uma situação). Use responsavel=\"eu\" para as suas.",
-    input: { type: "object", properties: { responsavel: S("'eu' ou id de pessoa"), status: S("TODO, IN_PROGRESS, WAITING, DONE"), caseId: S("id do processo"), atrasadas: { type: "boolean" } } },
-    schema: z.object({ responsavel: z.string().max(40).optional(), status: z.enum(["TODO", "IN_PROGRESS", "WAITING", "DONE"]).optional(), caseId: uuid.optional(), atrasadas: z.boolean().optional() }), subject: (a) => ({ caseId: a.caseId as string | undefined }),
+    input: { type: "object", properties: { responsavel: S("'eu' ou id de pessoa"), status: S("TODO, IN_PROGRESS, WAITING, DONE, CANCELED"), caseId: S("id do processo"), atrasadas: { type: "boolean" } } },
+    schema: z.object({ responsavel: z.string().max(40).optional(), status: z.enum(["TODO", "IN_PROGRESS", "WAITING", "DONE", "CANCELED"]).optional(), caseId: uuid.optional(), atrasadas: z.boolean().optional() }), subject: (a) => ({ caseId: a.caseId as string | undefined }),
     run: async (ctx, a) => {
       const assigneeId = a.responsavel === "eu" ? ctx.userId : a.responsavel ? uuid.parse(a.responsavel) : undefined;
       const r = await listTasks(ctx, { assigneeId, status: a.status as "TODO" | undefined, caseId: a.caseId as string | undefined, overdue: a.atrasadas as boolean | undefined });
@@ -236,14 +260,28 @@ const TOOLS: ToolDef[] = [
   },
 ];
 
-const proposeTool = (name: string, title: string, kind: (typeof KIND_LIST)[number], permission: PermissionKey, description: string, properties: Record<string, unknown>, required: string[]): ToolDef => ({
+function proposalSchema(kind: (typeof KIND_LIST)[number], descriptions: Record<string, unknown>) {
+  const schema = z.toJSONSchema(PROPOSAL_SCHEMAS[kind], { unrepresentable: "any", io: "input" }) as { type: "object"; properties: Record<string, unknown>; required?: string[] };
+  delete schema.properties.expectedUpdatedAt; delete schema.properties.targetTitle;
+  for (const [key, value] of Object.entries(descriptions)) if (schema.properties[key]) schema.properties[key] = { ...(schema.properties[key] as object), ...(value as object) };
+  return schema;
+}
+const proposeTool = (name: string, title: string, kind: (typeof KIND_LIST)[number], permission: PermissionKey, description: string, properties: Record<string, unknown>, _required: string[]): ToolDef => ({
   name, title, scope: "propose", permission, description: `${description} NÃO cria nada de verdade: registra uma proposta que uma pessoa precisa confirmar em RUTE → Propostas.`,
-  input: { type: "object", properties, required }, schema: z.record(z.string(), z.unknown()),
+  input: proposalSchema(kind, properties), schema: z.record(z.string(), z.unknown()),
   subject: (a) => ({ caseId: typeof a.caseId === "string" ? a.caseId : undefined }),
   run: async (ctx, a, origin) => createProposal(ctx, { via: origin.via, connection: origin.connection }, { kind, payload: a }),
 });
 
 TOOLS.push(
+  proposeTool("propor_cliente", "Propor cadastro de cliente", "CLIENT_CREATE", "clients:write", "Propõe cadastrar cliente por nome, tipo, situação e dados básicos. Não invente documento ou contato.", { name: S("nome do cliente"), type: S("PERSON ou COMPANY"), status: S("ACTIVE, INACTIVE ou PROSPECT") }, ["name"]),
+  proposeTool("propor_atualizacao_cliente", "Propor atualização de cliente", "CLIENT_UPDATE", "clients:write", "Propõe alterar campos informados de um cliente existente, preservando os demais. Consulte o cliente antes.", { clientId: S("id do cliente") }, ["clientId"]),
+  proposeTool("propor_atualizacao_tarefa", "Propor atualização de tarefa", "TASK_UPDATE", "tasks:write", "Propõe editar título, descrição, prioridade, vencimento ou responsável, preservando outros dados. Consulte a tarefa antes.", { taskId: S("id da tarefa"), assigneeId: S("id de usuário de listar_equipe; vazio remove responsável") }, ["taskId"]),
+  proposeTool("propor_situacao_tarefa", "Propor mudança de situação da tarefa", "TASK_STATUS", "tasks:write", "Propõe iniciar, concluir, reabrir ou cancelar uma tarefa. Exige confirmação reforçada da pessoa.", { taskId: S("id da tarefa"), status: S("TODO, IN_PROGRESS, WAITING, DONE ou CANCELED") }, ["taskId", "status"]),
+  proposeTool("propor_comentario_tarefa", "Propor comentário na tarefa", "TASK_COMMENT", "tasks:write", "Propõe adicionar um comentário interno a uma tarefa.", { taskId: S("id da tarefa"), body: S("texto do comentário") }, ["taskId", "body"]),
+  proposeTool("propor_compromisso", "Propor compromisso", "EVENT_CREATE", "deadlines:write", "Propõe compromisso na agenda do escritório. Use a data explícita, horário HH:MM e fuso do escritório; pergunte o que faltar.", { title: S("título"), date: S("AAAA-MM-DD"), startTime: S("HH:MM; obrigatório se não for dia inteiro") }, ["title", "date"]),
+  proposeTool("propor_atualizacao_compromisso", "Propor atualização de compromisso", "EVENT_UPDATE", "deadlines:write", "Propõe alterar os campos informados do compromisso. Consulte o compromisso antes.", { eventId: S("id do compromisso") }, ["eventId"]),
+  proposeTool("propor_cancelamento_compromisso", "Propor cancelamento de compromisso", "EVENT_CANCEL", "deadlines:write", "Propõe cancelar o compromisso no LegalOS. Não comunica participantes externos. Exige confirmação reforçada.", { eventId: S("id do compromisso") }, ["eventId"]),
   proposeTool("propor_tarefa", "Propor tarefa", "TASK", "tasks:write", "Propõe uma tarefa.", { title: S("título"), description: S("detalhes"), priority: S("LOW, NORMAL, HIGH, URGENT"), dueDate: S("AAAA-MM-DD"), assigneeId: S("id da pessoa"), caseId: S("id do processo"), clientId: S("id do cliente") }, ["title"]),
   proposeTool("propor_prazo", "Propor prazo", "DEADLINE", "deadlines:write", "Propõe um prazo (nasce em rascunho; a data é calculada pela calculadora do sistema).", { caseId: S("id do processo"), title: S("título"), startDate: S("data da ciência AAAA-MM-DD"), days: { type: "integer" }, countType: S("BUSINESS ou CALENDAR"), notes: S("observações") }, ["caseId", "title", "startDate", "days", "countType"]),
   proposeTool("propor_anotacao", "Propor anotação", "NOTE", "cases:write", "Propõe uma anotação no processo.", { caseId: S("id do processo"), title: S("título"), body: S("texto") }, ["caseId", "body"]),
@@ -287,7 +325,7 @@ export async function callTool(ctx: TenantContext, scopes: ReadonlySet<ToolScope
     const parsed = def.schema.safeParse(rawArgs ?? {});
     if (!parsed.success) throw new ValidationError(`Argumentos inválidos: ${parsed.error.issues[0]?.path.join(".") || "dados"} — ${parsed.error.issues[0]?.message}`);
     subject = def.subject?.(parsed.data) ?? {};
-    const data = await def.run(ctx, parsed.data, origin);
+    const data = await def.run(ctx, parsed.data, { ...origin, allowedScopes: scopes });
     const body = maskSensitive(JSON.stringify(data ?? null, null, 1));
     truncated = body.length > MAX_RESULT;
     if (!truncated) { try { structured = JSON.parse(body); } catch { structured = { text: body }; } }

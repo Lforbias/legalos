@@ -4,9 +4,9 @@ Data: 2026-10-23. Este inventário descreve código implementado. Disponibilidad
 
 ## Arquitetura
 
-RUTE e MCP usam `toolList`/`callTool`. A expansão adiciona o mesmo catálogo pela REST: `GET /api/v1/tools` e `POST /api/v1/tools/{name}`. Todas as interfaces usam os serviços de negócio do LegalOS; nenhuma IA recebe acesso direto ao banco.
+RUTE e MCP usam `toolList`/`callTool`. Os esquemas de entrada das propostas são gerados a partir da validação Zod do servidor. A expansão adiciona o mesmo catálogo pela REST: `GET /api/v1/tools` e `POST /api/v1/tools/{name}`. Todas as interfaces usam os serviços de negócio do LegalOS; nenhuma IA recebe acesso direto ao banco.
 
-Antes desta expansão: 13 consultas + 7 propostas (20 ferramentas), compartilhadas por RUTE e MCP. REST de recursos: 9 operações. Depois desta expansão: 17 consultas + 7 propostas (24 ferramentas), disponíveis nos três transportes, com catálogo e contrato OpenAPI autenticados. A REST de recursos permanece compatível e com os mesmos 9 métodos existentes.
+Antes desta expansão: 13 consultas + 7 propostas (20 ferramentas), compartilhadas por RUTE e MCP. REST de recursos: 9 operações. Primeira expansão: 17 consultas + 7 propostas (24 ferramentas). Rodada operacional: 20 consultas + 15 propostas (35 ferramentas), disponíveis nos três transportes, com catálogo e contrato OpenAPI autenticados e confirmação de ações no próprio chat. A REST de recursos permanece compatível e com os mesmos 9 métodos existentes.
 
 ## Catálogo completo de ferramentas compartilhadas
 
@@ -29,6 +29,17 @@ Antes desta expansão: 13 consultas + 7 propostas (20 ferramentas), compartilhad
 | `ver_prazo` **novo** | Datas, contagem, situação e responsável | id |
 | `ver_compromisso` **novo** | Horário, local e vínculos autorizados | id |
 | `listar_equipe` **novo** | Nomes, ids, perfis e situação, sem e-mail/credenciais | status |
+| `capacidades` **novo** | Catálogo compacto do que a pessoa e a conexão podem usar | Nenhum |
+| `listar_propostas` **novo** | Acompanhar pendentes/decididas | status, limit |
+| `ver_proposta` **novo** | Situação e resultado de uma proposta visível | id |
+| `propor_cliente` **novo** | Cadastrar cliente com dados básicos | name; type, status, tags, notes, addressCity, addressState |
+| `propor_atualizacao_cliente` **novo** | Atualizar os campos informados do cliente | clientId; name, status, tags, notes, addressCity, addressState |
+| `propor_atualizacao_tarefa` **novo** | Atualizar campos da tarefa sem apagar os demais | taskId; title, description, priority, dueDate, assigneeId |
+| `propor_situacao_tarefa` **novo** | Iniciar, concluir, reabrir ou cancelar tarefa | taskId, status |
+| `propor_comentario_tarefa` **novo** | Comentar tarefa | taskId, body |
+| `propor_compromisso` **novo** | Criar compromisso no fuso do escritório | title, date; kind, allDay, startTime, endTime, location, description, caseId, clientId |
+| `propor_atualizacao_compromisso` **novo** | Atualizar campos do compromisso | eventId; title, date, kind, allDay, startTime, endTime, location, description |
+| `propor_cancelamento_compromisso` **novo** | Cancelar compromisso no LegalOS sem enviar comunicações externas | eventId |
 | `propor_tarefa` | Propor criação de tarefa | title; description, priority, dueDate, assigneeId, caseId, clientId |
 | `propor_prazo` | Propor prazo em rascunho | caseId, title, startDate, days, countType; notes |
 | `propor_anotacao` | Propor nota no processo | caseId, body; title |
@@ -79,11 +90,11 @@ Métodos: `initialize`, `ping`, `tools/list`, `tools/call`. `resources/list`, `r
 | Módulo | O que já está acessível | O que falta ampliar |
 |---|---|---|
 | Indicadores | Totais gerais por permissão | Séries por período e agregações específicas |
-| Clientes | Busca, detalhe e situação | Paginação nas ferramentas, criar/editar por contrato e propostas, vínculos e histórico |
+| Clientes | Busca/detalhe; propostas de cadastro e atualização básica | Paginação nas ferramentas, contatos/documentos e histórico mais completos |
 | Processos | Busca, detalhe e andamentos | Notas completas, recursos/apensos, valores, importações e operações por proposta |
-| Tarefas | Lista, detalhe, comentários; proposta de criação | Paginação, editar/concluir, etapas, etiquetas, anexos e apontamentos |
+| Tarefas | Lista/detalhe; propostas de criação, edição, comentário e mudança de situação | Paginação, etapas, etiquetas, anexos e apontamentos |
 | Prazos | Lista, detalhe; proposta em rascunho | Paginação completa, atualizar e acompanhar validação sem substituí-la por decisão da IA |
-| Agenda | Período e detalhe | Paginação, propostas de criar/editar/cancelar compromisso |
+| Agenda | Período/detalhe; propostas de criar, editar e cancelar compromisso | Paginação e operações de participantes/recorrência |
 | Equipe | Listagem e totais | Distribuição de carga, produtividade e metas; convites/alterações com controles próprios |
 | Documentos | Minutas por proposta e biblioteca da IA | Metadados, texto extraído, versões, arquivos autorizados, modelos, autotextos e timbrados |
 | BOX | Intimações, detalhe e registro REST | Distribuição e tratamento por proposta, notas, histórico, autos e progresso das filas |
@@ -172,7 +183,7 @@ As rotas fora de `/api/v1` têm autenticação e finalidades próprias (sessão,
 
 ## Funções de negócio exportadas por módulo
 
-Inventário técnico das funções implementadas em serviços; não é uma lista de funções autorizadas pela API. Algumas rotinas são internas, administrativas ou de processamento. Tipos, constantes e funções de teste foram omitidos.
+Inventário técnico de declarações `export function` dos serviços; não é uma lista de funções autorizadas pela API. Rotinas internas e administrativas não são expostas automaticamente. Tipos, constantes e funções de teste foram omitidos.
 
 | Serviço | Funções exportadas |
 |---|---|
@@ -273,6 +284,7 @@ Inventário técnico das funções implementadas em serviços; não é uma lista
 | `rute-assistant.service` | `assistantAvailability`, `purgeExpired`, `listConversations`, `getConversation`, `createConversation`, `deleteConversation`, `sendMessage` |
 | `rute-governance.service` | `usageReport`, `listToolHistory`, `lgpdReport`, `lgpdCsv` |
 | `rute-library.service` | `listInstructions`, `saveInstruction`, `deleteInstruction`, `buildSkillPackage` |
+| `rute-operations.service` | `prepareOperation`, `executeOperation` |
 | `rute-proposal.service` | `createProposal`, `listProposals`, `getProposal`, `updateProposal`, `approveProposal`, `rejectProposal`, `pendingProposalCount` |
 | `rute-settings.service` | `getRuteSettings`, `assertRuteOn`, `setRuteFeature`, `setEmergencyStop`, `setAssistantProvider`, `officeProviderKey`, `setGovernance` |
 | `rute-tools.service` | `toolList`, `toolCatalog`, `callTool` |
@@ -301,3 +313,12 @@ Inventário técnico das funções implementadas em serviços; não é uma lista
 ## Descoberta e autorização MCP
 
 Além das rotas `/api`, há `GET /.well-known/oauth-authorization-server`, `GET /.well-known/oauth-protected-resource` e `GET /.well-known/oauth-protected-resource/api/mcp`. O consentimento ocorre na página `/oauth/authorize`; registro e emissão/troca de tokens usam `POST /api/oauth/register` e `POST /api/oauth/token`. Esses endpoints implementam o fluxo de autorização, não ferramentas de negócio.
+
+## Rodada operacional: execução dentro da conversa
+
+- A mensagem da RUTE mostra o cartão da proposta, os dados e os controles de revisão/aprovação/recusa. O resultado pode ser aberto sem procurar a proposta em outra tela.
+- A criação/alteração real só ocorre depois da aprovação humana. As ferramentas de consulta permitem acompanhar o resultado por MCP ou REST; não há ferramenta de aprovação autônoma.
+- Atualizações guardam a versão do registro de destino e recusam a execução quando ele mudou depois da proposta. É necessário consultar os dados atuais e criar outra proposta.
+- Edições de propostas não podem trocar ids de destino nem a versão registrada. As permissões e visibilidade são verificadas de novo pelos serviços na execução.
+- As propostas de cada resposta são vinculadas à conversa correspondente, evitando misturar ações de conversas simultâneas da mesma pessoa.
+- O cadastro de clientes nesta rodada usa dados básicos; não inclui os campos de documento, e-mail e telefone. Uma atualização básica preserva esses campos já cadastrados.

@@ -1,5 +1,6 @@
 "use server";
 
+import { formatDateTime } from "@/lib/dates/format";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ConflictError } from "@/lib/permissions/check";
@@ -9,7 +10,7 @@ import { createApiKey } from "@/server/services/apikey.service";
 import { revokeMcpConnection } from "@/server/services/mcp-auth.service";
 import { createConversation, deleteConversation, sendMessage, type MessageRef } from "@/server/services/rute-assistant.service";
 import { deleteInstruction, saveInstruction } from "@/server/services/rute-library.service";
-import { approveProposal, rejectProposal, updateProposal } from "@/server/services/rute-proposal.service";
+import { approveProposal, getProposal, rejectProposal, updateProposal } from "@/server/services/rute-proposal.service";
 import { setAssistantProvider, setEmergencyStop, setGovernance, setRuteFeature } from "@/server/services/rute-settings.service";
 import { callTool, toolList } from "@/server/services/rute-tools.service";
 import { requireTenant } from "@/server/session";
@@ -90,7 +91,7 @@ export async function approveProposalAction(id: string, opts: { confirmHighRisk?
     const { ctx } = await requireTenant();
     await approveProposal(ctx, parse(uuidSchema, id), { confirmHighRisk: opts.confirmHighRisk === true, edited: opts.edited });
     done();
-    revalidatePath("/tarefas");
+    for (const path of ["/tarefas", "/clientes", "/agenda", "/processos", "/prazos", "/documentos", "/peticoes"]) revalidatePath(path);
     return undefined;
   });
 }
@@ -188,5 +189,13 @@ export async function testProviderAction(): Promise<ActionState<{ model: string 
       if (e instanceof AiProviderError) throw new ConflictError(e.message);
       throw e;
     }
+  });
+}
+
+export async function proposalPanelAction(id: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const p = await getProposal(ctx, parse(uuidSchema, id));
+    return { id: p.id, title: p.title, kindLabel: p.kindLabel, risk: p.risk, payload: p.payload, via: p.via, connection: p.connection, caseId: p.caseId, caseTitle: p.caseTitle, status: p.status, proposerName: p.proposerName, createdAt: formatDateTime(p.createdAt, ctx.timezone), expiresAt: formatDateTime(p.expiresAt, ctx.timezone), decisionNote: p.decisionNote, resultId: p.resultId, resultType: p.resultType };
   });
 }
