@@ -94,3 +94,24 @@ function valid(secret, rawBody, header) {
 Entrega e repetição: não há processo em segundo plano; um agendador deve chamar **a cada minuto** `POST /api/cron/webhooks` com `Authorization: Bearer $CRON_SECRET` (ex.: `* * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/webhooks`). Falhou? Novas tentativas após 1 min, 5 min, 30 min, 2 h e 6 h (6 no total); depois fica "Falhou" e pode ser reenviada na tela. Após 30 falhas seguidas o webhook é desligado automaticamente (religue na tela). A ordem de chegada **não é garantida** e pode haver entrega repetida: deduplique por `X-LegalOS-Delivery`/`id`. Histórico mantido por 30 dias.
 
 Segurança: só https, nome de domínio público (IP, localhost e `.internal` recusados no cadastro; o DNS é revalidado a cada conexão contra rede interna), redirecionamentos não são seguidos, TLS sempre verificado.
+
+## Ferramentas compartilhadas com RUTE e MCP (expansão)
+
+Crie uma chave com `tools:read` e/ou `tools:propose` em Integrações. A permissão de cada módulo continua sendo exigida; estes escopos não concedem acesso MCP. Habilite o acesso externo da RUTE e o consentimento correspondente. A parada de emergência interrompe ferramentas externas.
+
+- `GET /api/v1/tools`: catálogo de ferramentas autorizado à chave, com nomes, descrições e esquemas de entrada.
+- `POST /api/v1/tools/{name}`: envie os argumentos diretamente no objeto JSON. Resultado: `{ data, meta: { tool, truncated } }`. Se exceder o limite, `data` é nulo e `meta.content` traz o texto limitado; refine a consulta. Não trate listas limitadas como exportação completa.
+- `GET /api/v1/openapi`: contrato OpenAPI 3.1 autenticado, com ferramentas filtradas pelos escopos e permissões da chave.
+
+Exemplo sem dados pessoais:
+
+```bash
+curl -H "Authorization: Bearer $LEGALOS_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{}' \
+  https://SEU-DOMINIO/api/v1/tools/indicadores_escritorio
+```
+
+As sete ferramentas `propor_*` apenas registram uma proposta pendente de decisão humana no LegalOS. A origem é registrada como API; nenhuma delas envia mensagem ao cliente ou protocola no tribunal. Esta API de ferramentas não depende de chave Gemini/Claude/OpenAI, pois a aplicação externa pode chamar diretamente o serviço autorizado.
+
+Catálogo completo, limites e cobertura por módulo: [Inventário de RUTE, REST e MCP](inventario-api-mcp.md).

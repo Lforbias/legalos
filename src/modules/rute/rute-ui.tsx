@@ -47,7 +47,7 @@ export function SettingsPanel({ s, canManage }: { s: SettingsView; canManage: bo
     <div className="space-y-4">
       {s.emergencyStop ? <Alert tone="error">PARADA DE EMERGÊNCIA ATIVA: conexões externas, assistente e novas propostas estão bloqueados.</Alert> : null}
       <div className="space-y-3">
-        <FeatureRow feature="mcp" label="Conectar IAs externas (Claude, ChatGPT, Gemini)" hint="Libera o servidor MCP: a IA consulta e propõe, como a pessoa que conectou." on={s.mcpEnabled} needConsent disabled={!canManage} />
+        <FeatureRow feature="mcp" label="Acesso externo às ferramentas (MCP e API)" hint="Libera MCP e chamadas de ferramentas pela API: a IA consulta e propõe, como a pessoa que conectou." on={s.mcpEnabled} needConsent disabled={!canManage} />
         <FeatureRow feature="proposals" label="Propostas da IA" hint="A IA registra propostas (tarefa, prazo, anotação, minuta…). Nada vale até uma pessoa confirmar." on={s.proposalsEnabled} disabled={!canManage} />
         <FeatureRow feature="assistant" label="Assistente embutido" hint="Conversa dentro do LegalOS, com a IA do escritório. Só consulta e propõe." on={s.assistantEnabled} disabled={!canManage} />
       </div>
@@ -201,7 +201,7 @@ function ProposalCard({ p }: { p: ProposalItem }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-sm font-medium">{p.title} <Badge tone={p.risk === "HIGH" ? "warning" : "neutral"}>{p.kindLabel}</Badge> <Badge tone={p.status === "APPROVED" ? "success" : p.status === "PENDING" ? "info" : "neutral"}>{STATUS[p.status as keyof typeof STATUS] ?? p.status}</Badge></p>
-          <p className="text-xs text-muted">Proposta de {p.proposerName} via {p.via === "MCP" ? p.connection ?? "IA externa" : "assistente"}{p.caseTitle ? ` · processo: ${p.caseTitle}` : ""} · vale até {p.expiresAt}</p>
+          <p className="text-xs text-muted">Proposta de {p.proposerName} via {p.via === "API" ? "API REST" : p.via === "MCP" ? p.connection ?? "IA externa" : "assistente"}{p.caseTitle ? ` · processo: ${p.caseTitle}` : ""} · vale até {p.expiresAt}</p>
         </div>
       </div>
       <dl className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[10rem_1fr]">

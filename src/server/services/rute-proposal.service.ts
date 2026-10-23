@@ -49,7 +49,7 @@ const SCHEMAS = {
 export const TTL_DAYS = 14;
 const MAX_PENDING = 30;
 
-export type ProposalOrigin = { via: "MCP" | "ASSISTANT"; connection?: string | null };
+export type ProposalOrigin = { via: "MCP" | "ASSISTANT" | "API"; connection?: string | null };
 
 function parsePayload(kind: ProposalKind, raw: unknown): Record<string, unknown> {
   const r = SCHEMAS[kind].safeParse(raw);
