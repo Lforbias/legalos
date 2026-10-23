@@ -18,7 +18,7 @@ test("DataJud sem chave: página de integrações avisa, não oferece ligar e o 
   await expect(page.getByTestId("box-dashboard")).toBeVisible();
   await page.getByRole("link", { name: /Integrações/ }).first().click();
   await expect(page.getByRole("heading", { name: "Integrações" })).toBeVisible();
-  await expect(page.getByText(/DATAJUD_API_KEY/)).toBeVisible();
+  await expect(page.getByText("Cadastre a chave pública do DataJud abaixo para habilitar a consulta.", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: /Ligar DataJud/ })).toHaveCount(0);
 
   await page.goto("/processos/novo");
