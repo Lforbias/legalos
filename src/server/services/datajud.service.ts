@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { mfaKey, encryptSecret, decryptSecret } from "@/lib/security/totp";
-import { testDatajudKey } from "@/lib/datajud/client";
+import { DatajudError, testDatajudKey } from "@/lib/datajud/client";
 import { db } from "@/lib/db/client";
 import { datajudAlias, datajudApiKey, fetchDatajud, movementKey, type DatajudResult } from "@/lib/datajud/client";
 import { ConflictError, ValidationError } from "@/lib/permissions/check";
@@ -8,13 +8,15 @@ import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertCaseVisible } from "./case.service";
 
-export type DatajudStatus = { keyConfigured: boolean; orgEnabled: boolean; ownKey: boolean; vaultAvailable: boolean };
+export type DatajudStatus = { keyConfigured: boolean; orgEnabled: boolean; ownKey: boolean; vaultAvailable: boolean; lastTest: { at: Date; ok: boolean; reason: string | null } | null };
 export type DatajudSyncResult = { alias: string; found: boolean; total: number; imported: number; classe: string | null; orgaoJulgador: string | null };
 
 export async function datajudStatus(ctx: TenantContext): Promise<DatajudStatus> {
   assertCan(ctx, "cases:read");
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { datajudEnabled: true, datajudApiKeyEnc: true } });
-  return { keyConfigured: Boolean(org?.datajudApiKeyEnc || datajudApiKey()), orgEnabled: Boolean(org?.datajudEnabled), ownKey: Boolean(org?.datajudApiKeyEnc), vaultAvailable: Boolean(mfaKey()) };
+  const check = await db.auditLog.findFirst({ where: { organizationId: ctx.organizationId, resourceId: ctx.organizationId, action: { in: ["datajud.connection_test", "datajud.connection_test_failed", "datajud.key_saved"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { action: true, createdAt: true, metadata: true } });
+  const reason = check?.metadata && typeof check.metadata === "object" && !Array.isArray(check.metadata) && typeof check.metadata.reason === "string" ? check.metadata.reason : null;
+  return { keyConfigured: Boolean(org?.datajudApiKeyEnc || datajudApiKey()), orgEnabled: Boolean(org?.datajudEnabled), ownKey: Boolean(org?.datajudApiKeyEnc), vaultAvailable: Boolean(mfaKey()), lastTest: check && check.action !== "datajud.key_saved" ? { at: check.createdAt, ok: check.action === "datajud.connection_test", reason } : null };
 }
 
 /** Liga/desliga a consulta ao DataJud (o número do processo é enviado ao CNJ). Exige `integrations:manage`. */
@@ -37,7 +39,13 @@ export async function syncCaseFromDatajud(ctx: TenantContext, caseId: string, fe
   if (!c.number) throw new ValidationError("Informe o número CNJ do processo para consultar o DataJud.");
   if (!datajudAlias(c.number)) throw new ValidationError("Este tribunal não é coberto pelo DataJud.");
 
-  const r = await (fetcher ? fetcher(c.number) : fetchDatajud(c.number, key));
+  let r: DatajudResult;
+  try { r = await (fetcher ? fetcher(c.number) : fetchDatajud(c.number, key)); }
+  catch (e) {
+    if (!(e instanceof DatajudError)) throw e;
+    await audit({ action: "datajud.sync_failed", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: caseId, metadata: { reason: e.code }, meta: ctx.meta });
+    throw new ConflictError(e.message);
+  }
   let imported = 0;
   if (r.found && r.movements.length) {
     const rows = r.movements.map((m) => ({
@@ -83,6 +91,11 @@ export async function testOrgDatajud(ctx: TenantContext, test: (key: string) => 
   assertCan(ctx, "integrations:manage");
   const key = await orgDatajudKey(ctx);
   if (!key) throw new ConflictError("Cadastre uma chave do DataJud antes de testar.");
-  await test(key);
+  try { await test(key); }
+  catch (e) {
+    if (!(e instanceof DatajudError)) throw e;
+    await audit({ action: "datajud.connection_test_failed", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "organization", resourceId: ctx.organizationId, metadata: { reason: e.code }, meta: ctx.meta });
+    throw new ConflictError(e.message);
+  }
   await audit({ action: "datajud.connection_test", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "organization", resourceId: ctx.organizationId, meta: ctx.meta });
 }

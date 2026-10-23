@@ -49,7 +49,7 @@ export function DatajudKeyForm({ ownKey, vaultAvailable, configured }: { ownKey:
       <label className="min-w-60 flex-1 text-sm">Chave pública do DataJud<Input type="password" value={key} onChange={e => setKey(e.target.value)} autoComplete="off" maxLength={600} disabled={!vaultAvailable || pending} placeholder={ownKey ? "Guardada; preencha apenas para trocar" : "Cole a APIKey do CNJ"} /></label>
       <Button type="submit" loading={pending} disabled={!vaultAvailable || !key.trim()}>Guardar chave DataJud</Button>
       <Button type="button" variant="secondary" disabled={!configured} loading={pending} onClick={() => start(async () => {
-        const r = await testDatajudAction(); setOk(r.ok); setMessage(r.ok ? "Conexão DataJud validada: autenticação aceita pelo CNJ." : r.message ?? "Falha no teste.");
+        const r = await testDatajudAction(); setOk(r.ok); setMessage(r.ok ? "Conexão DataJud validada: autenticação aceita pelo CNJ." : r.message ?? "Falha no teste."); router.refresh();
       })}>Testar DataJud</Button>
     </form>
     <p className="text-xs text-muted">{ownKey ? "Chave do escritório guardada com cifra; nunca é exibida de novo." : "A chave cadastrada aqui vale para este escritório; sem ela, usa a configuração do servidor."} {!vaultAvailable ? "A cifra precisa ser configurada no servidor para guardar uma chave." : ""}</p>

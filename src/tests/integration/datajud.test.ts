@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db/client";
-import type { DatajudResult } from "@/lib/datajud/client";
+import { DatajudError, type DatajudResult } from "@/lib/datajud/client";
 import { computeCnjCheck } from "@/lib/validation/br-documents";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { createCase } from "@/server/services/case.service";
@@ -101,6 +101,19 @@ describe("DataJud (Fase 8c) — HTTP simulado SÓ nos testes", () => {
       if (previousMfa === undefined) delete process.env.MFA_ENCRYPTION_KEY;
       else process.env.MFA_ENCRYPTION_KEY = previousMfa;
     }
+  });
+
+  it("falhas de conexão chegam como conflito, ficam registradas e não marcam sincronização como concluída", async () => {
+    process.env.DATAJUD_API_KEY = "chave-teste";
+    const c = await createCase(A.ctx, { ...caseBase, title: "Falha DataJud", number: mkCnj("0009876") });
+    await expect(testOrgDatajud(A.ctx, async () => { throw new DatajudError("O DataJud não respondeu em até 30 segundos.", "TIMEOUT"); })).rejects.toBeInstanceOf(ConflictError);
+    expect((await datajudStatus(A.ctx)).lastTest).toMatchObject({ ok: false, reason: "TIMEOUT" });
+    await expect(syncCaseFromDatajud(A.ctx, c.id, async () => { throw new DatajudError("O DataJud está indisponível.", "UNAVAILABLE"); })).rejects.toBeInstanceOf(ConflictError);
+    expect((await db.case.findUniqueOrThrow({ where: { id: c.id } })).datajudSyncedAt).toBeNull();
+    expect(await db.caseEvent.count({ where: { caseId: c.id, kind: "DATAJUD_MOVEMENT" } })).toBe(0);
+    expect(await db.auditLog.count({ where: { organizationId: A.org.id, action: "datajud.sync_failed", resourceId: c.id } })).toBe(1);
+    await testOrgDatajud(A.ctx, async () => {});
+    expect((await datajudStatus(A.ctx)).lastTest?.ok).toBe(true);
   });
 
 });
