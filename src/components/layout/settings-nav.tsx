@@ -1,29 +1,12 @@
 "use client";
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { cn } from "@/lib/utils";
-
-export function SettingsNav({ items }: { items: { href: string; label: string }[] }) {
+import { ArrowLeft } from "lucide-react";
+import { SETTINGS_GROUPS, type SettingsItem } from "@/config/settings";
+export function SettingsNav({ items }: { items: SettingsItem[] }) {
   const pathname = usePathname();
-  return (
-    <nav aria-label="Configurações" className="mb-5 flex gap-1 overflow-x-auto border-b border-border">
-      {items.map((i) => {
-        const active = pathname === i.href;
-        return (
-          <Link
-            key={i.href}
-            href={i.href}
-            aria-current={active ? "page" : undefined}
-            className={cn(
-              "-mb-px whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors",
-              active ? "border-primary text-fg" : "border-transparent text-muted hover:text-fg",
-            )}
-          >
-            {i.label}
-          </Link>
-        );
-      })}
-    </nav>
-  );
+  if (pathname === "/configuracoes") return null;
+  const current = items.find(i => i.href === pathname);
+  const group = SETTINGS_GROUPS.find(g => g.key === current?.group);
+  return <nav aria-label="Configurações" className="mb-5 flex flex-wrap items-center gap-2 text-xs text-muted"><Link href="/configuracoes" className="inline-flex items-center gap-1.5 rounded-md py-2 pr-2 hover:text-fg"><ArrowLeft className="h-3.5 w-3.5" aria-hidden />Todas as configurações</Link>{group ? <><span aria-hidden>/</span><span>{group.title}</span><span aria-hidden>/</span><span aria-current="page" className="text-fg">{current?.label}</span></> : null}</nav>;
 }

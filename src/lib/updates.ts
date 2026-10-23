@@ -9,6 +9,7 @@ export type Release = { id: string; when: string; title: string; items: string[]
 
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
+  { id: "workspace-ux-rute", when: "2026-10-23", title: "Navegação organizada e RUTE no canto da tela", items: ["RUTE em botão discreto que abre uma conversa em painel, com histórico pessoal, nova conversa e fechamento por Escape; mantém a página e o rascunho durante a navegação interna. A IA continua dependendo do provedor e das permissões já configurados.", "Menu lateral separa atalhos do dia a dia de Gestão, Ferramentas e Relacionamento; conexões do Box ficam agrupadas. Configurações permanecem no rodapé.", "Configurações com busca e cinco grupos por assunto. Dados do escritório, plano/cobrança e segurança agora têm páginas próprias, sem a antiga faixa de abas."] },
   { id: "datajud-diagnostico", when: "2026-10-23", title: "DataJud: falhas identificadas e último teste visível", items: ["Testes e consultas distinguem tempo esgotado, rede, acesso recusado, limite de consultas e respostas inválidas/incompletas. A tela mostra o último teste e diferencia habilitação de disponibilidade. Falhas não registram sincronização concluída nem importam respostas parciais. Consultas MNI usam os namespaces dos parâmetros declarados no contrato público do TJPR; acesso real continua sujeito às permissões do tribunal."] },
   {
     id: "autos-fila-box-fluxo", when: "2026-10-23", title: "Autos em fila e validação do ciclo da BOX", migration: "20261222000000_autos_queue",

@@ -39,6 +39,7 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   await expect(page.getByText("Membros ativos")).toBeVisible();
   await expect(page.getByText("Profissional").first()).toBeVisible();
   // todos os módulos do menu estão implementados: Relatórios abre a tela real
+  await page.getByRole("button", { name: "Gestão do escritório", exact: true }).click();
   await page.getByRole("link", { name: /Relatórios e BI/ }).first().click();
   await expect(page.getByRole("heading", { name: "Relatórios e BI" })).toBeVisible();
 

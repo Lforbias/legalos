@@ -158,3 +158,15 @@ export async function deleteInstructionAction(id: string): Promise<ActionState> 
     return undefined;
   });
 }
+
+/** Painel flutuante: consulta só conversas da pessoa no escritório atual. */
+export async function assistantPanelAction(conversationId?: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { assistantAvailability, listConversations, getConversation } = await import("@/server/services/rute-assistant.service");
+    const availability = await assistantAvailability(ctx);
+    const conversations = await listConversations(ctx);
+    const conversation = conversationId ? await getConversation(ctx, parse(uuidSchema, conversationId)) : null;
+    return { availability, conversations: conversations.map(c => ({ id: c.id, title: c.title })), conversation: conversation ? { id: conversation.id, caseId: conversation.caseId, clientId: conversation.clientId, messages: conversation.messages.map(m => ({ id: m.id, role: m.role, content: m.content, refs: m.refs })) } : null };
+  });
+}
