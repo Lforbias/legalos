@@ -54,7 +54,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
 
   // Resposta rápida.
   await page.getByLabel("Atalho").fill("boas-vindas");
-  await page.getByLabel("Título").fill("Boas-vindas");
+  await page.locator("#qr-ti").fill("Boas-vindas");
   await page.getByLabel("Texto", { exact: true }).fill("Olá! Como podemos ajudar?");
   await page.getByRole("button", { name: "Adicionar resposta rápida" }).click();
   await expect(page.getByText("/boas-vindas — Boas-vindas")).toBeVisible();

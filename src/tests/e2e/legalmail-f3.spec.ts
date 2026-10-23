@@ -52,10 +52,11 @@ test("3.0-F3: timbrado com logo, novas variáveis e prévia em PDF antes de gera
   await page.getByLabel("Modelo", { exact: true }).selectOption({ label: `Modelo ${id}` });
   await page.getByLabel("Processo", { exact: true }).selectOption({ label: `Caso ${id}` });
   await expect(page.getByLabel("Timbrado")).toContainText(`Padrão (Oficial ${id})`);
+  const previewReq = page.context().waitForEvent("request", { predicate: (r) => r.url().includes("/api/templates/preview"), timeout: 15000 });
   const popupPromise = page.waitForEvent("popup");
   await page.getByRole("button", { name: "Pré-visualizar em PDF" }).click();
-  const popup = await popupPromise;
-  expect(popup.url()).toContain("/api/templates/preview");
+  await popupPromise;
+  expect((await previewReq).url()).toContain("/api/templates/preview");
 
   const tplId = await page.getByLabel("Modelo", { exact: true }).inputValue();
   const caseId = await page.getByLabel("Processo", { exact: true }).inputValue();

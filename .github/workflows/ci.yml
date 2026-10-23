@@ -24,6 +24,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
+      - name: Instalar OCR e leitura de PDF (testes da Fase 8b)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-por tesseract-ocr-eng poppler-utils
       - run: npm ci --legacy-peer-deps
       - run: npm run typecheck
       - run: npm run lint
