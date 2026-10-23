@@ -49,6 +49,8 @@ export function __setAiProviderForTests(p: AiProvider | null | undefined) {
   override = p;
 }
 
+export function aiProviderOverride() { return override; }
+
 /** Provedor configurado por ambiente, ou `null` quando não há chave (o recurso fica desligado, sem respostas falsas). */
 export function getAiProvider(): AiProvider | null {
   if (override !== undefined) return override;

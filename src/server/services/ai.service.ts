@@ -1,6 +1,7 @@
+import { officeAiProvider } from "./office-ai-provider.service";
 import { db } from "@/lib/db/client";
 import { assertAiAllowed, effectiveAiLimit, getEntitlements } from "./plan.service";
-import { aiMonthlyTokenLimit, AiProviderError, getAiProvider } from "@/lib/ai/provider";
+import { aiMonthlyTokenLimit, AiProviderError } from "@/lib/ai/provider";
 import { dateToYmd } from "@/lib/dates/ymd";
 import { ConflictError, ValidationError } from "@/lib/permissions/check";
 import { assertCan, can, type TenantContext } from "@/server/context";
@@ -25,7 +26,7 @@ async function usedTokens(organizationId: string): Promise<number> {
 export async function aiStatus(ctx: TenantContext): Promise<AiStatus> {
   assertCan(ctx, "ai:use");
   const [org, used, ent] = await Promise.all([db.organization.findUnique({ where: { id: ctx.organizationId }, select: { aiEnabled: true } }), usedTokens(ctx.organizationId), getEntitlements(ctx.organizationId)]);
-  const provider = getAiProvider();
+  const provider = await officeAiProvider(ctx.organizationId);
   return { providerConfigured: Boolean(provider), orgEnabled: Boolean(org?.aiEnabled), model: provider?.model ?? null, usedThisMonth: used, monthlyLimit: effectiveAiLimit(ent.limits.maxAiTokensMonth, aiMonthlyTokenLimit()) };
 }
 
@@ -102,7 +103,7 @@ export async function askAboutCase(ctx: TenantContext, caseId: string, rawQuesti
   if (question.length < 5) throw new ValidationError("Escreva a pergunta com pelo menos 5 caracteres.", { question: ["Escreva a pergunta com pelo menos 5 caracteres."] });
   if (question.length > 2000) throw new ValidationError("A pergunta pode ter no máximo 2.000 caracteres.", { question: ["Máximo de 2.000 caracteres."] });
 
-  const provider = getAiProvider();
+  const provider = await officeAiProvider(ctx.organizationId);
   if (!provider) throw new ConflictError("O assistente de IA não está configurado neste sistema (falta a chave do provedor).");
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { aiEnabled: true } });
   if (!org?.aiEnabled) throw new ConflictError("O assistente de IA está desligado neste escritório. Peça a quem administra as integrações para ligá-lo.");

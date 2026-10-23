@@ -1,13 +1,14 @@
 "use client";
 
+import { ProviderForm } from "./provider-form";
 import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Field, Input, Textarea } from "@/components/ui/form";
 import { useRun } from "@/modules/kanban/use-run";
 import {
-  approveProposalAction, createMcpKeyAction, rejectProposalAction, revokeConnectionAction, setEmergencyStopAction, setFeatureAction, setProviderAction, testMcpAction, updateProposalAction,
+  approveProposalAction, createMcpKeyAction, rejectProposalAction, revokeConnectionAction, setEmergencyStopAction, setFeatureAction, testMcpAction, updateProposalAction,
 } from "./actions";
 
 // ----------------------------------------------------------------- Situação
@@ -42,8 +43,6 @@ function FeatureRow({ feature, label, hint, on, needConsent, disabled }: { featu
 
 export function SettingsPanel({ s, canManage }: { s: SettingsView; canManage: boolean }) {
   const stop = useRun();
-  const prov = useRun();
-  const [clear, setClear] = React.useState(false);
   return (
     <div className="space-y-4">
       {s.emergencyStop ? <Alert tone="error">PARADA DE EMERGÊNCIA ATIVA: conexões externas, assistente e novas propostas estão bloqueados.</Alert> : null}
@@ -54,27 +53,7 @@ export function SettingsPanel({ s, canManage }: { s: SettingsView; canManage: bo
       </div>
       {canManage ? (
         <>
-          <form
-            className="space-y-3 rounded-md border border-border p-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              prov.run(() => setProviderAction({ provider: String(fd.get("provider")), model: String(fd.get("model") ?? ""), apiKey: String(fd.get("apiKey") ?? "") || undefined, clearKey: clear }), "Salvo.");
-              e.currentTarget.reset();
-              setClear(false);
-            }}
-          >
-            <p className="text-sm font-medium">IA do assistente embutido</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Provedor" htmlFor="rp-p"><Select id="rp-p" name="provider" defaultValue={s.provider}><option value="ANTHROPIC">Claude (Anthropic)</option><option value="GEMINI">Gemini (Google)</option><option value="OPENAI">OpenAI</option></Select></Field>
-              <Field label="Modelo (opcional)" htmlFor="rp-m" hint="Vazio = modelo padrão."><Input id="rp-m" name="model" defaultValue={s.model ?? ""} maxLength={80} /></Field>
-            </div>
-            <Field label="Chave de API do escritório (opcional)" htmlFor="rp-k" hint={s.hasOfficeKey ? "Já há uma chave salva (cifrada). Preencha só para trocar." : "Sem chave própria, usa a chave do sistema, se existir. Fica cifrada e nunca é mostrada de volta."}><Input id="rp-k" name="apiKey" type="password" autoComplete="off" maxLength={300} /></Field>
-            {s.hasOfficeKey ? <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={clear} onChange={(e) => setClear(e.target.checked)} />Remover a chave salva</label> : null}
-            {prov.error ? <Alert tone="error">{prov.error}</Alert> : null}
-            {prov.done ? <Alert tone="success">{prov.done}</Alert> : null}
-            <Button type="submit" size="sm" loading={prov.pending}>Salvar</Button>
-          </form>
+          <ProviderForm provider={s.provider} model={s.model} hasOfficeKey={s.hasOfficeKey} />
           <div className="space-y-2 rounded-md border border-danger/40 p-3">
             <p className="text-sm font-medium">Parada de emergência</p>
             <p className="text-xs text-muted">Corta na hora as conexões externas, o assistente e as novas propostas. Propostas já feitas continuam podendo ser decididas por pessoas.</p>

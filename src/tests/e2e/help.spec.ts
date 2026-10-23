@@ -1,3 +1,4 @@
+import { HELP_GUIDES } from "../../modules/help/guides";
 import { expect, test } from "@playwright/test";
 
 test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", async ({ page }) => {
@@ -19,11 +20,17 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await expect(page.getByRole("heading", { name: /Preparar o escritório/ })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("");
   await page.getByRole("button", { name: "RUTE", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText("1 guia encontrado");
+  await expect(page.getByRole("status")).toHaveText(`${HELP_GUIDES.filter(g => g.area === "RUTE").length} guias encontrados`);
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("zzzinexistente");
   await expect(page.getByText("Nenhum guia encontrado", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Limpar busca e filtros" }).click();
-  await expect(page.getByRole("status")).toHaveText("11 guias encontrados");
+  await expect(page.getByRole("status")).toHaveText(`${HELP_GUIDES.length} guias encontrados`);
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("salvar gemini");
+  await expect(page.getByRole("heading", { name: /Configurar Gemini/ })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("");
+  await expect(page.getByRole("button", { name: /Mostrar mais guias/ })).toBeVisible();
+  await page.getByRole("button", { name: /Mostrar mais guias/ }).click();
+  await expect(page.getByRole("heading", { name: /Importar processos por número CNJ/ })).toBeVisible();
   await page.getByRole("button", { name: "Ajuda e suporte", exact: true }).click();
   await page.getByRole("menuitem", { name: "Central de ajuda", exact: true }).click();
   await expect(page).toHaveURL(/\/ajuda$/);

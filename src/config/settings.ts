@@ -22,7 +22,7 @@ export const SETTINGS_ITEMS: SettingsItem[] = [
   { href: "/configuracoes/tribunais", label: "Sistemas dos tribunais", description: "Defina o sistema utilizado em cada tribunal.", group: "connections", permission: "integrations:manage" },
   { href: "/certificados", label: "Certificados digitais", description: "Certificados A1 e autorizações de uso.", group: "connections", permission: "certificates:manage" },
   { href: "/atendimento/configuracoes", label: "Configurar o Chat", description: "WhatsApp, expediente e respostas rápidas.", group: "connections", permission: "whatsapp:manage" },
-  { href: "/ia", label: "IA do escritório", description: "Permissão de uso, provedor e perguntas sobre processos.", group: "connections", permission: "ai:use" },
+  { href: "/configuracoes/ia", label: "IA do escritório", description: "Permissão de uso, provedor e perguntas sobre processos.", group: "connections", permission: "ai:use" },
   { href: "/rute?aba=situacao", label: "RUTE e inteligência artificial", description: "Ativação, provedor, conexões e instruções da assistente.", group: "connections", permission: "ai:use" },
   { href: "/configuracoes/seguranca", label: "Segurança", description: "Verificação em duas etapas, sessões e restrições de acesso.", group: "security", permission: "organization:manage" },
   { href: "/configuracoes/auditoria", label: "Auditoria", description: "Histórico das ações feitas no escritório.", group: "security", permission: "audit:read" },

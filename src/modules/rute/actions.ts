@@ -14,7 +14,7 @@ import { setAssistantProvider, setEmergencyStop, setGovernance, setRuteFeature }
 import { callTool, toolList } from "@/server/services/rute-tools.service";
 import { requireTenant } from "@/server/session";
 
-const done = () => revalidatePath("/rute");
+const done = () => { revalidatePath("/rute"); revalidatePath("/configuracoes/ia"); revalidatePath("/ia"); };
 
 export async function setFeatureAction(input: { feature: string; on: boolean; consent?: boolean }): Promise<ActionState> {
   return runAction(async () => {
@@ -168,5 +168,25 @@ export async function assistantPanelAction(conversationId?: string) {
     const conversations = await listConversations(ctx);
     const conversation = conversationId ? await getConversation(ctx, parse(uuidSchema, conversationId)) : null;
     return { availability, conversations: conversations.map(c => ({ id: c.id, title: c.title })), conversation: conversation ? { id: conversation.id, caseId: conversation.caseId, clientId: conversation.clientId, messages: conversation.messages.map(m => ({ id: m.id, role: m.role, content: m.content, refs: m.refs })) } : null };
+  });
+}
+
+export async function testProviderAction(): Promise<ActionState<{ model: string }>> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { assertCan } = await import("@/server/context");
+    assertCan(ctx, "integrations:manage");
+    const { officeToolProvider } = await import("@/server/services/office-ai-provider.service");
+    const { ConflictError } = await import("@/lib/permissions/check");
+    const { AiProviderError } = await import("@/lib/ai/provider");
+    const provider = await officeToolProvider(ctx.organizationId);
+    if (!provider) throw new ConflictError("Salve a chave do provedor antes de testar.");
+    try {
+      const r = await provider.run({ system: "Teste de conexão. Responda somente OK.", history: [{ role: "user", text: "OK" }], tools: [], runTool: async () => "", maxTokens: 64, maxSteps: 1 });
+      return { model: r.model };
+    } catch (e) {
+      if (e instanceof AiProviderError) throw new ConflictError(e.message);
+      throw e;
+    }
   });
 }

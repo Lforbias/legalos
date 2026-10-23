@@ -1,7 +1,8 @@
+import { officeToolProvider } from "./office-ai-provider.service";
 import { db } from "@/lib/db/client";
 import { maskSensitive } from "@/lib/ai/mask";
 import { aiMonthlyTokenLimit, AiProviderError } from "@/lib/ai/provider";
-import { buildToolChat, toolChatOverride, type ChatTurn, type ToolChatProvider } from "@/lib/ai/tool-chat";
+import { toolChatOverride, type ChatTurn, type ToolChatProvider } from "@/lib/ai/tool-chat";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
@@ -9,14 +10,14 @@ import { assertCaseVisible } from "./case.service";
 import { assertModule } from "./org-security.service";
 import { assertAiAllowed } from "./plan.service";
 import { stripUnverifiedCitations } from "./ai-tools.service";
-import { assertRuteOn, DEFAULT_MODELS, getRuteSettings, officeProviderKey, type ProviderKey } from "./rute-settings.service";
+import { assertRuteOn, getRuteSettings } from "./rute-settings.service";
 import { callTool, toolList } from "./rute-tools.service";
 
 /**
  * 6.0-F5 — assistente embutido (RUTE). Age COMO A PESSOA que conversa: mesmas permissões e sigilo (as ferramentas conferem).
  * Só lê e propõe. CPF/CNPJ/e-mail são ocultados antes de sair. Conversas são privadas de quem as criou e expiram pela retenção do escritório.
  */
-const ENV_KEY: Record<ProviderKey, string> = { ANTHROPIC: "ANTHROPIC_API_KEY", GEMINI: "GEMINI_API_KEY", OPENAI: "OPENAI_API_KEY" };
+
 const MAX_TEXT = 4000;
 const MAX_MESSAGES = 200;
 const MAX_CONVERSATIONS = 100;
@@ -34,12 +35,9 @@ Regras obrigatórias:
 async function resolveProvider(orgId: string): Promise<ToolChatProvider> {
   const forced = toolChatOverride();
   if (forced) return forced;
-  const s = await db.ruteSettings.findUnique({ where: { organizationId: orgId }, select: { provider: true, model: true } });
-  const provider = (s?.provider ?? "ANTHROPIC") as ProviderKey;
-  const key = (await officeProviderKey(orgId)) ?? process.env[ENV_KEY[provider]]?.trim();
-  if (!key) throw new ConflictError("O assistente não tem chave de IA configurada. Quem administra as integrações informa a chave em RUTE → Situação, ou o sistema precisa ter a chave do provedor.");
-  const model = s?.model || (provider === "ANTHROPIC" ? process.env.AI_MODEL?.trim() || DEFAULT_MODELS.ANTHROPIC : DEFAULT_MODELS[provider]);
-  return buildToolChat(provider, key, model);
+  const provider = await officeToolProvider(orgId);
+  if (!provider) throw new ConflictError("O assistente não tem chave de IA configurada. Abra Configurações → IA para cadastrar o provedor.");
+  return provider;
 }
 
 export async function assistantAvailability(ctx: TenantContext): Promise<{ available: boolean; reason: string | null }> {

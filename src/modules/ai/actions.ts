@@ -20,6 +20,8 @@ export async function setAiEnabledAction(enabled: boolean): Promise<ActionState>
     const { ctx } = await requireTenant();
     await setOrgAiEnabled(ctx, parse(z.boolean(), enabled));
     revalidatePath("/ia");
+    revalidatePath("/configuracoes/ia");
+    revalidatePath("/rute");
     return undefined;
   });
 }
