@@ -50,8 +50,8 @@ export function Sidebar({
     { key: "relationship", label: "Relacionamento", icon: MessagesSquare, keys: ["portal", "portal-team"] },
   ] : space === "box" ? [{ key: "connections", label: "Conexões", icon: Plug, keys: ["certificates", "integrations", "monitoring", "prototypes"] }] : [{ key: "tools", label: "Ferramentas", icon: Wrench, keys: ["prototypes"] }];
   const groupedKeys = new Set(groups.flatMap(g => g.keys));
-  const primary = items.filter(i => i.key !== "settings" && !groupedKeys.has(i.key));
-  const settings = items.find(i => i.key === "settings");
+  const primary = items.filter(i => i.key !== "settings" && i.key !== "help" && !groupedKeys.has(i.key));
+  const footer = items.filter(i => i.key === "help" || i.key === "settings");
 
   const switcher = (isCollapsed: boolean) =>
     spaces.length > 1 ? (
@@ -135,7 +135,7 @@ export function Sidebar({
         {switcher(collapsed)}
         {nav(collapsed)}
         <div className="border-t border-border p-2">
-          {settings ? <nav aria-label="Ajustes do sistema">{links([settings], collapsed)}</nav> : null}
+          <nav aria-label="Ajustes do sistema">{links(footer, collapsed)}</nav>
           <button
             type="button"
             onClick={toggle}
@@ -160,7 +160,7 @@ export function Sidebar({
             </div>
             {switcher(false)}
             {nav(false, true)}
-            {settings ? <div className="border-t border-border p-2">{links([settings], false)}</div> : null}
+            <div className="border-t border-border p-2">{links(footer, false)}</div>
           </aside>
         </div>
       ) : null}

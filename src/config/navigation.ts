@@ -1,4 +1,5 @@
 import {
+  CircleHelp,
   BarChart3,
   Bell,
   Bot,
@@ -93,6 +94,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "integrations", space: "box", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "Consulta DataJud/CNJ (opt-in); e-mail e calendários em etapa futura." },
   { key: "monitoring", space: "box", label: "Monitoramento", href: "/monitoramento", icon: Activity, permission: "integrations:manage", phase: 10, implemented: true, summary: "Saúde da captura de intimações (DJEN e PJe/MNI): última execução, erros e fontes paradas." },
   { key: "prototypes", space: "both", label: "Protótipos", href: "/prototipos", icon: FlaskConical, phase: 0, implemented: true, summary: "Telas só visuais das próximas versões (visível só com LEGALOS_PROTOTYPES=1)." },
+  { key: "help", space: "both", label: "Ajuda", href: "/ajuda", icon: CircleHelp, phase: 1, implemented: true, summary: "Primeiros passos, guias de uso e caminhos da plataforma." },
   { key: "settings", space: "both", label: "Configurações", href: "/configuracoes", icon: Settings, phase: 1, implemented: true, summary: "Escritório, equipe, perfis e auditoria." },
 ];
 

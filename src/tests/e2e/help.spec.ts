@@ -1,0 +1,38 @@
+import { expect, test } from "@playwright/test";
+
+test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", async ({ page }) => {
+  const id = Math.random().toString(36).slice(2, 9);
+  await page.goto("/register");
+  await page.getByLabel("Nome completo").fill(`Pessoa Ajuda ${id}`);
+  await page.getByLabel("E-mail").fill(`help-${id}@example.test`);
+  await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
+  await page.getByRole("button", { name: "Criar conta", exact: true }).click();
+  await page.getByLabel("Nome do escritório").fill(`Escritório Ajuda ${id}`);
+  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  const footer = page.getByRole("navigation", { name: "Ajustes do sistema" });
+  await footer.getByRole("link", { name: "Ajuda", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Como podemos ajudar?" })).toBeVisible();
+  await page.locator("summary").filter({ hasText: "Preparar o escritório" }).click();
+  await expect(page.getByRole("link", { name: "Cadastrar clientes", exact: true })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("intimação");
+  await expect(page.getByRole("heading", { name: /Tratar uma intimação/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Preparar o escritório/ })).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("");
+  await page.getByRole("button", { name: "RUTE", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText("1 guia encontrado");
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("zzzinexistente");
+  await expect(page.getByText("Nenhum guia encontrado", { exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Limpar busca e filtros" }).click();
+  await expect(page.getByRole("status")).toHaveText("11 guias encontrados");
+  await page.goto("/box");
+  await footer.getByRole("link", { name: "Ajuda", exact: true }).click();
+  await expect(page).toHaveURL(/\/ajuda$/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("certificado");
+  await expect(page.getByRole("link", { name: "Ver certificados", exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: "/tmp/legalos-help-mobile.png", fullPage: true });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("");
+  await page.screenshot({ path: "/tmp/legalos-help-desktop.png", fullPage: true });
+});
