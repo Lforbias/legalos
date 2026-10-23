@@ -18,6 +18,7 @@ describe("troca de chaves de cifra (rotate-keys)", () => {
 
   beforeAll(async () => {
     // A troca de chaves é global (todos os segredos do banco). Limpa segredos deixados por outros testes, cifrados com outras chaves.
+    await db.organization.updateMany({ data: { datajudApiKeyEnc: null } });
     await db.webhookEndpoint.deleteMany({});
     await db.userMfa.deleteMany({});
     await db.courtConnection.deleteMany({});
@@ -26,6 +27,7 @@ describe("troca de chaves de cifra (rotate-keys)", () => {
     await db.courtCredential.deleteMany({});
     await db.whatsappAccount.deleteMany({});
     A = await makeOrgWithOwner("rot");
+    await db.organization.update({ where: { id: A.org.id }, data: { datajudApiKeyEnc: encryptSecret("DATAJUD-FICTICIO", oldMfa) } });
     await db.userMfa.create({ data: { userId: A.owner.id, secretEnc: encryptSecret("SEGREDO2FA", oldMfa), enabledAt: new Date() } as never });
     hookId = (await db.webhookEndpoint.create({ data: { organizationId: A.org.id, name: "h", url: "https://example.test/h", secretEnc: encryptSecret("segredo-webhook", oldMfa), events: ["x"] } as never })).id;
     certId = (await db.certificate.create({ data: { organizationId: A.org.id, ownerUserId: A.owner.id, label: "c", subjectCn: "x", serialNumber: "1", fingerprintSha256: `fp-rot-${A.org.id}`, notBefore: new Date(Date.now() - 1000), notAfter: new Date(Date.now() + 86_400_000), pfxEnc: sealBytes(Buffer.from("PFX-BYTES"), oldCert), passEnc: sealBytes(Buffer.from("senha"), oldCert) } })).id;
@@ -39,6 +41,7 @@ describe("troca de chaves de cifra (rotate-keys)", () => {
     const r = await rotateKeys(db, { mfa: { old: oldMfa, next: newMfa }, cert: { old: oldCert, next: newCert } }, { apply: false });
     expect(r.applied).toBe(false);
     expect(r.mfa!.userMfa).toBeGreaterThanOrEqual(1);
+    expect(r.mfa!.datajud).toBe(1);
     expect((await db.certificate.findUniqueOrThrow({ where: { id: certId } })).pfxEnc).toBe(before.pfxEnc);
   });
 
@@ -51,6 +54,9 @@ describe("troca de chaves de cifra (rotate-keys)", () => {
   it("aplica: tudo passa a abrir só com as chaves novas e o conteúdo é o mesmo", async () => {
     const r = await rotateKeys(db, { mfa: { old: oldMfa, next: newMfa }, cert: { old: oldCert, next: newCert } }, { apply: true });
     expect(r.applied).toBe(true);
+    const orgKey = (await db.organization.findUniqueOrThrow({ where: { id: A.org.id } })).datajudApiKeyEnc!;
+    expect(decryptSecret(orgKey, newMfa)).toBe("DATAJUD-FICTICIO");
+    expect(() => decryptSecret(orgKey, oldMfa)).toThrow();
     const mfa = await db.userMfa.findUniqueOrThrow({ where: { userId: A.owner.id } });
     expect(decryptSecret(mfa.secretEnc, newMfa)).toBe("SEGREDO2FA");
     expect(() => decryptSecret(mfa.secretEnc, oldMfa)).toThrow();

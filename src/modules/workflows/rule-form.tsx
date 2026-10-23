@@ -1,5 +1,6 @@
 "use client";
 
+import { CONDITION_FIELDS, EMPTY_CONDITIONS } from "./conditions";
 import { useRouter } from "next/navigation";
 import { fieldError, useServerForm } from "@/components/forms/use-server-form";
 import { Alert } from "@/components/ui/alert";
@@ -13,13 +14,13 @@ export function RuleForm({ ruleId, initial, members }: { ruleId?: string; initia
   const router = useRouter();
   const { form, submit, pending, message } = useServerForm<RuleInput, { id: string }>({
     schema: ruleSchema,
-    defaultValues: initial,
+    defaultValues: { ...initial, conditions: initial.conditions ?? EMPTY_CONDITIONS, noticeAssigneeId: initial.noticeAssigneeId ?? "", noticeTags: initial.noticeTags ?? "" },
     action: async (v) => {
       if (ruleId) {
-        const res = await updateRuleAction(ruleId, v);
+        const res = await updateRuleAction(ruleId, { ...v, ...(v.trigger !== "NOTICE_RECEIVED" ? { noticeAssigneeId: "", noticeTags: "" } : {}) });
         return res.ok ? { ok: true, data: { id: ruleId } } : { ok: false, message: res.message, fieldErrors: res.fieldErrors };
       }
-      return createRuleAction(v);
+      return createRuleAction({ ...v, ...(v.trigger !== "NOTICE_RECEIVED" ? { noticeAssigneeId: "", noticeTags: "" } : {}) });
     },
     onSuccess: () => {
       router.replace("/automacoes");
@@ -41,7 +42,11 @@ export function RuleForm({ ruleId, initial, members }: { ruleId?: string; initia
           </div>
           <div className="md:col-span-2">
             <Field label="Gatilho" htmlFor="rule-trigger" error={err("trigger")} hint={TRIGGER_HINT[trigger]}>
-              <Select id="rule-trigger" {...form.register("trigger")}>
+              <Select id="rule-trigger" {...form.register("trigger")} onChange={e => {
+                const next = e.target.value as RuleInput["trigger"];
+                form.setValue("trigger", next, { shouldDirty: true });
+                if (next !== "NOTICE_RECEIVED") { form.setValue("noticeAssigneeId", ""); form.setValue("noticeTags", ""); }
+              }}>
                 {WORKFLOW_TRIGGERS.map((t) => (
                   <option key={t} value={t}>{TRIGGER_LABEL[t]}</option>
                 ))}
@@ -90,7 +95,20 @@ export function RuleForm({ ruleId, initial, members }: { ruleId?: string; initia
           </label>
         </CardBody>
       </Card>
-      <Alert tone="info">Esta versão cria apenas <strong>tarefas</strong>. A regra roda uma única vez por item (repetir o gatilho não duplica a tarefa) e nunca impede a ação original.</Alert>
+      <Card><CardBody className="space-y-3">
+        <h2 className="font-medium">Condições</h2>
+        <label className="text-sm">Combinação<Select {...form.register("conditions.mode")}><option value="ALL">E — todas devem ser atendidas</option><option value="ANY">OU — ao menos uma deve ser atendida</option></Select></label>
+        {(form.watch("conditions.items") ?? []).map((_, i) => <div key={i} className="flex flex-wrap gap-2">
+          <label className="text-sm">Campo<Select {...form.register(`conditions.items.${i}.field`)}>{Object.entries(CONDITION_FIELDS).map(([v, label]) => <option key={v} value={v}>{label}</option>)}</Select></label>
+          <label className="text-sm">Comparação<Select {...form.register(`conditions.items.${i}.operator`)}><option value="CONTAINS">Contém</option><option value="EQUALS">Igual a</option><option value="NOT_CONTAINS">Não contém</option></Select></label>
+          <label className="text-sm">Valor<Input maxLength={200} {...form.register(`conditions.items.${i}.value`)} />{form.formState.errors.conditions?.items?.[i]?.value?.message ? <span role="alert" className="block text-xs text-danger">{form.formState.errors.conditions.items[i]?.value?.message}</span> : null}</label>
+          <Button type="button" variant="ghost" onClick={() => form.setValue("conditions.items", (form.getValues("conditions.items") ?? []).filter((_, j) => i !== j))}>Remover condição</Button>
+        </div>)}
+        <Button type="button" variant="secondary" disabled={(form.watch("conditions.items")?.length ?? 0) >= 10} onClick={() => form.setValue("conditions.items", [...(form.getValues("conditions.items") ?? []), { field: "label", operator: "CONTAINS", value: "" }])}>Adicionar condição</Button>
+        <p className="text-xs text-muted">Sem condições, executa para todo item do gatilho. Comparações ignoram maiúsculas e acentos.</p>
+        {trigger === "NOTICE_RECEIVED" ? <><label className="block text-sm">Distribuir intimação para<Select {...form.register("noticeAssigneeId")}><option value="">Preservar distribuição</option>{members.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></label><label className="block text-sm">Adicionar etiquetas à intimação<Input {...form.register("noticeTags")} placeholder="urgente, revisar" /></label></> : null}
+      </CardBody></Card>
+      <Alert tone="info">A regra cria uma <strong>tarefa</strong> e pode distribuir e etiquetar intimações. A regra roda uma única vez por item (repetir o gatilho não duplica a tarefa) e nunca impede a ação original.</Alert>
       <div className="flex gap-2">
         <Button type="submit" loading={pending}>{ruleId ? "Salvar regra" : "Criar regra"}</Button>
         <Button variant="ghost" onClick={() => router.back()} disabled={pending}>Cancelar</Button>

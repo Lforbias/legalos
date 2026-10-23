@@ -83,6 +83,7 @@ export async function importAutosMniAction(caseId: string): Promise<ActionState<
     const id = parse(uuidSchema, caseId);
     const r = await importAutosMni(ctx, id);
     revalidatePath(`/processos/${id}`);
+    revalidatePath(`/processos/${id}/autos`);
     return r;
   });
 }

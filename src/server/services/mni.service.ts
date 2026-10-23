@@ -318,6 +318,7 @@ export async function importAutosMni(ctx: TenantContext, caseId: string, post: S
       }
     }
   } catch (err) {
+    await audit({ action: "mni.import_autos_failed", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: caseId, metadata: { connectionId: connection.id, imported: res.imported }, meta: ctx.meta });
     if (err instanceof MniError) {
       await record(connection.id, false, err.message);
       throw new ConflictError(err.message);

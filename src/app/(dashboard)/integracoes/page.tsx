@@ -13,7 +13,7 @@ import { ConnectionForm, ConnectionList } from "@/modules/mni/mni-ui";
 import { listTribunals } from "@/lib/mni/tribunals";
 import { listCertificates, vaultAvailable } from "@/server/services/certificate.service";
 import { listConnections } from "@/server/services/mni.service";
-import { DatajudToggle } from "@/modules/organizations/datajud-toggle";
+import { DatajudKeyForm, DatajudToggle } from "@/modules/organizations/datajud-toggle";
 import { ApiKeyForm, ApiKeyList } from "@/modules/api-keys/api-keys-ui";
 import { API_SCOPES, listApiKeys } from "@/server/services/apikey.service";
 import { WebhookForm, WebhookList } from "@/modules/webhooks/webhooks-ui";
@@ -63,7 +63,8 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           <CardHeader title="DataJud (CNJ)" action={active ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-3 text-sm">
             <p>Importa os andamentos públicos de um processo a partir do número CNJ (Justiça Estadual, Federal, do Trabalho, Eleitoral, STJ e TST). Só o número do processo é enviado ao CNJ; processos sigilosos nunca são consultados. Cada andamento é importado uma única vez.</p>
-            {!s.keyConfigured ? <Alert tone="warning">Falta a chave pública do DataJud neste sistema (variável DATAJUD_API_KEY). Nada é simulado.</Alert> : null}
+            {!s.keyConfigured ? <Alert tone="warning">Cadastre a chave pública do DataJud abaixo para habilitar a consulta.</Alert> : null}
+            <DatajudKeyForm ownKey={s.ownKey} vaultAvailable={s.vaultAvailable} configured={s.keyConfigured} />
             {s.keyConfigured ? <DatajudToggle enabled={s.orgEnabled} /> : null}
           </CardBody>
         </Card>

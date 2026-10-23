@@ -28,20 +28,21 @@ export default defineConfig({
     { name: "chromium", testIgnore: /whatsapp\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
     { name: "whatsapp", testMatch: /whatsapp\.spec\.ts/, use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${WA_PORT}` } },
   ],
+  // Servidores locais com banco de testes: não herdar a restrição de cadastro da instalação real.
   webServer: [
     {
       command: `npx next start -p ${PORT}`,
       url: `http://localhost:${PORT}/api/health`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { DATABASE_URL: TEST_DB, LEGALOS_PROTOTYPES: "1", LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${PORT}` },
+      env: { REGISTRATION_MODE: "open", DATABASE_URL: TEST_DB, LEGALOS_PROTOTYPES: "1", LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${PORT}` },
     },
     {
       command: `npx next start -p ${WA_PORT}`,
       url: `http://localhost:${WA_PORT}/api/health`,
       reuseExistingServer: false,
       timeout: 60_000,
-      env: { DATABASE_URL: TEST_DB, LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${WA_PORT}`, CERT_ENCRYPTION_KEY: Buffer.alloc(32, 6).toString("base64"), WHATSAPP_APP_SECRET: "segredo-do-app-de-teste", WHATSAPP_VERIFY_TOKEN: "verifica-e2e-0123456789", WHATSAPP_API_URL: "http://127.0.0.1:3199", WHATSAPP_ALLOW_LOCAL: "1", WHATSAPP_QR_FAKE: "1", WHATSAPP_QR_FAKE_SCAN_MS: "1500", WHATSAPP_QR_MIN_GAP_MS: "0", WHATSAPP_QR_DISABLE_RESUME: "1" },
+      env: { REGISTRATION_MODE: "open", DATABASE_URL: TEST_DB, LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${WA_PORT}`, CERT_ENCRYPTION_KEY: Buffer.alloc(32, 6).toString("base64"), WHATSAPP_APP_SECRET: "segredo-do-app-de-teste", WHATSAPP_VERIFY_TOKEN: "verifica-e2e-0123456789", WHATSAPP_API_URL: "http://127.0.0.1:3199", WHATSAPP_ALLOW_LOCAL: "1", WHATSAPP_QR_FAKE: "1", WHATSAPP_QR_FAKE_SCAN_MS: "1500", WHATSAPP_QR_MIN_GAP_MS: "0", WHATSAPP_QR_DISABLE_RESUME: "1" },
     },
   ],
 });

@@ -29,7 +29,7 @@ function pair(oldName: string, newName: string): KeyPair | undefined {
   const cert = pair("CERT_ENCRYPTION_KEY", "NEW_CERT_ENCRYPTION_KEY");
   if (!mfa && !cert) throw new Error("Informe NEW_MFA_ENCRYPTION_KEY e/ou NEW_CERT_ENCRYPTION_KEY.");
   const r = await rotateKeys(db, { mfa, cert }, { apply });
-  if (r.mfa) console.log(`2FA: ${r.mfa.userMfa} segredo(s); webhooks: ${r.mfa.webhooks} segredo(s).`);
+  if (r.mfa) console.log(`2FA: ${r.mfa.userMfa} segredo(s); webhooks: ${r.mfa.webhooks} segredo(s); DataJud: ${r.mfa.datajud} chave(s).`);
   if (r.cert) console.log(`Cofre: ${r.cert.certificates} certificado(s); conexões PJe/MNI: ${r.cert.connections}; tokens do WhatsApp: ${r.cert.whatsapp}; credenciais de tribunais: ${r.cert.courtCredentials}; cofre de clientes: ${r.cert.clientCredentials}.`);
   console.log(r.applied ? "GRAVADO. Agora troque as chaves no .env.production e reinicie o app." : apply ? "Nada a gravar." : "SIMULAÇÃO: tudo abre com a chave antiga. Rode de novo com --apply para gravar.");
   await db.$disconnect();

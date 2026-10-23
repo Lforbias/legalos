@@ -69,3 +69,12 @@ Para mostrar o sistema com os dados reais e a equipe inteira, **antes** de impor
 - Quem já tem conta no LegalOS só ganha o vínculo; quem não tem recebe uma conta **sem senha utilizável** (senha aleatória que ninguém conhece, e-mail não verificado): aparece como responsável, mas não consegue entrar. Pode reivindicar a conta mais tarde pelo "Esqueci a senha" quando o e-mail real estiver configurado.
 - Papéis sugeridos (ajuste em Configurações → Equipe ou com `--roles email=ADMIN,email2=LAWYER`): `--owners` → Proprietário; administrador **com** acesso financeiro → Administrador; só financeiro → Financeiro; e-mail começando com `dr.`/`dra.` ou contendo `adv` → Advogado; demais → Assistente.
 - Depois rode o importador no mesmo escritório: `import-astrea-docker.sh /root/astrea-backup DONO@email --org <id> --dry-run` (o `--org` aparece na mensagem de erro se houver mais de um escritório) e, se estiver certo, `--yes`.
+
+
+## Conferir tarefas com conclusão no comentário legado
+
+Execute `npm run audit:astrea-tasks -- --org <id do escritório>` no ambiente que contém a importação. O diagnóstico só lê as tarefas vinculadas ao Astrea em `import_map`, desconsidera excluídas, concluídas e canceladas e sinaliza as abertas com evento explícito de conclusão no comentário. O JSON contém apenas identificadores, status e data da última alteração; não inclui nomes ou comentários.
+
+Os candidatos não comprovam erro: uma tarefa pode ter sido reaberta. Confira o campo `Realizada` no CSV original e o histórico de alterações antes de corrigir. O comando não altera nem reimporta registros.
+
+A conferência também pode ser aberta por quem administra o escritório em **Box → Operação e auditoria → Conferir tarefas importadas do Astrea**. A tela percorre todos os vínculos de importação, respeita o sigilo e exibe até 100 indícios. O contador considera todo o conjunto visível, sem concluir ou reabrir tarefas.

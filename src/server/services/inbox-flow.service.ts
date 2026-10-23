@@ -5,7 +5,7 @@ import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { isUniqueViolation } from "./db-errors";
 import { notify } from "./notification.service";
-import { getNotice } from "./notice.service";
+import { getNotice, visibility } from "./notice.service";
 
 // ---------------------------------------------------------------- equipes de trabalho
 export async function listTeams(ctx: TenantContext) {
@@ -156,8 +156,8 @@ export async function setNoticeTags(ctx: TenantContext, id: string, tags: string
 
 export async function listNoticeTags(ctx: TenantContext): Promise<string[]> {
   assertCan(ctx, "inbox:read");
-  const rows = await db.$queryRaw<{ t: string }[]>`SELECT DISTINCT unnest(tags) AS t FROM court_notices WHERE organization_id = ${ctx.organizationId}::uuid AND deleted_at IS NULL ORDER BY 1 LIMIT 100`;
-  return rows.map((r) => r.t);
+  const rows = await db.courtNotice.findMany({ where: { AND: [{ organizationId: ctx.organizationId, deletedAt: null }, visibility(ctx)] }, select: { tags: true }, distinct: ["tags"] });
+  return [...new Set(rows.flatMap(r => r.tags))].sort().slice(0, 100);
 }
 
 // ---------------------------------------------------------------- notas internas

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDate, relativeTime } from "@/lib/dates/format";
 import { getBoxDashboard } from "@/server/services/box.service";
+import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Visão geral do Box" };
@@ -40,9 +41,10 @@ export default async function BoxOverviewPage() {
         title="LegalOS Box"
         description="Intimações, capturas dos tribunais, peticionamento e certificados. Tudo calculado do banco, sem números fictícios."
         actions={
+          <div>{can(ctx, "integrations:manage") ? <Link href="/box/operacao" className="mr-3 text-sm text-primary-text hover:underline">Operação e auditoria</Link> : null}<Link href="/caixa-de-entrada?leitura=1" className="mr-3 text-sm text-primary-text hover:underline">Leitura integrada</Link>
           <Link href="/" className="text-sm text-primary-text hover:underline" data-testid="box-to-func">
             Ir para o LegalOS Func →
-          </Link>
+          </Link></div>
         }
       />
 
@@ -52,10 +54,10 @@ export default async function BoxOverviewPage() {
             <Kpi label="Na caixa de entrada" value={d.notices.boxes.entrada} hint="sem distribuição" href="/caixa-de-entrada" />
             <Kpi label="Para mim" value={d.notices.boxes.minhas} href="/caixa-de-entrada?responsavel=eu" />
             <Kpi label="Paradas há mais de 3 dias" value={d.notices.stale} hint="novas e sem distribuição" tone={d.notices.stale ? "warning" : undefined} href="/caixa-de-entrada" />
-            <Kpi label={`Recebidas em ${d.notices.byDay.length} dias`} value={d.notices.total14} hint={`${d.notices.bySource.imported} capturada(s) · ${d.notices.bySource.manual} manual(is)`} />
+            <Kpi label={`Registradas em ${d.notices.byDay.length} dias`} value={d.notices.total14} hint={`${d.notices.bySource.captured} capturas DJEN/PJe · ${d.notices.bySource.otherImports} outras importações · ${d.notices.bySource.manual} registros manuais/arquivo`} />
           </div>
           <Card className="mt-4">
-            <CardHeader title="Intimações recebidas por dia" description="Capturadas pelos tribunais e registradas manualmente, respeitando o sigilo." />
+            <CardHeader title="Intimações registradas por dia" description="Data de entrada no LegalOS, no fuso do escritório. Inclui importação de histórico; não representa a data da publicação nem comprova captura automática." />
             <CardBody>
               <ReportBars title="Intimações por dia" data={d.notices.byDay.map((x) => ({ label: x.day.slice(8, 10) + "/" + x.day.slice(5, 7), count: x.count }))} series={[{ key: "count", label: "Intimações", color: "primary" }]} />
             </CardBody>

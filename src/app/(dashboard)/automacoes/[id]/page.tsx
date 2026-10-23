@@ -1,3 +1,4 @@
+import { conditionsSchema, EMPTY_CONDITIONS } from "@/modules/workflows/conditions";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { AccessDenied } from "@/components/layout/access-denied";
@@ -25,7 +26,7 @@ export default async function EditRulePage({ params }: { params: Promise<{ id: s
       <RuleForm
         ruleId={r.id}
         members={await listActiveMembers(ctx)}
-        initial={{ name: r.name, trigger: r.trigger, taskTitle: r.taskTitle, taskDescription: r.taskDescription ?? "", dueDays: String(r.dueDays), priority: r.priority, assigneeMode: r.assigneeMode, assigneeId: r.assigneeId ?? "", active: r.active }}
+        initial={{ conditions: conditionsSchema.safeParse(r.conditions).data ?? EMPTY_CONDITIONS, noticeAssigneeId: r.noticeAssigneeId ?? "", noticeTags: r.noticeTags.join(", "), name: r.name, trigger: r.trigger, taskTitle: r.taskTitle, taskDescription: r.taskDescription ?? "", dueDays: String(r.dueDays), priority: r.priority, assigneeMode: r.assigneeMode, assigneeId: r.assigneeId ?? "", active: r.active }}
       />
     </div>
   );

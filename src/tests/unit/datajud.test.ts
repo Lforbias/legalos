@@ -36,3 +36,21 @@ describe("DataJud: interpretação da resposta", () => {
     expect(movementKey(r.movements[0]!)).toBe(movementKey({ ...r.movements[0]! }));
   });
 });
+
+// O teste de conexão usa uma consulta vazia e nunca precisa ler processos.
+describe("DataJud: teste de autenticação", () => {
+  it("envia cabeçalho correto e recusa autenticação inválida", async () => {
+    const { vi } = await import("vitest");
+    const { testDatajudKey } = await import("@/lib/datajud/client");
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ hits: { hits: [] } }), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      await testDatajudKey("chave-ficticia");
+      const options = fetchMock.mock.calls[0]?.[1] as RequestInit;
+      expect(options.headers).toMatchObject({ authorization: "APIKey chave-ficticia" });
+      expect(JSON.parse(options.body as string)).toEqual({ size: 0, query: { match_none: {} } });
+      fetchMock.mockResolvedValue(new Response("", { status: 401 }));
+      await expect(testDatajudKey("chave-ficticia")).rejects.toThrow(/recusou/);
+    } finally { vi.unstubAllGlobals(); }
+  });
+});

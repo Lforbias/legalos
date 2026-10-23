@@ -23,8 +23,8 @@ async function enableMfaFor(userId: string, email: string) {
   await confirmEnrollment(userId, totpCode(s.secret, totpStep()), META);
 }
 
-const call = (fn: (r: Request, c?: never) => Promise<Response>, token: string | null, path: string, init: RequestInit = {}) =>
-  fn(new Request(`http://localhost/api/v1/${path}`, { ...init, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers as Record<string, string>) } }));
+const call = (fn: (r: Request, c: { params: Promise<Record<string, never>> }) => Promise<Response>, token: string | null, path: string, init: RequestInit = {}) =>
+  fn(new Request(`http://localhost/api/v1/${path}`, { ...init, headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), ...(init.headers as Record<string, string>) } }), { params: Promise.resolve({}) });
 const callId = (fn: (r: Request, c: { params: Promise<{ id: string }> }) => Promise<Response>, token: string, id: string) =>
   fn(new Request("http://localhost/api/v1/x", { headers: { authorization: `Bearer ${token}` } }), { params: Promise.resolve({ id }) });
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { conditionsSchema } from "./conditions";
 import { TASK_PRIORITIES, TASK_PRIORITY_LABEL } from "@/modules/tasks/schemas";
 
 export const WORKFLOW_TRIGGERS = ["CASE_CREATED", "DEADLINE_VALIDATED", "NOTICE_RECEIVED", "LEAD_WON"] as const;
@@ -33,8 +34,12 @@ export const ruleSchema = z
     assigneeMode: z.enum(WORKFLOW_ASSIGNEES),
     assigneeId: z.string().refine((v) => v === "" || z.uuid().safeParse(v).success, "Identificador inválido."),
     active: z.boolean(),
+    conditions: conditionsSchema.optional(),
+    noticeAssigneeId: z.union([z.uuid(), z.literal("")]).optional(),
+    noticeTags: z.string().trim().max(300).optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.trigger !== "NOTICE_RECEIVED" && (v.noticeAssigneeId || v.noticeTags)) ctx.addIssue({ code: "custom", path: ["trigger"], message: "Distribuição e etiquetas só se aplicam a intimações." });
     if (v.assigneeMode === "FIXED" && !v.assigneeId) ctx.addIssue({ code: "custom", path: ["assigneeId"], message: "Escolha o membro." });
     if (v.assigneeMode === "CASE_RESPONSIBLE" && v.trigger === "LEAD_WON") ctx.addIssue({ code: "custom", path: ["assigneeMode"], message: "Lead ganho não tem processo." });
   });

@@ -16,6 +16,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "tsx scripts/reset-db.ts",
     "import:astrea": "tsx scripts/import-astrea.ts",
+    "audit:astrea-tasks": "tsx scripts/audit-astrea-tasks.ts",
     "seed:team-astrea": "tsx scripts/seed-team-astrea.ts",
     "check:prod": "tsx scripts/check-prod.ts",
     "platform-admin": "tsx scripts/platform-admin.ts",

@@ -78,8 +78,8 @@ export function parseDatajudResponse(alias: string, raw: unknown): DatajudResult
 }
 
 /** Consulta um processo na API pública do DataJud. Envia SOMENTE o número do processo. Nunca registra a chave. */
-export async function fetchDatajud(cnj: string): Promise<DatajudResult> {
-  const key = datajudApiKey();
+export async function fetchDatajud(cnj: string, configuredKey?: string | null): Promise<DatajudResult> {
+  const key = configuredKey ?? datajudApiKey();
   if (!key) throw new DatajudError("A consulta ao DataJud não está configurada neste sistema (falta DATAJUD_API_KEY).");
   const alias = datajudAlias(cnj);
   const p = parseCnj(cnj);
@@ -110,4 +110,16 @@ export async function fetchDatajud(cnj: string): Promise<DatajudResult> {
 /** Chave estável do andamento, para importar sem duplicar. */
 export function movementKey(m: DatajudMovement): string {
   return `datajud:${m.code ?? "x"}:${m.at.toISOString()}:${m.name.toLowerCase()}`.slice(0, 200);
+}
+
+/** Testa autenticação sem consultar dados de qualquer processo. */
+export async function testDatajudKey(key: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await fetch(`${baseUrl()}/api_publica_tjsp/_search`, { method: "POST", headers: { "content-type": "application/json", authorization: `APIKey ${key}` }, body: JSON.stringify({ size: 0, query: { match_none: {} } }), signal: AbortSignal.timeout(30_000) });
+  } catch { throw new DatajudError("Não foi possível falar com o DataJud agora. Tente novamente em instantes."); }
+  if (res.status === 401 || res.status === 403) throw new DatajudError("O DataJud recusou a chave configurada.");
+  if (!res.ok) throw new DatajudError(`O DataJud respondeu com erro (HTTP ${res.status}).`);
+  const json = await res.json().catch(() => null);
+  if (!json?.hits || typeof json.hits !== "object") throw new DatajudError("Resposta inválida do DataJud.");
 }

@@ -16,6 +16,7 @@ import { DeleteTaskButton } from "@/modules/tasks/delete-task-button";
 import { CommentForm, TaskStatusSelect } from "@/modules/tasks/task-controls";
 import { dueState, PRIORITY_TONE } from "@/modules/tasks/tone";
 import { can } from "@/server/context";
+import { listTaskStages } from "@/server/services/task-stage.service";
 import { getTask } from "@/server/services/task.service";
 import { getTaskClassification, listTaskAttachments, listTaskEvents, listTaskLabels, listTaskTypes } from "@/server/services/task-extras.service";
 import { listActiveMembers } from "@/server/services/members";
@@ -32,8 +33,8 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   const t = await getTask(ctx, parsed.data).catch((e) => (e instanceof NotFoundError ? null : Promise.reject(e)));
   if (!t) notFound();
   const canWrite = can(ctx, "tasks:write");
-  const [cls, types, labels, attachments, events, members] = await Promise.all([
-    getTaskClassification(ctx, t.id), listTaskTypes(ctx, { onlyActive: true }), listTaskLabels(ctx), listTaskAttachments(ctx, t.id), listTaskEvents(ctx, t.id), listActiveMembers(ctx),
+  const [cls, types, labels, attachments, events, members, stages] = await Promise.all([
+    getTaskClassification(ctx, t.id), listTaskTypes(ctx, { onlyActive: true }), listTaskLabels(ctx), listTaskAttachments(ctx, t.id), listTaskEvents(ctx, t.id), listActiveMembers(ctx), listTaskStages(ctx),
   ]);
   const tz = organization.timezone;
   const due = t.dueDate ? dateToYmd(t.dueDate) : null;
@@ -90,11 +91,11 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           <Card>
             <CardHeader title="Situação" />
             <CardBody className="space-y-3">
-              <TaskStatusSelect taskId={t.id} status={t.status} disabled={!canWrite} />
+              <TaskStatusSelect stages={stages} stageId={t.stageId} taskId={t.id} status={t.status} disabled={!canWrite} />
               <div className="flex flex-wrap gap-1.5">
                 <Badge tone={PRIORITY_TONE[t.priority]}>{TASK_PRIORITY_LABEL[t.priority]}</Badge>
                 {due ? <Badge tone={ds === "overdue" ? "danger" : ds === "today" || ds === "soon" ? "warning" : "neutral"}>{formatYmd(due)}{ds === "overdue" ? " · Atrasada" : ""}</Badge> : null}
-                <Badge>{TASK_STATUS_LABEL[t.status]}</Badge>
+                <Badge>{t.stage?.name ?? TASK_STATUS_LABEL[t.status]}</Badge>
               </div>
               {cls.type ? <p className="text-xs text-muted">Tipo: {cls.type.name} ({cls.type.points} pt)</p> : null}
               {cls.labels.length ? <div className="flex flex-wrap gap-1.5">{cls.labels.map((l) => <LabelBadge key={l.id} name={l.name} color={l.color} />)}</div> : null}

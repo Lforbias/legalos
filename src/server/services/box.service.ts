@@ -1,8 +1,7 @@
 import { db } from "@/lib/db/client";
-import { addDays, todayYmd } from "@/lib/dates/ymd";
-import { utcToZoned } from "@/lib/dates/zoned";
 import { can, type TenantContext } from "@/server/context";
 import { caseVisibility } from "./case.service";
+import { getNoticeActivity } from "./notice-activity.service";
 import { noticeBoxCounts, visibility } from "./notice.service";
 
 /** Quantas intimações aguardam distribuição (alternador Func/Box). Respeita sigilo; falha vira 0 no chamador. */
@@ -16,7 +15,7 @@ export type BoxDashboard = {
   notices: {
     boxes: { entrada: number; minhas: number; geral: number; adormecidas: number; acervo: number };
     stale: number;
-    bySource: { imported: number; manual: number };
+    bySource: { imported: number; captured: number; otherImports: number; manual: number };
     byDay: { day: string; count: number }[];
     total14: number;
   } | null;
@@ -32,34 +31,22 @@ export type BoxDashboard = {
 /** Painel do Box: tudo calculado do banco, por escritório, e cada bloco só para quem tem a permissão do módulo. Sigilo respeitado. */
 export async function getBoxDashboard(ctx: TenantContext, days = 14): Promise<BoxDashboard> {
   const org = ctx.organizationId;
-  const today = todayYmd(ctx.timezone);
   const now = new Date();
 
   const notices = can(ctx, "inbox:read")
     ? await (async () => {
         const base = [{ organizationId: org, deletedAt: null }, visibility(ctx)];
-        const sinceYmd = addDays(today, -(days - 1));
-        const since = new Date(Date.now() - (days + 1) * 86_400_000);
-        const [counts, stale, imported, manual, recent] = await Promise.all([
+        const [counts, stale, activity] = await Promise.all([
           noticeBoxCounts(ctx),
-          db.courtNotice.count({ where: { AND: [...base, { status: "NEW" }, { receivedAt: { lt: new Date(Date.now() - 3 * 86_400_000) } }] } }),
-          db.courtNotice.count({ where: { AND: [...base, { source: "IMPORTED", createdAt: { gte: since } }] } }),
-          db.courtNotice.count({ where: { AND: [...base, { source: { not: "IMPORTED" }, createdAt: { gte: since } }] } }),
-          db.courtNotice.findMany({ where: { AND: [...base, { createdAt: { gte: since } }] }, select: { createdAt: true }, take: 20_000 }),
+          db.courtNotice.count({ where: { AND: [...base, { status: "NEW" }, { receivedAt: { lt: new Date(now.getTime() - 3 * 86_400_000) } }] } }),
+          getNoticeActivity(ctx, days, now),
         ]);
-        const perDay = new Map<string, number>();
-        for (let i = 0; i < days; i++) perDay.set(addDays(sinceYmd, i), 0);
-        for (const r of recent) {
-          const d = utcToZoned(r.createdAt, ctx.timezone).ymd;
-          if (perDay.has(d)) perDay.set(d, (perDay.get(d) ?? 0) + 1);
-        }
-        const byDay = [...perDay].map(([day, count]) => ({ day, count }));
         return {
           boxes: { entrada: counts.entrada, minhas: counts.minhas, geral: counts.geral, adormecidas: counts.adormecidas, acervo: counts.acervo },
           stale,
-          bySource: { imported, manual },
-          byDay,
-          total14: byDay.reduce((a, b) => a + b.count, 0),
+          bySource: activity.bySource,
+          byDay: activity.byDay,
+          total14: activity.total,
         };
       })()
     : null;
