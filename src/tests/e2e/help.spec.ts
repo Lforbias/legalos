@@ -24,6 +24,9 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await expect(page.getByText("Nenhum guia encontrado", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Limpar busca e filtros" }).click();
   await expect(page.getByRole("status")).toHaveText("11 guias encontrados");
+  await page.getByRole("button", { name: "Ajuda e suporte", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Central de ajuda", exact: true }).click();
+  await expect(page).toHaveURL(/\/ajuda$/);
   await page.goto("/box");
   await footer.getByRole("link", { name: "Ajuda", exact: true }).click();
   await expect(page).toHaveURL(/\/ajuda$/);
