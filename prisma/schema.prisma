@@ -652,6 +652,9 @@ enum AgendaEventKind {
 }
 
 model Task {
+  blockedBy TaskDependency[] @relation("BlockedTask")
+  unblocks TaskDependency[] @relation("PredecessorTask")
+  @@unique([id, organizationId])
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   title          String
@@ -805,6 +808,9 @@ model Deadline {
 }
 
 model AgendaEvent {
+  status         TaskStatus      @default(TODO)
+  assigneeId     String?         @map("assignee_id") @db.Uuid
+  completedAt    DateTime?       @map("completed_at") @db.Timestamptz(3)
   id             String          @id @default(uuid()) @db.Uuid
   organizationId String          @map("organization_id") @db.Uuid
   title          String
@@ -2698,6 +2704,10 @@ model WorkflowPackage {
 }
 
 model WorkflowPackageStep {
+  countType String @default("CALENDAR") @map("count_type")
+  relativeTo String @default("BASE") @map("relative_to")
+  waitForPrevious Boolean @default(false) @map("wait_for_previous")
+  assigneeMode String @default("TRIGGER_USER") @map("assignee_mode")
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   packageId      String       @map("package_id") @db.Uuid
@@ -3563,4 +3573,79 @@ model AutosDownloadJob {
   @@index([status, nextRunAt])
   @@index([organizationId, caseId, createdAt])
   @@map("autos_download_jobs")
+}
+
+/// Recursos compartilhados de uma atividade; o serviço valida origem, tenant e sigilo em toda operação.
+model ActivityChecklist {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  activityId String @map("activity_id") @db.Uuid
+  title String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  items ActivityChecklistItem[]
+  @@unique([id, organizationId])
+  @@index([organizationId, activityKind, activityId])
+  @@map("activity_checklists")
+}
+model ActivityChecklistItem {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  checklistId String @map("checklist_id") @db.Uuid
+  body String
+  done Boolean @default(false)
+  position Int @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  checklist ActivityChecklist @relation(fields:[checklistId, organizationId], references:[id, organizationId], onDelete:Cascade)
+  @@index([organizationId, checklistId])
+  @@map("activity_checklist_items")
+}
+model ActivityCollaborator {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  activityId String @map("activity_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@unique([organizationId, activityKind, activityId, userId])
+  @@map("activity_collaborators")
+}
+model ActivitySeries {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  rule Json
+  createdById String @map("created_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  occurrences ActivityOccurrence[]
+  @@unique([id,organizationId])
+  @@index([organizationId])
+  @@map("activity_series")
+}
+model ActivityOccurrence {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  seriesId String @map("series_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  activityId String @map("activity_id") @db.Uuid
+  date DateTime @db.Date
+  series ActivitySeries @relation(fields:[seriesId,organizationId],references:[id,organizationId],onDelete:Cascade)
+  @@unique([organizationId,activityKind,activityId])
+  @@unique([seriesId,date])
+  @@map("activity_occurrences")
+}
+
+model TaskDependency {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ taskId String @unique @map("task_id") @db.Uuid
+ predecessorId String @map("predecessor_id") @db.Uuid
+ offsetDays Int @default(0) @map("offset_days")
+ countType String @default("CALENDAR") @map("count_type")
+ onCompletion Boolean @default(false) @map("on_completion")
+ nonWorkingDates String[] @default([]) @map("non_working_dates")
+ task Task @relation("BlockedTask",fields:[taskId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ predecessor Task @relation("PredecessorTask",fields:[predecessorId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ @@index([organizationId,predecessorId])
+ @@map("task_dependencies")
 }

@@ -1,3 +1,4 @@
+import { GroundedSearchPanel } from "@/modules/ai/grounded-search-panel";
 import Link from "next/link";
 import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
@@ -46,6 +47,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
         <AskPanel cases={cases} initialCaseId={sp.processo ?? ""} disabledReason={disabledReason} />
         {!disabledReason ? (
           <>
+            <Card><CardHeader title="Pesquisa pública com fontes" description="Consulta externa com Google/Gemini; fontes e síntese para conferência."/><CardBody><GroundedSearchPanel/></CardBody></Card>
             <Card><CardHeader title="Pesquisa de jurisprudência (mapa de pesquisa)" description="Teses, termos de busca e o que conferir. Não afirma precedentes." /><CardBody><JurisPanel cases={cases} /></CardBody></Card>
             {can(ctx, "petitions:write") ? <Card><CardHeader title="Minuta de peça" description="Rascunho para o advogado revisar. Nada é protocolado." /><CardBody><DraftPanel cases={cases} /></CardBody></Card> : null}
           </>

@@ -1,3 +1,4 @@
+import { EXPANDED_TOOLS } from "./rute-expanded-tools";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { maskSensitive } from "@/lib/ai/mask";
@@ -50,6 +51,7 @@ async function visibleCaseIds(ctx: TenantContext, where: object, take = 50) {
 }
 
 const TOOLS: ToolDef[] = [
+  ...EXPANDED_TOOLS,
   {
     name: "capacidades", title: "Capacidades disponíveis", scope: "read", permission: "ai:use",
     description: "Descobre as ferramentas disponíveis para esta pessoa e conexão, permissões e argumentos. Use para explicar o que pode consultar e fazer. Ações de escrita são propostas para confirmação humana.",
@@ -262,7 +264,7 @@ const TOOLS: ToolDef[] = [
 
 function proposalSchema(kind: (typeof KIND_LIST)[number], descriptions: Record<string, unknown>) {
   const schema = z.toJSONSchema(PROPOSAL_SCHEMAS[kind], { unrepresentable: "any", io: "input" }) as { type: "object"; properties: Record<string, unknown>; required?: string[] };
-  delete schema.properties.expectedUpdatedAt; delete schema.properties.targetTitle;
+  delete schema.properties.expectedUpdatedAt; delete schema.properties.targetTitle; delete schema.properties.collaboratorName; delete schema.properties.workflowPreview;
   for (const [key, value] of Object.entries(descriptions)) if (schema.properties[key]) schema.properties[key] = { ...(schema.properties[key] as object), ...(value as object) };
   return schema;
 }
@@ -274,6 +276,11 @@ const proposeTool = (name: string, title: string, kind: (typeof KIND_LIST)[numbe
 });
 
 TOOLS.push(
+  proposeTool("propor_checklist_tarefa", "Propor checklist", "TASK_CHECKLIST", "tasks:write", "Propõe checklist com título e até 30 itens numa tarefa existente.", {}, ["taskId","title","items"]),
+  proposeTool("propor_colaborador_tarefa", "Propor colaborador", "TASK_COLLABORATOR", "tasks:write", "Propõe adicionar colaborador ativo; não concede acesso a processo sigiloso.", {}, ["taskId","userId"]),
+  proposeTool("propor_recorrencia_tarefa", "Propor recorrência", "TASK_REPEAT", "tasks:write", "Propõe materializar até 120 ocorrências de tarefa datada, por até dois anos. Consulta a atividade antes e exige confirmação reforçada.", {}, ["taskId","frequency","until"]),
+  proposeTool("propor_situacao_compromisso", "Propor situação do compromisso", "EVENT_STATUS", "deadlines:write", "Propõe iniciar, concluir, cancelar ou reabrir compromisso na agenda.", {}, ["eventId","status"]),
+  proposeTool("propor_execucao_workflow", "Propor execução de pacote", "WORKFLOW_RUN", "tasks:write", "Propõe execução atômica do pacote num processo ou cliente, com data base, respostas às perguntas e exceções do calendário. As etapas dependentes aguardam a anterior. Não executa antes da confirmação reforçada.", {}, ["packageId","baseDate"]),
   proposeTool("propor_cliente", "Propor cadastro de cliente", "CLIENT_CREATE", "clients:write", "Propõe cadastrar cliente por nome, tipo, situação e dados básicos. Não invente documento ou contato.", { name: S("nome do cliente"), type: S("PERSON ou COMPANY"), status: S("ACTIVE, INACTIVE ou PROSPECT") }, ["name"]),
   proposeTool("propor_atualizacao_cliente", "Propor atualização de cliente", "CLIENT_UPDATE", "clients:write", "Propõe alterar campos informados de um cliente existente, preservando os demais. Consulte o cliente antes.", { clientId: S("id do cliente") }, ["clientId"]),
   proposeTool("propor_atualizacao_tarefa", "Propor atualização de tarefa", "TASK_UPDATE", "tasks:write", "Propõe editar título, descrição, prioridade, vencimento ou responsável, preservando outros dados. Consulte a tarefa antes.", { taskId: S("id da tarefa"), assigneeId: S("id de usuário de listar_equipe; vazio remove responsável") }, ["taskId"]),

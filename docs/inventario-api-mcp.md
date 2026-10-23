@@ -1,3 +1,21 @@
+> Atualização da rodada operacional: o catálogo agora contém **52 ferramentas (32 consultas e 20 propostas)**. As tabelas históricas de 35 abaixo documentam a base anterior; as 17 adições estão listadas nesta seção. Todas usam o mesmo gateway, validação, escopo e permissões na RUTE, REST e MCP.
+
+## Ampliação operacional
+
+| Consultas novas | Função |
+|---|---|
+| `listar_atividades`, `ver_detalhes_atividade` | Registros originais da agenda/gestão, checklists, participantes e série |
+| `resumo_financeiro`, `buscar_lancamentos` | Posição financeira e lançamentos paginados, sem cobranças ou pagamentos |
+| `produtividade_equipe` | Mesmo relatório de equipe, requer também `reports:read` |
+| `buscar_documentos`, `buscar_conteudo_documentos` | Metadados e texto previamente extraído dos documentos visíveis |
+| `buscar_oportunidades`, `ver_oportunidade` | Funil e detalhes do CRM |
+| `listar_conversas_chat`, `ler_conversa_chat` | Leitura com sigilo de processo, sem consumir não lidas ou enviar recibos |
+| `listar_pacotes_workflow` | Etapas, perguntas, responsáveis e regras de data/dependência |
+
+Propostas novas: `propor_checklist_tarefa`, `propor_colaborador_tarefa`, `propor_recorrencia_tarefa`, `propor_situacao_compromisso`, `propor_execucao_workflow`. As últimas três exigem confirmação reforçada. Não há ferramenta de aprovação externa. Recorrência e workflows usam os serviços do domínio; iniciar/concluir uma etapa dependente exige a conclusão da anterior.
+
+A ampliação não representa cobertura completa de todas as escritas: pagamentos/baixas, CRM, alterações de documentos e envios de Chat continuam pelas telas. A pesquisa pública com Google é uma ação própria da tela IA; não expõe HTML de sugestões do provedor pelo catálogo MCP.
+
 # Inventário de funcionalidades — RUTE, REST e MCP
 
 Data: 2026-10-23. Este inventário descreve código implementado. Disponibilidade depende de permissões, configuração e credenciais. Conectores de tribunal não são considerados homologados por terem funções no código.
@@ -6,7 +24,7 @@ Data: 2026-10-23. Este inventário descreve código implementado. Disponibilidad
 
 RUTE e MCP usam `toolList`/`callTool`. Os esquemas de entrada das propostas são gerados a partir da validação Zod do servidor. A expansão adiciona o mesmo catálogo pela REST: `GET /api/v1/tools` e `POST /api/v1/tools/{name}`. Todas as interfaces usam os serviços de negócio do LegalOS; nenhuma IA recebe acesso direto ao banco.
 
-Antes desta expansão: 13 consultas + 7 propostas (20 ferramentas), compartilhadas por RUTE e MCP. REST de recursos: 9 operações. Primeira expansão: 17 consultas + 7 propostas (24 ferramentas). Rodada operacional: 20 consultas + 15 propostas (35 ferramentas), disponíveis nos três transportes, com catálogo e contrato OpenAPI autenticados e confirmação de ações no próprio chat. A REST de recursos permanece compatível e com os mesmos 9 métodos existentes.
+Antes desta expansão: 13 consultas + 7 propostas (20 ferramentas), compartilhadas por RUTE e MCP. REST de recursos: 9 operações. Primeira expansão: 17 consultas + 7 propostas (24 ferramentas). Primeira rodada operacional: 20 consultas + 15 propostas (35 ferramentas), disponíveis nos três transportes, com catálogo e contrato OpenAPI autenticados e confirmação de ações no próprio chat. Ampliação Astrea: 32 consultas + 20 propostas (52 ferramentas). A REST de recursos permanece compatível e com os mesmos 9 métodos existentes.
 
 ## Catálogo completo de ferramentas compartilhadas
 

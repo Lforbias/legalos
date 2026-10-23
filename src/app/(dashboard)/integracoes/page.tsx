@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { formatDateTime } from "@/lib/dates/format";
 import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
@@ -51,6 +52,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Integrações" description="Conectores reais, sempre desligados até haver credenciais e consentimento do escritório." />
       <div className="space-y-4">
+        <Link href="/integracoes/diagnostico" className="inline-block text-sm text-primary-text underline">Abrir diagnóstico de WhatsApp, tribunais e migração</Link>
         {sp.google === "ok" ? <Alert tone="success">Google conectado. Falta só ligar o Drive neste escritório.</Alert> : null}
         {sp.google === "erro" ? <Alert tone="error">Não foi possível conectar ao Google{sp.msg ? `: ${sp.msg.slice(0, 160)}` : "."}</Alert> : null}
         <Card>

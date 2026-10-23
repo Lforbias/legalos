@@ -1,0 +1,83 @@
+import {describe,it,expect} from "vitest";
+import {makeOrgWithOwner,addMember} from "./helpers";
+import {db} from "@/lib/db/client";
+import {listActivities,setActivityStatus} from "@/server/services/activity.service";
+import {activityDetails,createActivityChecklist,setChecklistItem,addActivityCollaborator} from "@/server/services/activity-details.service";
+import {validateDeadline} from "@/server/services/deadline.service";
+describe("Atividades canônicas e colaboração",()=>{
+ it("quadro e agenda usam o registro original e preservam validação humana dos prazos",async()=>{
+  const a=await makeOrgWithOwner("activities"),b=await makeOrgWithOwner("foreign");
+  const c=await db.case.create({data:{organizationId:a.org.id,title:"Caso"}});
+  const t=await db.task.create({data:{organizationId:a.org.id,title:"Tarefa original",dueDate:new Date("2026-12-10T00:00:00Z")}});
+  const e=await db.agendaEvent.create({data:{organizationId:a.org.id,title:"Reunião original",startsAt:new Date("2026-12-10T15:00:00Z")}});
+  const d=await db.deadline.create({data:{organizationId:a.org.id,caseId:c.id,title:"Prazo original",dueDate:new Date("2026-12-10T00:00:00Z")}});
+  await db.task.create({data:{organizationId:b.org.id,title:"Não aparece"}});
+  const list=await listActivities(a.ctx,{from:"2026-12-10",to:"2026-12-10"});
+  expect(list.items.map(x=>x.id).sort()).toEqual([t.id,e.id,d.id].sort());
+  await setActivityStatus(a.ctx,"TASK",t.id,"DONE");
+  expect((await db.task.findUniqueOrThrow({where:{id:t.id}})).status).toBe("DONE");
+  expect((await listActivities(a.ctx)).items.some(x=>x.id===t.id)).toBe(false);
+  expect((await listActivities(a.ctx,{includeClosed:true})).items.find(x=>x.id===t.id)?.status).toBe("DONE");
+  await expect(setActivityStatus(a.ctx,"DEADLINE",d.id,"DONE")).rejects.toThrow();
+  await validateDeadline(a.ctx,d.id);await setActivityStatus(a.ctx,"DEADLINE",d.id,"DONE");
+  expect((await db.deadline.findUniqueOrThrow({where:{id:d.id}})).status).toBe("FULFILLED");
+  await setActivityStatus(a.ctx,"EVENT",e.id,"DONE");expect((await db.agendaEvent.findUniqueOrThrow({where:{id:e.id}})).completedAt).toBeTruthy();
+  await expect(setActivityStatus(b.ctx,"TASK",t.id,"TODO")).rejects.toThrow();
+ });
+ it("checklists não concluem a tarefa, isolam tenants e colaboradores não obtêm acesso ao sigilo",async()=>{
+  const a=await makeOrgWithOwner("checklists"),b=await makeOrgWithOwner("checkother");
+  const colleague=await addMember(a.org.id,"LAWYER","participant");
+  const t=await db.task.create({data:{organizationId:a.org.id,title:"Conferência"}});
+  await createActivityChecklist(a.ctx,"TASK",t.id,{title:"Documentos",items:["Conferir cadastro","Conferir anexo"]});
+  const details=await activityDetails(a.ctx,"TASK",t.id);
+  await setChecklistItem(a.ctx,details.checklists[0]!.items[0]!.id,true);
+  expect((await activityDetails(a.ctx,"TASK",t.id)).checklists[0]!.items[0]!.done).toBe(true);
+  expect((await db.task.findUniqueOrThrow({where:{id:t.id}})).status).toBe("TODO");
+  await expect(activityDetails(b.ctx,"TASK",t.id)).rejects.toThrow();
+  await expect(setChecklistItem(b.ctx,details.checklists[0]!.items[0]!.id,true)).rejects.toThrow();
+  await addActivityCollaborator(a.ctx,"TASK",t.id,colleague.user.id);await addActivityCollaborator(a.ctx,"TASK",t.id,colleague.user.id);
+  expect((await activityDetails(a.ctx,"TASK",t.id)).collaborators).toHaveLength(1);
+  const c=await db.case.create({data:{organizationId:a.org.id,title:"Segredo",confidential:true}});
+  const hidden=await db.task.create({data:{organizationId:a.org.id,title:"Sigilosa",caseId:c.id}});
+  await expect(addActivityCollaborator(a.ctx,"TASK",hidden.id,colleague.user.id)).rejects.toThrow(/acesso/);
+  expect((await listActivities(colleague.ctx)).items.some(x=>x.id===hidden.id)).toBe(false);
+ });
+});
+
+describe("Séries e etapas de workflow",()=>{
+ it("copia detalhes resetados, evita duplicação e cancela só as ocorrências abertas",async()=>{
+  const {repeatActivity,updateFollowingActivities}=await import("@/server/services/activity-series.service");
+  const a=await makeOrgWithOwner("series");
+  const t=await db.task.create({data:{organizationId:a.org.id,title:"Rotina mensal",dueDate:new Date("2027-01-31T00:00:00Z")}});
+  await createActivityChecklist(a.ctx,"TASK",t.id,{title:"Conferência",items:["Revisar documentos"]});
+  const details=await activityDetails(a.ctx,"TASK",t.id);
+  await setChecklistItem(a.ctx,details.checklists[0]!.items[0]!.id,true);
+  const series=await repeatActivity(a.ctx,"TASK",t.id,{frequency:"MONTHLY",until:"2027-03-31"});
+  expect(series.created).toBe(2);
+  await expect(repeatActivity(a.ctx,"TASK",t.id,{frequency:"MONTHLY",until:"2027-03-31"})).rejects.toThrow(/série/);
+  const occurrences=await db.activityOccurrence.findMany({where:{seriesId:series.id},orderBy:{date:"asc"}});
+  expect(occurrences.map(o=>o.date.toISOString().slice(0,10))).toEqual(["2027-01-31","2027-02-28","2027-03-31"]);
+  expect((await activityDetails(a.ctx,"TASK",occurrences[1]!.activityId)).checklists[0]!.items[0]!.done).toBe(false);
+  await setActivityStatus(a.ctx,"TASK",occurrences[1]!.activityId,"DONE");
+  const result=await updateFollowingActivities(a.ctx,"TASK",t.id,{action:"CANCEL"});
+  expect(result.updated).toBe(2);
+  expect((await db.task.findUniqueOrThrow({where:{id:occurrences[1]!.activityId}})).status).toBe("DONE");
+ });
+ it("executa pacote atomicamente e libera etapa após conclusão, mantendo o bloqueio nos serviços",async()=>{
+  const {savePackage,runPackage}=await import("@/server/services/workflow-package.service");
+  const a=await makeOrgWithOwner("dependencies"),b=await makeOrgWithOwner("dependencies-other");
+  const c=await db.case.create({data:{organizationId:a.org.id,title:"Fluxo"}});
+  const id=await savePackage(a.ctx,null,{name:"Fluxo de documentos",steps:[{title:"Conferir documentos",dueDays:0},{title:"Preparar atendimento",dueDays:2,countType:"BUSINESS",relativeTo:"PREVIOUS_DONE"}]});
+  await expect(runPackage(b.ctx,id,{caseId:c.id,baseDate:"2026-10-23"})).rejects.toThrow();
+  const result=await runPackage(a.ctx,id,{caseId:c.id,baseDate:"2026-10-23"});expect(result.created).toBe(2);
+  await expect(runPackage(a.ctx,id,{caseId:c.id,baseDate:"2026-10-23"})).rejects.toThrow(/já foi executado/);
+  const dep=await db.taskDependency.findFirstOrThrow({where:{organizationId:a.org.id},include:{task:true}});
+  expect(dep.task.status).toBe("WAITING");expect(dep.task.dueDate).toBeNull();
+  await expect(setActivityStatus(a.ctx,"TASK",dep.taskId,"IN_PROGRESS")).rejects.toThrow(/anterior/);
+  await setActivityStatus(a.ctx,"TASK",dep.predecessorId,"DONE");
+  const ready=await db.task.findUniqueOrThrow({where:{id:dep.taskId}});expect(ready.status).toBe("TODO");expect(ready.dueDate).not.toBeNull();
+  await setActivityStatus(a.ctx,"TASK",dep.taskId,"IN_PROGRESS");
+  await expect(setActivityStatus(a.ctx,"TASK",dep.predecessorId,"TODO")).rejects.toThrow(/dependente/);
+  expect((await db.task.findUniqueOrThrow({where:{id:dep.predecessorId}})).status).toBe("DONE");
+ });
+});

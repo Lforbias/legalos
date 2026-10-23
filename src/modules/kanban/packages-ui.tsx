@@ -10,10 +10,10 @@ import { Field, Input, Select } from "@/components/ui/form";
 import { deletePackageAction, runPackageAction, savePackageAction } from "./actions";
 import { useRun } from "./use-run";
 
-export type StepRow = { id?: string; title: string; description: string; dueDays: number; priority: "LOW" | "NORMAL" | "HIGH" | "URGENT"; assigneeId: string; ask: string };
+export type StepRow = { id?: string; title: string; description: string; dueDays: number; countType: "CALENDAR" | "BUSINESS"; relativeTo: "BASE" | "PREVIOUS_DUE" | "PREVIOUS_DONE"; waitForPrevious: boolean; assigneeMode: "TRIGGER_USER" | "CASE_RESPONSIBLE" | "FIXED"; priority: "LOW" | "NORMAL" | "HIGH" | "URGENT"; assigneeId: string; ask: string };
 export type PackageRow = { id: string; name: string; description: string; active: boolean; steps: StepRow[] };
 const PRIORITY: Record<StepRow["priority"], string> = { LOW: "Baixa", NORMAL: "Normal", HIGH: "Alta", URGENT: "Urgente" };
-const blank = (): StepRow => ({ title: "", description: "", dueDays: 1, priority: "NORMAL", assigneeId: "", ask: "" });
+const blank = (): StepRow => ({ title: "", description: "", dueDays: 1, countType: "CALENDAR", relativeTo: "BASE", waitForPrevious: false, assigneeMode: "TRIGGER_USER", priority: "NORMAL", assigneeId: "", ask: "" });
 
 function PackageForm({ id, initial, members, onDone }: { id: string | null; initial: Omit<PackageRow, "id">; members: { id: string; name: string }[]; onDone: () => void }) {
   const { run, pending, error } = useRun();
@@ -26,7 +26,7 @@ function PackageForm({ id, initial, members, onDone }: { id: string | null; init
   return (
     <form
       className="space-y-3 rounded-md border border-border bg-surface-2/50 p-3"
-      onSubmit={(e) => { e.preventDefault(); run(() => savePackageAction(id, { name, description, active, steps: steps.map(({ id: _i, ...s }) => s) }), undefined, onDone); }}
+      onSubmit={(e) => { e.preventDefault(); run(() => savePackageAction(id, { name, description, active, steps: steps.map(({ id: _i, ...s }, i) => i === 0 ? { ...s, relativeTo: "BASE", waitForPrevious: false } : s) }), undefined, onDone); }}
     >
       {error ? <Alert tone="error">{error}</Alert> : null}
       <div className="grid gap-3 md:grid-cols-[1fr_2fr]">
@@ -34,13 +34,18 @@ function PackageForm({ id, initial, members, onDone }: { id: string | null; init
         <Field label="Descrição (opcional)" htmlFor="pk-desc"><Input id="pk-desc" value={description} onChange={(e) => setDescription(e.target.value)} /></Field>
       </div>
       <label className="flex items-center gap-1.5 text-sm"><input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} /> pacote ativo (pode ser executado)</label>
+      <p className="text-xs text-muted">Dias úteis operacionais excluem fins de semana, feriados nacionais e exceções informadas na execução. Não substitui a contagem de prazo processual. Sem responsável do processo, assume quem executar.</p>
       <ol className="space-y-2">
         {steps.map((s, i) => (
-          <li key={i} className="grid gap-2 rounded-md border border-border bg-surface p-2 md:grid-cols-[2fr_90px_110px_1.2fr_1.5fr_auto]">
+          <li key={i} className="grid gap-2 rounded-md border border-border bg-surface p-2 md:grid-cols-3">
             <Field label={`Tarefa ${i + 1}`} htmlFor={`st-t-${i}`}><Input id={`st-t-${i}`} value={s.title} onChange={(e) => set(i, { title: e.target.value })} /></Field>
-            <Field label="Prazo (dias)" htmlFor={`st-d-${i}`}><Input id={`st-d-${i}`} type="number" min={0} max={365} value={s.dueDays} onChange={(e) => set(i, { dueDays: Number(e.target.value) })} /></Field>
+            <Field label="Prazo (dias)" htmlFor={`st-d-${i}`}><Input id={`st-d-${i}`} type="number" min={-365} max={365} value={s.dueDays} onChange={(e) => set(i, { dueDays: Number(e.target.value) })} /></Field>
+            <Field label="Contagem" htmlFor={`st-c-${i}`}><Select id={`st-c-${i}`} value={s.countType} onChange={e=>set(i,{countType:e.target.value as StepRow["countType"]})}><option value="CALENDAR">Dias corridos</option><option value="BUSINESS">Dias úteis operacionais</option></Select></Field>
+            <Field label="Referência da data" htmlFor={`st-r-${i}`}><Select id={`st-r-${i}`} disabled={i===0} value={i===0?"BASE":s.relativeTo} onChange={e=>set(i,{relativeTo:e.target.value as StepRow["relativeTo"]})}><option value="BASE">Data base</option><option value="PREVIOUS_DUE">Vencimento anterior</option><option value="PREVIOUS_DONE">Conclusão anterior</option></Select></Field>
+            <label className="flex items-center gap-2 text-xs"><input type="checkbox" disabled={i===0 || s.relativeTo==="PREVIOUS_DONE"} checked={i>0&&(s.waitForPrevious||s.relativeTo==="PREVIOUS_DONE")} onChange={e=>set(i,{waitForPrevious:e.target.checked})}/> Aguardar conclusão anterior</label>
+            <Field label="Quem assume" htmlFor={`st-m-${i}`}><Select id={`st-m-${i}`} value={s.assigneeMode} onChange={e=>set(i,{assigneeMode:e.target.value as StepRow["assigneeMode"],assigneeId:""})}><option value="TRIGGER_USER">Quem executar o pacote</option><option value="CASE_RESPONSIBLE">Responsável pelo processo</option><option value="FIXED">Pessoa fixa</option></Select></Field>
             <Field label="Prioridade" htmlFor={`st-p-${i}`}><Select id={`st-p-${i}`} value={s.priority} onChange={(e) => set(i, { priority: e.target.value as StepRow["priority"] })}>{Object.entries(PRIORITY).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></Field>
-            <Field label="Responsável fixo" htmlFor={`st-a-${i}`}><Select id={`st-a-${i}`} value={s.assigneeId} onChange={(e) => set(i, { assigneeId: e.target.value })}><option value="">Definir ao executar</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
+            <Field label="Responsável fixo" htmlFor={`st-a-${i}`}><Select id={`st-a-${i}`} disabled={s.assigneeMode!=="FIXED"} value={s.assigneeId} onChange={(e) => set(i, { assigneeId: e.target.value })}><option value="">Selecione</option>{members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
             <Field label="Pergunta ao executar (opcional)" htmlFor={`st-q-${i}`}><Input id={`st-q-${i}`} value={s.ask} onChange={(e) => set(i, { ask: e.target.value })} placeholder="Ex.: Valor do acordo" /></Field>
             <div className="flex items-end gap-1">
               <Button type="button" size="sm" variant="ghost" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Subir">↑</Button>
@@ -86,7 +91,7 @@ export function PackagesAdmin({ rows, members, canEdit }: { rows: PackageRow[]; 
                   ) : null}
                 </div>
                 {p.description ? <p className="text-xs text-muted">{p.description}</p> : null}
-                <ol className="list-decimal pl-5 text-xs text-muted">{p.steps.map((s, i) => <li key={i}>{s.title} <span>(+{s.dueDays} dia{s.dueDays === 1 ? "" : "s"})</span></li>)}</ol>
+                <ol className="list-decimal pl-5 text-xs text-muted">{p.steps.map((s, i) => <li key={i}>{s.title} <span>({s.dueDays >= 0 ? "+" : ""}{s.dueDays} dias {s.countType==="BUSINESS"?"úteis":"corridos"}; {s.relativeTo==="PREVIOUS_DONE"?"após conclusão anterior":s.relativeTo==="PREVIOUS_DUE"?"do vencimento anterior":"da data base"})</span></li>)}</ol>
               </li>
             ),
           )}
@@ -101,6 +106,7 @@ export function RunPackageCard({ caseId, packages, boards, today, history }: { c
   const { run, pending, error, done } = useRun();
   const [pid, setPid] = React.useState(packages[0]?.id ?? "");
   const [baseDate, setBaseDate] = React.useState(today);
+  const [exceptions, setExceptions] = React.useState("");
   const [boardId, setBoardId] = React.useState("");
   const [answers, setAnswers] = React.useState<Record<string, string>>({});
   const [confirmAgain, setConfirmAgain] = React.useState(false);
@@ -116,12 +122,13 @@ export function RunPackageCard({ caseId, packages, boards, today, history }: { c
         <Field label="Data base dos prazos" htmlFor="rp-date"><Input id="rp-date" type="date" value={baseDate} onChange={(e) => setBaseDate(e.target.value)} /></Field>
         <Field label="Cartão no quadro (opcional)" htmlFor="rp-board"><Select id="rp-board" value={boardId} onChange={(e) => setBoardId(e.target.value)}><option value="">Não criar cartão</option>{boards.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></Field>
       </div>
+      <Field label="Dias sem expediente (opcional, AAAA-MM-DD separados por vírgula)" htmlFor="rp-exceptions"><Input id="rp-exceptions" value={exceptions} onChange={e=>setExceptions(e.target.value)} placeholder="2026-12-24, 2026-12-31" /></Field>
       {asks.map((s) => (
         <Field key={s.id} label={s.ask} htmlFor={`rp-a-${s.id}`}><Input id={`rp-a-${s.id}`} value={answers[s.id] ?? ""} onChange={(e) => setAnswers((a) => ({ ...a, [s.id]: e.target.value }))} /></Field>
       ))}
       <p className="text-xs text-muted">Serão criadas {pkg?.steps.length ?? 0} tarefas neste processo. Depois você pode editar cada uma em Tarefas.</p>
       <label className="flex items-center gap-1.5 text-xs"><input type="checkbox" checked={confirmAgain} onChange={(e) => setConfirmAgain(e.target.checked)} /> já executei este pacote aqui e quero executar de novo</label>
-      <Button size="sm" loading={pending} disabled={!pid} onClick={() => run(() => runPackageAction(pid, { caseId, baseDate, answers, boardId, force: confirmAgain }), undefined, undefined)} data-testid="run-package">Executar pacote</Button>
+      <Button size="sm" loading={pending} disabled={!pid} onClick={() => run(() => runPackageAction(pid, { caseId, baseDate, answers, boardId, nonWorkingDates: exceptions.split(",").map(x=>x.trim()).filter(Boolean), force: confirmAgain }), undefined, undefined)} data-testid="run-package">Executar pacote</Button>
       {history.length ? (
         <ul className="border-t border-border pt-2 text-xs text-muted">{history.map((h) => <li key={h.id}>{h.name}: {h.taskCount} tarefa(s) em {h.when}</li>)}</ul>
       ) : null}

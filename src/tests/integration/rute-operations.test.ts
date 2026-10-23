@@ -68,9 +68,9 @@ describe("Operações da RUTE compartilhadas com REST e MCP", () => {
     expect((await getProposal(a.ctx, p.id)).status).toBe("PENDING");
     await rejectProposal(a.ctx, p.id);
   });
-  it("catálogo tem 35 ferramentas, esquemas de criação coerentes e descoberta respeita o escopo", async () => {
+  it("catálogo tem 52 ferramentas, esquemas de criação coerentes e descoberta respeita o escopo", async () => {
     const tools = toolCatalog(a.ctx, new Set(["read", "propose"]));
-    expect(tools).toHaveLength(35);
+    expect(tools).toHaveLength(52);
     const schema = tools.find(t => t.name === "propor_compromisso")!.inputSchema;
     expect(schema.required).toContain("date");
     expect(Object.keys(schema.properties)).not.toContain("expectedUpdatedAt");

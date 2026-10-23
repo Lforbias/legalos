@@ -1,5 +1,6 @@
 "use server";
 
+import { searchJurisprudence } from "@/server/services/jurisprudence-search.service";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { uuidSchema, type ActionState } from "@/lib/validation/common";
@@ -55,3 +56,5 @@ export async function summarizeConversationAction(conversationId: string): Promi
     return summarizeConversation(ctx, parse(uuidSchema, conversationId));
   });
 }
+
+export async function searchJurisprudenceAction(question:string){return runAction(async()=>{const {ctx}=await requireTenant();return searchJurisprudence(ctx,question);});}

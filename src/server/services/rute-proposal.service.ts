@@ -145,7 +145,7 @@ export async function updateProposal(ctx: TenantContext, id: string, payload: un
   if (p.status !== "PENDING") throw new ConflictError("Esta proposta já foi decidida.");
   assertCan(ctx, KINDS[p.kind].permission);
   const changes = payload as Record<string, unknown>;
-  for (const key of ["caseId", "clientId", "taskId", "eventId", "petitionId", "expectedUpdatedAt", "targetTitle"]) {
+  for (const key of ["caseId", "clientId", "taskId", "eventId", "packageId", "petitionId", "expectedUpdatedAt", "targetTitle", "collaboratorName", "workflowPreview"]) {
     if (Object.hasOwn(changes, key) && changes[key] !== p.payload[key]) throw new ValidationError("O registro de destino e a versão da proposta não podem ser alterados. Crie uma nova proposta.");
   }
   const clean = parsePayload(p.kind, { ...p.payload, ...changes });

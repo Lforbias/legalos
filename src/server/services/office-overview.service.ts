@@ -36,7 +36,7 @@ export async function getOfficeOverview(ctx: TenantContext) {
     canDeadlines ? db.deadline.count({ where: { ...deadlineWhere, dueDate: start } }) : null,
     canDeadlines ? db.deadline.count({ where: { ...deadlineWhere, status: "DRAFT" } }) : null,
     canDeadlines ? db.deadline.findMany({ where: { ...deadlineWhere, dueDate: { lt: end7 } }, orderBy: [{ dueDate: "asc" }, { id: "asc" }], take: 5, select: { id: true, title: true, dueDate: true, status: true, case: { select: { title: true } } } }) : null,
-    canDeadlines ? db.agendaEvent.findMany({ where: { organizationId: org, deletedAt: null, ...linked, startsAt: { gte: dayStart, lt: agendaEnd } }, orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: 5, select: { id: true, title: true, startsAt: true, allDay: true, kind: true, location: true } }) : null,
+    canDeadlines ? db.agendaEvent.findMany({ where: { organizationId: org, deletedAt: null, status:{notIn:["DONE","CANCELED"]}, ...linked, startsAt: { gte: dayStart, lt: agendaEnd } }, orderBy: [{ startsAt: "asc" }, { id: "asc" }], take: 5, select: { id: true, title: true, startsAt: true, allDay: true, kind: true, location: true } }) : null,
     canCases ? db.case.groupBy({ by: ["status"], where: portfolioWhere, _count: { _all: true } }) : null,
     canCases ? db.case.count({ where: { AND: [portfolioWhere, { createdAt: { gte: monthStart, lte: new Date() } }] } }) : null,
     canCases ? db.case.count({ where: { AND: [portfolioWhere, { status: "ACTIVE", members: { none: { role: "RESPONSIBLE" } } }] } }) : null,
