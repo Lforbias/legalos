@@ -342,6 +342,7 @@ export const PHASES_7: Phase[] = [
   { id: "7.0-F16", title: "Modo audiência no celular", status: "a fazer" },
   { id: "7.0-F17", title: "Busca única", status: "a fazer" },
   { id: "7.0-F18", title: "Relatório mensal automático para a sócia", status: "a fazer" },
+  { id: "7.0-F20", title: "Mesa da RUTE: tela cheia onde você diz \"traga tudo do cliente X\" e ela organiza processos, prazos e documentos para você mexer", status: "a fazer" },
   { id: "7.0-F19", title: "RUTE faz tarefas pequenas sozinha (criar tarefa para si, marcar como feita, anotar, abrir telas), com interruptor por ação e histórico", status: "a fazer" },
 ];
 

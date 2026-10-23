@@ -214,7 +214,7 @@ export default function ProdutoHome() {
             </li>
           ))}
         </ul>
-        <p className="mt-6 text-sm"><Link href="/produto/sobre" className="font-semibold text-primary-text hover:underline">Ver o que já foi entregue e o que vem a seguir →</Link></p>
+        <p className="mt-6 text-sm"><Link href="/produto/roadmap" className="font-semibold text-primary-text hover:underline">Ver tudo o que já temos e tudo o que estamos construindo →</Link></p>
       </section>
 
       {/* CTA FINAL — escuro */}

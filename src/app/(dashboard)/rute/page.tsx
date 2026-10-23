@@ -209,7 +209,7 @@ async function Governance({ ctx, settings, sp, tz }: { ctx: Ctx; settings: Await
 }
 
 const GROUPS_7: { title: string; ids: string[] }[] = [
-  { title: "RUTE com voz e mais autonomia", ids: ["7.0-F1", "7.0-F19"] },
+  { title: "RUTE com voz e mais autonomia", ids: ["7.0-F1", "7.0-F19", "7.0-F20"] },
   { title: "Rotina da RUTE", ids: ["7.0-F2", "7.0-F3", "7.0-F4", "7.0-F5"] },
   { title: "Para o cliente", ids: ["7.0-F6", "7.0-F7", "7.0-F8"] },
   { title: "Para a equipe", ids: ["7.0-F9", "7.0-F10"] },

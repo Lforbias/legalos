@@ -29,7 +29,7 @@ test("site /produto: páginas públicas abrem sem login, imagens carregam e as a
   await page.getByRole("tab", { name: "Intimações" }).press("ArrowRight");
   await expect(page.getByRole("tab", { name: "LegalOS Chat" })).toHaveAttribute("aria-selected", "true");
 
-  for (const [path, h1] of [["/produto/recursos", /Tudo o que o escritório/], ["/produto/seguranca", /Privado/], ["/produto/sobre", /Feito por quem/], ["/produto/contato", /Vamos/]] as const) {
+  for (const [path, h1] of [["/produto/recursos", /Tudo o que o escritório/], ["/produto/roadmap", /Tudo o que temos/], ["/produto/seguranca", /Privado/], ["/produto/sobre", /Feito por quem/], ["/produto/contato", /Vamos/]] as const) {
     const res = await page.goto(path);
     expect(res?.status()).toBe(200);
     await expect(page.getByRole("heading", { level: 1 })).toContainText(h1);

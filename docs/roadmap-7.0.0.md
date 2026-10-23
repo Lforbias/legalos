@@ -52,3 +52,7 @@ Falar com a RUTE e ouvir a resposta, com as mãos livres (no carro, no fórum, n
 - Voz: gratuita do navegador ou paga com qualidade melhor? Mãos livres com "Ei, RUTE" é desejado ou só botão de falar?
 - Resumo da manhã: dentro do sistema, e-mail ou os dois? A que horas?
 - Assinatura de contrato: valor jurídico simples (aceite com registro) basta, ou precisa de assinatura com certificado?
+
+
+## F20: Mesa da RUTE
+Tela cheia aberta por um botão: a pessoa diz "traga tudo do cliente X" e a RUTE organiza processos, prazos e documentos para ela mexer. Só lê e organiza; nada é enviado.
