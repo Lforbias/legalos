@@ -15,7 +15,7 @@ test("Integrações mostra o conector PJe (MNI) desligado e avisa que falta a ch
   await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
 
   await page.goto("/integracoes");
-  await expect(page.getByText("PJe (MNI) — intimações e movimentos")).toBeVisible();
+  await expect(page.getByText("Conexões de tribunais — MNI 2.2.2")).toBeVisible();
   await expect(page.getByText("Nenhuma conexão cadastrada.")).toBeVisible();
   await expect(page.getByText(/CERT_ENCRYPTION_KEY/).first()).toBeVisible();
   await expect(page.getByRole("button", { name: "Cadastrar conexão" })).toHaveCount(0);

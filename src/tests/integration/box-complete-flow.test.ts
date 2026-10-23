@@ -1,0 +1,55 @@
+import { describe, expect, it } from "vitest";
+import { db } from "@/lib/db/client";
+import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { createNotice, assignNotice, getNotice, markProcessed } from "@/server/services/notice.service";
+import { createTask, changeTaskStatus, getTask } from "@/server/services/task.service";
+import { createDeadline, validateDeadline, fulfillDeadline, getDeadline } from "@/server/services/deadline.service";
+import { uploadDocument } from "@/server/services/document.service";
+import { listCaseAutos } from "@/server/services/autos.service";
+import { listNotifications } from "@/server/services/notification.service";
+import { getBoxDashboard } from "@/server/services/box.service";
+import { addMember, makeOrgWithOwner } from "./helpers";
+describe("BOX: operação completa com dados de teste", () => {
+  it("recebe, distribui, gera tarefa/prazo, valida, anexa documento e encerra com histórico e notificações", async () => {
+    const A = await makeOrgWithOwner("box-complete-A"), B = await makeOrgWithOwner("box-complete-B");
+    const lawyer = await addMember(A.org.id, "LAWYER", "box-complete-law"), finance = await addMember(A.org.id, "FINANCE", "box-complete-fin");
+    const c = await db.case.create({ data: { organizationId: A.org.id, title: "Caso de teste do fluxo completo" } });
+    const before = (await getBoxDashboard(A.ctx)).notices!.boxes.entrada;
+    const n = await createNotice(A.ctx, { source: "MANUAL", kind: "INTIMACAO", title: "Manifestação de teste", content: "Conteúdo fictício para validar o fluxo da BOX.", court: "TJBA", caseNumber: "", caseId: c.id, publishedAt: "", receivedAt: "2026-10-23" });
+    expect((await getBoxDashboard(A.ctx)).notices!.boxes.entrada).toBe(before + 1);
+    await expect(assignNotice(finance.ctx, n.id, { userId: lawyer.user.id })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(getNotice(B.ctx, n.id)).rejects.toBeInstanceOf(NotFoundError);
+    await assignNotice(A.ctx, n.id, { userId: lawyer.user.id });
+    expect(await getNotice(lawyer.ctx, n.id)).toMatchObject({ status: "DISTRIBUTED", assigneeId: lawyer.user.id });
+    const t = await createTask(A.ctx, { title: "Preparar manifestação de teste", description: "Teste operacional", status: "TODO", priority: "HIGH", dueDate: "2026-11-03", assigneeId: lawyer.user.id, caseId: c.id, clientId: "" }, { sourceNoticeId: n.id });
+    const d = await createDeadline(A.ctx, { title: "Manifestação de teste", caseId: c.id, kind: "Manifestação", startDate: "", days: "", countType: "", dueDate: "2026-11-04", internalDueDate: "2026-11-03", responsibleId: lawyer.user.id, notes: "Datas fictícias; sem cálculo jurídico", calculationNote: "" }, { sourceNoticeId: n.id });
+    expect(d.status).toBe("DRAFT");
+    await validateDeadline(A.ctx, d.id);
+    const document = await uploadDocument(lawyer.ctx, { caseId: c.id }, { name: "manifestacao-teste.pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF") });
+    expect((await listCaseAutos(lawyer.ctx, c.id)).items.map(x => x.id)).toContain(document.id);
+    await changeTaskStatus(lawyer.ctx, t.id, "DONE");
+    await fulfillDeadline(lawyer.ctx, d.id);
+    await markProcessed(lawyer.ctx, n.id);
+    expect(await getNotice(A.ctx, n.id)).toMatchObject({ status: "PROCESSED", processedById: lawyer.user.id });
+    expect(await getTask(A.ctx, t.id)).toMatchObject({ status: "DONE", sourceNoticeId: n.id });
+    expect(await getDeadline(A.ctx, d.id)).toMatchObject({ status: "FULFILLED", sourceNoticeId: n.id });
+    const kinds = (await listNotifications(lawyer.ctx)).map(x => x.kind);
+    expect(kinds).toContain("notice.assigned"); expect(kinds).toContain("deadline.validated");
+    expect((await listNotifications(B.ctx))).toHaveLength(0);
+    expect(await db.auditLog.count({ where: { organizationId: A.org.id, action: { in: ["notice.create", "notice.assign", "notice.process", "deadline.create", "deadline.validate", "deadline.fulfill", "task.create"] } } })).toBe(7);
+    expect((await getBoxDashboard(A.ctx)).notices!.boxes.entrada).toBe(before);
+  });
+  it("não distribui nem notifica conteúdo sigiloso para pessoa ou equipe sem acesso", async () => {
+    const { createTeam, assignNoticeToTeam } = await import("@/server/services/inbox-flow.service");
+    const A = await makeOrgWithOwner("box-secret-flow");
+    const lawyer = await addMember(A.org.id, "LAWYER", "box-secret-recipient");
+    const c = await db.case.create({ data: { organizationId: A.org.id, title: "Caso restrito", confidential: true } });
+    const n = await createNotice(A.ctx, { source: "MANUAL", kind: "INTIMACAO", title: "Conteúdo restrito", content: "Publicação fictícia de caso sigiloso", court: "TJBA", caseNumber: "", caseId: c.id, publishedAt: "", receivedAt: "2026-10-23" });
+    const team = await createTeam(A.ctx, { name: "Equipe sem acesso ao caso", memberIds: [lawyer.user.id] });
+    await expect(assignNotice(A.ctx, n.id, { userId: lawyer.user.id })).rejects.toBeInstanceOf(ValidationError);
+    await expect(assignNoticeToTeam(A.ctx, n.id, team.id)).rejects.toBeInstanceOf(ValidationError);
+    expect(await getNotice(A.ctx, n.id)).toMatchObject({ status: "NEW", assigneeId: null, teamId: null });
+    expect(await listNotifications(lawyer.ctx)).toHaveLength(0);
+  });
+
+});

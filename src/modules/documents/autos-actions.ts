@@ -12,3 +12,26 @@ export async function bookmarkAction(id: string, favorite: boolean) {
     revalidatePath("/processos/[id]/autos", "page");
   });
 }
+
+export async function enqueueAutosAction(caseId: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { enqueueAutos } = await import("@/server/services/autos-queue.service");
+    return enqueueAutos(ctx, parse(uuidSchema, caseId));
+  });
+}
+export async function autosJobAction(caseId: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { latestAutosJob } = await import("@/server/services/autos-queue.service");
+    const job = await latestAutosJob(ctx, parse(uuidSchema, caseId));
+    return job ? { ...job, updatedAt: job.updatedAt.toISOString(), nextRunAt: job.nextRunAt.toISOString() } : null;
+  });
+}
+export async function retryAutosAction(caseId: string, id: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { retryAutos } = await import("@/server/services/autos-queue.service");
+    await retryAutos(ctx, parse(uuidSchema, caseId), parse(uuidSchema, id));
+  });
+}

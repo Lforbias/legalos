@@ -10,6 +10,18 @@ export type Release = { id: string; when: string; title: string; items: string[]
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
   {
+    id: "autos-fila-box-fluxo", when: "2026-10-23", title: "Autos em fila e validação do ciclo da BOX", migration: "20261222000000_autos_queue",
+    items: [
+      "Download de autos em lotes automáticos, persistido no banco: progresso, retomada após interrupções, três tentativas por falha e reenvio manual. Arquivos já recebidos são preservados; arquivos ignorados não bloqueiam os próximos lotes.",
+      "Notificações de conclusão/falha e autorização conferida a cada execução. A página de autos permite acompanhar a fila ao retornar.",
+      "Fluxo da BOX verificado com dados de teste: recebimento, distribuição, tarefa, prazo com validação humana, documentos, conclusão, histórico e notificações. Testes não equivalem a homologação de tribunal real.",
+    ],
+  },
+  {
+    id: "tribunais-mni-condicional", when: "2026-10-23", title: "Conexões por sistema e contrato MNI 2.2.2", migration: "20261221000000_court_connectors",
+    items: ["Sistema por processo, ambiente e inspeção do WSDL limitam as operações ao contrato cadastrado. eproc, e-SAJ e PROJUDI são condicionados à disponibilidade de MNI 2.2.2; MNI 3.0 e interfaces proprietárias não estão implementados. Perfil SCMPP/TJPR atende apenas movimentações públicas. Nenhum novo tribunal foi homologado nesta entrega."],
+  },
+  {
     id: "datajud-chave-escritorio", when: "2026-10-23", title: "DataJud: chave e teste de conexão em Integrações", migration: "20261220000000_datajud_org",
     items: ["Guarde a chave pública do CNJ com cifra por escritório, teste a autenticação e ligue a consulta sem precisar editar o servidor. A chave não volta ao navegador nem à auditoria. Configuração do servidor continua disponível como alternativa."],
   },

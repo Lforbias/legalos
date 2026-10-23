@@ -29,7 +29,7 @@ export default async function EditCasePage({ params }: { params: Promise<{ id: s
         members={members}
         initial={{
           number: c.number ?? "",
-          legacyNumber: c.legacyNumber ?? "",
+          courtSystem: (c.courtSystem ?? "") as "" | "pje-mni" | "eproc" | "esaj" | "projudi", legacyNumber: c.legacyNumber ?? "",
           title: c.title,
           area: c.area ?? "",
           court: c.court ?? "",

@@ -12,6 +12,7 @@ export const JOBS = {
   "chat-extras": { label: "Mensagens agendadas e lembretes de retorno do Chat", everyMin: 1, manual: true },
   "push-due": { label: "Avisos no celular (prazos e tarefas a vencer)", everyMin: 15, manual: true },
   "petition-queue": { label: "Fila de protocolos agendados", everyMin: 1, manual: true },
+  "autos-queue": { label: "Fila de download dos autos", everyMin: 1, manual: false },
   monitoring: { label: "Alertas do monitoramento de intimações", everyMin: 30, manual: true },
   "whatsapp-billing": { label: "Lembretes de cobrança no WhatsApp", everyMin: 60, manual: false },
 } as const;

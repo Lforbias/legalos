@@ -64,17 +64,27 @@ function extraCas(): string[] | undefined {
 export type Mtls = { pfx: Buffer; passphrase: string };
 
 /** POST SOAP. Certificado A1 (mTLS) opcional. Verificação TLS sempre ligada; nada do conteúdo é registrado em log. */
-export function postSoap(endpoint: string, xml: string, mtls?: Mtls): Promise<string> {
+export function postSoap(endpoint: string, xml: string, mtls?: Mtls, soapAction = ""): Promise<string> {
+  return requestXml(endpoint, xml, mtls, soapAction);
+}
+/** Consulta somente o WSDL do endpoint cadastrado; sem redirects, sem seguir imports, DNS protegido. */
+export function fetchWsdl(endpoint: string, mtls?: Mtls, direct = false): Promise<string> {
+  const u = assertEndpointUrl(endpoint);
+  if (!direct && ![...u.searchParams.keys()].some(k => k.toLowerCase() === "wsdl")) u.searchParams.set("wsdl", "");
+  return requestXml(u.href, null, mtls);
+}
+function requestXml(endpoint: string, xml: string | null, mtls?: Mtls, soapAction = ""): Promise<string> {
+  if (soapAction.length > 500 || /[\x00-\x20\x7f"\\]/.test(soapAction)) return Promise.reject(new MniError("SOAPAction inválido."));
   const url = assertEndpointUrl(endpoint);
   const isHttps = url.protocol === "https:";
   return new Promise((resolve, reject) => {
-    const body = Buffer.from(xml, "utf8");
+    const body = Buffer.from(xml ?? "", "utf8");
     const opts: https.RequestOptions = {
-      method: "POST",
+      method: xml === null ? "GET" : "POST",
       hostname: url.hostname,
       port: url.port || (isHttps ? 443 : 80),
       path: `${url.pathname}${url.search}`,
-      headers: { "content-type": "text/xml; charset=UTF-8", "content-length": body.length, soapaction: '""', accept: "text/xml, application/xml" },
+      headers: { "content-type": "text/xml; charset=UTF-8", "content-length": body.length, soapaction: `"${soapAction}"`, accept: "text/xml, application/xml" },
       lookup: safeLookup,
       timeout: TIMEOUT_MS,
       ...(isHttps ? { rejectUnauthorized: true, ca: extraCas(), ...(mtls ? { pfx: mtls.pfx, passphrase: mtls.passphrase } : {}) } : {}),
@@ -84,7 +94,7 @@ export function postSoap(endpoint: string, xml: string, mtls?: Mtls): Promise<st
       let size = 0;
       res.on("data", (c: Buffer) => {
         size += c.length;
-        if (size > MAX_RESPONSE_BYTES) {
+        if (size > (xml === null ? 2 * 1024 * 1024 : MAX_RESPONSE_BYTES)) {
           req.destroy();
           return reject(new MniError("Resposta do tribunal grande demais."));
         }

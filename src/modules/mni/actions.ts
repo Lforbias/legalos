@@ -6,6 +6,7 @@ import { uuidSchema, type ActionState } from "@/lib/validation/common";
 import { parse, runAction } from "@/server/action-helpers";
 import {
   AUTH_MODES,
+  inspectConnectionContract,
   consultCaseMni,
   importAutosMni,
   createConnection,
@@ -20,12 +21,16 @@ import { setPetitionTypes } from "@/server/services/mni-petition.service";
 import { requireTenant } from "@/server/session";
 
 const connectionSchema = z.object({
+  wsdlUrl: z.string().trim().max(2000).optional(),
+  authProfile: z.enum(["STATIC", "TJPR_SCMPP"]).optional(),
+  system: z.enum(["pje-mni", "eproc", "esaj", "projudi"]).optional(),
+  environment: z.enum(["HOMOLOGATION", "PRODUCTION", "UNSPECIFIED"]).optional(),
   label: z.string().trim().min(2, "Dê um nome à conexão.").max(80),
   jtr: z.string().trim(),
   endpointUrl: z.string().trim().min(8, "Informe o endereço do serviço."),
   authMode: z.enum(AUTH_MODES),
   certificateId: z.string().trim().optional(),
-  document: z.string().trim().min(11, "Informe o CPF ou CNPJ."),
+  document: z.string().trim().min(1, "Informe o identificador de acesso.").max(120),
   password: z.string().optional(),
 });
 
@@ -94,5 +99,14 @@ export async function setPetitionTypesAction(id: string, types: Record<string, s
     await setPetitionTypes(ctx, parse(uuidSchema, id), parse(z.record(z.string(), z.string().max(40)), types));
     revalidatePath("/integracoes");
     return undefined;
+  });
+}
+
+export async function inspectContractAction(id: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const result = await inspectConnectionContract(ctx, parse(uuidSchema, id));
+    revalidatePath("/integracoes");
+    return result;
   });
 }

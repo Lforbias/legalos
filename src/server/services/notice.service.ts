@@ -180,6 +180,18 @@ async function load(ctx: TenantContext, id: string) {
   return n;
 }
 
+/** Distribuição não concede acesso a processo sigiloso nem revela seu título em notificações. */
+export async function assertNoticeRecipients(ctx: TenantContext, noticeId: string, userIds: string[]) {
+  const ids = [...new Set(userIds)];
+  if (!ids.length) throw new ValidationError("Escolha destinatários ativos com acesso à caixa.");
+  const members = await db.membership.findMany({ where: { organizationId: ctx.organizationId, userId: { in: ids }, status: "ACTIVE", user: { disabledAt: null }, role: { permissions: { has: "inbox:read" } } }, select: { userId: true, role: { select: { permissions: true } } } });
+  if (members.length !== ids.length) throw new ValidationError("Há destinatários inativos ou sem acesso à caixa.");
+  for (const member of members) {
+    const targetCtx = { ...ctx, userId: member.userId, permissions: new Set(member.role.permissions) };
+    if (!await db.courtNotice.count({ where: { AND: [{ id: noticeId, organizationId: ctx.organizationId, deletedAt: null }, visibility(targetCtx)] } })) throw new ValidationError("Um destinatário não tem acesso ao processo. Confira o sigilo antes de distribuir.");
+  }
+}
+
 export async function assignNotice(ctx: TenantContext, id: string, raw: { userId: string }) {
   assertCan(ctx, "inbox:write");
   const { userId } = assignSchema.parse(raw);
@@ -188,6 +200,7 @@ export async function assignNotice(ctx: TenantContext, id: string, raw: { userId
   await assertActiveMember(ctx, userId);
   const target = await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId, status: "ACTIVE" }, select: { role: { select: { permissions: true } } } });
   if (!target?.role.permissions.includes("inbox:read")) throw new ValidationError("Este membro não tem acesso à caixa de intimações.", { userId: ["Escolha um membro com acesso à caixa de intimações."] });
+  await assertNoticeRecipients(ctx, id, [userId]);
   await db.$transaction(async (tx) => {
     await tx.courtNotice.update({ where: { id }, data: { assigneeId: userId, teamId: null, assignedById: ctx.userId, status: "DISTRIBUTED" } });
     await audit({ action: "notice.assign", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: id, metadata: { to: userId }, meta: ctx.meta }, tx);

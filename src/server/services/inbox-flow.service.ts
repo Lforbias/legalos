@@ -5,7 +5,7 @@ import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { isUniqueViolation } from "./db-errors";
 import { notify } from "./notification.service";
-import { getNotice, visibility } from "./notice.service";
+import { assertNoticeRecipients, getNotice, visibility } from "./notice.service";
 
 // ---------------------------------------------------------------- equipes de trabalho
 export async function listTeams(ctx: TenantContext) {
@@ -77,6 +77,7 @@ export async function assignNoticeToTeam(ctx: TenantContext, id: string, teamId:
   if (!isOpen(n.status)) throw new ConflictError("Reabra a intimação antes de redistribuí-la.");
   const team = await db.workTeam.findFirst({ where: { id: teamId, organizationId: ctx.organizationId }, include: { members: { select: { userId: true } } } });
   if (!team) throw new ValidationError("Equipe inválida.", { teamId: ["Selecione uma equipe."] });
+  await assertNoticeRecipients(ctx, id, team.members.map(m => m.userId));
   await db.$transaction(async (tx) => {
     await tx.courtNotice.update({ where: { id }, data: { teamId, assigneeId: null, assignedById: ctx.userId, status: "DISTRIBUTED" } });
     await audit({ action: "notice.assign_team", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: id, metadata: { teamId }, meta: ctx.meta }, tx);

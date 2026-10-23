@@ -462,6 +462,7 @@ model Case {
   organizationId String     @map("organization_id") @db.Uuid
   number         String?
   legacyNumber   String?    @map("legacy_number")
+  courtSystem    String?    @map("court_system")
   title          String
   area           String?
   court          String?
@@ -1556,6 +1557,14 @@ model CourtConnection {
   organizationId String    @map("organization_id") @db.Uuid
   label          String
   jtr            String
+  system         String    @default("pje-mni")
+  authProfile    String    @default("STATIC") @map("auth_profile")
+  environment    String    @default("UNSPECIFIED")
+  wsdlUrl        String?   @map("wsdl_url")
+  wsdlActions    Json      @default("{}") @map("wsdl_actions")
+  wsdlStatus     String?   @map("wsdl_status")
+  wsdlCheckedAt  DateTime? @map("wsdl_checked_at") @db.Timestamptz(3)
+  wsdlOperations String[]  @default([]) @map("wsdl_operations")
   endpointUrl    String    @map("endpoint_url")
   authMode       String    @map("auth_mode")
   certificateId  String?   @map("certificate_id") @db.Uuid
@@ -3530,4 +3539,28 @@ model TaskStage {
   tasks Task[]
   @@unique([organizationId, name])
   @@map("task_stages")
+}
+
+model AutosDownloadJob {
+  initialCount Int @default(0) @map("initial_count")
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  caseId String @map("case_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  status String @default("QUEUED")
+  attempts Int @default(0)
+  listed Int @default(0)
+  imported Int @default(0)
+  remaining Int @default(0)
+  skipped Int @default(0)
+  excludedIds String[] @default([]) @map("excluded_ids")
+  error String?
+  nextRunAt DateTime @default(now()) @map("next_run_at") @db.Timestamptz(3)
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+  leaseToken String? @map("lease_token") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([status, nextRunAt])
+  @@index([organizationId, caseId, createdAt])
+  @@map("autos_download_jobs")
 }

@@ -1,7 +1,8 @@
+import { connectionSoapAction } from "@/lib/connectors/capabilities";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { isValidCnj, onlyDigits } from "@/lib/validation/br-documents";
 import { jtrOfCnj } from "@/lib/mni/tribunals";
-import { assertConnectorFor } from "./court-system-map.service";
+
 import { postSoap } from "@/lib/mni/transport";
 import { buildEntregarManifestacao, MniError, parseEntregarManifestacao, type MniManifestDoc } from "@/lib/mni/xml";
 import { SubmissionUncertainError, type PetitioningAdapter } from "@/lib/petitioning/adapter";
@@ -10,7 +11,7 @@ import { db } from "@/lib/db/client";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { requireMfa } from "./certificate.service";
-import { loadConnection, mtlsFor, record, type SoapPost } from "./mni.service";
+import { connectionForCase, assertConnectionOperation, loadConnection, mtlsFor, record, type SoapPost } from "./mni.service";
 
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const CODE = /^[A-Za-z0-9._-]{1,20}$/;
@@ -32,11 +33,20 @@ export async function setPetitionTypes(ctx: TenantContext, connectionId: string,
   await audit({ action: "mni.petition_types_set", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: connectionId, metadata: { keys: Object.keys(clean) }, meta: ctx.meta });
 }
 
-async function findConnection(ctx: TenantContext, caseNumber: string | null) {
+async function findConnection(ctx: TenantContext, caseNumber: string | null, caseId?: string) {
   if (!caseNumber || !isValidCnj(caseNumber)) throw new ConflictError("O processo precisa ter um número CNJ válido para protocolar no tribunal.");
   const jtr = jtrOfCnj(caseNumber);
-  await assertConnectorFor(ctx.organizationId, jtr, "petition");
-  const conn = jtr ? await db.courtConnection.findFirst({ where: { organizationId: ctx.organizationId, jtr, enabled: true }, select: { id: true, petitionTypes: true, label: true } }) : null;
+  let conn;
+  if (caseId) {
+    const selected = await connectionForCase(ctx, caseId, "entregarManifestacaoProcessual");
+    conn = selected ? await db.courtConnection.findFirst({ where: { id: selected.id, organizationId: ctx.organizationId }, select: { id: true, petitionTypes: true, label: true } }) : null;
+  } else {
+    const { assertConnectorFor } = await import("./court-system-map.service");
+    await assertConnectorFor(ctx.organizationId, jtr, "petition");
+    const candidates = jtr ? await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, jtr, enabled: true }, select: { id: true, petitionTypes: true, label: true } }) : [];
+    if (candidates.length > 1) throw new ConflictError("Mais de uma conexão disponível; informe o processo para selecionar o sistema.");
+    conn = candidates[0];
+  }
   if (!conn) throw new ConflictError("Nenhuma conexão PJe/MNI ativa para o tribunal deste processo (cadastre em Integrações).");
   return conn;
 }
@@ -49,12 +59,12 @@ const asTypes = (v: unknown): Partial<Record<PetitionTypeKey, string>> => (v && 
  */
 export const mniAdapter: PetitioningAdapter = {
   key: "mni",
-  label: "PJe/MNI (protocolo real)",
+  label: "Tribunais via MNI 2.2.2 (protocolo real)",
   isDemo: false,
   async preflight(input, env) {
     const ctx = env.ctx as TenantContext;
     await requireMfa(ctx.userId);
-    const conn = await findConnection(ctx, input.caseNumber);
+    const conn = await findConnection(ctx, input.caseNumber, env.caseId);
     const types = asTypes(conn.petitionTypes);
     if (!types.PETICAO) throw new ConflictError(`Configure em Integrações o código de tipo de documento da PETIÇÃO para a conexão "${conn.label}" (o tribunal informa os códigos).`);
     for (const a of input.attachments) {
@@ -67,9 +77,10 @@ export const mniAdapter: PetitioningAdapter = {
     if (!env) throw new Error("Contexto de envio ausente.");
     const ctx = env.ctx as TenantContext;
     const post = (env.post as SoapPost | undefined) ?? postSoap;
-    const conn = await findConnection(ctx, input.caseNumber);
+    const conn = await findConnection(ctx, input.caseNumber, env.caseId);
     const types = asTypes(conn.petitionTypes) as Record<string, string>;
     const { c, secret } = await loadConnection(ctx, conn.id, { personal: true });
+    assertConnectionOperation(c, "entregarManifestacaoProcessual");
     const cnj = onlyDigits(input.caseNumber ?? "");
     const docs: MniManifestDoc[] = [
       { tipoDocumento: types.PETICAO!, mimetype: input.document.mimeType, descricao: input.title.slice(0, 120), conteudo: env.files.main },
@@ -80,7 +91,7 @@ export const mniAdapter: PetitioningAdapter = {
 
     let response: string;
     try {
-      response = await post(c.endpointUrl, xml, mtls);
+      response = await post(c.endpointUrl, xml, mtls, connectionSoapAction(c, "entregarManifestacaoProcessual"));
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       const definite = /recusou o acesso|Falha de TLS/i.test(msg);

@@ -14,7 +14,7 @@ import { getCase } from "@/server/services/case.service";
 import { listCaseAutos } from "@/server/services/autos.service";
 import { getDocument } from "@/server/services/document.service";
 import { connectionForCase } from "@/server/services/mni.service";
-import { MniAutosButton } from "@/modules/mni/mni-ui";
+import { AutosQueue } from "@/modules/documents/autos-queue";
 import { BookmarkButton } from "@/modules/documents/bookmark-button";
 import { formatDateTime } from "@/lib/dates/format";
 import { formatBytes } from "@/lib/format/phone";
@@ -39,8 +39,9 @@ export default async function AutosPage({ params, searchParams }: { params: Prom
     return `/processos/${c.id}/autos?${q}`;
   };
   return <div className="mx-auto max-w-[1600px]">
-    <PageHeader title="Autos digitais" description={`${c.title} · ${c.number ?? "Sem número"}`} actions={<div className="flex gap-2"><Link className={buttonVariants({ variant: "secondary" })} href={`/processos/${c.id}?aba=documentos`}>Documentos do processo</Link>{connection ? <MniAutosButton caseId={c.id} label={connection.label} /> : null}</div>} />
-    <p className="mb-3 text-sm text-muted">{data.lastSync ? `${data.lastSync.action.endsWith("failed") ? "Última tentativa falhou; arquivos já recebidos foram preservados" : "Última sincronização concluída"}: ${formatDateTime(data.lastSync.createdAt, ctx.timezone)}.` : "Nenhuma sincronização dos autos registrada."} {!connection ? "Para sincronizar, configure uma conexão compatível em Integrações." : "A sincronização importa até 25 arquivos por execução; repita se houver pendências."}</p>
+    <PageHeader title="Autos digitais" description={`${c.title} · ${c.number ?? "Sem número"}`} actions={<div className="flex gap-2"><Link className={buttonVariants({ variant: "secondary" })} href={`/processos/${c.id}?aba=documentos`}>Documentos do processo</Link></div>} />
+    <p className="mb-3 text-sm text-muted">{data.lastSync ? `${data.lastSync.action.endsWith("failed") ? "Última tentativa falhou; arquivos já recebidos foram preservados" : "Última sincronização concluída"}: ${formatDateTime(data.lastSync.createdAt, ctx.timezone)}.` : "Nenhuma sincronização dos autos registrada."} {!connection ? "Para sincronizar, configure uma conexão compatível em Integrações." : "Use a fila para baixar os arquivos em lotes automaticamente."}</p>
+    <AutosQueue caseId={c.id} canWrite={Boolean(connection)} />
     <form method="get" className="mb-4 flex flex-wrap gap-3 items-center"><label className="flex-1 text-sm">Buscar nos autos<Input name="q" defaultValue={sp.q ?? ""} maxLength={150} placeholder="Nome, descrição ou texto extraído (inclui versões anteriores)" /></label><label className="text-sm"><input name="favoritos" type="checkbox" value="1" defaultChecked={sp.favoritos === "1"} /> Só meus favoritos</label><button className={buttonVariants({ variant: "secondary" })}>Buscar</button></form>
     <p className="mb-3 text-sm">{data.total} documento(s) · página {data.page} de {data.pageCount}</p>
     <div className="grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
