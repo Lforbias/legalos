@@ -123,7 +123,10 @@ export class GeminiToolChat implements ToolChatProvider {
 
   async run(i: ToolChatInput): Promise<ToolChatResult> {
     const contents: { role: string; parts: GemPart[] }[] = i.history.map((t) => ({ role: t.role === "assistant" ? "model" : "user", parts: [{ text: t.text }] }));
-    const decls = i.tools.map((t) => ({ name: t.name, description: t.description, ...(Object.keys(t.input.properties).length ? { parameters: t.input } : {}) }));
+    const decls = i.tools.map((t) => {
+      const { $schema: _dialect, ...schema } = t.input as ToolSpec["input"] & { $schema?: string };
+      return { name: t.name, description: t.description, ...(Object.keys(t.input.properties).length ? { parametersJsonSchema: schema } : {}) };
+    });
     let inT = 0, outT = 0, calls = 0;
     for (let step = 0; step < i.maxSteps; step++) {
       const b = (await post(`${this.baseUrl}/v1beta/models/${encodeURIComponent(this.model)}:generateContent`, { "x-goog-api-key": this.apiKey }, { systemInstruction: { parts: [{ text: i.system }] }, contents, generationConfig: { maxOutputTokens: i.maxTokens }, ...(decls.length ? { tools: [{ functionDeclarations: decls }] } : {}) }, "Gemini")) as { candidates?: { content?: { parts?: GemPart[] } }[]; usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number } };
