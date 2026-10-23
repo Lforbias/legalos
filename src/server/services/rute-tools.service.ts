@@ -5,6 +5,7 @@ import { isYmd, todayYmd, addDays } from "@/lib/dates/ymd";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import type { PermissionKey } from "@/lib/permissions/catalog";
 import { assertCan, can, type TenantContext } from "@/server/context";
+import { getDashboard } from "./dashboard.service";
 import { listEvents } from "./agenda.service";
 import { caseVisibility } from "./case.service";
 import { apiGetCase, apiGetClient, apiGetNotice, apiListClients, apiListDeadlines, apiListNotices } from "./public-api.service";
@@ -48,6 +49,24 @@ async function visibleCaseIds(ctx: TenantContext, where: object, take = 50) {
 
 const TOOLS: ToolDef[] = [
   {
+    name: "indicadores_escritorio", title: "Indicadores do escritório", scope: "read", permission: "ai:use",
+    description: "Totais exatos da visão geral do escritório: membros ativos, clientes ativos, processos em andamento e suspensos, prazos, minhas tarefas e intimações. Use para perguntas 'quantos', contagens e estatísticas; não conte uma lista limitada. Cada indicador respeita a permissão do módulo e a visibilidade dos processos.",
+    input: { type: "object", properties: {} }, schema: z.object({}),
+    run: async (ctx) => {
+      const d = await getDashboard(ctx);
+      return {
+        fonte: { tela: "Visão geral do Func", caminho: "/" }, consultado_em: new Date().toISOString(), fuso: ctx.timezone,
+        ...(can(ctx, "members:read") ? { membros_ativos: d.members.active, membros_suspensos: d.members.suspended, convites_pendentes: d.pendingInvitations } : {}),
+        ...(d.legal.activeClients !== null ? { clientes_ativos: d.legal.activeClients } : {}),
+        ...(d.legal.activeCases !== null ? { processos_em_andamento: d.legal.activeCases, processos_suspensos: d.legal.suspendedCases } : {}),
+        ...(d.work.deadlines ? { prazos: { em_aberto: d.work.deadlines.open, vencidos: d.work.deadlines.overdue, aguardando_validacao: d.work.deadlines.draft, proximos_7_dias: d.work.deadlines.next7 } } : {}),
+        ...(d.work.myTasks ? { minhas_tarefas: { em_aberto: d.work.myTasks.open, atrasadas: d.work.myTasks.overdue } } : {}),
+        ...(d.work.notices ? { intimacoes: { novas: d.work.notices.new, distribuidas_para_mim: d.work.notices.mine } } : {}),
+        observacao: "Totais calculados no banco, não limitados à primeira página. Indicadores sem permissão são omitidos; processos respeitam a visibilidade de quem consulta. Não some rascunhos aos prazos em aberto: são parte deles.",
+      };
+    },
+  },
+  {
     name: "hoje", title: "Resumo do dia", scope: "read", permission: "ai:use",
     description: "Resumo do dia de quem está conectado: prazos dos próximos 7 dias, tarefas atrasadas e quantidade de intimações novas.",
     input: { type: "object", properties: {} }, schema: z.object({}),
@@ -62,11 +81,11 @@ const TOOLS: ToolDef[] = [
   },
   {
     name: "buscar_clientes", title: "Buscar clientes", scope: "read", permission: "clients:read",
-    description: "Busca clientes pelo nome (parte do nome). Devolve id, nome, tipo, situação e cidade.",
-    input: { type: "object", properties: { q: S("parte do nome"), limit: { type: "integer", description: "1 a 50" } } },
-    schema: z.object({ q: z.string().max(80).optional(), limit: lim }),
+    description: "Busca clientes pelo nome e/ou situação (ACTIVE = ativo, INACTIVE = inativo, PROSPECT = prospect). Lista limitada, não serve para contar o total; para totais use indicadores_escritorio.",
+    input: { type: "object", properties: { q: S("parte do nome"), status: S("ACTIVE, INACTIVE ou PROSPECT"), limit: { type: "integer", description: "1 a 50" } } },
+    schema: z.object({ q: z.string().max(80).optional(), status: z.enum(["ACTIVE", "INACTIVE", "PROSPECT"]).optional(), limit: lim }),
     run: async (ctx, a) => {
-      const r = await apiListClients(ctx, { q: a.q as string | undefined, limit: String(a.limit ?? 20) });
+      const r = await apiListClients(ctx, { q: a.q as string | undefined, status: a.status as string | undefined, limit: String(a.limit ?? 20) });
       return r.data.map((c) => ({ id: c.id, nome: c.name, tipo: c.type, situacao: c.status, cidade: c.city, estado: c.state, etiquetas: c.tags }));
     },
   },
