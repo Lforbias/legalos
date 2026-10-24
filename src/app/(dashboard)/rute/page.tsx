@@ -98,7 +98,7 @@ async function Connections({ ctx, manage, enabled, tz }: { ctx: Ctx; manage: boo
 async function Proposals({ ctx }: { ctx: Ctx }) {
   const tz = ctx.timezone;
   const [open, decided] = await Promise.all([listProposals(ctx, { status: "PENDING" }), listProposals(ctx, { status: "DECIDED" })]);
-  const map = (p: Awaited<ReturnType<typeof listProposals>>[number]) => ({ id: p.id, kindLabel: p.kindLabel, risk: p.risk, title: p.title, payload: p.payload, via: p.via, connection: p.connection, caseTitle: p.caseTitle, status: p.status, proposerName: p.proposerName, createdAt: formatDateTime(p.createdAt, tz), expiresAt: formatDateTime(p.expiresAt, tz), decisionNote: p.decisionNote });
+  const map = (p: Awaited<ReturnType<typeof listProposals>>[number]) => ({ id: p.id, kindLabel: p.kindLabel, risk: p.risk, title: p.title, payload: p.payload, via: p.via, connection: p.connection, caseTitle: p.caseTitle, status: p.status, proposerName: p.proposerName, createdAt: formatDateTime(p.createdAt, tz), expiresAt: formatDateTime(p.expiresAt, tz), decisionNote: p.decisionNote, resultId: p.resultId, resultType: p.resultType, caseId: p.caseId });
   return (
     <div className="space-y-4">
       <Card><CardHeader title="Aguardando a sua decisão" description="Revise, edite se quiser e aprove. Ações de maior risco pedem confirmação expressa." /><ProposalList items={open.map(map)} /></Card>

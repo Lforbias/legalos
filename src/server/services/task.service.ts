@@ -1,7 +1,8 @@
+import { assertTaskReady, advanceTaskDependencies } from "./task-dependency";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { formatYmd, todayYmd } from "@/lib/dates/ymd";
-import { NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { commentSchema, taskSchema, toTaskData, TASK_STATUS_LABEL, type CommentInput, type TaskInput } from "@/modules/tasks/schemas";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
@@ -117,10 +118,13 @@ export async function updateTask(ctx: TenantContext, id: string, raw: TaskInput)
   const current = await getTask(ctx, id);
   await validateLinks(ctx, data);
   await db.$transaction(async (tx) => {
-    await tx.task.update({
-      where: { id },
+    await assertTaskReady(tx,ctx,id,data.status);
+    const changed=await tx.task.updateMany({
+      where: { id, organizationId:ctx.organizationId, updatedAt:current.updatedAt, deletedAt:null },
       data: { ...data, ...(data.status !== current.status ? { stageId: null } : {}), completedAt: data.status === "DONE" ? (current.completedAt ?? new Date()) : null },
     });
+    if(changed.count!==1)throw new ConflictError("A tarefa mudou. Recarregue antes de salvar.");
+    if(data.status!==current.status&&(data.status==="DONE"||current.status==="DONE"))await advanceTaskDependencies(tx,ctx,id,data.status==="DONE");
     const changes: string[] = [];
     if (data.title !== current.title) changes.push(`Título: “${current.title}” → “${data.title}”`);
     if (data.status !== current.status) changes.push(`Situação: ${TASK_STATUS_LABEL[current.status]} → ${TASK_STATUS_LABEL[data.status]}`);
@@ -144,7 +148,10 @@ export async function changeTaskStatus(ctx: TenantContext, id: string, status: S
   const t = await getTask(ctx, id);
   if (t.status === status && !t.stageId) return;
   await db.$transaction(async (tx) => {
-    await tx.task.update({ where: { id }, data: { status, stageId: null, completedAt: status === "DONE" ? (t.completedAt ?? new Date()) : null } });
+    await assertTaskReady(tx,ctx,id,status);
+    const changed=await tx.task.updateMany({ where: { id,organizationId:ctx.organizationId,updatedAt:t.updatedAt,deletedAt:null }, data: { status, stageId: null, completedAt: status === "DONE" ? (t.completedAt ?? new Date()) : null } });
+    if(changed.count!==1)throw new ConflictError("A tarefa mudou. Recarregue antes de alterar.");
+    if(status!==t.status&&(status==="DONE"||t.status==="DONE"))await advanceTaskDependencies(tx,ctx,id,status==="DONE");
     if (t.caseId && t.status !== status && (status === "DONE" || t.status === "DONE")) {
       await logCaseEvent(tx, ctx, t.caseId, { kind: status === "DONE" ? "TASK_DONE" : "TASK_REOPENED", title: `${status === "DONE" ? "Tarefa concluída" : "Tarefa reaberta"}: ${t.title}` });
     }

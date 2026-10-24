@@ -71,12 +71,15 @@ export async function setEmergencyStop(ctx: TenantContext, on: boolean) {
 
 export async function setAssistantProvider(ctx: TenantContext, input: { provider: string; model?: string; apiKey?: string; clearKey?: boolean }) {
   assertCan(ctx, "integrations:manage");
-  if (!(input.provider in PROVIDERS)) throw new ValidationError("Escolha o provedor.", { provider: ["Escolha o provedor."] });
+  if (!Object.hasOwn(PROVIDERS, input.provider)) throw new ValidationError("Escolha o provedor.", { provider: ["Escolha o provedor."] });
   const model = input.model?.trim() || null;
   if (model && !/^[\w.:/-]{2,80}$/.test(model)) throw new ValidationError("Nome de modelo inválido.", { model: ["Nome de modelo inválido."] });
   const k = input.apiKey?.trim();
   if (k && (k.length < 20 || k.length > 300 || /\s/.test(k))) throw new ValidationError("A chave parece inválida.", { apiKey: ["Chave inválida."] });
-  const data = { provider: input.provider, model, ...(k ? { apiKeyEnc: encryptSecret(k, key()) } : {}), ...(input.clearKey ? { apiKeyEnc: null } : {}) };
+  if (k && input.clearKey) throw new ValidationError("Escolha entre trocar ou remover a chave.");
+  const previous = await row(ctx.organizationId);
+  const changingProvider = previous && previous.provider !== input.provider;
+  const data = { provider: input.provider, model, ...(changingProvider && !k ? { apiKeyEnc: null } : {}), ...(k ? { apiKeyEnc: encryptSecret(k, key()) } : {}), ...(input.clearKey ? { apiKeyEnc: null } : {}) };
   await db.ruteSettings.upsert({ where: { organizationId: ctx.organizationId }, create: { organizationId: ctx.organizationId, ...data }, update: data });
   await audit({ action: "rute.provider", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "organization", resourceId: ctx.organizationId, metadata: { provider: input.provider, keyChanged: !!k }, meta: ctx.meta });
 }

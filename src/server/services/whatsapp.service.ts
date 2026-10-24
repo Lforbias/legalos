@@ -1,7 +1,7 @@
+import { humanReplyLifecycle, setServiceStatus } from "./chat-lifecycle.service";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
-import { logger } from "@/lib/logging/logger";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { deleteObject, putObject } from "@/lib/storage/local-storage";
 import { markAsRead, sendTemplate as apiSendTemplate, WhatsappApiError, type OutKind } from "@/lib/whatsapp/client";
@@ -18,14 +18,15 @@ import { sanitizeFileName } from "./document.service";
 export type ConversationFilter = "mine" | "unassigned" | "open" | "closed";
 
 const listSelect = {
-  id: true, waId: true, contactName: true, status: true, lastMessageAt: true, lastInboundAt: true, lastPreview: true, unreadCount: true, accountId: true, account: { select: { label: true, isPrimary: true } },
+  id: true, serviceStatus:true, waId: true, contactName: true, status: true, lastMessageAt: true, lastInboundAt: true, lastPreview: true, unreadCount: true, accountId: true, account: { select: { label: true, isPrimary: true } },
   client: { select: { id: true, name: true } }, case: { select: { id: true, number: true, title: true } }, lead: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } }, queue: { select: { id: true, name: true } },
   labels: { select: { label: { select: { id: true, name: true, color: true } } }, orderBy: { label: { name: "asc" } } },
 } satisfies Prisma.WhatsappConversationSelect;
 
-export async function listConversations(ctx: TenantContext, filter: ConversationFilter = "open", search?: string, queueId?: string, labelId?: string, accountId?: string) {
+export async function listConversations(ctx: TenantContext, filter: ConversationFilter = "open", search?: string, queueId?: string, labelId?: string, accountId?: string,serviceStatus?:string) {
   assertCan(ctx, "whatsapp:read");
   const where: Prisma.WhatsappConversationWhereInput = { organizationId: ctx.organizationId };
+  if(serviceStatus)where.serviceStatus=serviceStatus;
   if (filter === "closed") where.status = "CLOSED";
   else where.status = "OPEN";
   if (filter === "mine") where.assignedToId = ctx.userId;
@@ -89,7 +90,7 @@ async function markLastInboundRead(organizationId: string, conversationId: strin
 const preview = (body: string | null, type: string) => (body ? body.replace(/\s+/g, " ").slice(0, 120) : `[${type}]`);
 
 async function touch(conversationId: string, text: string | null, type: string, at: Date) {
-  await db.whatsappConversation.update({ where: { id: conversationId }, data: { lastMessageAt: at, lastPreview: preview(text, type), status: "OPEN" } });
+  await db.whatsappConversation.update({ where: { id: conversationId }, data: { lastMessageAt: at, lastPreview: preview(text, type) } });
 }
 
 function cleanText(raw: string): string {
@@ -144,6 +145,7 @@ export async function sendMessage(ctx: TenantContext, conversationId: string, te
   const d = await deliver(() => tr.sendText(c.waId, body));
   const m = await saveOut({ organizationId: ctx.organizationId, conversationId, direction: "OUT", type: "text", body, status: d.status, error: d.error, waMessageId: d.waMessageId, authorId: ctx.userId });
   await touch(conversationId, body, "text", m.createdAt);
+  if(d.status==="SENT")await humanReplyLifecycle(ctx.organizationId,conversationId);
   return { id: m.id, status: d.status, error: d.error };
 }
 
@@ -186,6 +188,7 @@ export async function sendFile(ctx: TenantContext, conversationId: string, file:
     const d = await deliver(() => tr.sendFile(c.waId, { kind, buffer: file.buffer, mime, name, caption: cap }));
     const m = await saveOut({ organizationId: ctx.organizationId, conversationId, direction: "OUT", type: kind, body: cap, mediaKey: key, mediaMime: mime, mediaName: name, mediaSize: file.buffer.length, status: d.status, error: d.error, waMessageId: d.waMessageId, authorId: ctx.userId });
     await touch(conversationId, cap, name, m.createdAt);
+  if(d.status==="SENT")await humanReplyLifecycle(ctx.organizationId,conversationId);
     return { id: m.id, status: d.status, error: d.error };
   } catch (e) {
     await deleteObject(key);
@@ -212,6 +215,7 @@ export async function sendTemplateMessage(ctx: TenantContext, conversationId: st
   const text = fillTemplate(t.body, params);
   const m = await db.whatsappMessage.create({ data: { organizationId: ctx.organizationId, conversationId, direction: "OUT", type: "template", body: text, status: d.status, error: d.error, waMessageId: d.waMessageId, authorId: ctx.userId } });
   await touch(conversationId, text, "template", m.createdAt);
+  if(d.status==="SENT")await humanReplyLifecycle(ctx.organizationId,conversationId);
   return { id: m.id, status: d.status, error: d.error };
 }
 
@@ -239,12 +243,7 @@ export async function assignConversation(ctx: TenantContext, conversationId: str
 export async function setConversationStatus(ctx: TenantContext, conversationId: string, status: "OPEN" | "CLOSED") {
   assertCan(ctx, "whatsapp:write");
   await loadConversation(ctx, conversationId);
-  const before = await db.whatsappConversation.findUnique({ where: { id: conversationId }, select: { status: true } });
-  await db.whatsappConversation.update({ where: { id: conversationId }, data: { status } });
-  if (status === "CLOSED" && before?.status !== "CLOSED") {
-    const { autoSurveyOnClose } = await import("./chat-extras.service"); // NPS automático ao encerrar (só com a chave ligada)
-    await autoSurveyOnClose(ctx.organizationId, conversationId, ctx.userId).catch((e) => logger.warn("chat.auto_survey_failed", { error: e instanceof Error ? e.message : String(e) }));
-  }
+  await setServiceStatus(ctx,conversationId,status);
 }
 
 export async function linkClient(ctx: TenantContext, conversationId: string, clientId: string | null) {

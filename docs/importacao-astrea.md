@@ -39,7 +39,7 @@ npm run import:astrea -- --dir "..." --email ... --only clientes,processos,prazo
 | Usuário | — | usado só para achar o responsável pelo **e-mail de login**; sem correspondência, o item fica com quem rodou o importador |
 
 ## O que NÃO é importado
-- **Documentos:** o backup traz só links (Google Docs etc.), não os arquivos.
+- **Arquivos binários de documentos:** o CSV não contém os arquivos. O importador atual traz links externos válidos para `linked_documents` (`linked_doc` no mapa), vinculados ao processo/cliente. Links não equivalem a uma cópia local do arquivo.
 - **Faturas** (agrupadores), linhas de **saldo inicial** (já vêm da conta), lançamentos de valor zero e as planilhas Honorários/Despesas (espelham as Entradas); transferências entre contas.
 - comentários avulsos, timesheets, listas de tarefa, contatos que não são clientes nem partes.
 - Datas/campos que o Astrea exporta em formato inválido são ignorados e contados no relatório.
@@ -78,3 +78,7 @@ Execute `npm run audit:astrea-tasks -- --org <id do escritório>` no ambiente qu
 Os candidatos não comprovam erro: uma tarefa pode ter sido reaberta. Confira o campo `Realizada` no CSV original e o histórico de alterações antes de corrigir. O comando não altera nem reimporta registros.
 
 A conferência também pode ser aberta por quem administra o escritório em **Box → Operação e auditoria → Conferir tarefas importadas do Astrea**. A tela percorre todos os vínculos de importação, respeita o sigilo e exibe até 100 indícios. O contador considera todo o conjunto visível, sem concluir ou reabrir tarefas.
+
+## Auditoria no produto
+
+Integrações → Diagnóstico operacional compara os mapas Astrea com os destinos existentes por entidade, conta links e arquivos, mostra estados atuais, tarefas importadas sem data e valores financeiros inválidos. Não altera registros. O relatório declara que exclusão lógica não é destino ausente e que contagens atuais não comprovam igualdade com o backup original. A conferência da exportação original, dos arquivos e da conciliação financeira continua necessária.

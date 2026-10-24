@@ -1,3 +1,4 @@
+import { applyInboundLifecycle, humanReplyLifecycle } from "./chat-lifecycle.service";
 import { randomUUID } from "node:crypto";
 import { recordSurveyAnswer } from "@/server/services/chat-extras.service";
 import { db } from "@/lib/db/client";
@@ -60,7 +61,7 @@ export async function ingestMessage(account: IngestAccount, m: IngestMessage): P
   const dup = await db.whatsappMessage.findFirst({ where: { waMessageId: m.waMessageId }, select: { id: true } });
   if (dup) return; // reenvio da Meta, eco do próprio envio, ou histórico repetido
 
-  const sel = { id: true, clientId: true, lastAwayAt: true, status: true, assignedToId: true } as const;
+  const sel = { id: true, clientId: true, lastAwayAt: true, status: true, assignedToId: true, lastMessageAt:true } as const;
   let created = false;
   let conv = await db.whatsappConversation.findUnique({ where: { accountId_waId: { accountId: account.id, waId: m.waId } }, select: sel });
   if (!conv) {
@@ -97,6 +98,8 @@ export async function ingestMessage(account: IngestAccount, m: IngestMessage): P
   }
   const preview = (body ?? `[${label}]`).replace(/\s+/g, " ").slice(0, 120);
   if (m.fromMe) {
+    if(conv.lastMessageAt&&m.timestamp<conv.lastMessageAt)return;
+    await humanReplyLifecycle(account.organizationId,conv.id);
     await db.whatsappConversation.update({ where: { id: conv.id }, data: { lastMessageAt: m.timestamp, lastPreview: preview } });
     return;
   }
@@ -108,15 +111,17 @@ export async function ingestMessage(account: IngestAccount, m: IngestMessage): P
       return;
     }
   }
+  const transition=await applyInboundLifecycle(account.organizationId,conv.id,m.timestamp);
+  if(transition.stale)return;
   await db.whatsappConversation.update({
     where: { id: conv.id },
-    data: { status: "OPEN", unreadCount: { increment: 1 }, lastInboundAt: m.timestamp, lastMessageAt: m.timestamp, lastPreview: preview, ...(m.contactName ? { contactName: m.contactName } : {}) },
+    data: { unreadCount: { increment: 1 }, lastInboundAt: m.timestamp, lastMessageAt: m.timestamp, lastPreview: preview, ...(m.contactName ? { contactName: m.contactName } : {}) },
   });
   // Pesquisa de satisfação: resposta só com nota (0 a 10) fica registrada e não aciona robô nem automações.
   if (!created && (await recordSurveyAnswer(account.organizationId, conv.id, m.text).catch(() => false))) return;
   // LegalOS Chat: conversa nova, reaberta ou sem responsável entra na fila e é distribuída.
   const distributing = (await db.whatsappAccount.findUnique({ where: { id: account.id }, select: { autoAssignEnabled: true } }))?.autoAssignEnabled ?? true;
-  if (distributing && (created || conv.status === "CLOSED" || !conv.assignedToId)) await autoAssign(account.organizationId, conv.id).catch((e) => logger.warn("whatsapp.auto_assign_failed", { error: e instanceof Error ? e.message : String(e) }));
+  if (distributing && (created || transition.reassign || !conv.assignedToId)) await autoAssign(account.organizationId, conv.id).catch((e) => logger.warn("whatsapp.auto_assign_failed", { error: e instanceof Error ? e.message : String(e) }));
   const now = new Date();
   await runInboundAutomations(account, conv.id, { created, text: m.text, messageKey: m.waMessageId, now });
   await runInboundDialogs(account, conv.id, { text: m.text, messageKey: m.waMessageId, now });

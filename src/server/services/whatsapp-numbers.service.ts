@@ -17,12 +17,12 @@ import { startQrSession, stopQrSession } from "./whatsapp-qr.service";
  */
 export const MAX_NUMBERS = 5;
 
-export type NumberView = { id: string; label: string; provider: "META" | "QR"; isPrimary: boolean; enabled: boolean; phone: string | null; qrState: string | null; conversations: number; lastMessage: string | null };
+export type NumberView = { autoStatusEnabled:boolean;reopenAfterMinutes:number;reassignOnReopen:boolean; id: string; label: string; provider: "META" | "QR"; isPrimary: boolean; enabled: boolean; phone: string | null; qrState: string | null; conversations: number; lastMessage: string | null };
 
 export async function listNumbers(ctx: TenantContext): Promise<NumberView[]> {
   assertCan(ctx, "whatsapp:read");
-  const rows = await db.whatsappAccount.findMany({ where: { organizationId: ctx.organizationId }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: { id: true, label: true, provider: true, isPrimary: true, enabled: true, displayPhone: true, qrPhone: true, qrState: true, lastMessage: true, _count: { select: { conversations: true } } } });
-  return rows.map((a) => ({ id: a.id, label: a.label, provider: a.provider === "QR" ? "QR" : "META", isPrimary: a.isPrimary, enabled: a.enabled, phone: a.provider === "QR" ? a.qrPhone : a.displayPhone, qrState: a.provider === "QR" ? a.qrState : null, conversations: a._count.conversations, lastMessage: a.lastMessage }));
+  const rows = await db.whatsappAccount.findMany({ where: { organizationId: ctx.organizationId }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }], select: {autoStatusEnabled:true,reopenAfterMinutes:true,reassignOnReopen:true, id: true, label: true, provider: true, isPrimary: true, enabled: true, displayPhone: true, qrPhone: true, qrState: true, lastMessage: true, _count: { select: { conversations: true } } } });
+  return rows.map((a) => ({ autoStatusEnabled:a.autoStatusEnabled,reopenAfterMinutes:a.reopenAfterMinutes,reassignOnReopen:a.reassignOnReopen,id: a.id, label: a.label, provider: a.provider === "QR" ? "QR" : "META", isPrimary: a.isPrimary, enabled: a.enabled, phone: a.provider === "QR" ? a.qrPhone : a.displayPhone, qrState: a.provider === "QR" ? a.qrState : null, conversations: a._count.conversations, lastMessage: a.lastMessage }));
 }
 
 async function assertRoom(ctx: TenantContext) {
@@ -133,9 +133,13 @@ export async function numberQrStatus(ctx: TenantContext, id: string) {
 
 export async function restartNumberQr(ctx: TenantContext, id: string) {
   assertCan(ctx, "whatsapp:manage");
+  assertCan(ctx,"integrations:manage");
   const a = await secondary(ctx, id);
   if (a.provider !== "QR") throw new NotFoundError("Este número não usa QR-Code.");
   if (!a.enabled) throw new ConflictError("O número está desligado. Ligue-o antes de gerar o QR-Code.");
+  await requireMfa(ctx.userId);
+  await db.whatsappCampaign.updateMany({where:{accountId:id,organizationId:ctx.organizationId,status:{in:["APPROVED","SENDING"]}},data:{status:"PAUSED"}});
   await stopQrSession(id, { logout: true });
   await startQrSession(id);
+  await audit({action:"whatsapp.qr_repair",organizationId:ctx.organizationId,userId:ctx.userId,resourceType:"whatsapp_account",resourceId:id,meta:ctx.meta});
 }

@@ -1,3 +1,4 @@
+import { ActivityDetailsSection } from "@/modules/activities/details-section";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -120,6 +121,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           {canWrite ? <DeleteTaskButton taskId={t.id} /> : null}
         </div>
       </div>
+      <ActivityDetailsSection ctx={ctx} kind="TASK" id={t.id} />
     </div>
   );
 }

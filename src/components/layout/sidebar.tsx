@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, ChevronDown, Layers3, Wrench, MessagesSquare, Plug, X } from "lucide-react";
 import * as React from "react";
 import { NAV_ITEMS, SPACES, spaceOfPath, type Space } from "@/config/navigation";
 import { useLocalStorageValue } from "@/lib/hooks/use-local-storage";
@@ -41,7 +41,17 @@ export function Sidebar({
 
   const space = spaceOfPath(pathname);
   const spaces = (["func", "box", "chat"] as Space[]).filter((sp) => sp === "func" || NAV_ITEMS.some((n) => n.space === sp && visibleKeys.includes(n.key)));
-  const items = NAV_ITEMS.filter((n) => visibleKeys.includes(n.key) && (n.space === space || n.space === "both"));
+  const items = NAV_ITEMS.filter((n) => visibleKeys.includes(n.key) && n.key !== "rute" && (n.space === space || n.space === "both"));
+  const [expanded, setExpanded] = React.useState<{ path: string; group: string }>({ path: "", group: "" });
+  const selectedGroup = expanded.path === pathname ? expanded.group : null;
+  const groups = space === "func" ? [
+    { key: "management", label: "Gestão do escritório", icon: Layers3, keys: ["indicators", "crm", "finance", "team", "reports", "management"] },
+    { key: "tools", label: "Ferramentas", icon: Wrench, keys: ["calculations", "workflows", "copilot", "ai", "prototypes"] },
+    { key: "relationship", label: "Relacionamento", icon: MessagesSquare, keys: ["portal", "portal-team"] },
+  ] : space === "box" ? [{ key: "connections", label: "Conexões", icon: Plug, keys: ["certificates", "integrations", "monitoring", "prototypes"] }] : [{ key: "tools", label: "Ferramentas", icon: Wrench, keys: ["prototypes"] }];
+  const groupedKeys = new Set(groups.flatMap(g => g.keys));
+  const primary = items.filter(i => i.key !== "settings" && i.key !== "help" && !groupedKeys.has(i.key));
+  const footer = items.filter(i => i.key === "help" || i.key === "settings");
 
   const switcher = (isCollapsed: boolean) =>
     spaces.length > 1 ? (
@@ -67,9 +77,7 @@ export function Sidebar({
       </div>
     ) : null;
 
-  const nav = (isCollapsed: boolean) => (
-    <nav aria-label={`Navegação ${SPACES[space].short}`} className="flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
-      {items.map((item) => {
+  const links = (navItems: typeof items, isCollapsed: boolean) => <>      {navItems.map((item) => {
         const active = isActive(pathname, item.href, item.key);
         const Icon = item.icon;
         return (
@@ -93,6 +101,20 @@ export function Sidebar({
             ) : null}
           </Link>
         );
+      })}</>;
+  const nav = (isCollapsed: boolean, mobile = false) => (
+    <nav aria-label={`Navegação ${SPACES[space].short}`} className="flex-1 space-y-1 overflow-y-auto px-2 py-3">
+      {links(primary, isCollapsed)}
+      {groups.map(group => {
+        const children = group.keys.flatMap(key => items.filter(i => i.key === key));
+        if (!children.length) return null;
+        const active = children.some(i => isActive(pathname, i.href, i.key));
+        const open = !isCollapsed && (selectedGroup === null ? active : selectedGroup === group.key);
+        const Icon = group.icon;
+        return <div key={group.key} className="pt-2">
+          <button type="button" title={isCollapsed ? group.label : undefined} aria-label={group.label} aria-expanded={open} aria-controls={`nav-${mobile ? "mobile" : isCollapsed ? "compact" : "full"}-${group.key}`} onClick={() => { if (isCollapsed) setStored("open"); setExpanded({ path: pathname, group: open ? "" : group.key }); }} className={cn("flex h-9 w-full items-center gap-3 rounded-md px-2.5 text-[13px] text-muted hover:bg-surface-2 hover:text-fg", active && "text-fg", isCollapsed && "justify-center px-0")}><Icon className="h-[18px] w-[18px] shrink-0" aria-hidden />{!isCollapsed ? <><span className="flex-1 text-left">{group.label}</span><ChevronDown aria-hidden className={cn("h-3.5 w-3.5 transition-transform", open && "rotate-180")} /></> : <span className="sr-only">{group.label}</span>}</button>
+          <div id={`nav-${mobile ? "mobile" : isCollapsed ? "compact" : "full"}-${group.key}`} hidden={!open} className="ml-4 space-y-0.5 border-l border-border pl-2 pt-1">{links(children, false)}</div>
+        </div>;
       })}
     </nav>
   );
@@ -113,6 +135,7 @@ export function Sidebar({
         {switcher(collapsed)}
         {nav(collapsed)}
         <div className="border-t border-border p-2">
+          <nav aria-label="Ajustes do sistema">{links(footer, collapsed)}</nav>
           <button
             type="button"
             onClick={toggle}
@@ -136,7 +159,8 @@ export function Sidebar({
               </button>
             </div>
             {switcher(false)}
-            {nav(false)}
+            {nav(false, true)}
+            <div className="border-t border-border p-2">{links(footer, false)}</div>
           </aside>
         </div>
       ) : null}

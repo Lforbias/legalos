@@ -29,6 +29,7 @@ test("LegalOS Func e Box: alternador, painéis distintos, menus separados e atal
   await expect(page.getByTestId("box-dashboard")).toBeVisible();
   await expect(page.locator("[data-space]").first()).toHaveAttribute("data-space", "box");
   const boxNav = page.getByRole("navigation", { name: "Navegação Box" }).first();
+  await boxNav.getByRole("button", { name: "Conexões", exact: true }).click();
   for (const n of [/Caixa de entrada/, /Certificados/, /Integrações/]) await expect(boxNav.getByRole("link", { name: n }).first()).toBeVisible();
   await expect(boxNav.getByRole("link", { name: /^Processos/ })).toHaveCount(0);
 

@@ -1,12 +1,14 @@
+import { notify } from "./notification.service";
 import { db } from "@/lib/db/client";
-import { addDays } from "@/lib/dates/ymd";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { packageSchema, runSchema, SEED_PACKAGES, type PackageInput, type RunInput } from "@/modules/kanban/package-schemas";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertActiveMember, assertCaseVisible } from "./case.service";
-import { createCard } from "./kanban.service";
-import { createTask } from "./task.service";
+import { activityOffset } from "@/lib/activities/offset";
+import { recordTaskEvent } from "./task-event";
+import { logCaseEvent } from "./case.service";
+import { getClient } from "./client.service";
 
 /**
  * 2.0-F3 — pacotes de tarefas ("workflows" prontos do escritório). Um pacote é uma lista editável de tarefas com prazo em
@@ -49,7 +51,7 @@ export async function savePackage(ctx: TenantContext, id: string | null, raw: Pa
   assertCan(ctx, "organization:manage");
   const v = packageSchema.parse(raw);
   for (const s of v.steps) if (s.assigneeId) await assertActiveMember(ctx, s.assigneeId);
-  const data = v.steps.map((s, i) => ({ organizationId: ctx.organizationId, position: i, title: s.title, description: s.description || null, dueDays: s.dueDays, priority: s.priority, assigneeId: s.assigneeId || null, ask: s.ask || null }));
+  const data = v.steps.map((s, i) => ({ organizationId: ctx.organizationId, position: i, title: s.title, description: s.description || null, dueDays: s.dueDays, priority: s.priority, countType: s.countType, relativeTo: s.relativeTo, waitForPrevious: s.waitForPrevious, assigneeMode: s.assigneeId ? "FIXED" : s.assigneeMode, assigneeId: s.assigneeId || null, ask: s.ask || null }));
   let savedId = id;
   await db.$transaction(async (tx) => {
     if (id) {
@@ -81,37 +83,51 @@ export async function runPackage(ctx: TenantContext, packageId: string, raw: Run
   if (!v.caseId && !v.clientId) throw new ValidationError("Escolha o processo ou o cliente.", { caseId: ["Informe o processo ou o cliente."] });
   const kase = v.caseId ? await assertCaseVisible(ctx, v.caseId) : null;
   for (const s of p.steps) if (s.ask && !(v.answers[s.id] ?? "").trim()) throw new ValidationError(`Responda: ${s.ask}`, { [s.id]: [`Responda: ${s.ask}`] });
-  if (v.caseId && !v.force) {
-    const dup = await db.workflowPackageRun.findFirst({ where: { organizationId: ctx.organizationId, packageId, caseId: v.caseId }, select: { createdAt: true } });
-    if (dup) throw new ConflictError("Este pacote já foi executado neste processo. Confirme para executar de novo.");
-  }
-  const members = new Set((await db.membership.findMany({ where: { organizationId: ctx.organizationId, status: "ACTIVE" }, select: { userId: true } })).map((m) => m.userId));
-  const run = await db.workflowPackageRun.create({ data: { organizationId: ctx.organizationId, packageId, caseId: v.caseId || null, clientId: v.clientId || null, baseDate: new Date(`${v.baseDate}T00:00:00Z`), createdById: ctx.userId } });
-  let made = 0;
-  const failed: string[] = [];
-  for (const s of p.steps) {
-    const answer = (v.answers[s.id] ?? "").trim();
-    try {
-      await createTask(ctx, {
-        title: s.title, status: "TODO", priority: s.priority,
-        description: [s.description ?? "", answer ? `${s.ask}: ${answer}` : "", `Pacote: ${p.name}`].filter(Boolean).join("\n\n"),
-        dueDate: addDays(v.baseDate, s.dueDays),
-        assigneeId: s.assigneeId && members.has(s.assigneeId) ? s.assigneeId : "",
-        caseId: v.caseId, clientId: v.clientId,
-      });
-      made++;
-    } catch {
-      failed.push(s.title);
+  if (v.clientId) await getClient(ctx,v.clientId);
+  const responsible=v.caseId?await db.caseMember.findFirst({where:{organizationId:ctx.organizationId,caseId:v.caseId,role:"RESPONSIBLE"},select:{userId:true}}):null;
+  const assignees=p.steps.map(s=>s.assigneeId|| (s.assigneeMode==="CASE_RESPONSIBLE"?responsible?.userId:ctx.userId)||ctx.userId);
+  for(const userId of new Set(assignees)) {
+    await assertActiveMember(ctx,userId);
+    if(kase?.confidential){
+      const member=await db.caseMember.findFirst({where:{organizationId:ctx.organizationId,caseId:kase.id,userId},select:{id:true}});
+      const admin=await db.membership.findFirst({where:{organizationId:ctx.organizationId,userId,status:"ACTIVE",role:{permissions:{has:"organization:manage"}}},select:{id:true}});
+      if(!member&&!admin)throw new ValidationError("O responsável precisa ter acesso ao processo sigiloso antes de executar o pacote.");
     }
   }
-  let cardId: string | null = null;
-  if (v.boardId) {
-    const c = await createCard(ctx, v.boardId, { title: `${p.name}${kase ? ` — ${kase.title}` : ""}`.slice(0, 200), caseId: v.caseId, clientId: v.clientId, dueDate: addDays(v.baseDate, Math.max(...p.steps.map((s) => s.dueDays))) }, { runId: run.id });
-    cardId = c.id;
-  }
-  await db.workflowPackageRun.update({ where: { id: run.id }, data: { taskCount: made, cardId } });
-  await audit({ action: "workflow_package.run", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "workflow_package_run", resourceId: run.id, metadata: { packageId, tasks: made, failed: failed.length }, meta: ctx.meta });
-  return { runId: run.id, created: made, failed, cardId };
+  const targetBoard=v.boardId?await db.kanbanBoard.findFirst({where:{id:v.boardId,organizationId:ctx.organizationId,archivedAt:null},include:{columns:{orderBy:{position:"asc"},take:1}}}):null;
+  if(v.boardId&&!targetBoard?.columns[0])throw new ValidationError("Quadro indisponível.");
+  return db.$transaction(async tx=>{
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`${ctx.organizationId}:${packageId}:${v.caseId||v.clientId}`},0))`;
+    if(!v.force&&await tx.workflowPackageRun.findFirst({where:{organizationId:ctx.organizationId,packageId,caseId:v.caseId||null,clientId:v.clientId||null}}))throw new ConflictError("Este pacote já foi executado neste vínculo. Confirme para executar de novo.");
+    const unchanged=await tx.workflowPackage.findFirst({where:{id:p.id,organizationId:ctx.organizationId,updatedAt:p.updatedAt,active:true,deletedAt:null}});
+    if(!unchanged)throw new ConflictError("O pacote mudou. Recarregue antes de executar.");
+    const run=await tx.workflowPackageRun.create({data:{organizationId:ctx.organizationId,packageId,caseId:v.caseId||null,clientId:v.clientId||null,baseDate:new Date(`${v.baseDate}T00:00:00Z`),createdById:ctx.userId}});
+    let previousId:string|null=null,previousDue:string|null=null;const dates:string[]=[];
+    for(let index=0;index<p.steps.length;index++){
+      const step=p.steps[index]!;
+      const wait:boolean=!!previousId&&(step.waitForPrevious||step.relativeTo==="PREVIOUS_DONE");
+      const base:string|null=step.relativeTo==="PREVIOUS_DUE"?previousDue:v.baseDate;
+      if(step.relativeTo==="PREVIOUS_DUE"&&!base)throw new ValidationError("Uma etapa depende de vencimento ainda indefinido. Use a conclusão anterior como referência.");
+      const date:string|null=step.relativeTo==="PREVIOUS_DONE"?null:activityOffset(base??v.baseDate,step.dueDays,step.countType,v.nonWorkingDates);
+      const answer=(v.answers[step.id]??"").trim();
+      const task: {id:string}=await tx.task.create({data:{organizationId:ctx.organizationId,title:step.title,description:[step.description??"",answer?`${step.ask}: ${answer}`:"",`Pacote: ${p.name}`].filter(Boolean).join("\n\n"),status:wait?"WAITING":"TODO",priority:step.priority,dueDate:date?new Date(`${date}T00:00:00Z`):null,assigneeId:assignees[index],caseId:v.caseId||null,clientId:v.clientId||null,createdById:ctx.userId}});
+      await recordTaskEvent(tx,ctx,task.id,"created",`Criada pelo pacote ${p.name}`);
+      if(assignees[index]!==ctx.userId)await notify({organizationId:ctx.organizationId,userId:assignees[index]!,kind:"task.assigned",title:`Nova tarefa para você: ${step.title}`,link:`/tarefas/${task.id}`,dedupeKey:`task-assigned:${task.id}:${assignees[index]}`},tx);
+      if(wait&&previousId)await tx.taskDependency.create({data:{organizationId:ctx.organizationId,taskId:task.id,predecessorId:previousId,onCompletion:step.relativeTo==="PREVIOUS_DONE",offsetDays:step.dueDays,countType:step.countType,nonWorkingDates:v.nonWorkingDates}});
+      previousId=task.id;previousDue=date;if(date)dates.push(date);
+    }
+    let cardId:string|null=null;
+    if(targetBoard?.columns[0]){
+      const col=targetBoard.columns[0];
+      const card=await tx.kanbanCard.create({data:{organizationId:ctx.organizationId,boardId:targetBoard.id,columnId:col.id,title:`${p.name}${kase?` — ${kase.title}`:""}`.slice(0,200),caseId:v.caseId||null,clientId:v.clientId||null,dueDate:dates.length?new Date(`${dates.sort().at(-1)}T00:00:00Z`):null,closedAt:col.isDone?new Date():null,runId:run.id,createdById:ctx.userId}});
+      cardId=card.id;
+      await tx.kanbanCardEvent.create({data:{organizationId:ctx.organizationId,cardId,userId:ctx.userId,kind:"created",text:"Resumo de execução do pacote"}});
+    }
+    await tx.workflowPackageRun.update({where:{id:run.id},data:{taskCount:p.steps.length,cardId}});
+    if(v.caseId)await logCaseEvent(tx,ctx,v.caseId,{kind:"WORKFLOW_PACKAGE",title:`Pacote executado: ${p.name}`,description:`${p.steps.length} tarefas criadas.`});
+    await audit({action:"workflow_package.run",organizationId:ctx.organizationId,userId:ctx.userId,resourceType:"workflow_package_run",resourceId:run.id,metadata:{packageId,tasks:p.steps.length},meta:ctx.meta},tx);
+    return {runId:run.id,created:p.steps.length,failed:[] as string[],cardId};
+  },{timeout:30000});
 }
 
 export async function listRunsForCase(ctx: TenantContext, caseId: string) {

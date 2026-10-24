@@ -13,6 +13,8 @@ export const API_SCOPES = {
   "deadlines:read": { label: "Ler prazos", permission: "deadlines:read" },
   "notices:read": { label: "Ler intimações", permission: "inbox:read" },
   "notices:write": { label: "Registrar intimações", permission: "inbox:write" },
+  "tools:read": { label: "Ferramentas via API: consultar dados", permission: "ai:use" },
+  "tools:propose": { label: "Ferramentas via API: propor ações para aprovação", permission: "ai:use" },
   "mcp:read": { label: "RUTE: consultar dados (somente leitura)", permission: "ai:use" },
   "mcp:propose": { label: "RUTE: propor ações (só valem após confirmação humana)", permission: "ai:use" },
 } as const satisfies Record<string, { label: string; permission: PermissionKey }>;
@@ -36,7 +38,7 @@ export async function createApiKey(ctx: TenantContext, input: ApiKeyInput) {
   const name = input.name.trim();
   if (name.length < 3 || name.length > 80) throw new ValidationError("Nome inválido.", { name: ["Informe um nome de 3 a 80 caracteres."] });
   const scopes = [...new Set(input.scopes)];
-  if (scopes.length === 0 || scopes.some((s) => !(s in API_SCOPES))) throw new ValidationError("Escolha ao menos um acesso válido.", { scopes: ["Escolha ao menos um acesso."] });
+  if (scopes.length === 0 || scopes.some((s) => !Object.hasOwn(API_SCOPES, s))) throw new ValidationError("Escolha ao menos um acesso válido.", { scopes: ["Escolha ao menos um acesso."] });
   for (const s of scopes) {
     if (!can(ctx, API_SCOPES[s as ApiScope].permission)) throw new ValidationError("Você não tem permissão para conceder um dos acessos escolhidos.", { scopes: [`Seu perfil não permite: ${API_SCOPES[s as ApiScope].label}.`] });
   }

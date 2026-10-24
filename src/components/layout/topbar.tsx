@@ -248,9 +248,12 @@ export function Topbar({
             <MenuItem
               onClick={() => {
                 close();
-                router.push("/modulos/ajuda");
+                router.push("/ajuda");
               }}
             >
+              Central de ajuda
+            </MenuItem>
+            <MenuItem onClick={() => { close(); router.push("/modulos/ajuda"); }}>
               Roadmap e status dos módulos
             </MenuItem>
           </>

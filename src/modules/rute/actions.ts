@@ -1,5 +1,6 @@
 "use server";
 
+import { formatDateTime } from "@/lib/dates/format";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { ConflictError } from "@/lib/permissions/check";
@@ -9,12 +10,12 @@ import { createApiKey } from "@/server/services/apikey.service";
 import { revokeMcpConnection } from "@/server/services/mcp-auth.service";
 import { createConversation, deleteConversation, sendMessage, type MessageRef } from "@/server/services/rute-assistant.service";
 import { deleteInstruction, saveInstruction } from "@/server/services/rute-library.service";
-import { approveProposal, rejectProposal, updateProposal } from "@/server/services/rute-proposal.service";
+import { approveProposal, getProposal, rejectProposal, updateProposal } from "@/server/services/rute-proposal.service";
 import { setAssistantProvider, setEmergencyStop, setGovernance, setRuteFeature } from "@/server/services/rute-settings.service";
 import { callTool, toolList } from "@/server/services/rute-tools.service";
 import { requireTenant } from "@/server/session";
 
-const done = () => revalidatePath("/rute");
+const done = () => { revalidatePath("/rute"); revalidatePath("/configuracoes/ia"); revalidatePath("/ia"); };
 
 export async function setFeatureAction(input: { feature: string; on: boolean; consent?: boolean }): Promise<ActionState> {
   return runAction(async () => {
@@ -90,7 +91,7 @@ export async function approveProposalAction(id: string, opts: { confirmHighRisk?
     const { ctx } = await requireTenant();
     await approveProposal(ctx, parse(uuidSchema, id), { confirmHighRisk: opts.confirmHighRisk === true, edited: opts.edited });
     done();
-    revalidatePath("/tarefas");
+    for (const path of ["/tarefas", "/clientes", "/agenda", "/processos", "/prazos", "/documentos", "/peticoes"]) revalidatePath(path);
     return undefined;
   });
 }
@@ -156,5 +157,45 @@ export async function deleteInstructionAction(id: string): Promise<ActionState> 
     await deleteInstruction(ctx, parse(uuidSchema, id));
     done();
     return undefined;
+  });
+}
+
+/** Painel flutuante: consulta só conversas da pessoa no escritório atual. */
+export async function assistantPanelAction(conversationId?: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { assistantAvailability, listConversations, getConversation } = await import("@/server/services/rute-assistant.service");
+    const availability = await assistantAvailability(ctx);
+    const conversations = await listConversations(ctx);
+    const conversation = conversationId ? await getConversation(ctx, parse(uuidSchema, conversationId)) : null;
+    return { availability, conversations: conversations.map(c => ({ id: c.id, title: c.title })), conversation: conversation ? { id: conversation.id, caseId: conversation.caseId, clientId: conversation.clientId, messages: conversation.messages.map(m => ({ id: m.id, role: m.role, content: m.content, refs: m.refs })) } : null };
+  });
+}
+
+export async function testProviderAction(): Promise<ActionState<{ model: string }>> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { assertCan } = await import("@/server/context");
+    assertCan(ctx, "integrations:manage");
+    const { officeToolProvider } = await import("@/server/services/office-ai-provider.service");
+    const { ConflictError } = await import("@/lib/permissions/check");
+    const { AiProviderError } = await import("@/lib/ai/provider");
+    const provider = await officeToolProvider(ctx.organizationId);
+    if (!provider) throw new ConflictError("Salve a chave do provedor antes de testar.");
+    try {
+      const r = await provider.run({ system: "Teste de conexão. Responda somente OK.", history: [{ role: "user", text: "OK" }], tools: [], runTool: async () => "", maxTokens: 64, maxSteps: 1 });
+      return { model: r.model };
+    } catch (e) {
+      if (e instanceof AiProviderError) throw new ConflictError(e.message);
+      throw e;
+    }
+  });
+}
+
+export async function proposalPanelAction(id: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const p = await getProposal(ctx, parse(uuidSchema, id));
+    return { id: p.id, title: p.title, kindLabel: p.kindLabel, risk: p.risk, payload: p.payload, via: p.via, connection: p.connection, caseId: p.caseId, caseTitle: p.caseTitle, status: p.status, proposerName: p.proposerName, createdAt: formatDateTime(p.createdAt, ctx.timezone), expiresAt: formatDateTime(p.expiresAt, ctx.timezone), decisionNote: p.decisionNote, resultId: p.resultId, resultType: p.resultType };
   });
 }

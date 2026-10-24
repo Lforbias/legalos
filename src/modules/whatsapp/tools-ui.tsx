@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { useRun } from "@/modules/kanban/use-run";
 import { setExtrasSettingsAction } from "./extras-actions";
-import { approveCampaignAction, cancelCampaignAction, campaignReportAction, createCampaignAction, deleteChatStatusAction, deleteChecklistAction, deleteDialogAction, deleteIntentAction, deleteLibraryFileAction, forwardMessageAction, pauseCampaignAction, presetLabelsAction, saveChatStatusAction, saveChecklistAction, saveDialogAction, saveIntentAction, saveReportScheduleAction, saveSecurityAction, revokeOrgSessionAction, sendChecklistAction, sendLibraryFileAction, setChatStatusAction, setDialogActiveAction, setIntentActiveAction, testIntentsAction, transcribeAction } from "./tools-actions";
+import { campaignClientOptionsAction, approveCampaignAction, cancelCampaignAction, campaignReportAction, createCampaignAction, deleteChatStatusAction, deleteChecklistAction, deleteDialogAction, deleteIntentAction, deleteLibraryFileAction, forwardMessageAction, pauseCampaignAction, presetLabelsAction, saveChatStatusAction, saveChecklistAction, saveDialogAction, saveIntentAction, saveReportScheduleAction, saveSecurityAction, revokeOrgSessionAction, sendChecklistAction, sendLibraryFileAction, setChatStatusAction, setDialogActiveAction, setIntentActiveAction, testIntentsAction, transcribeAction } from "./tools-actions";
 
 const Msg = ({ error, done }: { error: string | null; done: string | null }) => (error ? <Alert tone="error">{error}</Alert> : done ? <Alert tone="success">{done}</Alert> : null);
 const fmt = (iso: string) => new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
@@ -220,20 +220,24 @@ export function IntentsPanel({ intents, labels, agents, queues }: { intents: Int
 }
 
 // ======================= campanhas =======================
-export type CampaignRow = { id: string; name: string; status: string; text: string; createdAt: string; counts: { PENDING: number; SENT: number; FAILED: number; SKIPPED: number } };
+export type CampaignRow = { id: string; name: string; status: string; text: string; createdAt: string; counts: { PENDING: number; SENT: number; FAILED: number; SKIPPED: number; UNKNOWN?:number } };
 const CSTATUS: Record<string, string> = { DRAFT: "Rascunho (aguardando aprovação)", APPROVED: "Aprovada (na fila)", SENDING: "Enviando", PAUSED: "Pausada", DONE: "Concluída", CANCELED: "Cancelada" };
 
 export function CampaignsPanel({ campaigns, clients, templates, enabled, canApprove, isMeta }: { campaigns: CampaignRow[]; clients: { id: string; name: string }[]; templates: { id: string; name: string }[]; enabled: boolean; canApprove: boolean; isMeta: boolean }) {
   const { run, pending, error, done } = useRun();
   const [f, setF] = React.useState({ name: "", text: "", templateId: "", q: "" });
   const [sel, setSel] = React.useState<Set<string>>(new Set());
-  const [rep, setRep] = React.useState<{ id: string; rows: { name: string; status: string; error: string | null }[] } | null>(null);
-  const shown = clients.filter((c) => !f.q.trim() || c.name.toLowerCase().includes(f.q.trim().toLowerCase())).slice(0, 100);
+  const [rep, setRep] = React.useState<{ id: string; rows: { name: string; status: string; error: string | null }[];page:number;pages:number;total:number } | null>(null);
+  const [page,setPage]=React.useState(1);const [clientError,setClientError]=React.useState("");const [loadingClients,setLoadingClients]=React.useState(true);
+  const [options,setOptions]=React.useState({items:clients,total:clients.length,pages:1});const [matching,setMatching]=React.useState<{q:string;total:number}|null>(null);
+  React.useEffect(()=>{let alive=true;const timer=setTimeout(async()=>{setLoadingClients(true);const r=await campaignClientOptionsAction({q:f.q,page});if(!alive)return;setLoadingClients(false);if(r.ok&&r.data){setOptions(r.data);setClientError("");}else setClientError(r.message??"Não foi possível buscar clientes.");},250);return()=>{alive=false;clearTimeout(timer);};},[f.q,page]);
+  const shown=options.items;
+  const reportPage=async(id:string,page:number)=>{const r=await campaignReportAction(id,page);if(r.ok&&r.data)setRep({id,...r.data});};
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   return (
     <div className="space-y-3 text-sm" data-testid="campaigns-panel">
       <Msg error={error} done={done} />
-      <Alert tone="warning">Campanha em massa só sai depois que uma pessoa com permissão APROVA. O envio é gradual (poucos por minuto), no máximo 500 clientes, e quem pediu para parar nunca recebe. Use com responsabilidade: mensagens em massa podem gerar bloqueios do WhatsApp.</Alert>
+      <Alert tone="warning">Campanha em massa só sai depois que uma pessoa com permissão APROVA. O envio é gradual (poucos por minuto), até 10.000 clientes por campanha, e quem pediu para parar nunca recebe. Use com responsabilidade: mensagens em massa podem gerar bloqueios do WhatsApp.</Alert>
       {!enabled ? <Alert tone="info">As campanhas estão desligadas. Ligue a chave “Campanhas em massa” acima para criar.</Alert> : null}
       <ul className="divide-y divide-border rounded-md border border-border">
         {campaigns.length === 0 ? <li className="p-3 text-muted">Nenhuma campanha.</li> : null}
@@ -241,16 +245,17 @@ export function CampaignsPanel({ campaigns, clients, templates, enabled, canAppr
           <li key={c.id} className="space-y-1 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div><span className="font-medium">{c.name}</span> <Badge tone={c.status === "DONE" ? "success" : c.status === "DRAFT" ? "warning" : "info"}>{CSTATUS[c.status] ?? c.status}</Badge>
-                <div className="text-xs text-muted">{fmt(c.createdAt)} · enviadas {c.counts.SENT} · na fila {c.counts.PENDING} · falhas {c.counts.FAILED} · ignoradas {c.counts.SKIPPED}</div></div>
+                <div className="text-xs text-muted">{fmt(c.createdAt)} · enviadas {c.counts.SENT} · na fila {c.counts.PENDING} · falhas {c.counts.FAILED} · ignoradas {c.counts.SKIPPED} · envio incerto {c.counts.UNKNOWN??0}</div></div>
               <div className="flex flex-wrap gap-2">
                 {(c.status === "DRAFT" || c.status === "PAUSED") && canApprove ? <Button size="sm" loading={pending} onClick={() => run(() => approveCampaignAction(c.id), "Campanha aprovada. O envio começa no próximo minuto, aos poucos.")}>Aprovar e enviar</Button> : null}
                 {c.status === "APPROVED" || c.status === "SENDING" ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => pauseCampaignAction(c.id), "Campanha pausada.")}>Pausar</Button> : null}
                 {["DRAFT", "APPROVED", "SENDING", "PAUSED"].includes(c.status) ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => cancelCampaignAction(c.id), "Campanha cancelada.")}>Cancelar</Button> : null}
-                <Button size="sm" variant="secondary" onClick={async () => { const r = await campaignReportAction(c.id); if (r.ok && r.data) setRep({ id: c.id, rows: r.data.rows }); }}>Relatório</Button>
+                <Button size="sm" variant="secondary" onClick={async () => { const r = await campaignReportAction(c.id); if (r.ok && r.data) setRep({ id: c.id,...r.data }); }}>Relatório</Button>
               </div>
             </div>
             <p className="line-clamp-2 text-xs">{c.text}</p>
-            {rep?.id === c.id ? <ul className="max-h-48 overflow-y-auto rounded border border-border p-2 text-xs">{rep.rows.map((r, i) => <li key={i}>{r.name}: {({ SENT: "enviada", PENDING: "na fila", FAILED: "falhou", SKIPPED: "ignorada", SENDING: "enviando" } as Record<string, string>)[r.status] ?? r.status}{r.error ? ` — ${r.error}` : ""}</li>)}</ul> : null}
+            {rep?.id===c.id?<div className="flex items-center gap-2 text-xs"><Button size="sm" disabled={rep.page<=1} onClick={()=>reportPage(c.id,rep.page-1)}>Anterior</Button><span>Relatório: {rep.page}/{rep.pages} · {rep.total} destinatários</span><Button size="sm" disabled={rep.page>=rep.pages} onClick={()=>reportPage(c.id,rep.page+1)}>Próxima</Button></div>:null}
+            {rep?.id === c.id ? <ul className="max-h-48 overflow-y-auto rounded border border-border p-2 text-xs">{rep.rows.map((r, i) => <li key={i}>{r.name}: {({ SENT: "enviada", PENDING: "na fila", FAILED: "falhou", SKIPPED: "ignorada", SENDING: "enviando", UNKNOWN:"envio incerto — conferir antes de repetir" } as Record<string, string>)[r.status] ?? r.status}{r.error ? ` — ${r.error}` : ""}</li>)}</ul> : null}
           </li>
         ))}
       </ul>
@@ -260,17 +265,20 @@ export function CampaignsPanel({ campaigns, clients, templates, enabled, canAppr
           <Field label="Nome (só para vocês)" htmlFor="cp-name"><Input id="cp-name" maxLength={80} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
           <Field label="Mensagem (use {nome})" htmlFor="cp-text"><Textarea id="cp-text" rows={4} maxLength={1000} value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} /></Field>
           <Field label={isMeta ? "Modelo aprovado (obrigatório na API oficial)" : "Modelo aprovado (opcional)"} htmlFor="cp-tpl"><Select id="cp-tpl" value={f.templateId} onChange={(e) => setF({ ...f, templateId: e.target.value })}><option value="">{isMeta ? "Escolha…" : "Sem modelo"}</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></Field>
-          <Field label="Buscar cliente" htmlFor="cp-q"><Input id="cp-q" value={f.q} onChange={(e) => setF({ ...f, q: e.target.value })} /></Field>
+          <Field label="Buscar cliente" htmlFor="cp-q"><Input id="cp-q" value={f.q} onChange={(e) => {setLoadingClients(true);setF({ ...f, q: e.target.value });setPage(1);setMatching(null);}} /></Field>
+          {clientError?<Alert tone="error">{clientError}</Alert>:null}
+          <div className="flex items-center gap-2"><Button size="sm" disabled={page<=1||loadingClients} onClick={()=>setPage(p=>p-1)}>Página anterior</Button><span className="text-xs">{page}/{options.pages} · {options.total} clientes no filtro</span><Button size="sm" disabled={page>=options.pages||loadingClients} onClick={()=>setPage(p=>p+1)}>Próxima página</Button></div>
           <div className="max-h-48 space-y-1 overflow-y-auto rounded border border-border p-2">
-            {shown.map((c) => <label key={c.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={sel.has(c.id)} onChange={() => toggle(c.id)} />{c.name}</label>)}
+            {shown.map((c) => <label key={c.id} className="flex items-center gap-2 text-xs"><input type="checkbox" checked={!!matching||sel.has(c.id)} disabled={!!matching||loadingClients} onChange={() => toggle(c.id)} />{c.name}</label>)}
             {shown.length === 0 ? <p className="text-xs text-muted">Nenhum cliente com telefone encontrado.</p> : null}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" variant="secondary" onClick={() => setSel(new Set([...sel, ...shown.map((c) => c.id)]))}>Marcar os exibidos</Button>
-            <Button size="sm" variant="secondary" onClick={() => setSel(new Set())}>Limpar</Button>
-            <span className="text-xs text-muted">{sel.size} selecionado(s)</span>
+            <Button size="sm" variant="secondary" disabled={loadingClients||!!matching} onClick={() => setSel(new Set([...sel, ...shown.map((c) => c.id)]))}>Marcar os exibidos</Button>
+            <Button size="sm" variant="secondary" disabled={loadingClients||options.total>10000||!options.total} onClick={()=>{setMatching({q:f.q,total:options.total});setSel(new Set());}}>Selecionar todos do filtro</Button>
+            <Button size="sm" variant="secondary" onClick={() => {setSel(new Set());setMatching(null);}}>Limpar</Button>
+            <span className="text-xs text-muted">{matching?.total??sel.size} selecionado(s){matching?" — todos os clientes do filtro":""}</span>
           </div>
-          <Button size="sm" loading={pending} disabled={!f.name.trim() || !f.text.trim() || sel.size === 0} onClick={() => run(() => createCampaignAction({ name: f.name, text: f.text, templateId: f.templateId || null, clientIds: [...sel] }), "Campanha criada como rascunho. Falta a aprovação.", () => { setF({ name: "", text: "", templateId: "", q: "" }); setSel(new Set()); })}>Criar rascunho</Button>
+          <Button size="sm" loading={pending} disabled={!f.name.trim() || !f.text.trim() || (sel.size === 0&&!matching)||loadingClients||!!clientError||sel.size>10000} onClick={() => run(() => createCampaignAction({ name: f.name, text: f.text, templateId: f.templateId || null, clientIds: [...sel],allMatching:!!matching,query:matching?.q??"" }), "Campanha criada como rascunho. Falta a aprovação.", () => { setF({ name: "", text: "", templateId: "", q: "" }); setSel(new Set());setMatching(null); })}>Criar rascunho</Button>
         </div>
       ) : null}
     </div>

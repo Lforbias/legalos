@@ -46,7 +46,7 @@ export function NumbersPanel({ numbers, max }: { numbers: NumberRow[]; max: numb
               {!n.isPrimary ? (
                 <div className="flex flex-wrap gap-2">
                   <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => setNumberEnabledAction(n.id, !n.enabled), n.enabled ? "Número desligado." : "Número ligado.")}>{n.enabled ? "Desligar" : "Ligar"}</Button>
-                  {n.provider === "QR" && n.enabled ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => restartNumberQrAction(n.id), "Gerando novo QR-Code…", () => setQr({ id: n.id, url: null, state: "CONNECTING", msg: null }))}>QR-Code</Button> : null}
+                  {n.provider === "QR" && n.enabled ? <Button size="sm" variant="secondary" loading={pending} onClick={() => {if(window.confirm("Refazer pareamento deste número? O histórico será preservado e as campanhas em andamento serão pausadas."))run(() => restartNumberQrAction(n.id), "Gerando novo QR-Code…", () => setQr({ id: n.id, url: null, state: "CONNECTING", msg: null }));}}>Trocar aparelho / reconectar</Button> : null}
                 </div>
               ) : null}
             </div>

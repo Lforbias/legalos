@@ -1,3 +1,4 @@
+import { LifecycleAccountForm } from "@/modules/whatsapp/operations-ui";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessDenied } from "@/components/layout/access-denied";
@@ -51,7 +52,7 @@ export default async function AtendimentoConfigPage() {
   const [extras, forms] = account ? await Promise.all([getExtrasSettings(ctx), listForms(ctx)]) : [null, []];
   const tools = account ? await Promise.all([listChatStatuses(ctx), listChecklists(ctx), listLibrary(ctx), listDialogs(ctx), listDialogRuns(ctx, 15), listIntents(ctx)]) : null;
   const campaignsOn = account ? await hasModule(ctx.organizationId, "campanhas") : false;
-  const [campaigns, campClients] = account && campaignsOn ? await Promise.all([listCampaigns(ctx), db.client.findMany({ where: { organizationId: ctx.organizationId, deletedAt: null, phone: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true }, take: 2000 })]) : [[], []];
+  const [campaigns, campClients] = account && campaignsOn ? await Promise.all([listCampaigns(ctx), can(ctx,"clients:read")?db.client.findMany({ where: { organizationId: ctx.organizationId, deletedAt: null, phone: { not: null } }, orderBy: { name: "asc" }, select: { id: true, name: true }, take: 100 }):Promise.resolve([])]) : [[], []];
   const keyOk = whatsappKeyAvailable();
   const hookOk = webhookConfigured();
   const isQr = account?.provider === "QR";
@@ -99,6 +100,7 @@ export default async function AtendimentoConfigPage() {
             <CardHeader title="Números do escritório" description="Vários números no mesmo Chat. Cada conversa fica no número que a recebeu." action={<Badge tone="info">{numbers.length} de {MAX_NUMBERS}</Badge>} />
             <CardBody><NumbersPanel numbers={numbers.map((n) => ({ id: n.id, label: n.label, provider: n.provider, isPrimary: n.isPrimary, enabled: n.enabled, phone: n.phone, qrState: n.qrState, conversations: n.conversations }))} max={MAX_NUMBERS} /></CardBody>
           </Card>
+          <Card><CardHeader title="Situação automática do atendimento" description="Regras por número; status personalizados continuam disponíveis separadamente."/><CardBody className="space-y-3">{numbers.map(n=><LifecycleAccountForm key={n.id} account={n}/>)}</CardBody></Card>
           {switches ? (
             <Card>
               <CardHeader title="Liga e desliga das automações" description="Controle central de tudo o que o Chat faz sozinho." />

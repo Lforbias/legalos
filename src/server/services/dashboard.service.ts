@@ -87,8 +87,8 @@ export async function getDashboard(ctx: TenantContext, days = 14): Promise<Dashb
         })
       : Promise.resolve(null),
     canClients ? db.client.count({ where: { organizationId: org, deletedAt: null, status: "ACTIVE" } }) : Promise.resolve(null),
-    canCases ? db.case.count({ where: { AND: [caseWhere, { status: "ACTIVE" }] } }) : Promise.resolve(null),
-    canCases ? db.case.count({ where: { AND: [caseWhere, { status: "SUSPENDED" }] } }) : Promise.resolve(null),
+    canCases ? db.case.count({ where: { AND: [caseWhere, { status: "ACTIVE", archivedAt: null }] } }) : Promise.resolve(null),
+    canCases ? db.case.count({ where: { AND: [caseWhere, { status: "SUSPENDED", archivedAt: null }] } }) : Promise.resolve(null),
   ]);
 
   const count = (s: "ACTIVE" | "SUSPENDED") => statusGroups.find((g) => g.status === s)?._count._all ?? 0;

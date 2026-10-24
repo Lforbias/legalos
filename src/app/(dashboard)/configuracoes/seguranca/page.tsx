@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { RequireMfaCard } from "@/modules/organizations/require-mfa-card";
+import { getOrganization, mfaCoverage } from "@/server/services/organization.service";
 import { SecurityPanel } from "@/modules/whatsapp/tools-ui";
 import { can } from "@/server/context";
 import { getSecuritySettings, listOrgSessions, modulesOf } from "@/server/services/org-security.service";
@@ -13,9 +15,11 @@ export const dynamic = "force-dynamic";
 export default async function SecurityPage() {
   const { ctx } = await requireTenant();
   if (!can(ctx, "organization:manage")) return <AccessDenied />;
+  const [org, mfa] = await Promise.all([getOrganization(ctx), mfaCoverage(ctx)]);
   const [s, sessions, mods] = await Promise.all([getSecuritySettings(ctx), listOrgSessions(ctx), modulesOf(ctx.organizationId)]);
   return (
     <div className="space-y-4">
+      <Card><CardHeader title="Verificação em duas etapas" description="Proteção de acesso para toda a equipe." /><CardBody><RequireMfaCard required={org.requireMfa} total={mfa.total} withMfa={mfa.withMfa} canEdit /></CardBody></Card>
       <Card>
         <CardHeader title="Segurança da conta" description="Endereços permitidos, saída por inatividade e sessões da equipe." />
         <CardBody>

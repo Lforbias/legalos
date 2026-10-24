@@ -1,3 +1,4 @@
+import { assertTaskReady, advanceTaskDependencies } from "./task-dependency";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { assertCan, type TenantContext } from "@/server/context";
@@ -38,10 +39,12 @@ export async function setTaskStage(ctx: TenantContext, taskId: string, stageId: 
   if (!stage) throw new NotFoundError("Etapa não encontrada ou desativada.");
   if (t.stageId === stage.id && t.status === stage.status) return;
   await db.$transaction(async tx => {
+    await assertTaskReady(tx,ctx,t.id,stage.status);
     const changed = await tx.task.updateMany({ where: { id: t.id, organizationId: ctx.organizationId, updatedAt: t.updatedAt, deletedAt: null }, data: { stageId: stage.id, status: stage.status, completedAt: stage.status === "DONE" ? (t.completedAt ?? new Date()) : null } });
     if (!changed.count) throw new ConflictError("A tarefa mudou. Recarregue antes de escolher a etapa.");
     if (t.caseId && (stage.status === "DONE" || t.status === "DONE")) await logCaseEvent(tx, ctx, t.caseId, { kind: stage.status === "DONE" ? "TASK_DONE" : "TASK_REOPENED", title: `${stage.status === "DONE" ? "Tarefa concluída" : "Tarefa reaberta"}: ${t.title}` });
     await recordTaskEvent(tx, ctx, taskId, "status", `Etapa: ${t.stage?.name ?? t.status} → ${stage.name}`);
+    if(stage.status!==t.status&&(stage.status==="DONE"||t.status==="DONE"))await advanceTaskDependencies(tx,ctx,t.id,stage.status==="DONE");
     await audit({ action: "task.stage", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "task", resourceId: taskId, metadata: { stageId, from: t.status, to: stage.status }, meta: ctx.meta }, tx);
   });
 }
