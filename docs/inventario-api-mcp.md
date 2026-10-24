@@ -9,7 +9,7 @@
 | `produtividade_equipe` | Mesmo relatório de equipe, requer também `reports:read` |
 | `buscar_documentos`, `buscar_conteudo_documentos` | Metadados e texto previamente extraído dos documentos visíveis |
 | `buscar_oportunidades`, `ver_oportunidade` | Funil e detalhes do CRM |
-| `listar_conversas_chat`, `ler_conversa_chat` | Leitura com sigilo de processo, sem consumir não lidas ou enviar recibos |
+| `listar_conversas_chat`, `ler_conversa_chat` | Busca por nome do contato/cliente vinculado (`q`), `clientId`, situação (`ALL` inclui encerradas), atribuição e paginação; leitura por direção e limite (`IN` + `limit: 1` para última mensagem do cliente), sem consumir não lidas ou enviar recibos |
 | `listar_pacotes_workflow` | Etapas, perguntas, responsáveis e regras de data/dependência |
 
 Propostas novas: `propor_checklist_tarefa`, `propor_colaborador_tarefa`, `propor_recorrencia_tarefa`, `propor_situacao_compromisso`, `propor_execucao_workflow`. As últimas três exigem confirmação reforçada. Não há ferramenta de aprovação externa. Recorrência e workflows usam os serviços do domínio; iniciar/concluir uma etapa dependente exige a conclusão da anterior.

@@ -31,7 +31,53 @@ export const EXPANDED_TOOLS:ToolDef[]=[
  {name:"buscar_conteudo_documentos",title:"Buscar texto já extraído",scope:"read",permission:"documents:read",description:"Pesquisa no texto já extraído dos documentos visíveis. Não faz OCR nem extrai novos arquivos; ausência de resultado não prova ausência de documento.",input:{type:"object",properties:{q:str("Texto a buscar, mínimo 2 caracteres")},required:["q"]},schema:z.object({q:z.string().trim().min(2).max(100)}),run:async(ctx,a)=>searchDocumentContent(ctx,a.q as string)},
  {name:"buscar_oportunidades",title:"Oportunidades do CRM",scope:"read",permission:"crm:read",description:"Consulta oportunidades do CRM por nome, etapa e responsável. Inclui totais do filtro e resumo geral do funil, explicitamente distintos. Retorna até 50 oportunidades sem contatos pessoais.",input:{type:"object",properties:{q:str("Parte do nome/interesse"),stage:str(LEAD_STAGES.join(", ")),ownerId:str("UUID do responsável")}},schema:z.object({q:z.string().max(80).optional(),stage:z.enum(LEAD_STAGES).optional(),ownerId:z.uuid().optional()}),run:async(ctx,a)=>{const r=await listLeads(ctx,a);return {total_filtrado:r.total,limitado:r.total>50,funil_geral:r.summary,oportunidades:r.items.slice(0,50)};}},
  {name:"ver_oportunidade",title:"Detalhes da oportunidade",scope:"read",permission:"crm:read",description:"Consulta etapa, interesse, histórico e propostas comerciais de uma oportunidade do CRM. Não converte nem altera o lead.",input:{type:"object",properties:{id:str("UUID do lead")},required:["id"]},schema:z.object({id:z.uuid()}),run:async(ctx,a)=>{const {lead:l}=await getLead(ctx,a.id as string);return {id:l.id,nome:l.name,etapa:l.stage,interesse:l.interest,responsavel:l.ownerId,proxima_acao:l.nextActionDate,atividades:l.activities,propostas:l.proposals};}},
- {name:"listar_conversas_chat",title:"Conversas do Chat",scope:"read",permission:"whatsapp:read",description:"Consulta metadados de até 50 conversas abertas ou fechadas. Respeita sigilo do processo, não marca como lida, não envia mensagens e não retorna telefones.",input:{type:"object",properties:{status:str("OPEN ou CLOSED"),mine:{type:"boolean"}}},schema:z.object({status:z.enum(["OPEN","CLOSED"]).default("OPEN"),mine:z.boolean().default(false)}),run:async(ctx,a)=>{const where={organizationId:ctx.organizationId,status:a.status as "OPEN"|"CLOSED",...(a.mine?{assignedToId:ctx.userId}:{}),...conversationVisibility(ctx)};const [total,items]=await Promise.all([db.whatsappConversation.count({where}),db.whatsappConversation.findMany({where,take:50,orderBy:[{lastMessageAt:{sort:"desc",nulls:"last"}},{id:"asc"}],select:{id:true,contactName:true,status:true,unreadCount:true,lastMessageAt:true,assignedToId:true,caseId:true,clientId:true}})]);return {total,limitado:total>items.length,conversas:items};}},
- {name:"ler_conversa_chat",title:"Ler conversa sem marcar como lida",scope:"read",permission:"whatsapp:read",description:"Lê últimas 50 mensagens e notas internas de conversa visível, sem enviar recibo de leitura ou zerar não lidas. Não retorna mídia ou contatos telefônicos.",input:{type:"object",properties:{id:str("UUID da conversa")},required:["id"]},schema:z.object({id:z.uuid()}),run:async(ctx,a)=>{const c=await db.whatsappConversation.findFirst({where:{id:a.id as string,organizationId:ctx.organizationId,...conversationVisibility(ctx)},select:{id:true,contactName:true,status:true,unreadCount:true}});if(!c)throw new NotFoundError("Conversa não encontrada.");const where={organizationId:ctx.organizationId,conversationId:c.id};const [total,rows]=await Promise.all([db.whatsappMessage.count({where}),db.whatsappMessage.findMany({where,orderBy:[{createdAt:"desc"},{id:"desc"}],take:50,select:{id:true,direction:true,type:true,body:true,status:true,createdAt:true}})]);return {conversa:c,mensagens:rows.reverse(),total,limitado:total>rows.length};}},
+ {
+  name: "listar_conversas_chat", title: "Buscar conversas do Chat", scope: "read", permission: "whatsapp:read",
+  description: "Localiza conversas pelo nome do contato (q), nome do cliente vinculado (q) ou UUID do cliente (clientId). Para procurar uma pessoa sem restringir situação use status=ALL; OPEN é o padrão. Retorna IDs para ler_conversa_chat, sem exigir que a pessoa saiba o número da conversa. Até 50 por página; se houver homônimos, confirme qual é. Respeita sigilo e não marca como lida, envia mensagens ou retorna telefones.",
+  input: {type: "object", properties: {
+   q: str("Nome ou parte do nome do contato/cliente; palavras podem estar em outra ordem"),
+   clientId: str("UUID do cliente vinculado, obtido em buscar_clientes"),
+   status: {type: "string", enum: ["OPEN", "CLOSED", "ALL"], description: "ALL busca abertas e encerradas; padrão OPEN"},
+   mine: {type: "boolean", description: "Somente atribuídas a mim; não significa todas do escritório"},
+   page: {type: "integer", minimum: 1, maximum: 1000}, limit: {type: "integer", minimum: 1, maximum: 50},
+  }},
+  schema: z.object({q: z.string().trim().max(100).optional(), clientId: z.uuid().optional(), status: z.enum(["OPEN", "CLOSED", "ALL"]).default("OPEN"), mine: z.boolean().default(false), page: z.number().int().min(1).max(1000).default(1), limit: z.number().int().min(1).max(50).default(50)}),
+  run: async(ctx, a) => {
+   const page = a.page as number, limit = a.limit as number;
+   const words = (a.q as string | undefined)?.split(/\s+/).filter(Boolean) ?? [];
+   const where = {organizationId: ctx.organizationId, AND: [
+    conversationVisibility(ctx),
+    ...(a.status !== "ALL" ? [{status: a.status as string}] : []),
+    ...(a.mine ? [{assignedToId: ctx.userId}] : []),
+    ...(a.clientId ? [{clientId: a.clientId as string}] : []),
+    ...words.map(word => ({OR: [
+     {contactName: {contains: word, mode: "insensitive" as const}},
+     {client: {organizationId: ctx.organizationId, deletedAt: null, name: {contains: word, mode: "insensitive" as const}}},
+    ]})),
+   ]};
+   const [total, items] = await Promise.all([
+    db.whatsappConversation.count({where}),
+    db.whatsappConversation.findMany({where, take: limit, skip: (page - 1) * limit, orderBy: [{lastMessageAt: {sort: "desc", nulls: "last"}}, {id: "asc"}], select: {id: true, contactName: true, status: true, serviceStatus: true, unreadCount: true, lastMessageAt: true, assignedToId: true, caseId: true, clientId: true, account: {select: {label: true}}}}),
+   ]);
+   return {total, page, pages: Math.ceil(total / limit), limit, limitado: total > items.length, tem_mais: page * limit < total, conversas: items};
+  },
+ },
+ {
+  name: "ler_conversa_chat", title: "Ler conversa sem marcar como lida", scope: "read", permission: "whatsapp:read",
+  description: "Lê mensagens da conversa localizada em listar_conversas_chat. Para saber a última mensagem que o cliente enviou use direction=IN e limit=1; OUT são respostas da equipe e NOTE são notas internas/eventos, nunca fala do cliente. ALL inclui todas (padrão). Retorna da mais antiga para a mais recente dentro da página; página 1 contém as mais recentes. Não transcreve áudio nem interpreta anexos sem texto. Não envia recibo de leitura nem zera não lidas.",
+  input: {type: "object", properties: {id: str("UUID da conversa retornado em listar_conversas_chat"), direction: {type: "string", enum: ["IN", "OUT", "NOTE", "ALL"]}, limit: {type: "integer", minimum: 1, maximum: 50}, page: {type: "integer", minimum: 1, maximum: 1000}}, required: ["id"]},
+  schema: z.object({id: z.uuid(), direction: z.enum(["IN", "OUT", "NOTE", "ALL"]).default("ALL"), limit: z.number().int().min(1).max(50).default(50), page: z.number().int().min(1).max(1000).default(1)}),
+  run: async(ctx, a) => {
+   const c = await db.whatsappConversation.findFirst({where: {id: a.id as string, organizationId: ctx.organizationId, ...conversationVisibility(ctx)}, select: {id: true, contactName: true, status: true, serviceStatus: true, unreadCount: true}});
+   if (!c) throw new NotFoundError("Conversa não encontrada.");
+   const page = a.page as number, limit = a.limit as number;
+   const where = {organizationId: ctx.organizationId, conversationId: c.id, ...(a.direction !== "ALL" ? {direction: a.direction as string} : {})};
+   const [total, rows] = await Promise.all([
+    db.whatsappMessage.count({where}),
+    db.whatsappMessage.findMany({where, orderBy: [{createdAt: "desc"}, {id: "desc"}], take: limit, skip: (page - 1) * limit, select: {id: true, direction: true, type: true, body: true, status: true, createdAt: true}}),
+   ]);
+   return {conversa: c, mensagens: rows.reverse(), total, direction: a.direction, page, pages: Math.ceil(total / limit), limit, limitado: total > rows.length, tem_mais: page * limit < total};
+  },
+ },
  {name:"listar_pacotes_workflow",title:"Pacotes e regras de workflow",scope:"read",permission:"tasks:read",description:"Lista pacotes com etapas, datas relativas, contagem, dependências e seleção de responsável. Não executa o pacote.",input:{type:"object",properties:{}},schema:z.object({}),run:async ctx=>(await listPackages(ctx)).map(p=>({id:p.id,nome:p.name,ativo:p.active,etapas:p.steps.map(s=>({id:s.id,titulo:s.title,pergunta:s.ask,descricao:s.description,dias:s.dueDays,contagem:s.countType,referencia:s.relativeTo,aguardar_anterior:s.waitForPrevious,responsavel:s.assigneeMode,usuario:s.assigneeId}))}))},
 ];
