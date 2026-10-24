@@ -1,3 +1,4 @@
+import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus, isClosedService } from "@/lib/whatsapp/lifecycle";
 import type { Metadata } from "next";
 import { MessageSquare, Search, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
@@ -46,11 +47,12 @@ function listTime(d: Date | null, tz: string): string {
 }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export default async function AtendimentoPage({ searchParams }: { searchParams: Promise<{ f?: string; c?: string; q?: string; fila?: string; etq?: string; num?: string }> }) {
+export default async function AtendimentoPage({ searchParams }: { searchParams: Promise<{ f?: string; c?: string; q?: string; fila?: string; etq?: string; num?: string; s?:string }> }) {
   const { ctx } = await requireTenant();
   if (!can(ctx, "whatsapp:read")) return <AccessDenied />;
   const sp = await searchParams;
-  const filter = FILTERS.find((f) => f.key === sp.f)?.key ?? "open";
+  const serviceStatus=SERVICE_STATUSES.includes(sp.s as ServiceStatus)?sp.s as ServiceStatus:undefined;
+  const filter = serviceStatus&&isClosedService(serviceStatus)?"closed":FILTERS.find((f) => f.key === sp.f)?.key ?? "open";
   const account = await getAccount(ctx);
   const manage = can(ctx, "whatsapp:manage");
   if (!account) {
@@ -72,7 +74,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   const numbers = await listNumbers(ctx);
   const multi = numbers.length > 1;
   const numId = sp.num && UUID.test(sp.num) && numbers.some((n) => n.id === sp.num) ? sp.num : undefined;
-  const list = await listConversations(ctx, filter, sp.q, queueId, labelId, numId);
+  const list = await listConversations(ctx, filter, sp.q, queueId, labelId, numId,serviceStatus);
   const selectedId = sp.c && UUID.test(sp.c) ? sp.c : null;
   const opened = selectedId ? await openConversation(ctx, selectedId).catch(() => null) : null;
   const [team, quick, templates] = opened ? await Promise.all([teamForAssignment(ctx), listQuickReplies(ctx), listTemplatesLocal(ctx)]) : [[], [], []];
@@ -143,6 +145,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted" aria-hidden="true" />
               <input name="q" defaultValue={sp.q ?? ""} aria-label="Buscar conversa" placeholder="Buscar nome, telefone ou campo" className="h-8 w-full rounded-full border border-border bg-surface-2 pl-8 pr-3 text-sm" />
             </div>
+            <div className="mt-2 flex gap-2"><select name="s" aria-label="Filtrar situação do atendimento" defaultValue={serviceStatus??""} className="min-w-0 flex-1 rounded border border-border bg-surface text-xs"><option value="">Todas as situações</option>{SERVICE_STATUSES.map(s=><option key={s} value={s}>{SERVICE_STATUS_LABEL[s]}</option>)}</select><button type="submit" className="text-xs underline">Aplicar</button></div>
           </form>
           <div className="flex flex-wrap gap-1 border-b border-border p-2">
             {FILTERS.map((f) => (
@@ -193,7 +196,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
                         <span className={`shrink-0 text-[11px] ${c.unreadCount > 0 ? "font-semibold text-danger" : "text-muted"}`}>{listTime(c.lastMessageAt, ctx.timezone)}</span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-xs text-muted">{c.lastPreview ?? "—"}</span>
+                        <span className="truncate text-xs text-muted">{SERVICE_STATUS_LABEL[c.serviceStatus as ServiceStatus]??"Aberto"} · {c.lastPreview ?? "—"}</span>
                         {c.unreadCount > 0 ? <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-semibold text-white" aria-label={`${c.unreadCount} não lidas`}>{c.unreadCount}</span> : null}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
@@ -216,7 +219,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
                 id: opened.conversation.id,
                 title: opened.conversation.client?.name ?? opened.conversation.contactName ?? formatWaId(opened.conversation.waId),
                 phone: formatWaId(opened.conversation.waId),
-                status: opened.conversation.status,
+                status: opened.conversation.status, serviceStatus:opened.conversation.serviceStatus,
                 client: opened.conversation.client,
                 case: opened.conversation.case,
                 lead: opened.conversation.lead,

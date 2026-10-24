@@ -1,3 +1,4 @@
+import { ingestQrCall } from "./chat-calls.service";
 import QRCode from "qrcode";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
@@ -70,6 +71,8 @@ async function handleEvent(accountId: string, live: NonNullable<ReturnType<typeo
     } else {
       await scheduleReconnect(accountId, live, e.reason);
     }
+  } else if(e.type==="call"){
+    live.events=live.events.then(()=>ingestQrCall(accountId,e.call)).then(()=>undefined).catch(()=>logger.error("whatsapp.qr_call_failed",{accountId}));
   } else if (e.type === "message") {
     // Em fila por conta: mantém a ordem das mensagens.
     live.events = live.events.then(() => toIngest(accountId, e.msg)).catch((err) => logger.error("whatsapp.qr_ingest_failed", { error: err instanceof Error ? err.message : String(err) }));
@@ -129,6 +132,7 @@ export async function stopQrSession(accountId: string, opts: { logout: boolean }
     live.session?.close();
     live.session = null;
     liveSessions.delete(accountId);
+    await live.events;
   }
   if (opts.logout) await dbKv(accountId).clear();
   await setState(accountId, { qrState: "DISCONNECTED", qrCode: null });
@@ -189,9 +193,13 @@ export async function disconnectQr(ctx: TenantContext) {
 /** Gera um QR-Code novo (descarta a sessão anterior). */
 export async function restartQr(ctx: TenantContext) {
   assertCan(ctx, "whatsapp:manage");
+  assertCan(ctx,"integrations:manage");
   const a = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true, enabled: true } });
   if (!a || a.provider !== "QR") throw new NotFoundError("A conexão por QR-Code não está configurada.");
   if (!a.enabled) throw new ConflictError("O atendimento está desligado. Ligue-o antes de gerar o QR-Code.");
+  await requireMfa(ctx.userId);
+  await db.whatsappCampaign.updateMany({where:{accountId:a.id,organizationId:ctx.organizationId,status:{in:["APPROVED","SENDING"]}},data:{status:"PAUSED"}});
   await stopQrSession(a.id, { logout: true });
   await startQrSession(a.id);
+  await audit({action:"whatsapp.qr_repair",organizationId:ctx.organizationId,userId:ctx.userId,resourceType:"whatsapp_account",resourceId:a.id,meta:ctx.meta});
 }

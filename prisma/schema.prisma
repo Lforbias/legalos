@@ -1770,6 +1770,9 @@ model MailOutbox {
 }
 
 model WhatsappAccount {
+  autoStatusEnabled Boolean @default(true) @map("auto_status_enabled")
+  reopenAfterMinutes Int @default(30) @map("reopen_after_minutes")
+  reassignOnReopen Boolean @default(true) @map("reassign_on_reopen")
   id                String    @id @default(uuid()) @db.Uuid
   organizationId    String    @map("organization_id") @db.Uuid
   /// 2.0-F8: vários números por escritório. O principal (is_primary) é o que as telas de configuração editam; os demais são números adicionais.
@@ -1809,6 +1812,8 @@ model WhatsappAccount {
 }
 
 model WhatsappConversation {
+  serviceStatus String @default("OPEN") @map("service_status")
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(3)
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   accountId      String    @map("account_id") @db.Uuid
@@ -1886,6 +1891,7 @@ model WhatsappAgent {
 }
 
 model WhatsappMessage {
+  callData Json? @map("call_data")
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   conversationId String   @map("conversation_id") @db.Uuid
@@ -3061,6 +3067,7 @@ model WhatsappIntent {
 }
 
 model WhatsappCampaign {
+  lastBatchAt DateTime? @map("last_batch_at") @db.Timestamptz(3)
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   name           String
@@ -3080,6 +3087,7 @@ model WhatsappCampaign {
 }
 
 model WhatsappCampaignRecipient {
+  claimedAt DateTime? @map("claimed_at") @db.Timestamptz(3)
   id             String    @id @default(uuid()) @db.Uuid
   campaignId     String    @map("campaign_id") @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid

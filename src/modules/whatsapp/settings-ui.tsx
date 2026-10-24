@@ -207,8 +207,9 @@ export function QrPanel() {
           <p className="text-xs text-muted">No celular: WhatsApp → Aparelhos conectados → Conectar um aparelho → aponte a câmera para este código. Ele se renova sozinho.</p>
         </div>
       ) : null}
+      <p className="text-xs text-muted">Para trocar de aparelho ou número, use o pareamento abaixo. Não remova a conta: a remoção apaga o histórico. Uma nova sessão não importa conversas antigas de outros sistemas.</p>
       <div className="flex flex-wrap gap-2">
-        <Button variant="secondary" loading={pending} onClick={() => run(qrRestartAction)}>Gerar novo QR-Code</Button>
+        <Button variant="secondary" loading={pending} onClick={() => {if(window.confirm("Gerar novo pareamento? A conexão anterior será encerrada. Conversas, mensagens e vínculos serão preservados. Campanhas em andamento serão pausadas para sua revisão."))run(qrRestartAction);}}>Trocar aparelho ou número (preservar histórico)</Button>
         <Button variant="danger" loading={pending} onClick={() => { if (window.confirm("Desconectar o WhatsApp deste sistema? As conversas ficam, mas será preciso ler um QR-Code novo para voltar.")) run(qrDisconnectAction); }}>Desconectar o aparelho</Button>
       </div>
     </div>

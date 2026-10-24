@@ -1,5 +1,8 @@
 "use client";
 
+import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus } from "@/lib/whatsapp/lifecycle";
+import { serviceStatusAction } from "./operations-actions";
+import { ManualCallForm } from "./operations-ui";
 import { ArrowLeft, Check, CheckCheck, Clock, PanelRightClose, PanelRightOpen, Paperclip, SendHorizontal, TriangleAlert, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -21,7 +24,7 @@ import { addNoteAction, assignAction, linkClientAction, searchClientsAction, sen
 export type MessageView = { id: string; direction: "IN" | "OUT" | "NOTE"; type: string; body: string | null; mediaMime: string | null; mediaName: string | null; hasMedia: boolean; status: string; error: string | null; automatic: boolean; createdAt: string; authorName: string | null };
 export type TemplateView = { id: string; name: string; language: string; body: string; variableCount: number };
 export type ChatView = {
-  id: string; title: string; phone: string; status: string; client: { id: string; name: string } | null; assignedToId: string | null;
+  id: string; title: string; phone: string; status: string; serviceStatus?:string; client: { id: string; name: string } | null; assignedToId: string | null;
   case: Links["case"]; lead: Links["lead"]; can: Can;
   windowOpen: boolean; windowClosesAt: string | null; canWrite: boolean; canLinkClient: boolean; me: string;
   queueId: string | null;
@@ -69,6 +72,7 @@ function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; act
         <a href={`/api/whatsapp/media/${m.id}`} className="mb-1 block underline" download>📎 {m.mediaName ?? "arquivo"}</a>
       ) : null}
       {m.type === "audio" && m.hasMedia && m.direction === "IN" ? <TranscribeButton messageId={m.id} initial={transcript ?? null} enabled={!!canTranscribe} /> : null}
+      {m.type==="call"?<p className="mb-1 text-xs font-semibold">Ligação · {m.automatic?"evento do aparelho":"registro manual"}</p>:null}
       {m.body ? <p className="whitespace-pre-wrap break-words">{m.body}</p> : null}
       {m.direction === "IN" && m.error ? <p className="mt-1 text-[11px] text-warning">{m.error}</p> : null}
       <div className={`mt-0.5 flex items-center justify-end gap-1 text-[11px] ${note ? "" : "text-[var(--wa-meta)]"}`}>
@@ -163,6 +167,8 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
 
   const controls = chat.canWrite ? (
     <div className="space-y-2 border-b border-border px-3 py-3" data-testid="wa-controls">
+      <Select aria-label="Situação do atendimento" value={chat.serviceStatus??chat.status} disabled={pending} onChange={e=>run(()=>serviceStatusAction(chat.id,e.target.value))}>{SERVICE_STATUSES.map(s=><option key={s} value={s}>{SERVICE_STATUS_LABEL[s]}</option>)}</Select>
+      <ManualCallForm conversationId={chat.id}/>
       <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-text">Responsável</h3>
       <div className="grid grid-cols-1 gap-2">
         <Select aria-label="Responsável" value={chat.assignedToId ?? ""} disabled={pending} onChange={(e) => run(() => assignAction(chat.id, e.target.value || null))} className="h-9 text-sm">
@@ -197,7 +203,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
               {assignee ? ` · ${assignee.name}` : ""}
             </div>
           </div>
-          <span className={`hidden rounded px-2 py-1 text-[11px] font-bold uppercase tracking-wide sm:inline ${open ? "bg-primary text-primary-fg" : "bg-surface-3 text-muted"}`} data-testid="wa-status">{open ? "Em atendimento" : "Encerrada"}</span>
+          <span className={`hidden rounded px-2 py-1 text-[11px] font-bold uppercase tracking-wide sm:inline ${open ? "bg-primary text-primary-fg" : "bg-surface-3 text-muted"}`} data-testid="wa-status">{SERVICE_STATUS_LABEL[(chat.serviceStatus??chat.status) as ServiceStatus]??chat.status}</span>
           {chat.canWrite ? (
             <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => setStatusAction(chat.id, open ? "CLOSED" : "OPEN"))}>
               {open ? "Encerrar" : "Reabrir"}

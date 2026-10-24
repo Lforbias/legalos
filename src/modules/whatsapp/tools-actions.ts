@@ -5,7 +5,7 @@ import { z } from "zod";
 import { uuidSchema, type ActionState } from "@/lib/validation/common";
 import { parse, runAction } from "@/server/action-helpers";
 import { requireTenant } from "@/server/session";
-import { approveCampaign, campaignReport, cancelCampaign, createCampaign, pauseCampaign } from "@/server/services/chat-campaigns.service";
+import { campaignClientOptions, approveCampaign, campaignReport, cancelCampaign, createCampaign, pauseCampaign } from "@/server/services/chat-campaigns.service";
 import { deleteDialog, deleteIntent, saveDialog, saveIntent, setDialogActive, setIntentActive, testIntents } from "@/server/services/chat-dialogs.service";
 import { saveReportSchedule } from "@/server/services/chat-report.service";
 import { createLabelPreset, deleteChatStatus, deleteChecklist, deleteLibraryFile, forwardMessage, saveChatStatus, saveChecklist, sendChecklist, sendLibraryFile, setChatStatus, type ForwardResult, type LabelPresetKey } from "@/server/services/chat-tools.service";
@@ -84,8 +84,8 @@ export async function pauseCampaignAction(id: string): Promise<ActionState> {
 export async function cancelCampaignAction(id: string): Promise<ActionState> {
   return runAction(async () => { const { ctx } = await requireTenant(); await cancelCampaign(ctx, parse(uuidSchema, id)); cfg(); return undefined; });
 }
-export async function campaignReportAction(id: string): Promise<ActionState<{ rows: { name: string; status: string; error: string | null }[] }>> {
-  return runAction(async () => { const { ctx } = await requireTenant(); const r = await campaignReport(ctx, parse(uuidSchema, id)); return { rows: r.recipients.map((x) => ({ name: x.name, status: x.status, error: x.error })) }; });
+export async function campaignReportAction(id: string,page=1): Promise<ActionState<{ rows: { name: string; status: string; error: string | null }[];page:number;pages:number;total:number }>> {
+  return runAction(async () => { const { ctx } = await requireTenant(); const r = await campaignReport(ctx, parse(uuidSchema, id),parse(z.number().int().min(1).max(10000),page)); return {total:r.total,page:r.page,pages:r.pages,rows: r.recipients.map((x) => ({ name: x.name, status: x.status, error: x.error })) }; });
 }
 
 export async function saveReportScheduleAction(input: { enabled: boolean; frequency: string; recipients: string[] }): Promise<ActionState> {
@@ -98,3 +98,5 @@ export async function saveSecurityAction(input: { ipAllowlist: string[]; ipEnfor
 export async function revokeOrgSessionAction(id: string): Promise<ActionState> {
   return runAction(async () => { const { ctx } = await requireTenant(); await revokeOrgSession(ctx, parse(uuidSchema, id)); revalidatePath("/configuracoes/seguranca"); return undefined; });
 }
+
+export async function campaignClientOptionsAction(input:unknown){return runAction(async()=>{const {ctx}=await requireTenant();return campaignClientOptions(ctx,input);});}
