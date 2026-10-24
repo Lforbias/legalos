@@ -29,3 +29,7 @@ Não foi implementada importação de sessão do ChatGuru ou de fornecedores inc
 ## Validação
 
 98 testes de integração passaram, incluindo campanha de 2.601 clientes sem envio, concorrência, opt-out, resultados incertos, isolamento, reabertura, registro de chamada e preservação de histórico no pareamento, além de bots, automações, cobrança, filas e NPS. Dois testes unitários de transição passaram. Quatro cenários de navegador passaram contra serviços simulados: atendimento Meta, permissões, pareamento QR, campanha de 2.601 contatos e relatório paginado. Build e lint passaram. Homologação real de entrega/captura de chamadas exige o número e contato autorizados; não foram feitas campanhas reais de teste.
+
+## Publicação
+
+Publicado em 24/10/2026 no commit `d0fb5b0`, execução GitHub Actions [40062670967](https://github.com/Lforbias/legalos/actions/runs/40062670967), concluída com sucesso. A migração foi aplicada e `/api/ready` confirmou banco, migrações e armazenamento. Conferência somente de leitura nas configurações do site mostrou o pareamento com preservação de histórico, regras por número com intervalo de 30 minutos e limite de 10.000 clientes nas campanhas. Nenhuma conexão foi trocada nem campanha aprovada nessa conferência. Captura e entrega reais continuam sem homologação nesta rodada.
