@@ -68,7 +68,7 @@ export function NumbersPanel({ numbers, max }: { numbers: NumberRow[]; max: numb
       ) : null}
       {numbers.length >= max ? <Alert tone="info">Limite de {max} números por escritório atingido.</Alert> : numbers.length === 0 ? <Alert tone="info">Conecte primeiro o número principal (acima). Depois dá para adicionar outros aqui.</Alert> : (
         <div className="space-y-2">
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" variant={kind === "META" ? "primary" : "secondary"} onClick={() => setKind(kind === "META" ? "" : "META")}>Adicionar número (API oficial)</Button>
             <Button size="sm" variant={kind === "QR" ? "primary" : "secondary"} onClick={() => setKind(kind === "QR" ? "" : "QR")}>Adicionar número (QR-Code)</Button>
           </div>

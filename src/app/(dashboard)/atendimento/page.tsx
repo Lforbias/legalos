@@ -1,11 +1,14 @@
 import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus, isClosedService } from "@/lib/whatsapp/lifecycle";
 import type { Metadata } from "next";
-import { MessageSquare, Search, SlidersHorizontal } from "lucide-react";
+import { BarChart3, MessageSquare, Search, Settings2, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardBody } from "@/components/ui/card";
+import { buttonVariants } from "@/components/ui/button";
+import { Input, Select } from "@/components/ui/form";
 import { db } from "@/lib/db/client";
 import { formatWaId } from "@/lib/whatsapp/phone";
 import { can } from "@/server/context";
@@ -57,8 +60,15 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   const manage = can(ctx, "whatsapp:manage");
   if (!account) {
     return (
-      <div className="mx-auto h-full max-w-3xl overflow-y-auto p-4 md:p-6">
-        <PageHeader title="LegalOS Chat" description="Caixa de conversas do escritório, ligada ao cadastro de clientes." />
+      <div className="mx-auto h-full max-w-5xl overflow-y-auto p-4 md:p-8">
+        <PageHeader title="LegalOS Chat" description="Um espaço para atender clientes, organizar a equipe e acompanhar cada conversa." />
+        <Card className="mb-5"><CardBody className="py-8 sm:py-12">
+          <span className="mb-5 inline-flex rounded-2xl bg-primary/10 p-4 text-primary-text"><MessageSquare className="h-7 w-7" aria-hidden /></span>
+          <h2 className="text-xl font-semibold tracking-tight">Prepare seu espaço de atendimento</h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-muted">Reúna as conversas do WhatsApp e os dados dos clientes. Sua equipe acompanha responsáveis, tarefas e processos durante o atendimento.</p>
+          {manage ? <Link href="/atendimento/configuracoes" className={`${buttonVariants({})} mt-5`}>Configurar número do escritório</Link> : null}
+          <ol className="mt-8 grid gap-4 border-t border-border pt-5 sm:grid-cols-3">{["Conecte um número", "Organize filas e responsáveis", "Atenda com o contexto do cliente"].map((step, index) => <li key={step} className="flex items-start gap-3 text-sm"><span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted">{index + 1}</span><span>{step}</span></li>)}</ol>
+        </CardBody></Card>
         <Alert tone="info">
           O WhatsApp ainda não foi conectado. {manage ? <>Conecte o número em <Link className="underline" href="/atendimento/configuracoes">Configurações do Chat</Link>.</> : "Peça a um administrador para conectar o número."}
         </Alert>
@@ -115,6 +125,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   }
   const qs = (o: Record<string, string | undefined>) => {
     const p = new URLSearchParams();
+    if (serviceStatus && (o.f ?? filter) === filter) p.set("s", serviceStatus);
     for (const [k, v] of Object.entries(o)) if (v) p.set(k, v);
     const s = p.toString();
     return `/atendimento${s ? `?${s}` : ""}`;
@@ -125,33 +136,33 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="atendimento">
       <AutoRefresh />
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-3 py-1.5 text-xs">
-        <span className="font-semibold">LegalOS Chat <span className="font-normal text-muted">· {multi ? `${numbers.length} números` : `Número ${account.displayPhone ?? account.label}`}{account.enabled ? "" : " (desligado)"}</span></span>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
+        <div className="min-w-0"><h1 className="text-sm font-semibold tracking-tight">LegalOS Chat</h1><p className="mt-0.5 truncate text-xs text-muted">{multi ? `${numbers.length} números` : account.displayPhone ?? account.label}{account.enabled ? "" : " · Atendimento desligado"}</p></div>
         <div className="flex items-center gap-3">
           {writer ? <AvailabilityButton available={available} /> : null}
-          {manage ? <Link className="underline" href="/atendimento/relatorios">Relatórios</Link> : null}
-          {manage ? <Link className="underline" href="/atendimento/configuracoes">Configurações</Link> : null}
+          {manage ? <Link className="inline-flex items-center gap-1.5 rounded-lg p-2 text-xs text-muted hover:bg-surface-2 hover:text-fg" aria-label="Relatórios do Chat" href="/atendimento/relatorios"><BarChart3 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Relatórios</span></Link> : null}
+          {manage ? <Link className="inline-flex items-center gap-1.5 rounded-lg p-2 text-xs text-muted hover:bg-surface-2 hover:text-fg" aria-label="Configurações do Chat" href="/atendimento/configuracoes"><Settings2 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Configurações</span></Link> : null}
         </div>
       </div>
       {!account.enabled ? <Alert tone="warning" className="m-2">O atendimento está desligado: mensagens novas não estão sendo recebidas.</Alert> : null}
       <div className="flex min-h-0 flex-1">
-        <section className={`${chat ? "hidden lg:flex" : "flex"} min-h-0 w-full flex-col border-r border-border bg-surface lg:w-[340px] lg:shrink-0`} aria-label="Conversas">
-          <form action="/atendimento" className="border-b border-border p-2">
+        <section className={`${chat ? "hidden lg:flex" : "flex"} min-h-0 w-full flex-col border-r border-border bg-surface lg:w-[340px] xl:w-[360px] lg:shrink-0`} aria-label="Conversas">
+          <form action="/atendimento" className="border-b border-border p-3">
             <input type="hidden" name="f" value={filter} />
             {queueId ? <input type="hidden" name="fila" value={queueId} /> : null}
             {labelId ? <input type="hidden" name="etq" value={labelId} /> : null}
             {numId ? <input type="hidden" name="num" value={numId} /> : null}
             <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted" aria-hidden="true" />
-              <input name="q" defaultValue={sp.q ?? ""} aria-label="Buscar conversa" placeholder="Buscar nome, telefone ou campo" className="h-8 w-full rounded-full border border-border bg-surface-2 pl-8 pr-3 text-sm" />
+              <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted" aria-hidden="true" />
+              <Input name="q" defaultValue={sp.q ?? ""} aria-label="Buscar conversa" placeholder="Buscar nome, telefone ou campo" className="pl-9" />
             </div>
-            <div className="mt-2 flex gap-2"><select name="s" aria-label="Filtrar situação do atendimento" defaultValue={serviceStatus??""} className="min-w-0 flex-1 rounded border border-border bg-surface text-xs"><option value="">Todas as situações</option>{SERVICE_STATUSES.map(s=><option key={s} value={s}>{SERVICE_STATUS_LABEL[s]}</option>)}</select><button type="submit" className="text-xs underline">Aplicar</button></div>
+            <div className="mt-2 flex items-center gap-2"><Select name="s" aria-label="Filtrar situação do atendimento" defaultValue={serviceStatus??""} className="h-9 min-w-0 flex-1 text-xs"><option value="">Todas as situações</option>{SERVICE_STATUSES.map(s=><option key={s} value={s}>{SERVICE_STATUS_LABEL[s]}</option>)}</Select><button type="submit" className="h-9 rounded-lg border border-border px-3 text-xs hover:bg-surface-2">Aplicar</button></div>
           </form>
-          <div className="flex flex-wrap gap-1 border-b border-border p-2">
+          <nav aria-label="Caixas de conversa" className="flex flex-wrap gap-1 border-b border-border p-3">
             {FILTERS.map((f) => (
-              <Link key={f.key} href={qs({ f: f.key, q: sp.q, fila: queueId, etq: labelId, num: numId })} className={`rounded-full px-2.5 py-1 text-xs ${f.key === filter ? "bg-primary text-primary-fg" : "bg-surface-2 hover:bg-border"}`}>{f.label}</Link>
+              <Link key={f.key} aria-current={f.key === filter ? "page" : undefined} href={qs({ f: f.key, q: sp.q, fila: queueId, etq: labelId, num: numId })} className={`rounded-lg px-2.5 py-2 text-xs ${f.key === filter ? "bg-primary/10 font-semibold text-primary-text" : "text-muted hover:bg-surface-2 hover:text-fg"}`}>{f.label}</Link>
             ))}
-          </div>
+          </nav>
           {multi ? (
             <div className="flex flex-wrap gap-1 border-b border-border p-2" data-testid="wa-number-filter" aria-label="Número do WhatsApp">
               <Link href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId })} className={`rounded-md px-2 py-1 text-xs ${!numId ? "bg-primary text-primary-fg" : "hover:bg-surface-2"}`}>Todos os números</Link>
@@ -188,19 +199,19 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               const name = c.client?.name ?? c.contactName ?? formatWaId(c.waId);
               return (
                 <li key={c.id}>
-                  <Link href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId, c: c.id })} className={`flex gap-3 border-b border-border px-3 py-2.5 text-sm hover:bg-surface-2 ${c.id === selectedId ? "bg-surface-2" : ""}`}>
+                  <Link aria-current={c.id === selectedId ? "page" : undefined} href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId, c: c.id })} className={`flex gap-3 border-b border-l-2 border-border px-3 py-3.5 text-sm transition-colors hover:bg-surface-2 ${c.id === selectedId ? "border-l-primary bg-primary/5" : "border-l-transparent"}`}>
                     <Avatar name={name} size={40} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className={`truncate ${c.unreadCount > 0 ? "font-semibold" : "font-medium"}`}>{name}</span>
-                        <span className={`shrink-0 text-[11px] ${c.unreadCount > 0 ? "font-semibold text-danger" : "text-muted"}`}>{listTime(c.lastMessageAt, ctx.timezone)}</span>
+                        <span className={`shrink-0 text-[11px] ${c.unreadCount > 0 ? "font-semibold text-primary-text" : "text-muted"}`}>{listTime(c.lastMessageAt, ctx.timezone)}</span>
                       </div>
                       <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-xs text-muted">{SERVICE_STATUS_LABEL[c.serviceStatus as ServiceStatus]??"Aberto"} · {c.lastPreview ?? "—"}</span>
-                        {c.unreadCount > 0 ? <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1 text-[11px] font-semibold text-white" aria-label={`${c.unreadCount} não lidas`}>{c.unreadCount}</span> : null}
+                        <span className="truncate text-xs text-muted">{c.lastPreview ?? "—"}</span>
+                        {c.unreadCount > 0 ? <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-fg" aria-label={`${c.unreadCount} não lidas`}>{c.unreadCount}</span> : null}
                       </div>
                       <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
-                        <span className={`rounded px-1.5 py-0.5 font-semibold uppercase ${c.status === "OPEN" ? "bg-success/15 text-success" : "bg-surface-2 text-muted"}`}>{c.status === "OPEN" ? "Em atendimento" : "Encerrada"}</span>
+                        <span className={`rounded px-1.5 py-0.5 font-medium ${c.status === "OPEN" ? "bg-primary/10 text-primary-text" : "bg-surface-2 text-muted"}`}>{SERVICE_STATUS_LABEL[c.serviceStatus as ServiceStatus] ?? (c.status === "OPEN" ? "Aberto" : "Fechado")}</span>
                         {multi ? <span className="rounded bg-surface-2 px-1.5 py-0.5 text-muted" data-testid="wa-number-chip">{c.account.label}</span> : null}
                         <span className="truncate text-muted">{c.assignedTo?.name ?? "Sem responsável"}{c.queue ? ` · ${c.queue.name}` : ""}</span>
                         {c.labels.map(({ label }) => <span key={label.id} className="rounded-full border px-1.5" style={labelStyle(label.color)}>{label.name}</span>)}
@@ -217,6 +228,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
             <ChatPane
               chat={{
                 id: opened.conversation.id,
+                backHref: qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId }),
                 title: opened.conversation.client?.name ?? opened.conversation.contactName ?? formatWaId(opened.conversation.waId),
                 phone: formatWaId(opened.conversation.waId),
                 status: opened.conversation.status, serviceStatus:opened.conversation.serviceStatus,

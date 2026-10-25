@@ -51,7 +51,7 @@ export function SidePanel({ title, phone, data, meta, actions, controls, extras 
     financeiro: d.finance?.overdueCount,
   };
   return (
-    <aside className="flex min-h-0 flex-col border-border lg:w-[340px] lg:shrink-0 lg:border-l" data-testid="wa-side">
+    <aside className="flex h-full min-h-0 w-full flex-col border-border xl:border-l" data-testid="wa-side">
       <div role="tablist" aria-label="Informações da conversa" className="flex overflow-x-auto border-b border-border">
         {TABS.map((t) => (
           <button key={t.key} role="tab" type="button" title={t.label} aria-label={t.label} aria-selected={tab === t.key} data-testid={`side-tab-${t.key}`} onClick={() => setTab(t.key)} className={`relative flex flex-1 items-center justify-center px-2 py-2.5 ${tab === t.key ? "border-b-2 border-primary text-primary-text" : "text-muted hover:bg-surface-2"}`}>

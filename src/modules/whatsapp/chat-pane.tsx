@@ -3,7 +3,7 @@
 import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus } from "@/lib/whatsapp/lifecycle";
 import { serviceStatusAction } from "./operations-actions";
 import { ManualCallForm } from "./operations-ui";
-import { ArrowLeft, Check, CheckCheck, Clock, PanelRightClose, PanelRightOpen, Paperclip, SendHorizontal, TriangleAlert, Zap } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Clock, PanelRightClose, PanelRightOpen, Paperclip, SendHorizontal, TriangleAlert, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -24,6 +24,7 @@ import { addNoteAction, assignAction, linkClientAction, searchClientsAction, sen
 export type MessageView = { id: string; direction: "IN" | "OUT" | "NOTE"; type: string; body: string | null; mediaMime: string | null; mediaName: string | null; hasMedia: boolean; status: string; error: string | null; automatic: boolean; createdAt: string; authorName: string | null };
 export type TemplateView = { id: string; name: string; language: string; body: string; variableCount: number };
 export type ChatView = {
+  backHref?: string;
   id: string; title: string; phone: string; status: string; serviceStatus?:string; client: { id: string; name: string } | null; assignedToId: string | null;
   case: Links["case"]; lead: Links["lead"]; can: Can;
   windowOpen: boolean; windowClosesAt: string | null; canWrite: boolean; canLinkClient: boolean; me: string;
@@ -100,7 +101,26 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
   const [params, setParams] = React.useState<string[]>([]);
   const [q, setQ] = React.useState("");
   const [found, setFound] = React.useState<{ id: string; name: string }[]>([]);
-  const [showSide, setShowSide] = React.useState(true);
+  const [showSide, setShowSide] = React.useState(false);
+  const [wide, setWide] = React.useState(false);
+  const infoDialog = React.useRef<HTMLDialogElement>(null);
+  const infoTrigger = React.useRef<HTMLButtonElement>(null);
+  const infoId = React.useId();
+
+  React.useEffect(() => {
+    const media = window.matchMedia("(min-width: 1280px)");
+    const sync = () => { setWide(media.matches); setShowSide(media.matches); };
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  React.useEffect(() => {
+    const dialog = infoDialog.current;
+    if (!dialog || wide) return;
+    if (showSide && !dialog.open) dialog.showModal();
+    if (!showSide && dialog.open) dialog.close();
+  }, [showSide, wide]);
 
   React.useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -189,11 +209,23 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
     </div>
   ) : null;
 
+  const informationPanel = side ? (
+    <SidePanel
+          title={chat.title}
+          phone={chat.phone}
+          data={side}
+          controls={controls}
+          extras={extras || tools ? <>{extras ? <ConversationExtras d={extras} /> : null}{tools ? <ConversationTools d={tools} /> : null}</> : null}
+          meta={chat.canWrite && meta ? <MetaPanel key={JSON.stringify([meta.selected, meta.values])} chatId={chat.id} labels={meta.labels} selected={meta.selected} fields={meta.fields} values={meta.values} onMsg={setMsg} /> : null}
+          actions={chat.canWrite ? <ChatActions key={`${panel?.kind ?? "-"}:${panel?.messageId ?? ""}:${panelN}`} chatId={chat.id} title={chat.title} links={links} can={chat.can} team={team} me={chat.me} panel={panel} setPanel={openPanel} onMsg={setMsg} /> : <p className="px-3 pb-3 text-xs text-muted">Sem permissão para criar a partir da conversa.</p>}
+        />
+  ) : null;
+
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col lg:flex-row" data-testid="wa-chat-wrap">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="wa-chat">
         <div className="flex items-center gap-3 border-b border-border bg-surface px-3 py-2">
-          <Link href="/atendimento" aria-label="Voltar às conversas" className="rounded-full p-1.5 hover:bg-surface-2 lg:hidden"><ArrowLeft className="h-5 w-5" aria-hidden /></Link>
+          <Link href={chat.backHref ?? "/atendimento"} aria-label="Voltar às conversas" className="rounded-full p-1.5 hover:bg-surface-2 lg:hidden"><ArrowLeft className="h-5 w-5" aria-hidden /></Link>
           <Avatar name={chat.title} size={40} />
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{chat.title}</div>
@@ -210,7 +242,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
             </Button>
           ) : null}
           {side ? (
-            <button type="button" aria-pressed={showSide} aria-label={showSide ? "Ocultar informações" : "Informações"} title={showSide ? "Ocultar informações" : "Informações"} onClick={() => setShowSide(!showSide)} className="rounded-full p-2 text-muted hover:bg-surface-2">
+            <button ref={infoTrigger} type="button" aria-expanded={showSide} aria-controls={infoId} aria-haspopup={!wide ? "dialog" : undefined} aria-label={showSide ? "Ocultar informações" : "Informações"} title={showSide ? "Ocultar informações" : "Informações"} onClick={() => setShowSide(!showSide)} className="rounded-full p-2 text-muted hover:bg-surface-2">
               {showSide ? <PanelRightClose className="h-5 w-5" aria-hidden /> : <PanelRightOpen className="h-5 w-5" aria-hidden />}
             </button>
           ) : null}
@@ -299,7 +331,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
                   ref={taRef}
                   aria-label={note ? "Nota interna" : "Mensagem"}
                   rows={1}
-                  className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted"
+                  className="max-h-40 min-h-9 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted"
                   placeholder={note ? "Nota interna (o cliente não vê)" : "Escreva a mensagem… (/ para respostas rápidas; Enter envia, Shift+Enter quebra a linha)"}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -311,16 +343,15 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           </div>
         ) : null}
       </div>
-      {side && showSide ? (
-        <SidePanel
-          title={chat.title}
-          phone={chat.phone}
-          data={side}
-          controls={controls}
-          extras={extras || tools ? <>{extras ? <ConversationExtras d={extras} /> : null}{tools ? <ConversationTools d={tools} /> : null}</> : null}
-          meta={chat.canWrite && meta ? <MetaPanel key={JSON.stringify([meta.selected, meta.values])} chatId={chat.id} labels={meta.labels} selected={meta.selected} fields={meta.fields} values={meta.values} onMsg={setMsg} /> : null}
-          actions={chat.canWrite ? <ChatActions key={`${panel?.kind ?? "-"}:${panel?.messageId ?? ""}:${panelN}`} chatId={chat.id} title={chat.title} links={links} can={chat.can} team={team} me={chat.me} panel={panel} setPanel={openPanel} onMsg={setMsg} /> : <p className="px-3 pb-3 text-xs text-muted">Sem permissão para criar a partir da conversa.</p>}
-        />
+      {side && (wide ? showSide : true) ? (
+        wide ? <div id={infoId} className="h-full min-h-0 w-[320px] shrink-0">
+          {informationPanel}
+        </div> : <dialog ref={infoDialog} id={infoId} aria-label="Informações da conversa" onClose={() => { setShowSide(false); infoTrigger.current?.focus(); }} className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-[min(400px,100vw)] max-w-none border-l border-border bg-surface p-0 text-fg shadow-2xl backdrop:bg-black/40">
+        <div className="flex h-full flex-col">
+        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3"><h2 className="text-sm font-semibold">Informações da conversa</h2><button type="button" aria-label="Fechar informações" onClick={() => setShowSide(false)} className="rounded-lg p-2 text-muted hover:bg-surface-2"><X className="h-4 w-4" aria-hidden /></button></header>
+        <div className="min-h-0 flex-1">
+        {informationPanel}
+        </div></div></dialog>
       ) : null}
     </div>
   );

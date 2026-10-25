@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Plus, Search } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
+import { FilterPanel } from "@/components/layout/filter-panel";
+import { SectionSelect } from "@/components/ui/section-select";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/form";
@@ -81,13 +83,18 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     params.set("pagina", String(page));
     return `/caixa-de-entrada?${params}`;
   };
+  const advancedCount = [tag, sp.duplicadas === "1", sp.tipo, sp.origem, sp.orgao, sp.recebidaDe, sp.recebidaAte, sp.publicadaDe, sp.publicadaAte, sp.ordem === "asc", sp.porPagina && sp.porPagina !== "25"].filter(Boolean).length;
+  const clearParams = new URLSearchParams();
+  if (reading) clearParams.set("leitura", "1");
+  if (current) clearParams.set("caixa", current);
+  const clearHref = `/caixa-de-entrada${clearParams.size ? `?${clearParams}` : ""}`;
   return (
-    <div className={reading ? "mx-auto max-w-[1800px]" : "mx-auto max-w-6xl"}>
+    <div className={reading ? "mx-auto max-w-[1800px]" : "mx-auto max-w-7xl"}>
       <PageHeader
         title="Caixa de entrada jurídica"
-        description="Central de intimações e publicações: registre, classifique, distribua e transforme em tarefas e prazos. Registre à mão, cole o texto ou importe do DJEN e do PJe em Integrações. Caixas: Entrada (sem responsável), Minhas, Geral, equipes, Acervo (tratadas) e Adormecidas."
+        description="Receba, distribua e trate as intimações do escritório. Cada publicação segue até a tarefa ou o prazo correspondente."
         actions={
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Link href={readerHref(undefined, !reading)} className={buttonVariants({ variant: "secondary" })}>{reading ? "Ver tabela" : "Leitura integrada"}</Link>
             {can(ctx, "members:manage") ? <Link href="/caixa-de-entrada/equipes" className={buttonVariants({ variant: "secondary" })}>Equipes</Link> : null}
             {canWrite ? (
@@ -120,7 +127,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           </Card>
         ))}
       </div>
-      <nav aria-label="Situação" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
+      <nav aria-label="Situação" className="mb-5 min-w-0">
+        <div className="md:hidden"><SectionSelect base="/caixa-de-entrada" label="Caixa de trabalho" current={current} tabs={tabs.map((t) => ({ ...t, href: href(t.key) }))} /></div>
+        <div className="hidden gap-1 overflow-x-auto border-b border-border md:flex">
         {tabs.map((t) => {
           const active = current === t.key && !(status && !box);
           return (
@@ -134,19 +143,21 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             </Link>
           );
         })}
+        </div>
       </nav>
-      <form method="get" className="mb-4 flex flex-wrap items-center gap-2" role="search" aria-label="Filtrar intimações">
+      <form method="get" className="mb-5 space-y-3" role="search" aria-label="Filtrar intimações">
         {reading ? <input type="hidden" name="leitura" value="1" /> : null}
         {status && !box ? <input type="hidden" name="status" value={status} /> : null}
         {box ? <input type="hidden" name="caixa" value={current} /> : null}
-        <div className="relative min-w-60 flex-1">
+        <div className="grid items-center gap-2 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_240px_auto_auto]">
+        <div className="relative min-w-0">
           <label htmlFor="q" className="sr-only">Buscar</label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
           <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Título, teor ou número do processo" className="pl-9" />
         </div>
         <div>
           <label htmlFor="responsavel" className="sr-only">Responsável</label>
-          <Select id="responsavel" name="responsavel" defaultValue={sp.responsavel ?? ""} className="w-56">
+          <Select id="responsavel" name="responsavel" defaultValue={sp.responsavel ?? ""}>
             <option value="">Todos os responsáveis</option>
             <option value="eu">Distribuídas para mim</option>
             {members.map((m) => (
@@ -154,10 +165,15 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             ))}
           </Select>
         </div>
+        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Filtrar</button>
+        <Link href={clearHref} className={buttonVariants({ variant: "ghost" })}>Limpar filtros</Link>
+        </div>
+        <FilterPanel label="Mais filtros de intimações" activeCount={advancedCount}>
+        <div className="grid items-end gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {tags.length ? (
           <div>
             <label htmlFor="etiqueta" className="sr-only">Etiqueta</label>
-            <Select id="etiqueta" name="etiqueta" defaultValue={sp.etiqueta ?? ""} className="w-44">
+            <Select id="etiqueta" name="etiqueta" defaultValue={sp.etiqueta ?? ""}>
               <option value="">Todas as etiquetas</option>
               {tags.map((t) => (
                 <option key={t} value={t}>{t}</option>
@@ -165,8 +181,8 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             </Select>
           </div>
         ) : null}
-        <label className="flex h-9 items-center gap-2 text-sm">
-          <input type="checkbox" name="duplicadas" value="1" defaultChecked={sp.duplicadas === "1"} className="h-4 w-4" /> Possíveis duplicatas
+        <label className="flex min-h-10 items-center gap-2 text-sm">
+          <input type="checkbox" name="duplicadas" value="1" defaultChecked={sp.duplicadas === "1"} className="h-4 w-4 accent-primary" /> Possíveis duplicatas
         </label>
         <label className="text-sm">Tipo<Select name="tipo" defaultValue={sp.tipo ?? ""}><option value="">Todos os tipos</option>{NOTICE_KINDS.map(k => <option key={k} value={k}>{NOTICE_KIND_LABEL[k]}</option>)}</Select></label>
         <label className="text-sm">Origem<Select name="origem" defaultValue={sp.origem ?? ""}><option value="">Todas as origens</option>{Object.entries(ORIGIN_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></label>
@@ -177,8 +193,9 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         <label className="text-sm">Publicada até<Input type="date" name="publicadaAte" defaultValue={sp.publicadaAte ?? ""} /></label>
         <label className="text-sm">Ordem<Select name="ordem" defaultValue={parsed.data.sort}><option value="desc">Mais recentes primeiro</option><option value="asc">Mais antigas primeiro</option></Select></label>
         <label className="text-sm">Por página<Select name="porPagina" defaultValue={parsed.data.pageSize}>{[25, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}</Select></label>
-        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Filtrar</button>
-        <Link href="/caixa-de-entrada" className="text-sm underline">Limpar filtros</Link>
+        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Aplicar filtros</button>
+        </div>
+        </FilterPanel>
       </form>
       <p className="mb-2 text-sm text-muted">{result.total} intimação(ões) · página {result.page} de {result.pageCount}</p>
       {result.items.length === 0 ? (
@@ -196,7 +213,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
       ) : (
         <NoticeTable key={JSON.stringify([sp, result.items.map(n => [n.id, n.updatedAt])])} rows={result.items} members={members} teams={teams} canWrite={canWrite} />
       )}
-      <nav aria-label="Paginação de intimações" className="mt-4 flex items-center justify-between gap-3">
+      <nav aria-label="Paginação de intimações" className="mt-5 flex flex-wrap items-center justify-between gap-3">
         {result.page > 1 ? <Link className={buttonVariants({ variant: "secondary" })} href={pageHref(result.page - 1)}>Página anterior</Link> : <span />}
         <span className="text-sm">Página {result.page} de {result.pageCount} · {result.total} resultado(s)</span>
         {result.page < result.pageCount ? <Link className={buttonVariants({ variant: "secondary" })} href={pageHref(result.page + 1)}>Próxima página</Link> : <span />}
