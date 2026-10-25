@@ -14,6 +14,8 @@ export const API_SCOPES = {
   "notices:read": { label: "Ler intimações", permission: "inbox:read" },
   "notices:write": { label: "Registrar intimações", permission: "inbox:write" },
   "tools:read": { label: "Ferramentas via API: consultar dados", permission: "ai:use" },
+  "tools:execute": { label: "Ferramentas via API: criar e alterar diretamente (sem aprovação posterior)", permission: "ai:use" },
+  "mcp:execute": { label: "MCP: criar e alterar diretamente (sem aprovação posterior)", permission: "ai:use" },
   "tools:propose": { label: "Ferramentas via API: propor ações para aprovação", permission: "ai:use" },
   "mcp:read": { label: "RUTE: consultar dados (somente leitura)", permission: "ai:use" },
   "mcp:propose": { label: "RUTE: propor ações (só valem após confirmação humana)", permission: "ai:use" },

@@ -55,12 +55,12 @@ export function Chat({ conversationId, caseId, clientId, messages, contextLabel,
         {all.length === 0 ? <section className="space-y-4 py-2" aria-label="Comece uma conversa com a RUTE">
           <div className="flex items-start gap-3">
             <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary-text"><Sparkles className="h-5 w-5" aria-hidden /></span>
-            <div><h3 className="text-base font-semibold">Por onde começamos?</h3><p className="mt-1 max-w-sm text-sm leading-relaxed text-muted">Posso consultar as informações do escritório e preparar ações para você revisar. Escolha um começo ou escreva do seu jeito.</p></div>
+            <div><h3 className="text-base font-semibold">Por onde começamos?</h3><p className="mt-1 max-w-sm text-sm leading-relaxed text-muted">Posso consultar dados, criar e atualizar registros quando você pedir. Escolha um começo ou escreva do seu jeito.</p></div>
           </div>
           <div className="grid gap-2 sm:grid-cols-2">
             {STARTERS.map(({ label, prompt, icon: Icon }) => <button key={label} type="button" onClick={() => { setText(prompt); input.current?.focus(); }} className="group flex min-h-14 items-center gap-2.5 rounded-xl border border-border bg-surface px-3 py-2.5 text-left text-sm transition hover:border-primary/50 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"><Icon className="h-4 w-4 shrink-0 text-muted group-hover:text-primary-text" aria-hidden /><span>{label}</span><ArrowUp className="ml-auto h-3.5 w-3.5 -rotate-45 text-muted opacity-0 transition group-hover:opacity-100 group-focus-visible:opacity-100" aria-hidden /></button>)}
           </div>
-          <p className="text-xs text-muted">Para alterações, a RUTE prepara uma proposta. Você confere e confirma no LegalOS.</p>
+          <p className="text-xs text-muted">Pedidos de criação e alteração podem ser executados na hora, conforme seu acesso. Você também pode pedir apenas uma proposta para revisar.</p>
         </section> : null}
         {all.map((m) => (
           <div key={m.id} className={m.role === "user" ? "text-right" : ""}>
@@ -70,6 +70,7 @@ export function Chat({ conversationId, caseId, clientId, messages, contextLabel,
                 {m.refs.filter((r) => r.type === "tool").map((r, i) => <Badge key={i} tone={r.ok ? "neutral" : "warning"}>{r.name}</Badge>)}
               </p>
             ) : null}
+            {m.role === "assistant" ? m.refs.filter(r => r.type === "action" && r.id).map((r, i) => <p key={`action-${i}`} className="mt-2 rounded-lg border border-border bg-surface-2 px-3 py-2 text-xs" role="status">Executado: {r.title ?? r.name} · Registro: <span className="select-all font-mono">{r.id}</span></p>) : null}
             {m.role === "assistant" ? m.refs.filter(r => r.type === "proposal" && r.id).map(r => <InlineProposal key={r.id} id={r.id!} />) : null}
           </div>
         ))}

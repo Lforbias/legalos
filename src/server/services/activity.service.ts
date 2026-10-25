@@ -13,7 +13,7 @@ import { changeEventStatus } from "./agenda.service";
 
 export const ACTIVITY_KINDS = ["TASK", "EVENT", "DEADLINE"] as const;
 export type ActivityKind = typeof ACTIVITY_KINDS[number];
-export const activityFilterSchema = z.object({ from: z.string().refine(isYmd).optional(), to: z.string().refine(isYmd).optional(), kind: z.enum(ACTIVITY_KINDS).optional(), assigneeId: z.uuid().optional(), q: z.string().trim().max(100).optional(), includeClosed: z.boolean().default(false), caseId: z.uuid().optional() }).refine(v => !v.from || !v.to || (v.from <= v.to && diffDays(v.to, v.from) <= 366), "Escolha um intervalo de até 366 dias.");
+export const activityFilterSchema = z.object({ from: z.string().refine(isYmd).optional(), to: z.string().refine(isYmd).optional(), kind: z.enum(ACTIVITY_KINDS).optional(), assigneeId: z.uuid().optional(), q: z.string().trim().max(100).optional(), includeClosed: z.boolean().default(false), caseId: z.uuid().optional(), clientId: z.uuid().optional() }).refine(v => !v.from || !v.to || (v.from <= v.to && diffDays(v.to, v.from) <= 366), "Escolha um intervalo de até 366 dias.");
 export type ActivityFilter = z.input<typeof activityFilterSchema>;
 export type Activity = { id: string; kind: ActivityKind; title: string; date: string | null; time: string | null; status: "TODO" | "IN_PROGRESS" | "WAITING" | "DONE" | "CANCELED"; originalStatus: string; href: string; assigneeId: string | null; assigneeName: string | null; caseId: string | null; caseTitle: string | null; canWrite: boolean };
 
@@ -25,9 +25,11 @@ export async function listActivities(ctx: TenantContext, raw: ActivityFilter = {
   const visible = { OR: [{ caseId: null }, { case: cv }] };
   const date = { ...(f.from ? { gte: new Date(`${f.from}T00:00:00Z`) } : {}), ...(f.to ? { lte: new Date(`${f.to}T00:00:00Z`) } : {}) };
   const common = { organizationId: org, ...(f.caseId ? { caseId: f.caseId } : {}), ...(f.q ? { title: { contains: f.q, mode: "insensitive" as const } } : {}) };
-  const tw: Prisma.TaskWhereInput = { ...common, deletedAt: null, ...visible, ...(f.assigneeId ? { assigneeId: f.assigneeId } : {}), ...(!f.includeClosed ? { status: { in: ["TODO", "IN_PROGRESS", "WAITING"] } } : {}), ...((f.from || f.to) ? { dueDate: date } : {}) };
-  const dw: Prisma.DeadlineWhereInput = { ...common, case: cv, ...(f.assigneeId ? { responsibleId: f.assigneeId } : {}), ...(!f.includeClosed ? { status: { in: ["DRAFT", "VALIDATED"] } } : {}), ...((f.from || f.to) ? { dueDate: date } : {}) };
-  const ew: Prisma.AgendaEventWhereInput = { ...common, deletedAt: null, ...visible, ...(f.assigneeId ? { assigneeId: f.assigneeId } : {}), ...(!f.includeClosed ? { status: { in: ["TODO", "IN_PROGRESS", "WAITING"] } } : {}), ...((f.from || f.to) ? { startsAt: { ...(f.from ? { gte: zonedToUtc(f.from, "00:00", ctx.timezone) } : {}), ...(f.to ? { lt: zonedToUtc(addDays(f.to, 1), "00:00", ctx.timezone) } : {}) } } : {}) };
+  const clientCase = f.clientId ? { parties: { some: { clientId: f.clientId, organizationId: org } } } : {};
+  const clientActivity = f.clientId ? { AND: [{ OR: [{ clientId: f.clientId }, { case: clientCase }] }] } : {};
+  const tw: Prisma.TaskWhereInput = { ...common, ...clientActivity, deletedAt: null, ...visible, ...(f.assigneeId ? { assigneeId: f.assigneeId } : {}), ...(!f.includeClosed ? { status: { in: ["TODO", "IN_PROGRESS", "WAITING"] } } : {}), ...((f.from || f.to) ? { dueDate: date } : {}) };
+  const dw: Prisma.DeadlineWhereInput = { ...common, case: { AND: [cv, clientCase] }, ...(f.assigneeId ? { responsibleId: f.assigneeId } : {}), ...(!f.includeClosed ? { status: { in: ["DRAFT", "VALIDATED"] } } : {}), ...((f.from || f.to) ? { dueDate: date } : {}) };
+  const ew: Prisma.AgendaEventWhereInput = { ...common, ...clientActivity, deletedAt: null, ...visible, ...(f.assigneeId ? { assigneeId: f.assigneeId } : {}), ...(!f.includeClosed ? { status: { in: ["TODO", "IN_PROGRESS", "WAITING"] } } : {}), ...((f.from || f.to) ? { startsAt: { ...(f.from ? { gte: zonedToUtc(f.from, "00:00", ctx.timezone) } : {}), ...(f.to ? { lt: zonedToUtc(addDays(f.to, 1), "00:00", ctx.timezone) } : {}) } } : {}) };
   const tk = can(ctx, "tasks:read") && (!f.kind || f.kind === "TASK"), dl = can(ctx, "deadlines:read") && (!f.kind || f.kind === "DEADLINE"), ev = (can(ctx, "deadlines:read") || can(ctx, "tasks:read")) && (!f.kind || f.kind === "EVENT");
   const [tasks, deadlines, events, tc, dc, ec] = await Promise.all([
     tk ? db.task.findMany({ where: tw, orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { id: "asc" }], take: 300, include: { case: { select: { title: true } } } }) : [],

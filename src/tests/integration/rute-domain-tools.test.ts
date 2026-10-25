@@ -30,6 +30,32 @@ describe("Expansão do catálogo compartilhado", () => {
     const found = await callTool(a.ctx, scopes, origin, "capacidades", {q: "custo"});
     expect(found.data).toMatchObject({total: 2});
   });
+  it("rejeita filtros inexistentes em vez de executar uma consulta mais ampla", async () => {
+    const r = await callTool(a.ctx, scopes, origin, "listar_atividades", { cliente: "Ana" });
+    expect(r).toMatchObject({ ok: false, status: 422, code: "validation_error" });
+    expect(r.text).toContain("cliente");
+    const catalog = toolCatalog(a.ctx, scopes).find(t => t.name === "listar_atividades")!;
+    expect(catalog.inputSchema.properties).toHaveProperty("clientId");
+    expect(catalog.inputSchema.properties).toHaveProperty("includeClosed");
+    expect((await callTool(a.ctx, scopes, origin, "capacidades", { name: "listar_atividades" })).data).toMatchObject({ nome: "listar_atividades", argumentos: { properties: { clientId: { type: "string" } } } });
+  });
+  it("consulta pendências do cliente por vínculo direto e por processo, sem misturar sigilo ou escritórios", async () => {
+    const client = await db.client.create({ data: { organizationId: a.org.id, name: "Cliente relacional", type: "PERSON" } });
+    const other = await db.client.create({ data: { organizationId: b.org.id, name: "Outro cliente", type: "PERSON" } });
+    const process = await db.case.create({ data: { organizationId: a.org.id, title: "Caso do cliente", parties: { create: { organizationId: a.org.id, clientId: client.id, name: client.name, role: "PLAINTIFF", isOurClient: true } } } });
+    const secret = await db.case.create({ data: { organizationId: a.org.id, title: "Caso restrito", confidential: true, parties: { create: { organizationId: a.org.id, clientId: client.id, name: client.name, role: "PLAINTIFF", isOurClient: true } } } });
+    await db.task.createMany({ data: [
+      { organizationId: a.org.id, title: "Direta", clientId: client.id },
+      { organizationId: a.org.id, title: "Pelo processo", caseId: process.id },
+      { organizationId: a.org.id, title: "Sigilosa", caseId: secret.id, clientId: client.id },
+      { organizationId: b.org.id, title: "Externa", clientId: other.id },
+    ] });
+    const limited = { ...a.ctx, isOwner: false, permissions: new Set(["ai:use", "tasks:read"] as const) };
+    const r = await callTool(limited, scopes, origin, "listar_atividades", { clientId: client.id });
+    expect(r.ok).toBe(true);
+    expect(r.data).toMatchObject({ total: 2, items: expect.arrayContaining([expect.objectContaining({ title: "Direta" }), expect.objectContaining({ title: "Pelo processo" })]) });
+    expect((await callTool(limited, scopes, origin, "listar_atividades", { clientId: other.id })).data).toMatchObject({ total: 0 });
+  });
   it("financeiro só grava após aprovação e consulta não mistura escritórios", async () => {
     const p = await createProposal(a.ctx, origin, {kind: "FINANCE_COST_CENTER_CREATE", payload: {name: "Contencioso"}});
     expect(await db.costCenter.count({where: {organizationId: a.org.id}})).toBe(0);

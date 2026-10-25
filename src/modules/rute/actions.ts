@@ -128,6 +128,7 @@ export async function sendMessageAction(conversationId: string, text: string): P
   return runAction(async () => {
     const { ctx } = await requireTenant();
     const r = await sendMessage(ctx, parse(uuidSchema, conversationId), parse(z.string().max(6000), text));
+    if (r.refs.some(ref => ref.type === "action")) revalidatePath("/", "layout");
     done();
     return { answer: r.answer, refs: r.refs };
   });

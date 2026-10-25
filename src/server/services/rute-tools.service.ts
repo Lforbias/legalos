@@ -1,3 +1,4 @@
+import { ACTION_TOOLS } from "./rute-action-tools";
 import { DOMAIN_TOOLS } from "./rute-domain-tools";
 import { EXPANDED_TOOLS } from "./rute-expanded-tools";
 import { z } from "zod";
@@ -19,11 +20,11 @@ import { getTask, listTasks } from "./task.service";
 
 /**
  * 6.0 — catálogo único de ferramentas da RUTE, usado pelo servidor MCP e pelo assistente embutido.
- * Leitura respeita as permissões e o sigilo de quem conectou. Nada grava dado real: "propor_*" só cria PROPOSTA para uma pessoa confirmar.
+ * Leitura respeita as permissões e o sigilo de quem conectou. "propor_*" cria proposta; ações diretas exigem escopo execute explícito e gravam imediatamente.
  * O retorno é sempre DADO (nunca instrução), com CPF, CNPJ e e-mails ocultados. A pergunta e a resposta NÃO ficam na auditoria: só quem, quando e qual ferramenta.
  */
 
-export type ToolScope = "read" | "propose";
+export type ToolScope = "read" | "propose" | "execute";
 export type Origin = { via: "MCP" | "ASSISTANT" | "API"; connection: string | null; provider: string; allowedScopes?: ReadonlySet<ToolScope> };
 type Subject = { clientId?: string; caseId?: string };
 type Json = Record<string, unknown>;
@@ -52,13 +53,19 @@ async function visibleCaseIds(ctx: TenantContext, where: object, take = 50) {
 }
 
 const TOOLS: ToolDef[] = [
+  ...ACTION_TOOLS,
   ...EXPANDED_TOOLS,
   ...DOMAIN_TOOLS,
   {
     name: "capacidades", title: "Capacidades disponíveis", scope: "read", permission: "ai:use",
-    description: "Descobre as ferramentas disponíveis para esta pessoa e conexão, permissões e argumentos. Use para explicar o que pode consultar e fazer. Ações de escrita são propostas para confirmação humana.",
-    input: { type: "object", properties: { q: S("Filtrar nome ou título"), page: {type: "integer", minimum: 1}, limit: {type: "integer", minimum: 1, maximum: 50} } }, schema: z.object({ q: z.string().max(100).optional(), page: z.number().int().min(1).max(1000).default(1), limit: z.number().int().min(1).max(50).default(30) }),
+    description: "Descobre as ferramentas disponíveis para esta pessoa e conexão, permissões e argumentos. Use para explicar o que pode consultar e fazer. Comandos propor_* exigem confirmação; comandos do tipo execute gravam diretamente quando autorizados.",
+    input: { type: "object", properties: { name: S("Nome exato da ferramenta para obter contrato completo, tipos e campos obrigatórios"), q: S("Filtrar nome ou título"), page: {type: "integer", minimum: 1}, limit: {type: "integer", minimum: 1, maximum: 50} } }, schema: z.object({ name: z.string().max(100).optional(), q: z.string().max(100).optional(), page: z.number().int().min(1).max(1000).default(1), limit: z.number().int().min(1).max(50).default(30) }),
     run: async (ctx, args, origin) => {
+      if (args.name) {
+        const tool = toolCatalog(ctx, origin.allowedScopes ?? new Set(["read", "propose"])).find(t => t.name === args.name);
+        if (!tool) throw new NotFoundError("Ferramenta não disponível nesta conexão.");
+        return { nome: tool.name, titulo: tool.title, descricao: tool.description, tipo: tool.scope, argumentos: tool.inputSchema, exige_confirmacao: tool.scope === "propose" };
+      }
       const q = String(args.q ?? "").toLocaleLowerCase("pt-BR");
       const rows = toolCatalog(ctx, origin.allowedScopes ?? new Set(["read", "propose"])).filter(t => !q || `${t.name} ${t.title}`.toLocaleLowerCase("pt-BR").includes(q));
       const page = Number(args.page), limit = Number(args.limit);
@@ -315,6 +322,19 @@ TOOLS.push(
   proposeTool("propor_envio_para_revisao", "Propor envio de petição para revisão", "PROTOCOLO_PREPARO", "petitions:write", "Propõe enviar uma petição em rascunho para revisão (preparo do protocolo; ação de maior risco). Nunca protocola.", { petitionId: S("id da petição") }, ["petitionId"]),
 );
 
+// O contrato entregue ao modelo deve refletir o validador executado pelo servidor.
+// Propostas usam um validador genérico aqui e o contrato específico do tipo na criação.
+for (const tool of TOOLS) {
+  if (tool.scope === "execute") continue;
+  const generated = z.toJSONSchema(tool.schema, { io: "input", unrepresentable: "any" }) as ToolDef["input"];
+  if (generated.type === "object" && generated.properties) {
+    for (const [key, value] of Object.entries(tool.input.properties)) {
+      if (generated.properties[key]) generated.properties[key] = { ...(generated.properties[key] as object), ...(typeof value === "object" && value ? { description: (value as { description?: string }).description } : {}) };
+    }
+    tool.input = generated;
+  }
+}
+
 export function toolList(ctx: TenantContext, scopes: ReadonlySet<ToolScope>) {
   if (!can(ctx, "ai:use")) return [];
   return TOOLS.filter((t) => scopes.has(t.scope) && can(ctx, t.permission));
@@ -346,6 +366,9 @@ export async function callTool(ctx: TenantContext, scopes: ReadonlySet<ToolScope
     if (!def) throw new NotFoundError(`Ferramenta desconhecida: ${name}.`);
     if (!scopes.has(def.scope)) throw new ForbiddenError("Esta conexão não tem permissão para essa ferramenta.");
     assertCan(ctx, def.permission);
+    if (rawArgs !== undefined && rawArgs !== null && (typeof rawArgs !== "object" || Array.isArray(rawArgs))) throw new ValidationError("Argumentos devem ser um objeto JSON.");
+    const unknown = Object.keys(rawArgs ?? {}).filter(key => !(key in def.input.properties));
+    if (unknown.length) throw new ValidationError(`Parâmetros não reconhecidos: ${unknown.join(", ")}. Consulte capacidades para obter os argumentos aceitos por ${name}.`);
     const parsed = def.schema.safeParse(rawArgs ?? {});
     if (!parsed.success) throw new ValidationError(`Argumentos inválidos: ${parsed.error.issues[0]?.path.join(".") || "dados"} — ${parsed.error.issues[0]?.message}`);
     subject = def.subject?.(parsed.data) ?? {};

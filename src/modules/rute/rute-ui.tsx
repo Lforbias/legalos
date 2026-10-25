@@ -49,7 +49,7 @@ export function SettingsPanel({ s, canManage }: { s: SettingsView; canManage: bo
       <div className="space-y-3">
         <FeatureRow feature="mcp" label="Acesso externo às ferramentas (MCP e API)" hint="Libera MCP e chamadas de ferramentas pela API: a IA consulta e propõe, como a pessoa que conectou." on={s.mcpEnabled} needConsent disabled={!canManage} />
         <FeatureRow feature="proposals" label="Propostas da IA" hint="A IA registra propostas (tarefa, prazo, anotação, minuta…). Nada vale até uma pessoa confirmar." on={s.proposalsEnabled} disabled={!canManage} />
-        <FeatureRow feature="assistant" label="Assistente embutido" hint="Conversa dentro do LegalOS, com a IA do escritório. Só consulta e propõe." on={s.assistantEnabled} disabled={!canManage} />
+        <FeatureRow feature="assistant" label="Assistente embutido" hint="Conversa dentro do LegalOS, com a IA do escritório. Consulta e executa pedidos de criação e alteração conforme suas permissões; também prepara propostas." on={s.assistantEnabled} disabled={!canManage} />
       </div>
       {canManage ? (
         <>
@@ -161,7 +161,7 @@ export function ConnectionList({ items }: { items: ConnView[] }) {
           <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
             <div>
               <p className="font-medium">{c.name} <Badge tone="neutral">{c.kind === "KEY" ? "Chave" : "Login (OAuth)"}</Badge> <Badge tone={c.status === "ACTIVE" ? "success" : "neutral"}>{c.status === "ACTIVE" ? "Ativa" : c.status === "REVOKED" ? "Revogada" : "Expirada"}</Badge></p>
-              <p className="text-xs text-muted">{c.userName ? `Pessoa: ${c.userName} · ` : ""}{c.scopes.includes("mcp:propose") ? "consulta + propõe" : "só consulta"} · último uso: {c.lastUsedAt ?? "nunca"}</p>
+              <p className="text-xs text-muted">{c.userName ? `Pessoa: ${c.userName} · ` : ""}{c.scopes.includes("mcp:execute") ? "ações diretas habilitadas" : c.scopes.includes("mcp:propose") ? "consulta + propõe" : "só consulta"} · último uso: {c.lastUsedAt ?? "nunca"}</p>
             </div>
             {c.status === "ACTIVE" ? <Button size="sm" variant="danger" loading={pending} onClick={() => run(() => revokeConnectionAction(c.id))}>Revogar</Button> : null}
           </li>

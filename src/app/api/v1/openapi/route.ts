@@ -6,5 +6,6 @@ export const GET = v1Route(null, async ({ principal }) => {
   const scopes = new Set<ToolScope>();
   if (principal.scopes.has("tools:read")) scopes.add("read");
   if (principal.scopes.has("tools:propose")) scopes.add("propose");
+  if (principal.scopes.has("tools:execute")) scopes.add("execute");
   return jsonOk(buildOpenApi(toolCatalog(principal.ctx, scopes)));
 });

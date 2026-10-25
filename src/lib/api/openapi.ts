@@ -27,13 +27,13 @@ export function buildOpenApi(tools: Catalog) {
     } };
   }
   for (const tool of tools) paths[`/api/v1/tools/${tool.name}`] = { post: {
-    operationId: tool.name, summary: tool.title, description: tool.description, tags: [tool.scope === "read" ? "Consultas" : "Propostas para aprovação"],
+    operationId: tool.name, summary: tool.title, description: tool.description, tags: [tool.scope === "read" ? "Consultas" : tool.scope === "execute" ? "Ações diretas" : "Propostas para aprovação"],
     "x-legalos-scope": `tools:${tool.scope}`, "x-legalos-permission": tool.permission,
     security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } },
     responses: { "200": response, "401": response, "403": response, "404": response, "409": response, "422": response, "429": response, "500": response },
   } };
   return {
-    openapi: "3.1.0", info: { title: "LegalOS API", version: "1.1.0", description: "REST de recursos e catálogo compartilhado com a RUTE e o MCP. Ferramentas são filtradas pelas permissões e escopos desta chave. Propostas exigem decisão humana no LegalOS. Escopos REST de recursos são descritos em docs/api.md; tools:read e tools:propose concedem acesso ao catálogo de ferramentas, condicionado aos interruptores do escritório." },
+    openapi: "3.1.0", info: { title: "LegalOS API", version: "1.1.0", description: "REST de recursos e catálogo compartilhado com a RUTE e o MCP. Ferramentas são filtradas pelas permissões e escopos desta chave. Propostas exigem decisão humana no LegalOS. Escopos REST de recursos são descritos em docs/api.md; tools:read, tools:propose e tools:execute concedem acesso às consultas, propostas e ações diretas respectivamente, condicionado aos interruptores e permissões do escritório. Ações diretas gravam imediatamente e não passam por aprovação posterior." },
     paths, components: { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "LegalOS API key" } } },
   };
 }

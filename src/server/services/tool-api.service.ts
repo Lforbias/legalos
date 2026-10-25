@@ -7,7 +7,8 @@ export function apiToolScopes(principal: ApiPrincipal) {
   const scopes = new Set<ToolScope>();
   if (principal.scopes.has("tools:read")) scopes.add("read");
   if (principal.scopes.has("tools:propose")) scopes.add("propose");
-  if (!scopes.size) throw new ForbiddenError("Esta chave precisa de tools:read ou tools:propose. Os acessos MCP não concedem acesso às ferramentas pela REST.");
+  if (principal.scopes.has("tools:execute")) scopes.add("execute");
+  if (!scopes.size) throw new ForbiddenError("Esta chave precisa de tools:read, tools:propose ou tools:execute. Os acessos MCP não concedem acesso às ferramentas pela REST.");
   return scopes;
 }
 export async function apiToolCatalog(principal: ApiPrincipal) {
