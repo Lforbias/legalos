@@ -47,7 +47,7 @@ export function AppShell(props: {
           onOpenMobile={() => setMobileOpen(true)}
         />
         {props.banner}
-        <main id="conteudo" tabIndex={-1} className={fullBleed ? "min-h-0 flex-1 overflow-hidden" : "min-h-0 flex-1 overflow-y-auto p-4 md:p-6"}>
+        <main id="conteudo" tabIndex={-1} className={fullBleed ? "min-h-0 flex-1 overflow-hidden" : "min-h-0 flex-1 overflow-y-auto p-4 md:p-7 xl:p-8"}>
           {props.children}
         </main>
       </div>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Scale } from "lucide-react";
+import { Brand } from "@/components/layout/brand";
 import { CtaLink, contact } from "./_parts";
 
 export const metadata: Metadata = {
@@ -25,9 +25,8 @@ export default function ProdutoLayout({ children }: { children: React.ReactNode 
     <div className="force-light min-h-dvh bg-bg text-fg">
       <header className="force-dark sticky top-0 z-30 border-b border-white/10 bg-[#0a0c13]/80 text-fg backdrop-blur-xl">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-4">
-          <Link href="/produto" className="flex items-center gap-2.5 font-semibold" aria-label="LegalOS — início">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#3565f0] to-[#8b6cff] text-white"><Scale className="h-4 w-4" aria-hidden /></span>
-            <span className="text-base tracking-tight">LegalOS</span>
+          <Link href="/produto" className="flex items-center font-semibold" aria-label="LegalOS — início">
+            <Brand />
           </Link>
           <nav aria-label="Principal" className="hidden items-center gap-7 text-sm text-muted md:flex">
             {NAV.map((n) => <Link key={n.href} href={n.href} className="transition hover:text-fg">{n.label}</Link>)}
@@ -45,7 +44,7 @@ export default function ProdutoLayout({ children }: { children: React.ReactNode 
       <footer className="force-dark border-t border-white/10 bg-[#07090f] text-fg">
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-[2fr_1fr_1fr]">
           <div>
-            <div className="flex items-center gap-2.5 font-semibold"><span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-[#3565f0] to-[#8b6cff] text-white"><Scale className="h-4 w-4" aria-hidden /></span> LegalOS</div>
+            <Brand />
             <p className="mt-4 max-w-sm text-sm text-muted">Gestão jurídica integrada: processos, intimações, prazos, financeiro e atendimento por WhatsApp, num só lugar.</p>
           </div>
           <div>

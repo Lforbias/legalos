@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LayoutGrid, Lock, Plus, Rows3, Search } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
-import { ExportLinks } from "@/modules/export/export-links";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
@@ -13,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { formatMoneyBR } from "@/lib/validation/money";
 import { CASE_AREAS, CASE_STATUS_LABEL, CASE_STATUSES } from "@/modules/cases/schemas";
 import { StatusControl } from "@/modules/cases/case-panels";
+import { CaseActionsMenu } from "@/modules/cases/case-actions-menu";
 import { can } from "@/server/context";
 import { listAssignableMembers, listCases } from "@/server/services/case.service";
 import { requireTenant } from "@/server/session";
@@ -54,10 +54,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         description="Carteira de processos do escritório. Processos sigilosos só aparecem para a equipe do processo e administradores."
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <Link href="/partes" className={buttonVariants({ variant: "secondary" })}>Cadastro de partes</Link>
-            {canWrite ? <Link href="/processos/importar" className={buttonVariants({ variant: "secondary" })}>Importar por número</Link> : null}
-            {canWrite ? <Link href="/processos/nota-em-lote" className={buttonVariants({ variant: "secondary" })}>Nota em lote</Link> : null}
-            <ExportLinks kind="processos" />
+            <CaseActionsMenu canWrite={canWrite} />
             <div className="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="Modo de visualização">
               <Link href={viewHref("tabela")} aria-current={!board ? "page" : undefined} className={cn("flex h-8 items-center gap-1.5 rounded px-2.5 text-xs", !board ? "bg-surface-3 font-medium" : "text-muted hover:text-fg")}>
                 <Rows3 className="h-3.5 w-3.5" aria-hidden /> Tabela

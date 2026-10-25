@@ -7,20 +7,20 @@
 :root[data-theme="dark"],
 .force-dark {
   color-scheme: dark;
-  --bg: #0a0c13;
-  --surface: #11141e;
-  --surface-2: #181c29;
-  --surface-3: #202536;
-  --border: #262c3f;
-  --border-strong: #353d57;
-  --fg: #e9ecf5;
-  --muted: #8f97ad;
-  --primary: #3565f0;
-  --primary-hover: #4a77f5;
-  --primary-fg: #ffffff;
-  --primary-text: #8fadff;
-  --accent: #8b6cff;
-  --accent-text: #b5a0ff;
+  --bg: #0A0C13;
+  --surface: #10131a;
+  --surface-2: #171b24;
+  --surface-3: #1e232d;
+  --border: #252b35;
+  --border-strong: #343c48;
+  --fg: #f2f4f7;
+  --muted: #939ba8;
+  --primary: #FF3B4E;
+  --primary-hover: #ff5968;
+  --primary-fg: #0A0C13;
+  --primary-text: #ff8490;
+  --accent: #7C8CFF;
+  --accent-text: #a6b0ff;
   --success: #34d399;
   --warning: #fbbf24;
   --danger: #f87171;
@@ -28,7 +28,7 @@
   --success-bg: #0f2e25;
   --warning-bg: #35290d;
   --info-bg: #14214a;
-  --ring: #6b93ff;
+  --ring: #FF3B4E;
   --wa-bg: #0b141a;
   --wa-dot: rgba(255, 255, 255, 0.035);
   --wa-out: #005c4b;
@@ -42,28 +42,28 @@
 :root[data-theme="light"],
 .force-light {
   color-scheme: light;
-  --bg: #f5f6fb;
+  --bg: #F5F7FA;
   --surface: #ffffff;
-  --surface-2: #f0f2f9;
-  --surface-3: #e6e9f3;
-  --border: #dde1ee;
-  --border-strong: #c3c9dc;
-  --fg: #141826;
-  --muted: #545d73;
-  --primary: #2a56e0;
-  --primary-hover: #1f46c4;
+  --surface-2: #f0f2f4;
+  --surface-3: #e7eaee;
+  --border: #e1e5ea;
+  --border-strong: #c8cfd8;
+  --fg: #151821;
+  --muted: #606777;
+  --primary: #E5243B;
+  --primary-hover: #c71f34;
   --primary-fg: #ffffff;
-  --primary-text: #2448c4;
-  --accent: #6340d9;
-  --accent-text: #5632c4;
+  --primary-text: #b91f32;
+  --accent: #4F5DE0;
+  --accent-text: #414ec4;
   --success: #0f7b56;
   --warning: #8a5a00;
   --danger: #c0262d;
   --danger-bg: #fdecee;
   --success-bg: #e3f6ee;
   --warning-bg: #fdf3d9;
-  --info-bg: #e5ecff;
-  --ring: #2a56e0;
+  --info-bg: #edf0ff;
+  --ring: #E5243B;
   --wa-bg: #efeae2;
   --wa-dot: rgba(0, 0, 0, 0.045);
   --wa-out: #d9fdd3;
@@ -74,23 +74,59 @@
   --wa-tick: #2a9fd6;
 }
 
+/* Identidade própria do LegalOS Func. */
+[data-space="func"] {
+  --primary: #7C8CFF;
+  --primary-hover: #98a4ff;
+  --primary-fg: #0A0C13;
+  --primary-text: #a6b0ff;
+  --accent: #FF3B4E;
+  --accent-text: #ff8490;
+  --ring: #7C8CFF;
+}
+:root[data-theme="light"] [data-space="func"] {
+  --primary: #4F5DE0;
+  --primary-hover: #414ec4;
+  --primary-fg: #ffffff;
+  --primary-text: #414ec4;
+  --accent: #E5243B;
+  --accent-text: #b91f32;
+  --ring: #4F5DE0;
+}
+
 /* Espaço "Box" (caixa de intimações): mesma interface, identidade verde-água para o usuário saber onde está. */
 [data-space="box"] {
-  --primary: #0f8f83;
-  --primary-hover: #12a597;
-  --primary-text: #5eead4;
-  --accent: #22b8cf;
-  --accent-text: #7ee0ee;
+  --primary: #2DD4BF;
+  --primary-hover: #5de0d0;
+  --primary-fg: #0A0C13;
+  --primary-text: #65e4d4;
+  --accent: #FF3B4E;
+  --accent-text: #ff8490;
   --ring: #2dd4bf;
 }
 :root[data-theme="light"] [data-space="box"] {
-  --primary: #0f766e;
-  --primary-hover: #0b5f58;
-  --primary-text: #0f766e;
-  --accent: #0e7490;
-  --accent-text: #0e7490;
-  --ring: #0f766e;
+  --primary: #0F9F8F;
+  --primary-hover: #0b8377;
+  --primary-fg: #0A0C13;
+  --primary-text: #0F8175;
+  --accent: #E5243B;
+  --accent-text: #b91f32;
+  --ring: #0F9F8F;
 }
+
+/* Os arquivos de marca têm versões próprias para fundos claros e escuros. */
+.brand-theme-dark,
+.brand-theme-light { display: none; }
+:root[data-theme="dark"] .brand-theme-dark,
+:root:not([data-theme="light"]) .brand-theme-dark,
+.force-dark .brand-theme-dark { display: inline-block; }
+:root[data-theme="light"] .brand-theme-light,
+:root .force-light .brand-theme-light { display: inline-block; }
+:root .force-dark .brand-theme-dark { display: inline-block; }
+:root .force-dark .brand-theme-light,
+:root .force-light .brand-theme-dark { display: none; }
+:root .force-light .force-dark .brand-theme-dark { display: inline-block; }
+:root .force-light .force-dark .brand-theme-light { display: none; }
 
 @theme inline {
   --color-bg: var(--bg);
@@ -131,6 +167,11 @@ body {
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }
+
+button,
+input,
+select,
+textarea { font: inherit; }
 
 :focus-visible {
   outline: 2px solid var(--ring);
@@ -182,13 +223,13 @@ body {
   --ring: #facc15;
 }
 :root[data-theme="light"] [data-space="chat"] {
-  --primary: #eab308;
-  --primary-hover: #ca9a06;
+  --primary: #C79A00;
+  --primary-hover: #a98200;
   --primary-fg: #1c1500;
-  --primary-text: #854d0e;
-  --accent: #d97706;
-  --accent-text: #92400e;
-  --ring: #ca8a04;
+  --primary-text: #8e6c00;
+  --accent: #E5243B;
+  --accent-text: #b91f32;
+  --ring: #C79A00;
 }
 
 
@@ -202,12 +243,12 @@ body {
 
 /* ───── Página pública /produto ───── */
 .prod-grid-bg {
-  background-image: linear-gradient(to right, rgba(143, 173, 255, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(143, 173, 255, 0.07) 1px, transparent 1px);
+  background-image: linear-gradient(to right, rgba(255, 59, 78, 0.07) 1px, transparent 1px), linear-gradient(to bottom, rgba(255, 59, 78, 0.07) 1px, transparent 1px);
   background-size: 56px 56px;
   mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
 }
 .prod-gradient-text {
-  background: linear-gradient(100deg, #8fadff 0%, #b5a0ff 45%, #5eead4 100%);
+  background: linear-gradient(100deg, #FF3B4E 0%, #ff8490 52%, #7C8CFF 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;

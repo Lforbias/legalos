@@ -20,19 +20,19 @@ export function WebhookList({ items, deliveries, eventLabels }: { items: Webhook
   return (
     <div className="space-y-3">
       {msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : null}
-      {items.length === 0 ? <p className="text-sm text-slate-600">Nenhum webhook cadastrado.</p> : null}
+      {items.length === 0 ? <p className="text-sm text-muted">Nenhum webhook cadastrado.</p> : null}
       {items.map((w) => (
         <div key={w.id} className="rounded-md border border-slate-200 p-3 text-sm">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <div className="font-medium">{w.name}</div>
-              <div className="break-all text-xs text-slate-600">{w.url}</div>
-              <div className="text-xs text-slate-600">{w.events.map((e) => eventLabels[e] ?? e).join(", ")}</div>
+              <div className="break-all text-xs text-muted">{w.url}</div>
+              <div className="text-xs text-muted">{w.events.map((e) => eventLabels[e] ?? e).join(", ")}</div>
             </div>
             {w.enabled ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>}
           </div>
-          {w.disabledReason && !w.enabled ? <p className="mt-2 text-xs text-slate-600">{w.disabledReason}</p> : null}
-          <p className="mt-2 text-xs text-slate-600">{w.lastSuccessAt ? `Última entrega ok: ${new Date(w.lastSuccessAt).toLocaleString("pt-BR")}` : "Ainda sem entrega bem-sucedida."}</p>
+          {w.disabledReason && !w.enabled ? <p className="mt-2 text-xs text-muted">{w.disabledReason}</p> : null}
+          <p className="mt-2 text-xs text-muted">{w.lastSuccessAt ? `Última entrega ok: ${new Date(w.lastSuccessAt).toLocaleString("pt-BR")}` : "Ainda sem entrega bem-sucedida."}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
               variant="secondary"
@@ -80,7 +80,7 @@ export function WebhookList({ items, deliveries, eventLabels }: { items: Webhook
       ))}
       {deliveries.length ? (
         <div>
-          <h3 className="mb-1 text-xs font-semibold uppercase text-slate-500">Últimas entregas</h3>
+          <h3 className="mb-1 text-xs font-semibold uppercase text-muted">Últimas entregas</h3>
           <ul className="divide-y divide-slate-200 rounded-md border border-slate-200 text-xs">
             {deliveries.map((d) => {
               const [tone, label] = DELIVERY[d.status];

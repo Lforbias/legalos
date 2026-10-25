@@ -13,7 +13,7 @@ export default function Contato() {
     <>
       <section className="force-dark relative overflow-hidden bg-[#0a0c13] text-fg">
         <div className="prod-grid-bg pointer-events-none absolute inset-0" aria-hidden />
-        <div className="prod-glow pointer-events-none absolute left-1/2 top-0 h-[380px] w-[720px] -translate-x-1/2 rounded-full bg-[#3565f0]/30 blur-[120px]" aria-hidden />
+        <div className="prod-glow pointer-events-none absolute left-1/2 top-0 h-[380px] w-[720px] -translate-x-1/2 rounded-full bg-[#FF3B4E]/25 blur-[120px]" aria-hidden />
         <div className="relative mx-auto max-w-3xl px-4 py-24 text-center md:py-32">
           <h1 className="text-5xl font-semibold leading-[1.03] tracking-tight md:text-7xl">Vamos <span className="prod-gradient-text">conversar.</span></h1>
           <p className="mx-auto mt-6 max-w-xl text-lg text-white/70">Conte como é o seu escritório. Mostramos o LegalOS funcionando e respondemos o que for preciso.</p>

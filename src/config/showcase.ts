@@ -106,7 +106,7 @@ export const MODULES: ModuleShot[] = [
 ];
 
 export const SPACES = [
-  { name: "LegalOS Func", tone: "#3565f0", text: "A gestão do escritório: clientes, processos, tarefas, prazos, agenda, documentos, financeiro, CRM e relatórios.", items: ["Clientes e processos", "Tarefas, prazos e agenda", "Financeiro e relatórios", "Portal do cliente"] },
+  { name: "LegalOS Func", tone: "#7C8CFF", text: "A gestão do escritório: clientes, processos, tarefas, prazos, agenda, documentos, financeiro, CRM e relatórios.", items: ["Clientes e processos", "Tarefas, prazos e agenda", "Financeiro e relatórios", "Portal do cliente"] },
   { name: "LegalOS Box", tone: "#0f8f83", text: "A caixa de intimações e o peticionamento: captura, distribuição, certificados digitais e integrações com tribunais.", items: ["Caixa de entrada jurídica", "DJEN e DataJud", "Cofre de certificados A1", "Petições e conector PJe/MNI"] },
   { name: "LegalOS Chat", tone: "#e0a800", text: "O atendimento por WhatsApp, ligado a cliente, processo, tarefas e financeiro.", items: ["Filas e etiquetas", "Robô e automações", "Painel do cliente na conversa", "Interruptores de tudo que é automático"] },
 ] as const;

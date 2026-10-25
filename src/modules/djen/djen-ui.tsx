@@ -15,7 +15,7 @@ export function MonitorList({ items, recipients }: { items: MonitorView[]; recip
   const router = useRouter();
   const [msg, setMsg] = React.useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, start] = React.useTransition();
-  if (!items.length) return <p className="text-sm text-slate-600">Nenhuma OAB monitorada.</p>;
+  if (!items.length) return <p className="text-sm text-muted">Nenhuma OAB monitorada.</p>;
   return (
     <div className="space-y-3">
       {msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : null}
@@ -24,18 +24,18 @@ export function MonitorList({ items, recipients }: { items: MonitorView[]; recip
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="font-medium">{m.label}</div>
-              <div className="text-xs text-slate-600">OAB {m.oabUf} {m.oabNumber}</div>
+              <div className="text-xs text-muted">OAB {m.oabUf} {m.oabNumber}</div>
             </div>
             {m.enabled ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>}
           </div>
           {m.lastSyncAt ? (
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 text-xs text-muted">
               Última verificação: {new Date(m.lastSyncAt).toLocaleString("pt-BR")} — {m.lastStatus === "OK" ? "ok" : "falhou"}
               {m.lastMessage ? `: ${m.lastMessage}` : ""}
             </p>
           ) : null}
           <div className="mt-2 max-w-sm">
-            <label htmlFor={`rcv-${m.id}`} className="text-xs text-slate-600">Quem recebe as publicações novas</label>
+            <label htmlFor={`rcv-${m.id}`} className="text-xs text-muted">Quem recebe as publicações novas</label>
             <Select
               id={`rcv-${m.id}`}
               value={m.defaultAssigneeId ? `u:${m.defaultAssigneeId}` : m.defaultTeamId ? `t:${m.defaultTeamId}` : ""}

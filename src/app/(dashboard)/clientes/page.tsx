@@ -4,6 +4,7 @@ import { Plus, Search } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { ExportLinks } from "@/modules/export/export-links";
 import { PageHeader } from "@/components/layout/page-header";
+import { FilterPanel } from "@/components/layout/filter-panel";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -30,9 +31,10 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const type = (CLIENT_TYPES as readonly string[]).includes(sp.tipo ?? "") ? (sp.tipo as (typeof CLIENT_TYPES)[number]) : undefined;
   const page = Math.max(1, Number.parseInt(sp.pagina ?? "1", 10) || 1);
   const [result, tags] = await Promise.all([listClients(ctx, { q: sp.q, status, type, tag: sp.etiqueta, page }), listClientTags(ctx)]);
+  const filtered = Boolean(sp.q || status || type || sp.etiqueta);
 
   return (
-    <div className="mx-auto max-w-6xl">
+    <div className="mx-auto max-w-7xl">
       <PageHeader
         title="Clientes"
         description="Pessoas físicas e jurídicas do escritório."
@@ -48,14 +50,20 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
         }
       />
 
-      <form method="get" className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_170px_190px_190px_auto]" role="search" aria-label="Filtrar clientes">
-        <div className="relative">
+      <form method="get" className="mb-5 space-y-3" role="search" aria-label="Filtrar clientes">
+        <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-48 flex-1">
           <label htmlFor="q" className="sr-only">
             Buscar por nome, documento, e-mail ou telefone
           </label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
           <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Nome, CPF/CNPJ, e-mail ou telefone" className="pl-9" />
         </div>
+        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Buscar</button>
+        {filtered ? <Link href="/clientes" className={buttonVariants({ variant: "ghost" })}>Limpar</Link> : null}
+        </div>
+        <FilterPanel label="Mais filtros de clientes" activeCount={[type, status, sp.etiqueta].filter(Boolean).length}>
+        <div className="grid items-end gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_auto]">
         <div>
           <label htmlFor="tipo" className="sr-only">
             Tipo de pessoa
@@ -96,10 +104,13 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
           </Select>
         </div>
         <button type="submit" className={buttonVariants({ variant: "secondary" })}>
-          Filtrar
+          Aplicar filtros
         </button>
+        </div>
+        </FilterPanel>
       </form>
 
+      <p className="mb-3 text-xs text-muted">{result.total} cliente(s){filtered ? " nesta seleção" : " cadastrados"}</p>
       <Card className="overflow-hidden">
         {result.items.length === 0 ? (
           <div className="p-10 text-center text-sm text-muted">
@@ -119,7 +130,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
               <thead className="border-b border-border bg-surface-2/60 text-left text-xs text-muted">
                 <tr>
                   <th scope="col" className="px-4 py-2 font-medium">Nome</th>
-                  <th scope="col" className="px-4 py-2 font-medium">Documento</th>
+                  <th scope="col" className="hidden px-4 py-2 font-medium md:table-cell">Documento</th>
                   <th scope="col" className="hidden px-4 py-2 font-medium md:table-cell">Contato</th>
                   <th scope="col" className="px-4 py-2 font-medium">Situação</th>
                   <th scope="col" className="hidden px-4 py-2 font-medium lg:table-cell">Etiquetas</th>
@@ -129,16 +140,17 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
               <tbody className="divide-y divide-border">
                 {result.items.map((c) => (
                   <tr key={c.id} className="hover:bg-surface-2/40">
-                    <td className="px-4 py-2.5">
+                    <td className="px-4 py-4">
                       <Link href={`/clientes/${c.id}`} className="font-medium hover:underline">
                         {c.name}
                       </Link>
                       <p className="text-xs text-muted">{CLIENT_TYPE_LABEL[c.type]}</p>
+                      {c.document ? <p className="mt-1 text-xs tabular-nums text-muted md:hidden">{formatDocument(c.type, c.document)}</p> : null}
                     </td>
-                    <td className="px-4 py-2.5 tabular-nums text-muted">{c.document ? formatDocument(c.type, c.document) : "—"}</td>
+                    <td className="hidden px-4 py-2.5 tabular-nums text-muted md:table-cell">{c.document ? formatDocument(c.type, c.document) : "—"}</td>
                     <td className="hidden px-4 py-2.5 text-xs text-muted md:table-cell">
-                      {c.email ?? "—"}
-                      {c.phone ? <p>{formatPhone(c.phone)}</p> : null}
+                      {c.email ? <a href={`mailto:${c.email}`} className="hover:text-fg hover:underline">{c.email}</a> : "—"}
+                      {c.phone ? <p className="mt-1"><a href={`tel:${c.phone}`} className="hover:text-fg hover:underline">{formatPhone(c.phone)}</a></p> : null}
                     </td>
                     <td className="px-4 py-2.5">
                       <Badge tone={TONE[c.status]}>{CLIENT_STATUS_LABEL[c.status]}</Badge>

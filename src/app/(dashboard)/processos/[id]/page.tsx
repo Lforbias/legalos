@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { Bot, Lock, Pencil, PenLine, Server } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
+import { RecordBackLink } from "@/components/layout/record-back-link";
+import { PageActionsMenu } from "@/components/layout/page-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -146,7 +148,8 @@ export default async function CaseDetailPage({
   const responsible = c.members.find((m) => m.role === "RESPONSIBLE");
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-7xl">
+      <RecordBackLink href="/processos">Processos</RecordBackLink>
       <PageHeader
         title={c.title}
         description={c.number ? `Nº ${formatCnj(c.number)}` : c.legacyNumber ? `Nº ${c.legacyNumber}` : "Processo sem número"}
@@ -161,14 +164,10 @@ export default async function CaseDetailPage({
             <Badge tone={TONE[c.status]}>{CASE_STATUS_LABEL[c.status]}</Badge>
             {c.archivedAt ? <Badge>Acervo</Badge> : null}
             {can(ctx, "ai:use") ? (
-              <Link href={`/ia?processo=${c.id}`} className={buttonVariants({ variant: "secondary" })}>
-                <Bot className="h-4 w-4" aria-hidden /> Perguntar à IA
-              </Link>
-            ) : null}
-            {can(ctx, "ai:use") ? (
-              <Link href={`/rute?aba=assistente&caso=${c.id}`} className={buttonVariants({ variant: "secondary" })}>
-                <Bot className="h-4 w-4" aria-hidden /> RUTE
-              </Link>
+              <PageActionsMenu label="Mais ações do processo" items={[
+                { href: `/ia?processo=${c.id}`, label: "Perguntar à IA sobre este processo" },
+                { href: `/rute?aba=assistente&caso=${c.id}`, label: "Abrir RUTE neste processo" },
+              ]} />
             ) : null}
             {showDatajud ? <DatajudSyncButton caseId={c.id} /> : null}
             {mni ? <MniConsultButton caseId={c.id} label={mni.label} /> : null}
@@ -181,7 +180,7 @@ export default async function CaseDetailPage({
           </div>
         }
       />
-      <TabsNav base={`/processos/${c.id}`} current={tab} tabs={tabs} />
+      <TabsNav base={`/processos/${c.id}`} current={tab} tabs={tabs} compactOnMobile />
 
       {tab === "resumo" ? (
         <div className="grid gap-4 lg:grid-cols-3">
