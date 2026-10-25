@@ -1,3 +1,15 @@
+import { createCaseSchema } from "@/modules/cases/schemas";
+import { createCase } from "./case.service";
+import { leadSchema } from "@/modules/crm/schemas";
+import { createLead } from "./crm.service";
+import { accountSchema, categorySchema, costCenterSchema } from "@/modules/finance/schemas";
+import { createAccount, createCategory, createCostCenter } from "./finance.service";
+import { timeEntrySchema } from "@/modules/timesheet/schemas";
+import { logTime } from "./team.service";
+import { createSnippet } from "./snippet.service";
+import { createTemplate } from "./template.service";
+import { createBoard } from "./kanban.service";
+import { setTaskStage, listTaskStages } from "./task-stage.service";
 import { db } from "@/lib/db/client";
 import { createActivityChecklist, addActivityCollaborator } from "./activity-details.service";
 import { repeatActivity } from "./activity-series.service";
@@ -22,6 +34,16 @@ const date = z.string().refine(isYmd, "Use AAAA-MM-DD.");
 const optionalId = z.uuid().or(z.literal(""));
 const version = { expectedUpdatedAt: z.iso.datetime().optional(), targetTitle: text(200).optional() };
 export const OPERATION_KINDS = {
+  CASE_CREATE: { label: "Cadastrar processo", risk: "HIGH", permission: "cases:write" },
+  LEAD_CREATE: { label: "Cadastrar oportunidade", risk: "LOW", permission: "crm:write" },
+  FINANCE_ACCOUNT_CREATE: { label: "Cadastrar conta financeira", risk: "HIGH", permission: "finance:manage" },
+  FINANCE_CATEGORY_CREATE: { label: "Cadastrar categoria financeira", risk: "LOW", permission: "finance:manage" },
+  FINANCE_COST_CENTER_CREATE: { label: "Cadastrar centro de custo", risk: "LOW", permission: "finance:manage" },
+  TIME_CREATE: { label: "Registrar minhas horas", risk: "LOW", permission: "tasks:write" },
+  SNIPPET_CREATE: { label: "Criar autotexto", risk: "LOW", permission: "templates:manage" },
+  TEMPLATE_CREATE: { label: "Criar modelo de documento", risk: "LOW", permission: "templates:manage" },
+  BOARD_CREATE: { label: "Criar quadro Kanban", risk: "LOW", permission: "organization:manage" },
+  TASK_STAGE: { label: "Alterar etapa da tarefa", risk: "HIGH", permission: "tasks:write" },
   TASK_CHECKLIST: { label: "Criar checklist na tarefa", risk: "LOW", permission: "tasks:write" },
   TASK_COLLABORATOR: { label: "Adicionar colaborador na tarefa", risk: "LOW", permission: "tasks:write" },
   TASK_REPEAT: { label: "Repetir tarefa", risk: "HIGH", permission: "tasks:write" },
@@ -41,6 +63,16 @@ const changed = (id: string) => (v: Record<string, unknown>) => Object.keys(v).s
 const clientFields = { name: text(160).min(2), status: z.enum(["PROSPECT", "ACTIVE", "INACTIVE"]), tags: text(300), notes: text(4000), addressCity: text(80), addressState: text(2) };
 const eventFields = { title: text(200).min(3), kind: z.enum(EVENT_KINDS), date, allDay: z.boolean(), startTime: text(5), endTime: text(5), location: text(200), description: text(2000), caseId: optionalId, clientId: optionalId };
 export const OPERATION_SCHEMAS = {
+  CASE_CREATE: createCaseSchema,
+  LEAD_CREATE: leadSchema,
+  FINANCE_ACCOUNT_CREATE: accountSchema,
+  FINANCE_CATEGORY_CREATE: categorySchema,
+  FINANCE_COST_CENTER_CREATE: costCenterSchema,
+  TIME_CREATE: timeEntrySchema,
+  SNIPPET_CREATE: z.object({ slug: text(60).min(1), name: text(120).min(3), description: text(300).default(""), body: text(20000).min(1), active: z.boolean().default(true) }),
+  TEMPLATE_CREATE: z.object({ name: text(120).min(3), description: text(500).default(""), category: text(60).default(""), body: text(20000).min(1), active: z.boolean().default(true) }),
+  BOARD_CREATE: z.object({ name: text(80).min(2) }),
+  TASK_STAGE: z.object({ taskId: z.uuid(), stageId: z.uuid(), stageName: text(100).optional(), ...version }),
   TASK_CHECKLIST: z.object({ taskId:z.uuid(), title:text(100).min(2), items:z.array(text(500).min(1)).min(1).max(30), ...version }),
   TASK_COLLABORATOR: z.object({ taskId:z.uuid(), userId:z.uuid(), collaboratorName:text(200).optional(), ...version }),
   TASK_REPEAT: z.object({ taskId:z.uuid(), ...recurrenceSchema.shape, ...version }),
@@ -75,6 +107,10 @@ function checkVersion(p: Record<string, unknown>, date: Date) {
 
 /** Identifica o alvo e guarda uma versão para evitar aplicar alteração com contexto antigo. Não modifica o cadastro. */
 export async function prepareOperation(ctx: TenantContext, kind: OperationKind, p: Record<string, unknown>) {
+  if (kind === "CASE_CREATE") return { clientId: p.clientId as string || null };
+  if (kind === "LEAD_CREATE") return {};
+  if (["FINANCE_ACCOUNT_CREATE", "FINANCE_CATEGORY_CREATE", "FINANCE_COST_CENTER_CREATE", "SNIPPET_CREATE", "TEMPLATE_CREATE", "BOARD_CREATE"].includes(kind)) return {};
+  if (kind === "TIME_CREATE") return { caseId: p.caseId as string || null };
   if(kind==="WORKFLOW_RUN") {
     const pack=(await listPackages(ctx)).find(x=>x.id===p.packageId&&x.active);
     if(!pack)throw new ValidationError("Pacote indisponível.");
@@ -91,6 +127,11 @@ export async function prepareOperation(ctx: TenantContext, kind: OperationKind, 
   }
   if (kind.startsWith("TASK_")) {
     const t = await getTask(ctx, p.taskId as string);
+    if (kind === "TASK_STAGE") {
+      const stage = (await listTaskStages(ctx)).find(s => s.id === p.stageId && s.active);
+      if (!stage) throw new ValidationError("Etapa não encontrada ou inativa.");
+      p.stageName = stage.name;
+    }
     if(kind==="TASK_COLLABORATOR"){
       await assertActiveMember(ctx,p.userId as string);
       p.collaboratorName=(await db.user.findUnique({where:{id:p.userId as string},select:{name:true}}))?.name??"";
@@ -107,6 +148,17 @@ export async function prepareOperation(ctx: TenantContext, kind: OperationKind, 
 }
 
 export async function executeOperation(ctx: TenantContext, kind: OperationKind, p: Record<string, unknown>): Promise<{ type: string; id: string }> {
+  if (kind === "CASE_CREATE") return { type: "case", id: (await createCase(ctx, createCaseSchema.parse(p))).id };
+  if (kind === "LEAD_CREATE") return { type: "lead", id: (await createLead(ctx, p)).id };
+
+  if (kind === "FINANCE_ACCOUNT_CREATE") return { type: "finance_account", id: (await createAccount(ctx, p)).id };
+  if (kind === "FINANCE_CATEGORY_CREATE") return { type: "finance_category", id: (await createCategory(ctx, p)).id };
+  if (kind === "FINANCE_COST_CENTER_CREATE") return { type: "finance_cost_center", id: (await createCostCenter(ctx, p)).id };
+  if (kind === "TIME_CREATE") return { type: "time_entry", id: (await logTime(ctx, timeEntrySchema.parse(p))).id };
+  if (kind === "SNIPPET_CREATE") return { type: "snippet", id: (await createSnippet(ctx, OPERATION_SCHEMAS.SNIPPET_CREATE.parse(p))).id };
+  if (kind === "TEMPLATE_CREATE") return { type: "template", id: (await createTemplate(ctx, OPERATION_SCHEMAS.TEMPLATE_CREATE.parse(p))).id };
+  if (kind === "BOARD_CREATE") return { type: "kanban_board", id: await createBoard(ctx, p.name as string) };
+
   if(kind==="WORKFLOW_RUN") {
     const pack=(await listPackages(ctx)).find(x=>x.id===p.packageId&&x.active);
     if(!pack)throw new ValidationError("Pacote indisponível.");checkVersion(p,pack.updatedAt);
@@ -123,7 +175,8 @@ export async function executeOperation(ctx: TenantContext, kind: OperationKind, 
   }
   if (kind.startsWith("TASK_")) {
     const t = await getTask(ctx, p.taskId as string); checkVersion(p, t.updatedAt);
-    if (kind === "TASK_STATUS") await changeTaskStatus(ctx, t.id, p.status as TaskInput["status"]);
+    if (kind === "TASK_STAGE") await setTaskStage(ctx, t.id, p.stageId as string);
+    else if (kind === "TASK_STATUS") await changeTaskStatus(ctx, t.id, p.status as TaskInput["status"]);
     else if (kind === "TASK_COMMENT") await addTaskComment(ctx, t.id, { body: p.body as string });
     else if (kind === "TASK_CHECKLIST") await createActivityChecklist(ctx,"TASK",t.id,p);
     else if (kind === "TASK_COLLABORATOR") await addActivityCollaborator(ctx,"TASK",t.id,p.userId as string);

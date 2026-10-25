@@ -1,3 +1,4 @@
+import { DOMAIN_TOOLS } from "./rute-domain-tools";
 import { EXPANDED_TOOLS } from "./rute-expanded-tools";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
@@ -52,11 +53,17 @@ async function visibleCaseIds(ctx: TenantContext, where: object, take = 50) {
 
 const TOOLS: ToolDef[] = [
   ...EXPANDED_TOOLS,
+  ...DOMAIN_TOOLS,
   {
     name: "capacidades", title: "Capacidades disponíveis", scope: "read", permission: "ai:use",
     description: "Descobre as ferramentas disponíveis para esta pessoa e conexão, permissões e argumentos. Use para explicar o que pode consultar e fazer. Ações de escrita são propostas para confirmação humana.",
-    input: { type: "object", properties: {} }, schema: z.object({}),
-    run: async (ctx, _args, origin) => ({ ferramentas: toolCatalog(ctx, origin.allowedScopes ?? new Set(["read", "propose"])).map(t => ({ nome: t.name, titulo: t.title, tipo: t.scope, permissao: t.permission, argumentos: Object.keys(t.inputSchema.properties), obrigatorios: t.inputSchema.required ?? [] })), propostas_exigem_confirmacao: true }),
+    input: { type: "object", properties: { q: S("Filtrar nome ou título"), page: {type: "integer", minimum: 1}, limit: {type: "integer", minimum: 1, maximum: 50} } }, schema: z.object({ q: z.string().max(100).optional(), page: z.number().int().min(1).max(1000).default(1), limit: z.number().int().min(1).max(50).default(30) }),
+    run: async (ctx, args, origin) => {
+      const q = String(args.q ?? "").toLocaleLowerCase("pt-BR");
+      const rows = toolCatalog(ctx, origin.allowedScopes ?? new Set(["read", "propose"])).filter(t => !q || `${t.name} ${t.title}`.toLocaleLowerCase("pt-BR").includes(q));
+      const page = Number(args.page), limit = Number(args.limit);
+      return { total: rows.length, page, limit, tem_mais: page * limit < rows.length, ferramentas: rows.slice((page - 1) * limit, page * limit).map(t => ({ nome: t.name, titulo: t.title, tipo: t.scope, permissao: t.permission, argumentos: Object.keys(t.inputSchema.properties), obrigatorios: t.inputSchema.required ?? [] })), propostas_exigem_confirmacao: true };
+    },
   },
   {
     name: "listar_propostas", title: "Listar propostas", scope: "read", permission: "ai:use",
@@ -264,7 +271,7 @@ const TOOLS: ToolDef[] = [
 
 function proposalSchema(kind: (typeof KIND_LIST)[number], descriptions: Record<string, unknown>) {
   const schema = z.toJSONSchema(PROPOSAL_SCHEMAS[kind], { unrepresentable: "any", io: "input" }) as { type: "object"; properties: Record<string, unknown>; required?: string[] };
-  delete schema.properties.expectedUpdatedAt; delete schema.properties.targetTitle; delete schema.properties.collaboratorName; delete schema.properties.workflowPreview;
+  delete schema.properties.stageName; delete schema.properties.expectedUpdatedAt; delete schema.properties.targetTitle; delete schema.properties.collaboratorName; delete schema.properties.workflowPreview;
   for (const [key, value] of Object.entries(descriptions)) if (schema.properties[key]) schema.properties[key] = { ...(schema.properties[key] as object), ...(value as object) };
   return schema;
 }
@@ -276,6 +283,16 @@ const proposeTool = (name: string, title: string, kind: (typeof KIND_LIST)[numbe
 });
 
 TOOLS.push(
+  proposeTool("propor_processo", "Cadastrar processo", "CASE_CREATE", "cases:write", "Cadastro interno de processo com partes, sigilo e responsável. Não distribui ação em tribunal nem inicia monitoramento externo.", {}, []),
+  proposeTool("propor_oportunidade", "Cadastrar oportunidade", "LEAD_CREATE", "crm:write", "Cadastro de oportunidade comercial no CRM, sem enviar mensagem ao contato.", {}, []),
+  proposeTool("propor_conta_financeira", "Cadastro de conta financeira; saldo inicial informado não transfere dinheiro", "FINANCE_ACCOUNT_CREATE", "finance:manage", "Cadastro de conta financeira; saldo inicial informado não transfere dinheiro.", {}, []),
+  proposeTool("propor_categoria_financeira", "Cadastro de categoria financeira", "FINANCE_CATEGORY_CREATE", "finance:manage", "Cadastro de categoria financeira.", {}, []),
+  proposeTool("propor_centro_custo", "Cadastro de centro de custo", "FINANCE_COST_CENTER_CREATE", "finance:manage", "Cadastro de centro de custo.", {}, []),
+  proposeTool("propor_registro_horas", "Registro de horas da própria pessoa conectada, com data e duração", "TIME_CREATE", "tasks:write", "Registro de horas da própria pessoa conectada, com data e duração.", {}, []),
+  proposeTool("propor_autotexto", "Criação de bloco de texto reutilizável", "SNIPPET_CREATE", "templates:manage", "Criação de bloco de texto reutilizável.", {}, []),
+  proposeTool("propor_modelo_documento", "Criação de modelo de documento do escritório, com variáveis validadas na execução", "TEMPLATE_CREATE", "templates:manage", "Criação de modelo de documento do escritório, com variáveis validadas na execução.", {}, []),
+  proposeTool("propor_quadro_kanban", "Criação de quadro de gestão com colunas iniciais", "BOARD_CREATE", "organization:manage", "Criação de quadro de gestão com colunas iniciais.", {}, []),
+  proposeTool("propor_etapa_tarefa", "Mudança de etapa de tarefa; consulte listar_etapas_tarefa antes", "TASK_STAGE", "tasks:write", "Mudança de etapa de tarefa; consulte listar_etapas_tarefa antes. Exige confirmação reforçada.", {}, []),
   proposeTool("propor_checklist_tarefa", "Propor checklist", "TASK_CHECKLIST", "tasks:write", "Propõe checklist com título e até 30 itens numa tarefa existente.", {}, ["taskId","title","items"]),
   proposeTool("propor_colaborador_tarefa", "Propor colaborador", "TASK_COLLABORATOR", "tasks:write", "Propõe adicionar colaborador ativo; não concede acesso a processo sigiloso.", {}, ["taskId","userId"]),
   proposeTool("propor_recorrencia_tarefa", "Propor recorrência", "TASK_REPEAT", "tasks:write", "Propõe materializar até 120 ocorrências de tarefa datada, por até dois anos. Consulta a atividade antes e exige confirmação reforçada.", {}, ["taskId","frequency","until"]),

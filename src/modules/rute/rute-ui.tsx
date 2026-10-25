@@ -186,10 +186,17 @@ export function TestButton() {
 // ----------------------------------------------------------------- Propostas
 export type ProposalItem = { id: string; kindLabel: string; risk: "LOW" | "HIGH"; title: string; payload: Record<string, unknown>; via: string; connection: string | null; caseTitle: string | null; status: string; proposerName: string; createdAt: string; expiresAt: string; decisionNote: string | null; resultId?: string | null; resultType?: string | null; caseId?: string | null };
 const EDITABLE = ["name", "title", "text", "body", "description", "notes"] as const;
-const LABELS: Record<string, string> = { workflowPreview:"Etapas do pacote", collaboratorName:"Colaborador", items:"Itens", userId:"Colaborador", frequency:"Frequência", interval:"A cada", until:"Até", baseDate:"Data base", answers:"Respostas do pacote", nonWorkingDates:"Dias sem expediente", force:"Repetir execução", name: "Nome", status: "Situação", targetTitle: "Registro", type: "Tipo", date: "Data", startTime: "Início", endTime: "Término", allDay: "Dia inteiro", location: "Local", addressCity: "Cidade", addressState: "UF", tags: "Etiquetas", title: "Título", text: "Texto", body: "Texto", description: "Descrição", notes: "Observações", priority: "Prioridade", dueDate: "Vencimento", startDate: "Início", days: "Dias", countType: "Contagem", kind: "Tipo", caseId: "Processo (id)", petitionId: "Petição (id)", assigneeId: "Responsável (id)", clientId: "Cliente (id)" };
+const LABELS: Record<string, string> = { stageName: "Etapa", initialBalance: "Saldo inicial", openingDate: "Data de abertura", color: "Cor", duration: "Duração", slug: "Código", category: "Categoria", active: "Ativo", workflowPreview:"Etapas do pacote", collaboratorName:"Colaborador", items:"Itens", userId:"Colaborador", frequency:"Frequência", interval:"A cada", until:"Até", baseDate:"Data base", answers:"Respostas do pacote", nonWorkingDates:"Dias sem expediente", force:"Repetir execução", name: "Nome", status: "Situação", targetTitle: "Registro", type: "Tipo", date: "Data", startTime: "Início", endTime: "Término", allDay: "Dia inteiro", location: "Local", addressCity: "Cidade", addressState: "UF", tags: "Etiquetas", title: "Título", text: "Texto", body: "Texto", description: "Descrição", notes: "Observações", priority: "Prioridade", dueDate: "Vencimento", startDate: "Início", days: "Dias", countType: "Contagem", kind: "Tipo", caseId: "Processo (id)", petitionId: "Petição (id)", assigneeId: "Responsável (id)", clientId: "Cliente (id)" };
 const VALUE_LABELS: Record<string, string> = { PERSON: "Pessoa física", COMPANY: "Pessoa jurídica", ACTIVE: "Ativo", INACTIVE: "Inativo", PROSPECT: "Prospecto", TODO: "A fazer", IN_PROGRESS: "Em andamento", WAITING: "Aguardando", DONE: "Concluída", CANCELED: "Cancelada", LOW: "Baixa", NORMAL: "Normal", HIGH: "Alta", URGENT: "Urgente", MEETING: "Reunião", HEARING: "Audiência", DILIGENCE: "Diligência", OTHER: "Outro", BUSINESS: "Dias úteis", CALENDAR: "Dias corridos" };
 const displayValue = (key: string, value: unknown) => typeof value === "object" ? JSON.stringify(value,null,2) : typeof value === "boolean" ? value ? "Sim" : "Não" : ["type", "status", "priority", "kind", "countType"].includes(key) ? VALUE_LABELS[String(value)] ?? String(value) : ["date", "dueDate", "startDate"].includes(key) && /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? String(value).split("-").reverse().join("/") : String(value);
 const STATUS = { PENDING: "Aguardando", APPROVED: "Aprovada", REJECTED: "Recusada", EXPIRED: "Expirada", FAILED: "Falhou" } as const;
+
+function proposalResultHref(p: ProposalItem) {
+  const collections: Record<string, string> = { finance_account: "/financeiro/cadastros", finance_category: "/financeiro/cadastros", finance_cost_center: "/financeiro/cadastros", time_entry: "/equipe", kanban_board: "/gestao", agenda_event_canceled: "/agenda" };
+  if (collections[p.resultType ?? ""]) return collections[p.resultType ?? ""];
+  const paths: Record<string, string> = { client: "/clientes", case: "/processos", lead: "/crm", task: "/tarefas", deadline: "/prazos", agenda_event: "/agenda", document: "/documentos", petition: "/peticoes", template: "/documentos/modelos", snippet: "/documentos/autotextos" };
+  return `${paths[p.resultType ?? ""] ?? "/processos"}/${p.resultType === "case_note" ? p.caseId ?? p.resultId : p.resultId}`;
+}
 
 export function ProposalCard({ p, onChanged }: { p: ProposalItem; onChanged?: () => void }) {
   const { run, pending, error } = useRun();
@@ -224,7 +231,7 @@ export function ProposalCard({ p, onChanged }: { p: ProposalItem; onChanged?: ()
           </React.Fragment>
         ))}
       </dl>
-      {p.status === "APPROVED" && p.resultId ? <p className="text-sm text-success">Ação executada. <a className="underline" href={p.resultType === "agenda_event_canceled" ? "/agenda" : `${({ client: "/clientes", task: "/tarefas", deadline: "/prazos", agenda_event: "/agenda", document: "/documentos", petition: "/peticoes" } as Record<string, string>)[p.resultType ?? ""] ?? "/processos"}/${p.resultType === "case_note" ? p.caseId ?? p.resultId : p.resultId}`}>Abrir resultado</a></p> : null}
+      {p.status === "APPROVED" && p.resultId ? <p className="text-sm text-success">Ação executada. <a className="underline" href={proposalResultHref(p)}>Abrir resultado</a></p> : null}
       {p.decisionNote ? <p className="text-xs text-muted">Motivo: {p.decisionNote}</p> : null}
       {error ? <Alert tone="error">{error}</Alert> : null}
       {open ? (

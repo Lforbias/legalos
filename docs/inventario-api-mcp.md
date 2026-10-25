@@ -1,4 +1,4 @@
-> Atualização da rodada operacional: o catálogo agora contém **52 ferramentas (32 consultas e 20 propostas)**. As tabelas históricas de 35 abaixo documentam a base anterior; as 17 adições estão listadas nesta seção. Todas usam o mesmo gateway, validação, escopo e permissões na RUTE, REST e MCP.
+> Rodada operacional anterior: o catálogo então continha 52 ferramentas. A versão atual contém 82; consulte [API expandida](api-expandida.md). As tabelas a seguir preservam os registros históricos dessa rodada.
 
 ## Ampliação operacional
 
@@ -18,7 +18,7 @@ A ampliação não representa cobertura completa de todas as escritas: pagamento
 
 # Inventário de funcionalidades — RUTE, REST e MCP
 
-Data: 2026-10-23. Este inventário descreve código implementado. Disponibilidade depende de permissões, configuração e credenciais. Conectores de tribunal não são considerados homologados por terem funções no código.
+Data: 2026-10-24. Este inventário descreve código implementado. Disponibilidade depende de permissões, configuração e credenciais. Conectores de tribunal não são considerados homologados por terem funções no código. O catálogo atual é de 82 ferramentas (52 consultas e 30 propostas); tabelas abaixo que indiquem números menores são o inventário histórico da base anterior. Consulte [API expandida](api-expandida.md) para a lista atual completa e seus limites.
 
 ## Arquitetura
 
