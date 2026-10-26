@@ -41,7 +41,7 @@ export function Sidebar({
 
   const space = spaceOfPath(pathname);
   const spaces = (["func", "box", "chat"] as Space[]).filter((sp) => sp === "func" || NAV_ITEMS.some((n) => n.space === sp && visibleKeys.includes(n.key)));
-  const items = NAV_ITEMS.filter((n) => visibleKeys.includes(n.key) && n.key !== "rute" && (n.space === space || n.space === "both"));
+  const items = NAV_ITEMS.filter((n) => visibleKeys.includes(n.key) && n.key !== "rute" && n.key !== "workspace" && (n.space === space || n.space === "both"));
   const [expanded, setExpanded] = React.useState<{ path: string; group: string }>({ path: "", group: "" });
   const selectedGroup = expanded.path === pathname ? expanded.group : null;
   const groups = space === "func" ? [

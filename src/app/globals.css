@@ -280,3 +280,19 @@ textarea { font: inherit; }
   .prod-float, .prod-float-slow, .prod-glow, .prod-marquee, .prod-hero-in { animation: none; }
   .prod-reveal { opacity: 1; transform: none; transition: none; }
 }
+
+/* Desktop is a separate, computer-first workspace. */
+@keyframes desktop-arrive {
+  from { opacity: 0; transform: translateY(20px) scale(.985); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+.desktop-enter { animation: desktop-arrive .55s cubic-bezier(.16, 1, .3, 1) both; }
+.desktop-folder { transition: transform .25s ease, border-color .25s ease, background .25s ease; }
+.desktop-folder:hover { transform: translateY(-4px); }
+@media (prefers-reduced-motion: reduce) {
+  .desktop-enter { animation: none; }
+  .desktop-folder { transition: none; }
+  .desktop-folder:hover { transform: none; }
+}
+
+.desktop-shell input:focus-visible { outline: none; }

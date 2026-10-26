@@ -13,8 +13,8 @@ describe("Cobertura da central de ajuda", () => {
     for (const link of shortcuts) {
       expect(keys.has(link.key), link.label).toBe(true);
       const pathname = link.href.split("?")[0]!;
-      const file = path.join(process.cwd(), "src/app/(dashboard)", pathname, "page.tsx");
-      expect(fs.existsSync(file), link.href).toBe(true);
+      const groups = ["(dashboard)", "(desktop)"];
+      expect(groups.some(group => fs.existsSync(path.join(process.cwd(), "src/app", group, pathname, "page.tsx"))), link.href).toBe(true);
     }
     for (const setting of SETTINGS_ITEMS) expect(shortcuts.some(l => l.href === setting.href), setting.label).toBe(true);
     for (const item of NAV_ITEMS.filter(n => !["help", "prototypes", "portal"].includes(n.key))) expect(shortcuts.some(l => l.key === item.key), item.label).toBe(true);

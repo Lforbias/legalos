@@ -13,7 +13,7 @@ test("RUTE permite revisar, executar e consultar o resultado sem sair da convers
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
   await page.getByLabel("Nome do escritório").fill(`Escritório operações ${id}`);
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia|Boa tarde|Boa noite/ })).toBeVisible();
   const url = process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test";
   if (!/test/i.test(new URL(url).pathname)) throw Error("Fixture exige banco de testes");
   const database = new Client({ connectionString: url }); await database.connect();
@@ -27,6 +27,7 @@ test("RUTE permite revisar, executar e consultar o resultado sem sair da convers
     await database.query('INSERT INTO assistant_messages (id, organization_id, conversation_id, role, content, refs) VALUES ($1,$2,$3,$4,$5,$6)', [randomUUID(), person.organization_id, conversation, "assistant", "Preparei a proposta. Confira os dados e confirme aqui.", JSON.stringify([{ type: "proposal", id: proposal, title: "Novo cliente pelo chat" }])]);
     await page.reload();
     await page.getByRole("button", { name: "Abrir RUTE", exact: true }).click();
+    await page.getByRole("button", { name: "Histórico de conversas", exact: true }).click();
     await page.getByRole("combobox", { name: "Conversas da RUTE", exact: true }).selectOption(conversation);
     const card = page.getByRole("region", { name: "Proposta da RUTE", exact: true });
     await expect(card.getByRole("textbox", { name: "Nome", exact: true })).toHaveValue("Cliente criado pela conversa");

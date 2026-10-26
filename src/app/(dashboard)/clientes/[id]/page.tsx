@@ -82,6 +82,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
         description={`${CLIENT_TYPE_LABEL[client.type]}${client.document ? ` · ${formatDocument(client.type, client.document)}` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Link href={`/area-de-trabalho/${client.id}`} className={buttonVariants({ variant: "secondary" })}>Abrir pasta</Link>
             <Badge tone={TONE[client.status]}>{CLIENT_STATUS_LABEL[client.status]}</Badge>
             {can(ctx, "ai:use") ? (
               <Link href={`/rute?aba=assistente&cliente=${client.id}`} className={buttonVariants({ variant: "secondary" })}>

@@ -1,5 +1,6 @@
 import {
   CircleHelp,
+  FolderOpen,
   BarChart3,
   Bell,
   Bot,
@@ -64,6 +65,7 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
+  { key: "workspace", space: "both", label: "Área de Trabalho", href: "/area-de-trabalho", icon: FolderOpen, permission: "clients:read", phase: 2, implemented: true, summary: "Pastas por cliente com casos, processos, atividades, conversas, documentos e financeiro conectados." },
   { key: "overview", space: "func", label: "Visão geral do Func", href: "/", icon: LayoutDashboard, phase: 1, implemented: true, summary: "Indicadores e atividade do escritório." },
   { key: "indicators", space: "func", label: "Indicadores", href: "/indicadores", icon: BarChart3, phase: 9, implemented: true, summary: "Atrasados por tipo, movimentação de processos, evolução da carteira, processos por cliente e os seus números." },
   { key: "alerts", space: "func", label: "Central de alertas", href: "/alertas", icon: Bell, phase: 9, implemented: true, summary: "Publicações, andamentos, processos parados, tarefas, prazos, agenda, financeiro e integrações, com link direto para agir." },

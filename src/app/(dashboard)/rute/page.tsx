@@ -10,7 +10,7 @@ import { TabsNav } from "@/components/ui/tabs-nav";
 import { db } from "@/lib/db/client";
 import { formatDateTime } from "@/lib/dates/format";
 import { mcpUrl } from "@/lib/mcp/http";
-import { Chat, DeleteConversation } from "@/modules/rute/assistant-ui";
+import { Chat, DeleteConversation, RuteSetup } from "@/modules/rute/assistant-ui";
 import { GovernanceForm, InstructionForm, InstructionRow } from "@/modules/rute/library-ui";
 import { ConnectGuide, ConnectionList, KeyForm, ProposalList, SettingsPanel, TestButton } from "@/modules/rute/rute-ui";
 import { can } from "@/server/context";
@@ -44,14 +44,14 @@ export default async function RutePage({ searchParams }: { searchParams: Promise
     ...(manage ? [{ key: "governanca", label: "Governança" }] : []),
     { key: "embreve", label: "Em breve" },
   ];
-  const current = tabs.some((t) => t.key === sp.aba) ? (sp.aba as string) : "situacao";
+  const current = tabs.some((t) => t.key === sp.aba) ? (sp.aba as string) : "assistente";
   const settings = await getRuteSettings(ctx);
   const tz = organization.timezone;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4">
-      <PageHeader title="RUTE — a IA do LegalOS" description="A IA lê e propõe; uma pessoa confirma. Nada é criado, alterado ou enviado sem confirmação humana, e nada fala com cliente." />
-      <TabsNav base="/rute" current={current} tabs={tabs} />
+    <div className="mx-auto max-w-6xl space-y-5">
+      <PageHeader title="RUTE" description="Seu espaço para conectar informações, organizar o trabalho e transformar decisões em ações." />
+      <TabsNav base="/rute" current={current} tabs={tabs} compactOnMobile />
       {settings.emergencyStop ? <Alert tone="error">Parada de emergência ativa neste escritório.</Alert> : null}
 
       {current === "situacao" ? (
@@ -109,7 +109,7 @@ async function Proposals({ ctx }: { ctx: Ctx }) {
 
 async function Assistant({ ctx, sp, enabled, tz }: { ctx: Ctx; sp: SP; enabled: boolean; tz: string }) {
   const [avail, convs] = await Promise.all([assistantAvailability(ctx), listConversations(ctx)]);
-  if (!enabled || !avail.available) return <Card><CardBody><Alert tone="warning">{avail.reason ?? "O assistente embutido está desligado. Quem administra liga em Situação."}</Alert></CardBody></Card>;
+  if (!enabled || !avail.available) return <Card><CardBody><RuteSetup reason={avail.reason ?? "O assistente está desligado. Quem administra pode preparar a conexão em Situação."} /></CardBody></Card>;
   const conv = sp.c ? await getConversation(ctx, sp.c).catch(() => null) : null;
   const caseId = conv?.caseId ?? (sp.caso && /^[0-9a-f-]{36}$/i.test(sp.caso) ? sp.caso : null);
   const clientId = conv?.clientId ?? (sp.cliente && /^[0-9a-f-]{36}$/i.test(sp.cliente) ? sp.cliente : null);
@@ -117,7 +117,7 @@ async function Assistant({ ctx, sp, enabled, tz }: { ctx: Ctx; sp: SP; enabled: 
   if (caseId) label = (await db.case.findFirst({ where: { id: caseId, organizationId: ctx.organizationId, deletedAt: null }, select: { title: true } }))?.title ?? null;
   if (!label && clientId) label = (await db.client.findFirst({ where: { id: clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { name: true } }))?.name ?? null;
   return (
-    <div className="grid gap-4 md:grid-cols-[14rem_1fr]">
+    <div className="grid min-w-0 gap-4 md:grid-cols-[13rem_minmax(0,1fr)]">
       <Card>
         <CardHeader title="Conversas" action={<Link href="/rute?aba=assistente"><Button size="sm" variant="secondary">Nova</Button></Link>} />
         <ul className="divide-y divide-border text-sm">

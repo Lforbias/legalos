@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell, Building2, CheckSquare, Check, CircleHelp, LogOut, Menu as MenuIcon, Plus, Scale, Search, User, UserPlus, Users } from "lucide-react";
+import { Command, Bell, Building2, CheckSquare, Check, CircleHelp, LogOut, Menu as MenuIcon, Plus, Scale, Search, User, UserPlus, Users } from "lucide-react";
 import * as React from "react";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import Link from "next/link";
@@ -114,6 +114,8 @@ export function Topbar({
       >
         <Search className="h-4 w-4" aria-hidden />
       </button>
+
+      {visibleKeys.includes("workspace") ? <Link href="/area-de-trabalho" aria-label="Abrir LegalOS Desktop" title="Abrir LegalOS Desktop" className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium transition hover:bg-surface-2"><Command className="h-4 w-4" /><span>Desktop</span></Link> : null}
 
       <Menu
         label="Criação rápida"
