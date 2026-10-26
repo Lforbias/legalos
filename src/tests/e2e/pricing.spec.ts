@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("public pricing compares sources, searches the catalogue and reaches the four unpriced plans", async ({ page }) => {
+test("public pricing compares sources, searches the catalogue and shows approved prices and limits", async ({ page }) => {
   const response = await page.goto("/produto/precos");
   expect(response?.status()).toBe(200);
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Antes do preço");
@@ -27,9 +27,14 @@ test("public pricing compares sources, searches the catalogue and reaches the fo
   await page.getByRole("link", { name: "Ver planos LegalOS", exact: true }).click();
   await expect(page).toHaveURL(/#planos$/);
   const plans = page.getByTestId("legalos-plans");
-  await expect(plans.getByText("Em definição", { exact: true })).toHaveCount(4);
-  for (const name of ["Simples", "Básico", "Intermediário", "Avançado"]) await expect(plans.getByRole("heading", { name, exact: true })).toBeVisible();
-  await expect(plans.getByText(/R\$/)).toHaveCount(0);
+  await expect(plans.getByText("Em definição", { exact: true })).toHaveCount(0);
+  for (const [name, price, users, cases, numbers] of [["Simples", 79, 2, "150", null], ["Básico", 149, 5, "500", null], ["Intermediário", 349, 10, "1.000", "1 número de WhatsApp"], ["Avançado", 599, 20, "2.000", "2 números de WhatsApp"]] as const) {
+    const card = plans.getByRole("article").filter({ has: page.getByRole("heading", { name, exact: true }) });
+    await expect(card).toContainText(new RegExp(`R\\$\\s*${price}`));
+    await expect(card).toContainText(`${users} usuários`);
+    await expect(card).toContainText(`Até ${cases} processos`);
+    if (numbers) await expect(card).toContainText(numbers);
+  }
   for (const width of [390, 768, 1024, 1440]) {
     await page.setViewportSize({ width, height: 960 });
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);

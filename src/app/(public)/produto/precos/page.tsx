@@ -10,7 +10,7 @@ import { FeatureCatalogue } from "./feature-catalogue";
 
 export const metadata: Metadata = {
   title: "Preços e comparativo",
-  description: "Compare os preços públicos de LegalMail, ADVBOX, Astrea e ChatGuru e conheça os recursos e a estrutura de planos do LegalOS. Valores LegalOS em definição.",
+  description: "Compare os preços públicos de LegalMail, ADVBOX, Astrea e ChatGuru e conheça os recursos e a estrutura de planos do LegalOS. Planos LegalOS a partir de R$ 79 por mês.",
 };
 
 function Status({ value }: { value: ComparisonCell }) {
@@ -34,7 +34,7 @@ export default function PricingPage() {
         <div className="mt-16 grid gap-5 border-t border-white/15 pt-7 sm:grid-cols-3">
           <div><p className="text-3xl font-medium">{featureCount}</p><p className="mt-1 text-sm text-white/55">recursos e operações catalogados</p></div>
           <div><p className="text-3xl font-medium">Um ecossistema</p><p className="mt-1 text-sm text-white/55">Func · Box · Chat · RUTE · Desktop</p></div>
-          <div><p className="text-3xl font-medium">4 planos</p><p className="mt-1 text-sm text-white/55">estrutura proposta · preços em definição</p></div>
+          <div><p className="text-3xl font-medium">4 planos</p><p className="mt-1 text-sm text-white/55">a partir de R$ 79 por mês</p></div>
         </div>
       </div>
     </section>
@@ -54,7 +54,7 @@ export default function PricingPage() {
           <a href={c.source} target="_blank" rel="noopener noreferrer" className="mt-auto flex items-center gap-2 pt-6 text-xs font-medium underline underline-offset-4">Conferir fonte oficial <ExternalLink className="h-3 w-3" aria-hidden /></a>
         </article>)}
       </div>
-      <p className="mt-5 max-w-4xl text-xs leading-relaxed text-muted">As médias são descritivas e não ponderadas. Planos com quantidades diferentes de usuários, processos e canais não são equivalentes. Não somamos esses preços como se fossem uma contratação obrigatória, nem anunciamos economia enquanto o preço do LegalOS está em definição. Marcas pertencem aos respectivos titulares; apresentação apenas para identificação comparativa.</p>
+      <p className="mt-5 max-w-4xl text-xs leading-relaxed text-muted">As médias são descritivas e não ponderadas. Planos com quantidades diferentes de usuários, processos e canais não são equivalentes. Não somamos esses preços como se fossem uma contratação obrigatória, nem tratamos a diferença de preço como equivalência entre produtos. Marcas pertencem aos respectivos titulares; apresentação apenas para identificação comparativa.</p>
     </section>
 
     <section className="border-y border-border bg-surface-2/60 py-24" id="comparativo">
@@ -71,7 +71,7 @@ export default function PricingPage() {
 
     <section className="mx-auto max-w-7xl px-4 py-24" id="recursos">
       <SectionTitle eyebrow="O LegalOS em detalhe" title={<>{featureCount} recursos e operações.<br />Encontre o que importa para você.</>} text="Explore o catálogo por área ou procure uma necessidade específica. São ações e recursos granulares da plataforma — consultar, criar e editar são contados separadamente, não como módulos independentes." />
-      <p className="mt-5 max-w-3xl text-sm leading-relaxed text-muted">O catálogo descreve a base atual do produto. Não significa que todos os itens estarão em todos os planos, disponíveis pela RUTE ou liberados sem configuração. A distribuição comercial e os limites ainda serão definidos.</p>
+      <p className="mt-5 max-w-3xl text-sm leading-relaxed text-muted">O catálogo descreve a base atual do produto. Não significa que todos os itens estarão em todos os planos, disponíveis pela RUTE ou liberados sem configuração. Os recursos disponíveis variam conforme o plano e as integrações configuradas.</p>
       <FeatureCatalogue groups={PRICING_FEATURES.map(g => ({ name: g.name, condition: g.condition, features: g.features.map(({ id, label }) => ({ id, label })) }))} />
     </section>
 
@@ -79,12 +79,12 @@ export default function PricingPage() {
       <div className="mx-auto max-w-7xl">
         <Brand /><p className="mt-10 text-xs uppercase tracking-[.2em] text-white/50">Planos LegalOS</p>
         <h2 className="mt-4 text-4xl font-medium tracking-tight md:text-6xl">Um começo simples.<br /><span className="text-white/50">Espaço para evoluir.</span></h2>
-        <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/65">Quatro níveis para diferentes momentos do escritório. Estamos definindo os valores, os limites e a composição de cada plano. Abaixo está a estrutura proposta, ainda sem oferta de contratação.</p>
+        <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/65">Quatro níveis para diferentes momentos do escritório. Escolha a estrutura que acompanha o tamanho da sua equipe e o volume de processos da sua operação.</p>
         <div className="mt-12 grid gap-4 md:grid-cols-2 xl:grid-cols-4">{LEGALOS_PLANS.map(p => <article key={p.id} className={`flex flex-col rounded-3xl border p-6 ${p.featured ? "border-white/60 bg-white/[.08]" : "border-white/15 bg-white/[.025]"}`}>
-          <p className="text-[10px] uppercase tracking-[.18em] text-white/45">{p.featured ? "Foco em equipes" : "Estrutura proposta"}</p><h3 className="mt-5 text-2xl font-medium">{p.name}</h3><p className="mt-2 min-h-12 text-sm text-white/60">{p.subtitle}</p><p className="mt-7 text-2xl font-medium">Em definição</p><p className="mt-1 text-xs text-white/45">Valor, limites e inclusões a confirmar</p><p className="mt-7 min-h-16 text-sm leading-relaxed text-white/65">{p.audience}</p>
-          <p className="mt-5 text-xs font-medium text-white/80">Foco sugerido para este nível</p><ul className="mt-4 space-y-3 text-sm text-white/65">{p.focus.map(f => <li key={f} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />{f}</li>)}</ul><Link href="/produto/contato" className="mt-auto flex items-center justify-between gap-2 border-t border-white/15 pt-5 text-sm font-medium">Conversar sobre os planos <ArrowRight className="h-4 w-4" aria-hidden /></Link>
+          <p className="text-[10px] uppercase tracking-[.18em] text-white/45">{p.featured ? "Foco em equipes" : "Plano mensal"}</p><h3 className="mt-5 text-2xl font-medium">{p.name}</h3><p className="mt-2 min-h-12 text-sm text-white/60">{p.subtitle}</p><p className="mt-7 text-3xl font-medium">{formatBRL(p.price)}<span className="ml-1 text-sm font-normal text-white/50">/mês</span></p><ul className="mt-4 space-y-2 text-sm text-white/80"><li>{p.users} usuários</li><li>Até {p.processes.toLocaleString("pt-BR")} processos</li>{p.whatsappNumbers !== null && <li>{p.whatsappNumbers} {p.whatsappNumbers === 1 ? "número de WhatsApp" : "números de WhatsApp"}</li>}</ul><p className="mt-7 min-h-16 text-sm leading-relaxed text-white/65">{p.audience}</p>
+          <p className="mt-5 text-xs font-medium text-white/80">Foco do plano</p><ul className="mt-4 space-y-3 text-sm text-white/65">{p.focus.map(f => <li key={f} className="flex gap-2"><Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/40" aria-hidden />{f}</li>)}</ul><Link href="/produto/contato" className="mt-auto flex items-center justify-between gap-2 border-t border-white/15 pt-5 text-sm font-medium">Conversar sobre os planos <ArrowRight className="h-4 w-4" aria-hidden /></Link>
         </article>)}</div>
-        <p className="mt-7 max-w-4xl text-xs leading-relaxed text-white/50">Esta página não altera assinaturas ou permissões atuais. IA, WhatsApp, pagamentos e integrações podem ter custos de terceiros; inclusão, franquias e eventuais adicionais serão informados com a oferta final. Nenhum preço provisório, desconto ou contratação automática está sendo apresentado.</p>
+        <p className="mt-7 max-w-4xl text-xs leading-relaxed text-white/50">Valores mensais em reais. Serviços de IA, WhatsApp, pagamentos e integrações podem ter custos de terceiros, conforme o uso e o provedor. Consulte as condições de contratação e de implantação.</p>
       </div>
     </section>
   </>;

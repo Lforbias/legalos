@@ -1,3 +1,9 @@
+## Produto — valores dos planos (2026-10-26)
+
+- Preços mensais aprovados: Simples R$ 79, Básico R$ 149, Intermediário R$ 349 e Avançado R$ 599.
+- Limites divulgados: 2/5/10/20 usuários e 150/500/1.000/2.000 processos; 1 e 2 números WhatsApp nos planos Intermediário e Avançado.
+- Atualiza a página comercial, sem reajustes de assinaturas existentes ou alterações de provisionamento. Não publica economia baseada em preço ChatGuru não confirmado.
+
 ## Produto — co-founders (2026-10-26)
 
 - Nova página `/produto/fundadores` e três perfis individuais com os nomes e fotografias fornecidos pelo usuário; todos com título Co-founder.

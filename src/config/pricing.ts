@@ -37,10 +37,10 @@ export function publishedPlanAverage(plans: readonly { value: number | null }[])
 }
 
 export const LEGALOS_PLANS = [
-  { id: "simples", name: "Simples", subtitle: "O primeiro passo para organizar a rotina.", audience: "Para quem está começando e quer concentrar o essencial.", focus: ["Cadastro e organização dos clientes", "Casos, tarefas e agenda", "Documentos da rotina"], featured: false },
-  { id: "basico", name: "Básico", subtitle: "Mais estrutura para o dia a dia.", audience: "Para o profissional que quer acompanhar o escritório com mais clareza.", focus: ["Operação jurídica no Func", "Acompanhamento de prazos e intimações", "Organização financeira"], featured: false },
-  { id: "intermediario", name: "Intermediário", subtitle: "Equipe, atendimento e operação conectados.", audience: "Para escritórios que precisam coordenar pessoas e diferentes rotinas.", focus: ["Conexão entre Func, Box e Chat", "Fluxos de trabalho e colaboração", "Visão do cliente no Desktop"], featured: true },
-  { id: "avancado", name: "Avançado", subtitle: "Uma operação com mais possibilidades.", audience: "Para equipes que buscam automações, inteligência e integrações.", focus: ["RUTE e governança da inteligência artificial", "API REST, MCP e webhooks", "Automações e acompanhamento gerencial"], featured: false },
+  { id: "simples", name: "Simples", price: 79, users: 2, processes: 150, whatsappNumbers: null, subtitle: "O primeiro passo para organizar a rotina.", audience: "Para quem está começando e quer concentrar o essencial.", focus: ["Cadastro e organização dos clientes", "Casos, tarefas e agenda", "Documentos da rotina"], featured: false },
+  { id: "basico", name: "Básico", price: 149, users: 5, processes: 500, whatsappNumbers: null, subtitle: "Mais estrutura para o dia a dia.", audience: "Para o profissional que quer acompanhar o escritório com mais clareza.", focus: ["Operação jurídica no Func", "Acompanhamento de prazos e intimações", "Organização financeira"], featured: false },
+  { id: "intermediario", name: "Intermediário", price: 349, users: 10, processes: 1000, whatsappNumbers: 1, subtitle: "Equipe, atendimento e operação conectados.", audience: "Para escritórios que precisam coordenar pessoas e diferentes rotinas.", focus: ["Conexão entre Func, Box e Chat", "Fluxos de trabalho e colaboração", "Visão do cliente no Desktop"], featured: true },
+  { id: "avancado", name: "Avançado", price: 599, users: 20, processes: 2000, whatsappNumbers: 2, subtitle: "Uma operação com mais possibilidades.", audience: "Para equipes que buscam automações, inteligência e integrações.", focus: ["RUTE e governança da inteligência artificial", "API REST, MCP e webhooks", "Automações e acompanhamento gerencial"], featured: false },
 ] as const;
 
 export type ComparisonCell = "yes" | "plan" | "unknown" | "conditional" | "validation";

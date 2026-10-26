@@ -24,5 +24,6 @@ describe("Evidence for public pricing comparisons", () => {
     expect(averages).toEqual({ legalmail: 893.6, advbox: 1674, astrea: 631.5, chatguru: null });
     expect(COMPETITORS.find(c => c.id === "chatguru")?.plans.every(p => p.value === null)).toBe(true);
     expect(LEGALOS_PLANS.map(p => p.name)).toEqual(["Simples", "Básico", "Intermediário", "Avançado"]);
+    expect(LEGALOS_PLANS.map(p => [p.price, p.users, p.processes, p.whatsappNumbers])).toEqual([[79, 2, 150, null], [149, 5, 500, null], [349, 10, 1000, 1], [599, 20, 2000, 2]]);
   });
 });

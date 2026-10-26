@@ -5,8 +5,10 @@ Rota pública: `/produto/precos`. Levantamento conferido em 26/10/2026.
 ## Decisões comerciais
 
 - Quatro níveis solicitados: Simples, Básico, Intermediário e Avançado.
-- Nenhum valor LegalOS, quota ou composição final foi decidido. Os cartões mostram **Em definição**, estrutura proposta e focos sugeridos. Não há checkout nem alteração dos planos de cobrança existentes.
-- Custos externos de IA, WhatsApp, pagamentos e integrações devem entrar na análise comercial futura. Não anunciar economia percentual antes de existir preço e cenário equivalente.
+- Atualização aprovada pelo usuário em 26/10/2026: Simples **R$ 79/mês**, 2 usuários e 150 processos; Básico **R$ 149/mês**, 5 usuários e 500 processos; Intermediário **R$ 349/mês**, 10 usuários, 1.000 processos e 1 número WhatsApp; Avançado **R$ 599/mês**, 20 usuários, 2.000 processos e 2 números WhatsApp. Os cartões substituem a indicação anterior “Em definição”.
+- Intermediário destaca Func, Box e Chat; Avançado destaca RUTE, API, MCP e webhooks. Não foram presumidos números WhatsApp para Simples ou Básico.
+- Esta entrega atualiza a página comercial, sem checkout, migração de assinatura, reajuste ou alteração dos controles de limites existentes. O critério operacional de contagem dos processos e o provisionamento precisam acompanhar uma futura implantação comercial.
+- Custos externos de IA, WhatsApp, pagamentos e integrações podem ser adicionais. Não foram publicados os percentuais sugeridos contra somas de concorrentes que usam um preço ChatGuru não confirmado.
 - Os atalhos do início e do comparativo levam a `#planos`, no final da página.
 
 ## Preços públicos de terceiros
