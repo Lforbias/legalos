@@ -1,3 +1,28 @@
+## Produto — valores dos planos (2026-10-26)
+
+- Preços mensais aprovados: Simples R$ 79, Básico R$ 149, Intermediário R$ 349 e Avançado R$ 599.
+- Limites divulgados: 2/5/10/20 usuários e 150/500/1.000/2.000 processos; 1 e 2 números WhatsApp nos planos Intermediário e Avançado.
+- Atualiza a página comercial, sem reajustes de assinaturas existentes ou alterações de provisionamento. Não publica economia baseada em preço ChatGuru não confirmado.
+
+## Produto — co-founders (2026-10-26)
+
+- Nova página `/produto/fundadores` e três perfis individuais com os nomes e fotografias fornecidos pelo usuário; todos com título Co-founder.
+- Links no menu público e na página Sobre, com fotografias preservadas e enquadramento adaptado à apresentação.
+- Sem cargos adicionais, credenciais ou biografias não fornecidas.
+
+## Produto — preços e comparativo (2026-10-26)
+
+- Página pública `/produto/precos`, com valores oficiais e condições de LegalMail, ADVBOX, Astrea e ChatGuru, médias calculáveis e fontes datadas.
+- Comparativo de cobertura distingue falta de evidência, dependência de plano/configuração e integrações do LegalOS ainda em validação.
+- Catálogo pesquisável de 300 recursos e operações com referência à implementação; contagem granular, sem alegar 300 módulos independentes.
+- Quatro planos propostos (Simples, Básico, Intermediário e Avançado), preços e composição em definição. Não altera assinatura nem habilita contratação.
+
+## LegalOS Desktop — identidade e produto (2026-10-26)
+
+- Marca vetorial própria em preto e branco, com versões para os temas claro e escuro, aplicada ao cabeçalho do Desktop.
+- Destaque em `/produto`, navegação pública e recursos; apresentação dedicada em `/produto/desktop`, com dados fictícios e indicação de uso em computador.
+- Documentadas as funções disponíveis e as ideias futuras de voz, organização automática e conexão a notebooks. A animação de entrada atual foi mantida.
+
 ## DataJud — chave por escritório (2026-10-23)
 
 Migração aditiva: `20261220000000_datajud_org`.

@@ -21,8 +21,8 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// Aplica o tema salvo antes da primeira pintura (evita flash). Padrão: dark.
-const themeScript = `(function(){try{var t=localStorage.getItem('lo-theme')||'dark';if(t==='system'){t=matchMedia('(prefers-color-scheme: light)').matches?'light':'dark'}document.documentElement.setAttribute('data-theme',t)}catch(e){}})()`;
+// Aplica o tema salvo antes da primeira pintura e acompanha mudanças do sistema sem recarregar.
+const themeScript = `(function(){try{var media=window.matchMedia('(prefers-color-scheme: light)');function apply(){var preference=localStorage.getItem('lo-theme')||'dark';var theme=preference==='system'?(media.matches?'light':'dark'):(preference==='light'?'light':'dark');document.documentElement.setAttribute('data-theme',theme);var color=document.querySelector('meta[name="theme-color"]');if(color)color.setAttribute('content',theme==='light'?'#F5F7FA':'#0A0C13')}apply();var onChange=function(){if((localStorage.getItem('lo-theme')||'dark')==='system')apply()};if(media.addEventListener)media.addEventListener('change',onChange);else if(media.addListener)media.addListener(onChange)}catch(e){document.documentElement.setAttribute('data-theme','dark')}})()`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (

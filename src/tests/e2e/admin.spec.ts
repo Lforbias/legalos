@@ -71,7 +71,7 @@ test("painel de admin: super-admin sem 2FA vai ativar o 2FA; com 2FA vê as tela
   await expect(alvo.getByRole("heading", { name: /Olá/ })).toBeVisible();
 
   // plano e assinatura: cancelar pela administração pausa só o que aumenta uso e avisa o escritório
-  await alvo.goto("/configuracoes");
+  await alvo.goto("/configuracoes/plano");
   await expect(alvo.getByTestId("plan-card")).toContainText("Profissional");
   await page.getByRole("button", { name: "Plano…" }).click();
   const form = page.locator("[data-testid^=sub-form-]");
@@ -79,14 +79,14 @@ test("painel de admin: super-admin sem 2FA vai ativar o 2FA; com 2FA vê as tela
   await form.getByLabel("Observação (fica registrada)").fill("teste e2e");
   await form.getByRole("button", { name: "Salvar" }).click();
   await expect(page.getByText("Cancelada").first()).toBeVisible();
-  await alvo.goto("/configuracoes");
+  await alvo.goto("/configuracoes/plano");
   await expect(alvo.getByTestId("plan-banner")).toContainText("cancelada");
   await expect(alvo.getByTestId("plan-card")).toContainText("Cancelada");
   await alvo.goto("/clientes");
   await expect(alvo.getByRole("heading", { name: "Clientes" })).toBeVisible();
 
   // cobrança automática desligada: o escritório vê o aviso (sem simular nada); a administração define preço e limites
-  await alvo.goto("/configuracoes");
+  await alvo.goto("/configuracoes/plano");
   await expect(alvo.getByTestId("billing-card")).toBeVisible();
   await expect(alvo.getByTestId("billing-off")).toContainText("ainda não foi ativada");
   await page.goto("/admin/planos");

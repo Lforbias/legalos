@@ -10,7 +10,7 @@ Crie em **Integrações → API do LegalOS** (exige permissão `integrations:man
 - Para de funcionar se o criador for suspenso/removido, perder a permissão equivalente, ou se o escritório for suspenso.
 - Validade opcional (30 dias a 2 anos); revogação imediata na tela. Até 20 chaves ativas por escritório. Criação e revogação são auditadas (sem o token).
 
-Acessos (escopos): `cases:read`, `clients:read`, `deadlines:read`, `notices:read`, `notices:write`.
+Acessos de recursos: `cases:read`, `clients:read`, `deadlines:read`, `notices:read`, `notices:write`. Para o catálogo de ferramentas: `tools:read` e `tools:propose` (independentes). MCP usa `mcp:read` e `mcp:propose`. As ferramentas exigem também `ai:use` e a permissão específica do módulo.
 
 ## Autenticação, limites e erros
 
@@ -35,7 +35,7 @@ Listas devolvem `{"data":[...],"nextCursor":"..."|null"}`, ordenadas do mais nov
 | `GET /notices`, `GET /notices/{id}` | `notices:read` | `status` (NEW, DISTRIBUTED, PROCESSED, DISCARDED), `caseId` (a lista não traz o teor; o detalhe traz `content`) |
 | `POST /notices` | `notices:write` | corpo abaixo |
 
-Não expostos de propósito: anotações internas de clientes e processos, documentos (arquivos), financeiro. Datas puras vão como `AAAA-MM-DD`; instantes em ISO 8601 (UTC).
+As rotas de recursos acima são um conjunto REST direto e limitado. O catálogo de ferramentas possui consultas e propostas adicionais sob as permissões próprias de cada módulo. Datas puras vão como `AAAA-MM-DD`; instantes em ISO 8601 (UTC).
 
 ### POST /notices
 
@@ -60,9 +60,14 @@ Obrigatórios: `title`, `content`. `kind`: INTIMACAO (padrão), CITACAO, DESPACH
 curl -H "Authorization: Bearer $LEGALOS_KEY" "https://SEU-DOMINIO/api/v1/cases?status=ACTIVE&limit=20"
 ```
 
-## Limites e próximos passos
+## Catálogo de ferramentas compartilhado
 
-- Somente leitura (exceto intimações); não há criação/edição de processos, clientes ou prazos pela API.
+Para a documentação detalhada, exemplos REST/n8n/MCP, as 82 operações disponíveis e seus limites, veja [API expandida](api-expandida.md).
+
+- `GET /api/v1/tools` descobre as ferramentas autorizadas para a chave.
+- `POST /api/v1/tools/{name}` executa uma consulta ou registra uma proposta. Corpo: argumentos JSON diretamente.
+- `GET /api/v1/openapi` publica o contrato OpenAPI gerado.
+- Propostas de alteração exigem aprovação humana no LegalOS; a rota de ferramenta não grava a alteração diretamente.
 - Webhooks: veja a seção abaixo.
 - Sem versionamento além do prefixo `/v1`; mudanças que quebrem contrato irão para `/v2`.
 
@@ -94,3 +99,27 @@ function valid(secret, rawBody, header) {
 Entrega e repetição: não há processo em segundo plano; um agendador deve chamar **a cada minuto** `POST /api/cron/webhooks` com `Authorization: Bearer $CRON_SECRET` (ex.: `* * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/webhooks`). Falhou? Novas tentativas após 1 min, 5 min, 30 min, 2 h e 6 h (6 no total); depois fica "Falhou" e pode ser reenviada na tela. Após 30 falhas seguidas o webhook é desligado automaticamente (religue na tela). A ordem de chegada **não é garantida** e pode haver entrega repetida: deduplique por `X-LegalOS-Delivery`/`id`. Histórico mantido por 30 dias.
 
 Segurança: só https, nome de domínio público (IP, localhost e `.internal` recusados no cadastro; o DNS é revalidado a cada conexão contra rede interna), redirecionamentos não são seguidos, TLS sempre verificado.
+
+## Ferramentas compartilhadas com RUTE e MCP (expansão)
+
+Crie uma chave com `tools:read` e/ou `tools:propose` em Integrações. A permissão de cada módulo continua sendo exigida; estes escopos não concedem acesso MCP. Habilite o acesso externo da RUTE e o consentimento correspondente. A parada de emergência interrompe ferramentas externas.
+
+- `GET /api/v1/tools`: catálogo de ferramentas autorizado à chave, com nomes, descrições e esquemas de entrada.
+- `POST /api/v1/tools/{name}`: envie os argumentos diretamente no objeto JSON. Resultado: `{ data, meta: { tool, truncated } }`. Se exceder o limite, `data` é nulo e `meta.content` traz o texto limitado; refine a consulta. Não trate listas limitadas como exportação completa.
+- `GET /api/v1/openapi`: contrato OpenAPI 3.1 autenticado, com ferramentas filtradas pelos escopos e permissões da chave.
+
+Exemplo sem dados pessoais:
+
+```bash
+curl -H "Authorization: Bearer $LEGALOS_KEY" \
+  -H 'Content-Type: application/json' \
+  -d '{}' \
+  https://SEU-DOMINIO/api/v1/tools/indicadores_escritorio
+```
+
+As quinze ferramentas `propor_*` apenas registram uma proposta pendente de decisão humana no LegalOS. A origem é registrada como API; nenhuma delas envia mensagem ao cliente ou protocola no tribunal. Esta API de ferramentas não depende de chave Gemini/Claude/OpenAI, pois a aplicação externa pode chamar diretamente o serviço autorizado.
+
+Catálogo completo, limites e cobertura por módulo: [Inventário de RUTE, REST e MCP](inventario-api-mcp.md).
+
+
+O catálogo atual possui 35 ferramentas compartilhadas. Além das consultas, há propostas para cadastro/atualização básica de clientes, edição/comentário/situação de tarefas e criação/edição/cancelamento de compromissos. `capacidades`, `listar_propostas` e `ver_proposta` permitem descobrir e acompanhar operações. A confirmação pode ser feita pela pessoa no chat interno do LegalOS. Campos de destino e versão não podem ser modificados pela edição de uma proposta; alterações concorrentes exigem nova proposta.

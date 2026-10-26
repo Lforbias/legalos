@@ -1,3 +1,5 @@
+import { GroundedSearchPanel } from "@/modules/ai/grounded-search-panel";
+import Link from "next/link";
 import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
@@ -21,7 +23,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
   const [status, caseRows] = await Promise.all([aiStatus(ctx), can(ctx, "cases:read") ? listCaseOptions(ctx) : Promise.resolve([])]);
   const cases = caseRows.map((c) => ({ id: c.id, label: c.number ? `${c.title} (${c.number})` : c.title }));
   const disabledReason = !status.providerConfigured
-    ? "O assistente ainda não foi configurado neste sistema: falta a chave do provedor (variável ANTHROPIC_API_KEY). Nenhuma resposta é simulada."
+    ? "Configure o provedor e a chave em Configurações → IA. Nenhuma resposta é simulada."
     : !status.orgEnabled
       ? "A IA está desligada neste escritório. Quem administra as integrações pode ligá-la abaixo."
       : null;
@@ -30,6 +32,7 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Assistente de IA" description="Perguntas sobre um processo, respondidas só com os dados que você já pode ver no LegalOS, sempre com fontes." />
       <div className="space-y-4">
+        <Link href="/configuracoes/ia" className="inline-block text-sm text-primary-text underline">Configurar provedor e chave de IA</Link>
         <Alert tone="info">
           Ao perguntar, os dados do processo escolhido (partes, andamentos, prazos, tarefas, intimações, nomes de documentos e o início do texto extraído de até 5 documentos) são enviados ao provedor de IA. CPF/CNPJ e e-mails são ocultados e o cadastro de clientes não é enviado. A pergunta e a resposta não ficam gravadas; só o consumo.
         </Alert>
@@ -38,12 +41,13 @@ export default async function AiPage({ searchParams }: { searchParams: Promise<{
           <CardBody className="space-y-2 text-sm">
             <p>Modelo: {status.model ?? "—"}</p>
             <p data-testid="ai-usage">Uso neste mês: {status.usedThisMonth.toLocaleString("pt-BR")} de {status.monthlyLimit.toLocaleString("pt-BR")} tokens ({pct}%)</p>
-            {can(ctx, "integrations:manage") && status.providerConfigured ? <EnableToggle enabled={status.orgEnabled} /> : null}
+            {can(ctx, "integrations:manage") ? <EnableToggle enabled={status.orgEnabled} /> : null}
           </CardBody>
         </Card>
         <AskPanel cases={cases} initialCaseId={sp.processo ?? ""} disabledReason={disabledReason} />
         {!disabledReason ? (
           <>
+            <Card><CardHeader title="Pesquisa pública com fontes" description="Consulta externa com Google/Gemini; fontes e síntese para conferência."/><CardBody><GroundedSearchPanel/></CardBody></Card>
             <Card><CardHeader title="Pesquisa de jurisprudência (mapa de pesquisa)" description="Teses, termos de busca e o que conferir. Não afirma precedentes." /><CardBody><JurisPanel cases={cases} /></CardBody></Card>
             {can(ctx, "petitions:write") ? <Card><CardHeader title="Minuta de peça" description="Rascunho para o advogado revisar. Nada é protocolado." /><CardBody><DraftPanel cases={cases} /></CardBody></Card> : null}
           </>

@@ -22,7 +22,7 @@ function PetitionTypesEditor({ id, initial }: { id: string; initial: Record<stri
   return (
     <details className="mt-2 rounded-md border border-slate-200 p-2" data-testid={`types-${id}`}>
       <summary className="cursor-pointer text-xs font-medium">Protocolo de petições: códigos de tipo de documento do tribunal</summary>
-      <p className="mt-2 text-xs text-slate-600">Cada tribunal tem os seus códigos (tabela do PJe). Preencha só o que o tribunal informou; sem o código da petição, o protocolo é recusado.</p>
+      <p className="mt-2 text-xs text-muted">Cada tribunal tem os seus códigos (tabela do PJe). Preencha só o que o tribunal informou; sem o código da petição, o protocolo é recusado.</p>
       {msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : null}
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {PETITION_TYPE_KEYS.map((k) => (
@@ -48,7 +48,7 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
   const [msg, setMsg] = React.useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
   const [pending, start] = React.useTransition();
   const run = (fn: () => Promise<void>) => start(fn);
-  if (!items.length) return <p className="text-sm text-slate-600">Nenhuma conexão cadastrada.</p>;
+  if (!items.length) return <p className="text-sm text-muted">Nenhuma conexão cadastrada.</p>;
   return (
     <div className="space-y-3">
       {msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : null}
@@ -57,16 +57,16 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="font-medium">{c.label}</div>
-              <div className="text-xs text-slate-600">
+              <div className="text-xs text-muted">
                 {COURT_SYSTEMS.find(s => s.key === c.system)?.label ?? "PJe (MNI)"} · {ENVIRONMENT_LABEL[(c.environment ?? "UNSPECIFIED") as keyof typeof ENVIRONMENT_LABEL]} · {c.tribunal} · {MODE_LABEL[c.authMode] ?? c.authMode}
                 {c.certificateLabel ? ` · ${c.certificateLabel}` : ""}
               </div>
-              <div className="break-all text-xs text-slate-500">{c.endpointUrl}</div>
+              <div className="break-all text-xs text-muted">{c.endpointUrl}</div>
             </div>
             {c.enabled ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>}
           </div>
           {c.lastSyncAt ? (
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 text-xs text-muted">
               Última sincronização: {new Date(c.lastSyncAt).toLocaleString("pt-BR")} — {c.lastStatus === "OK" ? "ok" : "falhou"}
               {c.lastMessage ? `: ${c.lastMessage}` : ""}
             </p>

@@ -1,13 +1,14 @@
 "use client";
 
+import { ProviderForm } from "./provider-form";
 import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Field, Input, Textarea } from "@/components/ui/form";
 import { useRun } from "@/modules/kanban/use-run";
 import {
-  approveProposalAction, createMcpKeyAction, rejectProposalAction, revokeConnectionAction, setEmergencyStopAction, setFeatureAction, setProviderAction, testMcpAction, updateProposalAction,
+  approveProposalAction, createMcpKeyAction, rejectProposalAction, revokeConnectionAction, setEmergencyStopAction, setFeatureAction, testMcpAction, updateProposalAction,
 } from "./actions";
 
 // ----------------------------------------------------------------- Situação
@@ -42,39 +43,17 @@ function FeatureRow({ feature, label, hint, on, needConsent, disabled }: { featu
 
 export function SettingsPanel({ s, canManage }: { s: SettingsView; canManage: boolean }) {
   const stop = useRun();
-  const prov = useRun();
-  const [clear, setClear] = React.useState(false);
   return (
     <div className="space-y-4">
       {s.emergencyStop ? <Alert tone="error">PARADA DE EMERGÊNCIA ATIVA: conexões externas, assistente e novas propostas estão bloqueados.</Alert> : null}
       <div className="space-y-3">
-        <FeatureRow feature="mcp" label="Conectar IAs externas (Claude, ChatGPT, Gemini)" hint="Libera o servidor MCP: a IA consulta e propõe, como a pessoa que conectou." on={s.mcpEnabled} needConsent disabled={!canManage} />
+        <FeatureRow feature="mcp" label="Acesso externo às ferramentas (MCP e API)" hint="Libera MCP e chamadas de ferramentas pela API: a IA consulta e propõe, como a pessoa que conectou." on={s.mcpEnabled} needConsent disabled={!canManage} />
         <FeatureRow feature="proposals" label="Propostas da IA" hint="A IA registra propostas (tarefa, prazo, anotação, minuta…). Nada vale até uma pessoa confirmar." on={s.proposalsEnabled} disabled={!canManage} />
-        <FeatureRow feature="assistant" label="Assistente embutido" hint="Conversa dentro do LegalOS, com a IA do escritório. Só consulta e propõe." on={s.assistantEnabled} disabled={!canManage} />
+        <FeatureRow feature="assistant" label="Assistente embutido" hint="Conversa dentro do LegalOS, com a IA do escritório. Consulta e executa pedidos de criação e alteração conforme suas permissões; também prepara propostas." on={s.assistantEnabled} disabled={!canManage} />
       </div>
       {canManage ? (
         <>
-          <form
-            className="space-y-3 rounded-md border border-border p-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              prov.run(() => setProviderAction({ provider: String(fd.get("provider")), model: String(fd.get("model") ?? ""), apiKey: String(fd.get("apiKey") ?? "") || undefined, clearKey: clear }), "Salvo.");
-              e.currentTarget.reset();
-              setClear(false);
-            }}
-          >
-            <p className="text-sm font-medium">IA do assistente embutido</p>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Field label="Provedor" htmlFor="rp-p"><Select id="rp-p" name="provider" defaultValue={s.provider}><option value="ANTHROPIC">Claude (Anthropic)</option><option value="GEMINI">Gemini (Google)</option><option value="OPENAI">OpenAI</option></Select></Field>
-              <Field label="Modelo (opcional)" htmlFor="rp-m" hint="Vazio = modelo padrão."><Input id="rp-m" name="model" defaultValue={s.model ?? ""} maxLength={80} /></Field>
-            </div>
-            <Field label="Chave de API do escritório (opcional)" htmlFor="rp-k" hint={s.hasOfficeKey ? "Já há uma chave salva (cifrada). Preencha só para trocar." : "Sem chave própria, usa a chave do sistema, se existir. Fica cifrada e nunca é mostrada de volta."}><Input id="rp-k" name="apiKey" type="password" autoComplete="off" maxLength={300} /></Field>
-            {s.hasOfficeKey ? <label className="flex items-center gap-2 text-xs"><input type="checkbox" checked={clear} onChange={(e) => setClear(e.target.checked)} />Remover a chave salva</label> : null}
-            {prov.error ? <Alert tone="error">{prov.error}</Alert> : null}
-            {prov.done ? <Alert tone="success">{prov.done}</Alert> : null}
-            <Button type="submit" size="sm" loading={prov.pending}>Salvar</Button>
-          </form>
+          <ProviderForm provider={s.provider} model={s.model} hasOfficeKey={s.hasOfficeKey} />
           <div className="space-y-2 rounded-md border border-danger/40 p-3">
             <p className="text-sm font-medium">Parada de emergência</p>
             <p className="text-xs text-muted">Corta na hora as conexões externas, o assistente e as novas propostas. Propostas já feitas continuam podendo ser decididas por pessoas.</p>
@@ -182,7 +161,7 @@ export function ConnectionList({ items }: { items: ConnView[] }) {
           <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
             <div>
               <p className="font-medium">{c.name} <Badge tone="neutral">{c.kind === "KEY" ? "Chave" : "Login (OAuth)"}</Badge> <Badge tone={c.status === "ACTIVE" ? "success" : "neutral"}>{c.status === "ACTIVE" ? "Ativa" : c.status === "REVOKED" ? "Revogada" : "Expirada"}</Badge></p>
-              <p className="text-xs text-muted">{c.userName ? `Pessoa: ${c.userName} · ` : ""}{c.scopes.includes("mcp:propose") ? "consulta + propõe" : "só consulta"} · último uso: {c.lastUsedAt ?? "nunca"}</p>
+              <p className="text-xs text-muted">{c.userName ? `Pessoa: ${c.userName} · ` : ""}{c.scopes.includes("mcp:execute") ? "ações diretas habilitadas" : c.scopes.includes("mcp:propose") ? "consulta + propõe" : "só consulta"} · último uso: {c.lastUsedAt ?? "nunca"}</p>
             </div>
             {c.status === "ACTIVE" ? <Button size="sm" variant="danger" loading={pending} onClick={() => run(() => revokeConnectionAction(c.id))}>Revogar</Button> : null}
           </li>
@@ -205,12 +184,21 @@ export function TestButton() {
 }
 
 // ----------------------------------------------------------------- Propostas
-export type ProposalItem = { id: string; kindLabel: string; risk: "LOW" | "HIGH"; title: string; payload: Record<string, unknown>; via: string; connection: string | null; caseTitle: string | null; status: string; proposerName: string; createdAt: string; expiresAt: string; decisionNote: string | null };
-const EDITABLE = ["title", "text", "body", "description", "notes"] as const;
-const LABELS: Record<string, string> = { title: "Título", text: "Texto", body: "Texto", description: "Descrição", notes: "Observações", priority: "Prioridade", dueDate: "Vencimento", startDate: "Início", days: "Dias", countType: "Contagem", kind: "Tipo", caseId: "Processo (id)", petitionId: "Petição (id)", assigneeId: "Responsável (id)", clientId: "Cliente (id)" };
+export type ProposalItem = { id: string; kindLabel: string; risk: "LOW" | "HIGH"; title: string; payload: Record<string, unknown>; via: string; connection: string | null; caseTitle: string | null; status: string; proposerName: string; createdAt: string; expiresAt: string; decisionNote: string | null; resultId?: string | null; resultType?: string | null; caseId?: string | null };
+const EDITABLE = ["name", "title", "text", "body", "description", "notes"] as const;
+const LABELS: Record<string, string> = { stageName: "Etapa", initialBalance: "Saldo inicial", openingDate: "Data de abertura", color: "Cor", duration: "Duração", slug: "Código", category: "Categoria", active: "Ativo", workflowPreview:"Etapas do pacote", collaboratorName:"Colaborador", items:"Itens", userId:"Colaborador", frequency:"Frequência", interval:"A cada", until:"Até", baseDate:"Data base", answers:"Respostas do pacote", nonWorkingDates:"Dias sem expediente", force:"Repetir execução", name: "Nome", status: "Situação", targetTitle: "Registro", type: "Tipo", date: "Data", startTime: "Início", endTime: "Término", allDay: "Dia inteiro", location: "Local", addressCity: "Cidade", addressState: "UF", tags: "Etiquetas", title: "Título", text: "Texto", body: "Texto", description: "Descrição", notes: "Observações", priority: "Prioridade", dueDate: "Vencimento", startDate: "Início", days: "Dias", countType: "Contagem", kind: "Tipo", caseId: "Processo (id)", petitionId: "Petição (id)", assigneeId: "Responsável (id)", clientId: "Cliente (id)" };
+const VALUE_LABELS: Record<string, string> = { PERSON: "Pessoa física", COMPANY: "Pessoa jurídica", ACTIVE: "Ativo", INACTIVE: "Inativo", PROSPECT: "Prospecto", TODO: "A fazer", IN_PROGRESS: "Em andamento", WAITING: "Aguardando", DONE: "Concluída", CANCELED: "Cancelada", LOW: "Baixa", NORMAL: "Normal", HIGH: "Alta", URGENT: "Urgente", MEETING: "Reunião", HEARING: "Audiência", DILIGENCE: "Diligência", OTHER: "Outro", BUSINESS: "Dias úteis", CALENDAR: "Dias corridos" };
+const displayValue = (key: string, value: unknown) => typeof value === "object" ? JSON.stringify(value,null,2) : typeof value === "boolean" ? value ? "Sim" : "Não" : ["type", "status", "priority", "kind", "countType"].includes(key) ? VALUE_LABELS[String(value)] ?? String(value) : ["date", "dueDate", "startDate"].includes(key) && /^\d{4}-\d{2}-\d{2}$/.test(String(value)) ? String(value).split("-").reverse().join("/") : String(value);
 const STATUS = { PENDING: "Aguardando", APPROVED: "Aprovada", REJECTED: "Recusada", EXPIRED: "Expirada", FAILED: "Falhou" } as const;
 
-function ProposalCard({ p }: { p: ProposalItem }) {
+function proposalResultHref(p: ProposalItem) {
+  const collections: Record<string, string> = { finance_account: "/financeiro/cadastros", finance_category: "/financeiro/cadastros", finance_cost_center: "/financeiro/cadastros", time_entry: "/equipe", kanban_board: "/gestao", agenda_event_canceled: "/agenda" };
+  if (collections[p.resultType ?? ""]) return collections[p.resultType ?? ""];
+  const paths: Record<string, string> = { client: "/clientes", case: "/processos", lead: "/crm", task: "/tarefas", deadline: "/prazos", agenda_event: "/agenda", document: "/documentos", petition: "/peticoes", template: "/documentos/modelos", snippet: "/documentos/autotextos" };
+  return `${paths[p.resultType ?? ""] ?? "/processos"}/${p.resultType === "case_note" ? p.caseId ?? p.resultId : p.resultId}`;
+}
+
+export function ProposalCard({ p, onChanged }: { p: ProposalItem; onChanged?: () => void }) {
   const { run, pending, error } = useRun();
   const [edit, setEdit] = React.useState<Record<string, string>>({});
   const [confirm, setConfirm] = React.useState(false);
@@ -222,39 +210,40 @@ function ProposalCard({ p }: { p: ProposalItem }) {
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-sm font-medium">{p.title} <Badge tone={p.risk === "HIGH" ? "warning" : "neutral"}>{p.kindLabel}</Badge> <Badge tone={p.status === "APPROVED" ? "success" : p.status === "PENDING" ? "info" : "neutral"}>{STATUS[p.status as keyof typeof STATUS] ?? p.status}</Badge></p>
-          <p className="text-xs text-muted">Proposta de {p.proposerName} via {p.via === "MCP" ? p.connection ?? "IA externa" : "assistente"}{p.caseTitle ? ` · processo: ${p.caseTitle}` : ""} · vale até {p.expiresAt}</p>
+          <p className="text-xs text-muted">Proposta de {p.proposerName} via {p.via === "API" ? "API REST" : p.via === "MCP" ? p.connection ?? "IA externa" : "assistente"}{p.caseTitle ? ` · processo: ${p.caseTitle}` : ""} · vale até {p.expiresAt}</p>
         </div>
       </div>
       <dl className="grid gap-x-4 gap-y-1 text-xs sm:grid-cols-[10rem_1fr]">
-        {Object.entries(p.payload).filter(([k, v]) => v !== "" && v !== null && v !== undefined && !/Id$/.test(k) && k !== "petitionTitle").map(([k, v]) => (
+        {Object.entries(p.payload).filter(([k, v]) => v !== "" && v !== null && v !== undefined && !/Id$/.test(k) && k !== "petitionTitle" && k !== "expectedUpdatedAt").map(([k, v]) => (
           <React.Fragment key={k}>
             <dt className="text-muted">{LABELS[k] ?? k}</dt>
-            <dd>
+            <dd className="min-w-0">
               {open && (EDITABLE as readonly string[]).includes(k) ? (
                 String(v).length > 120 || k === "text" || k === "body" ? (
-                  <Textarea rows={6} defaultValue={String(v)} onChange={(e) => setEdit((cur) => ({ ...cur, [k]: e.target.value }))} />
+                  <Textarea aria-label={LABELS[k] ?? k} rows={6} defaultValue={String(v)} onChange={(e) => setEdit((cur) => ({ ...cur, [k]: e.target.value }))} />
                 ) : (
-                  <Input defaultValue={String(v)} onChange={(e) => setEdit((cur) => ({ ...cur, [k]: e.target.value }))} />
+                  <Input aria-label={LABELS[k] ?? k} defaultValue={String(v)} onChange={(e) => setEdit((cur) => ({ ...cur, [k]: e.target.value }))} />
                 )
               ) : (
-                <span className="whitespace-pre-wrap break-words">{String(v)}</span>
+                <span className="whitespace-pre-wrap break-words">{displayValue(k, v)}</span>
               )}
             </dd>
           </React.Fragment>
         ))}
       </dl>
+      {p.status === "APPROVED" && p.resultId ? <p className="text-sm text-success">Ação executada. <a className="underline" href={proposalResultHref(p)}>Abrir resultado</a></p> : null}
       {p.decisionNote ? <p className="text-xs text-muted">Motivo: {p.decisionNote}</p> : null}
       {error ? <Alert tone="error">{error}</Alert> : null}
       {open ? (
         <div className="space-y-2">
           {p.risk === "HIGH" ? (
-            <label className="flex items-start gap-2 text-xs"><input type="checkbox" className="mt-0.5" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /><span>Revisei todo o conteúdo e sei que esta é uma ação de maior risco. Isto não protocola nada: só prepara para revisão.</span></label>
+            <label className="flex items-start gap-2 text-xs"><input type="checkbox" className="mt-0.5" checked={confirm} onChange={(e) => setConfirm(e.target.checked)} /><span>Revisei os dados, o registro de destino e os efeitos desta ação de maior risco.</span></label>
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
-            <Button size="sm" loading={pending} disabled={p.risk === "HIGH" && !confirm} onClick={() => run(() => approveProposalAction(p.id, { confirmHighRisk: confirm, edited: edited() }))}>Aprovar e executar</Button>
-            {Object.keys(edit).length ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => updateProposalAction(p.id, edit))}>Salvar edição</Button> : null}
+            <Button size="sm" loading={pending} disabled={p.risk === "HIGH" && !confirm} onClick={() => run(() => approveProposalAction(p.id, { confirmHighRisk: confirm, edited: edited() }), undefined, () => onChanged?.())}>Aprovar e executar</Button>
+            {Object.keys(edit).length ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => updateProposalAction(p.id, edit), undefined, () => onChanged?.())}>Salvar edição</Button> : null}
             <Input className="max-w-xs" placeholder="Motivo da recusa (opcional)" value={note} onChange={(e) => setNote(e.target.value)} maxLength={500} />
-            <Button size="sm" variant="danger" loading={pending} onClick={() => run(() => rejectProposalAction(p.id, note))}>Recusar</Button>
+            <Button size="sm" variant="danger" loading={pending} onClick={() => run(() => rejectProposalAction(p.id, note), undefined, () => onChanged?.())}>Recusar</Button>
           </div>
         </div>
       ) : null}

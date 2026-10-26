@@ -19,7 +19,9 @@ export function EventForm({
   initial,
   cases,
   initialClientLabel = "",
+  members = [],
 }: {
+  members?: {id:string;name:string}[];
   eventId?: string;
   initial: EventInput;
   cases: { id: string; title: string; number: string | null }[];
@@ -65,6 +67,7 @@ export function EventForm({
                 ))}
               </Select>
             </Field>
+            <Field label="Responsável" htmlFor="assigneeId" error={err("assigneeId")}><Select id="assigneeId" {...form.register("assigneeId")}><option value="">Sem responsável</option>{members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</Select></Field>
             <Field label="Data" htmlFor="date" error={err("date")}>
               <Input id="date" type="date" aria-invalid={Boolean(err("date"))} {...form.register("date")} />
             </Field>

@@ -1,4 +1,6 @@
 import {
+  CircleHelp,
+  FolderOpen,
   BarChart3,
   Bell,
   Bot,
@@ -63,6 +65,7 @@ export type NavItem = {
 };
 
 export const NAV_ITEMS: NavItem[] = [
+  { key: "workspace", space: "both", label: "Área de Trabalho", href: "/area-de-trabalho", icon: FolderOpen, permission: "clients:read", phase: 2, implemented: true, summary: "Pastas por cliente com casos, processos, atividades, conversas, documentos e financeiro conectados." },
   { key: "overview", space: "func", label: "Visão geral do Func", href: "/", icon: LayoutDashboard, phase: 1, implemented: true, summary: "Indicadores e atividade do escritório." },
   { key: "indicators", space: "func", label: "Indicadores", href: "/indicadores", icon: BarChart3, phase: 9, implemented: true, summary: "Atrasados por tipo, movimentação de processos, evolução da carteira, processos por cliente e os seus números." },
   { key: "alerts", space: "func", label: "Central de alertas", href: "/alertas", icon: Bell, phase: 9, implemented: true, summary: "Publicações, andamentos, processos parados, tarefas, prazos, agenda, financeiro e integrações, com link direto para agir." },
@@ -93,6 +96,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "integrations", space: "box", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "Consulta DataJud/CNJ (opt-in); e-mail e calendários em etapa futura." },
   { key: "monitoring", space: "box", label: "Monitoramento", href: "/monitoramento", icon: Activity, permission: "integrations:manage", phase: 10, implemented: true, summary: "Saúde da captura de intimações (DJEN e PJe/MNI): última execução, erros e fontes paradas." },
   { key: "prototypes", space: "both", label: "Protótipos", href: "/prototipos", icon: FlaskConical, phase: 0, implemented: true, summary: "Telas só visuais das próximas versões (visível só com LEGALOS_PROTOTYPES=1)." },
+  { key: "help", space: "both", label: "Ajuda", href: "/ajuda", icon: CircleHelp, phase: 1, implemented: true, summary: "Primeiros passos, guias de uso e caminhos da plataforma." },
   { key: "settings", space: "both", label: "Configurações", href: "/configuracoes", icon: Settings, phase: 1, implemented: true, summary: "Escritório, equipe, perfis e auditoria." },
 ];
 

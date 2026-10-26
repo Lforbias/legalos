@@ -89,7 +89,7 @@ export function BotPanel({ bot, labels, queues, agents, fields }: { bot: BotView
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div className="text-sm font-medium">Opções do menu ({v.options.length}/8)</div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button size="sm" variant="secondary" onClick={useTemplate}>Usar modelo para escritório de advocacia</Button>
             {v.options.length < 8 ? <Button size="sm" variant="secondary" onClick={() => setV({ ...v, options: [...v.options, blank()] })}>Adicionar opção</Button> : null}
           </div>

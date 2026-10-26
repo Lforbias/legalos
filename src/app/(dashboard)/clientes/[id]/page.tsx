@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Bot, Pencil } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
+import { RecordBackLink } from "@/components/layout/record-back-link";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -74,12 +75,14 @@ export default async function ClientDetailPage({ params, searchParams }: { param
     .join(", ");
 
   return (
-    <div className="mx-auto max-w-5xl">
+    <div className="mx-auto max-w-7xl">
+      <RecordBackLink href="/clientes">Clientes</RecordBackLink>
       <PageHeader
         title={client.name}
         description={`${CLIENT_TYPE_LABEL[client.type]}${client.document ? ` · ${formatDocument(client.type, client.document)}` : ""}`}
         actions={
           <div className="flex flex-wrap items-center gap-2">
+            <Link href={`/area-de-trabalho/${client.id}`} className={buttonVariants({ variant: "secondary" })}>Abrir pasta</Link>
             <Badge tone={TONE[client.status]}>{CLIENT_STATUS_LABEL[client.status]}</Badge>
             {can(ctx, "ai:use") ? (
               <Link href={`/rute?aba=assistente&cliente=${client.id}`} className={buttonVariants({ variant: "secondary" })}>
@@ -94,7 +97,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
           </div>
         }
       />
-      <TabsNav base={`/clientes/${client.id}`} current={tab} tabs={tabs} />
+      <TabsNav base={`/clientes/${client.id}`} current={tab} tabs={tabs} compactOnMobile />
 
       {tab === "resumo" ? (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -106,8 +109,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
                 <Item label={client.type === "PERSON" ? "Nome social" : "Nome fantasia"}>{client.tradeName}</Item>
                 <Item label={client.type === "PERSON" ? "CPF" : "CNPJ"}>{client.document ? formatDocument(client.type, client.document) : null}</Item>
                 {client.type === "PERSON" ? <Item label="Data de nascimento">{client.birthDate ? formatDate(client.birthDate, "UTC") : null}</Item> : null}
-                <Item label="E-mail">{client.email}</Item>
-                <Item label="Telefone">{client.phone ? formatPhone(client.phone) : null}</Item>
+                <Item label="E-mail">{client.email ? <a href={`mailto:${client.email}`} className="break-all hover:underline">{client.email}</a> : null}</Item>
+                <Item label="Telefone">{client.phone ? <a href={`tel:${client.phone}`} className="hover:underline">{formatPhone(client.phone)}</a> : null}</Item>
                 <div className="sm:col-span-2">
                   <Item label="Endereço">{address}</Item>
                 </div>

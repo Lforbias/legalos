@@ -20,6 +20,7 @@ export const eventSchema = z
     description: text(2000),
     caseId: uuidOrEmpty,
     clientId: uuidOrEmpty,
+    assigneeId: uuidOrEmpty.optional(),
   })
   .superRefine((v, ctx) => {
     if (!v.allDay && v.startTime === "") ctx.addIssue({ code: "custom", path: ["startTime"], message: "Informe o horário de início ou marque “dia inteiro”." });

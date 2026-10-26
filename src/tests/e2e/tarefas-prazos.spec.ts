@@ -118,6 +118,7 @@ test("equipe e produtividade: carga por responsável e registro de horas", async
   await page.getByRole("button", { name: "Criar tarefa" }).click();
   await expect(page.getByRole("heading", { name: `Tarefa de carga ${id}` })).toBeVisible();
 
+  await page.getByRole("button", { name: "Gestão do escritório", exact:true }).click();
   await page.getByRole("link", { name: /^Equipe e produtividade/ }).first().click();
   await expect(page.getByRole("heading", { name: "Equipe e produtividade" })).toBeVisible();
   const row = page.getByRole("row", { name: new RegExp(`Dona eq${id}`) });

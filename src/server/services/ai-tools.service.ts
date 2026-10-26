@@ -1,5 +1,6 @@
+import { officeAiProvider } from "./office-ai-provider.service";
 import { db } from "@/lib/db/client";
-import { aiMonthlyTokenLimit, AiProviderError, getAiProvider } from "@/lib/ai/provider";
+import { aiMonthlyTokenLimit, AiProviderError } from "@/lib/ai/provider";
 import { maskSensitive } from "@/lib/ai/mask";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { assertCan, type TenantContext } from "@/server/context";
@@ -18,7 +19,7 @@ import { assertModule } from "./org-security.service";
 
 export async function gate(ctx: TenantContext) {
   assertCan(ctx, "ai:use");
-  const provider = getAiProvider();
+  const provider = await officeAiProvider(ctx.organizationId);
   if (!provider) throw new ConflictError("O assistente de IA não está configurado neste sistema (falta a chave do provedor).");
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { aiEnabled: true } });
   if (!org?.aiEnabled) throw new ConflictError("O assistente de IA está desligado neste escritório. Peça a quem administra as integrações para ligá-lo.");

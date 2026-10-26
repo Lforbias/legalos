@@ -1,3 +1,4 @@
+import { ActivityDetailsSection } from "@/modules/activities/details-section";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -99,6 +100,7 @@ export default async function DeadlineDetailPage({ params }: { params: Promise<{
           </Card>
         </div>
       </div>
+      <ActivityDetailsSection ctx={ctx} kind="DEADLINE" id={d.id} />
     </div>
   );
 }

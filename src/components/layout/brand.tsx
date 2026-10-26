@@ -1,28 +1,25 @@
-import { Scale } from "lucide-react";
+import Image from "next/image";
 import { product } from "@/config/product";
 import { cn } from "@/lib/utils";
 
 export function BrandMark({ className }: { className?: string }) {
   return (
-    <span
-      aria-hidden
-      className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent text-white", className)}
-    >
-      <Scale className="h-4 w-4" />
+    <span aria-hidden className={cn("brand-assets inline-flex h-8 w-8 shrink-0 items-center justify-center", className)}>
+      <Image className="brand-theme-dark h-8 w-8" src="/brand/legalos-ecosystem-dark.svg" width={120} height={120} alt="" />
+      <Image className="brand-theme-light h-8 w-8" src="/brand/legalos-ecosystem-light.svg" width={120} height={120} alt="" />
     </span>
   );
 }
 
 export function Brand({ compact = false, space }: { compact?: boolean; space?: "func" | "box" | "chat" }) {
+  const stem = space ? `legalos-${space}` : "legalos-horizontal";
+  const width = space ? 172 : 120;
   return (
-    <span className="inline-flex items-center gap-2.5">
-      <BrandMark />
-      {compact ? null : (
-        <span className="text-[15px] font-semibold tracking-tight">
-          {product.name}
-          {space ? <span className="ml-1.5 rounded bg-primary/15 px-1.5 py-0.5 align-middle text-[11px] font-medium text-primary-text">{space === "box" ? "Box" : space === "chat" ? "Chat" : "Func"}</span> : null}
-        </span>
-      )}
+    <span className="brand-assets inline-flex items-center">
+      {compact ? <BrandMark /> : <>
+        <Image className="brand-theme-dark h-auto max-h-9 w-auto max-w-full" src={`/brand/${stem}-dark.svg`} width={width} height={30} alt={`${product.name}${space ? ` ${space === "box" ? "Box" : space === "chat" ? "Chat" : "Func"}` : ""}`} />
+        <Image className="brand-theme-light h-auto max-h-9 w-auto max-w-full" src={`/brand/${stem}-light.svg`} width={width} height={30} alt={`${product.name}${space ? ` ${space === "box" ? "Box" : space === "chat" ? "Chat" : "Func"}` : ""}`} />
+      </>}
     </span>
   );
 }

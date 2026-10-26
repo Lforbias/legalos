@@ -16,7 +16,7 @@ export default async function PackagesPage() {
     <PackagesAdmin
       canEdit={can(ctx, "organization:manage")}
       members={members}
-      rows={pkgs.map((p) => ({ id: p.id, name: p.name, description: p.description ?? "", active: p.active, steps: p.steps.map((s) => ({ id: s.id, title: s.title, description: s.description ?? "", dueDays: s.dueDays, priority: s.priority, assigneeId: s.assigneeId ?? "", ask: s.ask ?? "" })) }))}
+      rows={pkgs.map((p) => ({ id: p.id, name: p.name, description: p.description ?? "", active: p.active, steps: p.steps.map((s) => ({ id: s.id, title: s.title, description: s.description ?? "", dueDays: s.dueDays, countType: s.countType as "CALENDAR" | "BUSINESS", relativeTo: s.relativeTo as "BASE" | "PREVIOUS_DUE" | "PREVIOUS_DONE", waitForPrevious: s.waitForPrevious, assigneeMode: s.assigneeMode as "TRIGGER_USER" | "CASE_RESPONSIBLE" | "FIXED", priority: s.priority, assigneeId: s.assigneeId ?? "", ask: s.ask ?? "" })) }))}
     />
   );
 }

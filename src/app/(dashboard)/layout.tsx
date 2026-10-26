@@ -49,7 +49,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       banner={
         planNotice ? (
           <div className="flex flex-wrap items-center justify-center gap-2 border-b border-warning/30 bg-warning-bg px-4 py-1.5 text-xs text-warning" data-testid="plan-banner">
-            {planNotice} <Link href="/configuracoes" className="underline">Ver plano e uso</Link>
+            {planNotice} <Link href="/configuracoes/plano" className="underline">Ver plano e uso</Link>
           </div>
         ) : session.user.emailVerifiedAt ? null : (
           <div className="flex flex-wrap items-center justify-center gap-2 border-b border-warning/30 bg-warning-bg px-4 py-1.5 text-xs text-warning">

@@ -111,10 +111,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
       />
 
       <div className="mb-3 flex gap-3 text-sm">{can(ctx, "organization:manage") ? <Link className="underline" href="/tarefas/etapas">Personalizar etapas</Link> : null}</div>
-      <form method="get" className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4" role="search" aria-label="Filtrar tarefas">
+      <form method="get" className="mb-5 grid items-end gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-8" role="search" aria-label="Filtrar tarefas">
         {board ? <input type="hidden" name="visao" value="quadro" /> : null}
-        <label className="text-sm">Etapa<Select name="etapa" defaultValue={sp.etapa ?? ""}><option value="">Todas as etapas</option>{stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></label>
-        <div className="relative">
+        <label className="text-xs font-medium text-muted lg:col-span-2">Etapa<Select name="etapa" defaultValue={sp.etapa ?? ""}><option value="">Todas as etapas</option>{stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></label>
+        <div className="relative sm:col-span-2 lg:col-span-2">
           <label htmlFor="q" className="sr-only">Buscar tarefas</label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
           <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Título ou descrição" className="pl-9" />
@@ -152,10 +152,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
             {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </Select>
         </div>
-        <label className="flex h-9 items-center gap-2 text-sm">
-          <input type="checkbox" name="atrasadas" value="1" defaultChecked={overdue} className="h-4 w-4" /> Só atrasadas
+        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium text-muted">
+          <input type="checkbox" name="atrasadas" value="1" defaultChecked={overdue} className="h-4 w-4 accent-primary" /> Só atrasadas
         </label>
-        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Filtrar</button>
+        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Aplicar filtros</button>
       </form>
 
       {points.length ? (
