@@ -48,6 +48,7 @@ export async function updateCommercialProspect(pc: PlatformCtx, input: unknown) 
       version: { increment: 1 },
     } });
     if (!changed.count) throw new ConflictError("Este cadastro foi atualizado. Reabra a ficha antes de salvar.");
+    if (data.doNotContact) await tx.comProspect.updateMany({ where: { cnpj, deletedAt: null }, data: { doNotContact: true, nextActionAt: null, nextActionNote: null } });
     await audit({ action: "platform.prospect.updated", userId: pc.userId, resourceType: "commercial_prospect", resourceId: cnpj, meta: pc.meta, metadata: { stage: data.stage, doNotContact: data.doNotContact, locationChanged: moved } }, tx);
   });
 }

@@ -188,6 +188,25 @@ describe("8.0 — LegalOS Comercial", () => {
     await expect(svc.addFromBase(seller, "11222333000181")).rejects.toThrow(NotFoundError);
   });
 
+  it("amostra: importa sem duplicar nem sobrescrever negociação; vendedor não importa em lote", async () => {
+    await expect(svc.addBaseSample(seller)).rejects.toThrow(ForbiddenError);
+    await db.commercialProspect.create({ data: { cnpj: "99999999000191", legalName: "Amostra adicional", address: "Rua teste", cnae: "6911701", sourceMonth: "2026-10", doNotContact: true, notes: "Preservar bloqueio" } });
+    expect((await svc.addBaseSample(mgr)).created).toBe(1);
+    expect((await svc.addBaseSample(mgr)).created).toBe(0);
+    const row = await db.comProspect.findUniqueOrThrow({ where: { cnpj: "99999999000191" } });
+    expect(row).toMatchObject({ doNotContact: true, notes: "Preservar bloqueio", rankingPosition: null });
+    await db.comProspect.update({ where: { id: row.id }, data: { notes: "Negociação preservada" } });
+    await svc.addBaseSample(mgr);
+    expect((await db.comProspect.findUniqueOrThrow({ where: { id: row.id } })).notes).toBe("Negociação preservada");
+  });
+
+  it("mapa: falha externa mantém endereço disponível para nova tentativa", async () => {
+    const row = await svc.createProspect(seller, P("Consulta indisponível", { street: "Rua exemplo", zip: "01310100" }));
+    const unavailable = (async () => new Response("indisponível", { status: 503 })) as typeof fetch;
+    await expect(svc.geocodeProspect(seller, row.id, unavailable)).rejects.toThrow(ValidationError);
+    expect((await svc.getProspect(seller, row.id)).geocodedAt).toBeNull();
+  });
+
   it("equipe: adicionar por e-mail exige conta existente", async () => {
     await expect(svc.addMember(mgr, "naoexiste@example.test", "VENDEDOR")).rejects.toThrow(NotFoundError);
     const u = await makeUser("com-new");

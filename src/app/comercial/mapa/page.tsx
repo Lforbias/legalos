@@ -18,8 +18,9 @@ export default async function MapPage({ searchParams }: { searchParams: Promise<
   return (
     <div className="space-y-4">
       <PageHeader title="Mapa dos escritórios" description="Cada ponto é um escritório, na cor da etapa do funil. Clique para ver o resumo e abrir a ficha." actions={<Link href={top ? "/comercial/mapa" : "/comercial/mapa?top=1"} className="text-sm underline">{top ? "Mostrar todos" : "Só a lista dos 100"}</Link>} />
+      <Link href="/comercial/base" className="inline-block text-sm underline">Abrir a amostra da Receita e adicionar ao Comercial →</Link>
       <GeocodePending missing={withoutCoords} />
-      {points.length === 0 ? <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">Nenhum ponto ainda. Importe escritórios ou adicione pelo CNPJ; o endereço da Receita vira ponto no mapa automaticamente.</p> : null}
+      {points.length === 0 ? <p className="rounded-lg border border-border bg-surface p-4 text-sm text-muted">Nenhum ponto ainda. Importe escritórios ou adicione pelo CNPJ; Depois, use “Localizar 8 agora” para consultar os endereços. Nem todo endereço pode ser localizado.</p> : null}
       <ProspectMap points={points} />
     </div>
   );

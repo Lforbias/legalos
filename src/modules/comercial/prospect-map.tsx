@@ -13,6 +13,8 @@ export function ProspectMap({ points }: { points: MapPointDto[] }) {
   const el = React.useRef<HTMLDivElement>(null);
   const mapRef = React.useRef<LMap | null>(null);
   const layersRef = React.useRef<Record<string, import("leaflet").LayerGroup>>({});
+  const [mapError, setMapError] = React.useState(false);
+  const hiddenRef = React.useRef<Set<StageKey>>(new Set());
   const [hidden, setHidden] = React.useState<Set<StageKey>>(new Set());
 
   React.useEffect(() => {
@@ -22,9 +24,10 @@ export function ProspectMap({ points }: { points: MapPointDto[] }) {
       if (cancelled || !el.current) return;
       const map = L.map(el.current, { zoomControl: true }).setView([-23.5505, -46.6333], 11);
       mapRef.current = map;
-      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">OpenStreetMap</a>' }).addTo(map);
+      L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer noopener">OpenStreetMap</a>' }).on("tileerror", () => { if (!cancelled) setMapError(true); }).addTo(map);
       const groups: Record<string, import("leaflet").LayerGroup> = {};
-      for (const k of STAGE_KEYS) groups[k] = L.layerGroup().addTo(map);
+      for (const k of STAGE_KEYS) groups[k] = L.layerGroup();
+      for (const k of STAGE_KEYS) if (!hiddenRef.current.has(k)) groups[k]!.addTo(map);
       layersRef.current = groups;
       const bounds: [number, number][] = [];
       for (const p of points) {
@@ -45,7 +48,7 @@ export function ProspectMap({ points }: { points: MapPointDto[] }) {
       }
       if (bounds.length > 1) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
       else if (bounds.length === 1) map.setView(bounds[0]!, 15);
-    })();
+    })().catch(() => { if (!cancelled) setMapError(true); });
     return () => {
       cancelled = true;
       mapRef.current?.remove();
@@ -54,6 +57,7 @@ export function ProspectMap({ points }: { points: MapPointDto[] }) {
   }, [points]);
 
   React.useEffect(() => {
+    hiddenRef.current = hidden;
     const map = mapRef.current;
     for (const k of STAGE_KEYS) {
       const g = layersRef.current[k];
@@ -81,6 +85,7 @@ export function ProspectMap({ points }: { points: MapPointDto[] }) {
         ))}
         <span className="text-muted">Pontos maiores = escritórios da lista dos 100.</span>
       </div>
+      {mapError ? <p role="status" className="text-sm text-muted">O mapa não carregou completamente. As fichas continuam disponíveis em Escritórios.</p> : null}
       <div ref={el} className="h-[560px] w-full overflow-hidden rounded-lg border border-border" role="application" aria-label="Mapa dos escritórios" />
     </div>
   );

@@ -180,11 +180,11 @@ export async function createProspect(cx: ComCtx, input: ProspectInput) {
 }
 
 export async function updateProspect(cx: ComCtx, id: string, input: ProspectInput) {
-  const cur = await db.comProspect.findFirst({ where: { id, deletedAt: null }, select: { id: true, cnpj: true, street: true, number: true, zip: true, city: true } });
+  const cur = await db.comProspect.findFirst({ where: { id, deletedAt: null }, select: { id: true, cnpj: true, street: true, number: true, zip: true, city: true, state: true, district: true } });
   if (!cur) throw new NotFoundError("Escritório não encontrado.");
   const data = dataFrom(input);
   await assertCnpjFree(data.cnpj, id);
-  const addressChanged = (data.street ?? null) !== cur.street || (data.number ?? null) !== cur.number || (data.zip ?? null) !== cur.zip || data.city !== cur.city;
+  const addressChanged = (data.street ?? null) !== cur.street || (data.number ?? null) !== cur.number || (data.zip ?? null) !== cur.zip || data.city !== cur.city || data.state !== cur.state || data.district !== cur.district;
   await db.comProspect.update({ where: { id }, data: { ...data, ...(addressChanged ? { lat: null, lng: null, geocodedAt: null, geocodeNote: null } : {}) } });
   await audit({ action: "comercial.prospect_update", userId: cx.userId, resourceType: "com_prospect", resourceId: id, meta: cx.meta });
 }
@@ -286,11 +286,21 @@ export async function enrichProspect(cx: ComCtx, id: string, fetchImpl: typeof f
 }
 
 export async function geocodeProspect(_cx: ComCtx, id: string, fetchImpl: typeof fetch = fetch): Promise<boolean> {
-  const p = await db.comProspect.findFirst({ where: { id, deletedAt: null }, select: { street: true, number: true, district: true, city: true, state: true, zip: true } });
-  if (!p) throw new NotFoundError("Escritório não encontrado.");
-  const g = await geocodeAddress(p, fetchImpl);
-  await db.comProspect.update({ where: { id }, data: g ? { lat: g.lat, lng: g.lng, geocodedAt: new Date(), geocodeNote: g.note } : { geocodedAt: new Date(), geocodeNote: "Endereço não encontrado no mapa. Confira rua, número e CEP." } });
-  return !!g;
+  // Uma única consulta externa por vez em toda a instalação, inclusive entre processos.
+  return db.$transaction(async tx => {
+    const lock = await tx.$queryRaw<{ locked: boolean }[]>`SELECT pg_try_advisory_xact_lock(727290) AS locked`;
+    if (!lock[0]?.locked) throw new ConflictError("Já existe uma localização em andamento. Tente novamente em instantes.");
+    const p = await tx.comProspect.findFirst({ where: { id, deletedAt: null } });
+    if (!p) throw new NotFoundError("Escritório não encontrado.");
+    const g = await geocodeAddress(p, fetchImpl);
+    // O tempo também vale para chamadas avulsas e para diferentes usuários.
+    await sleep(1100);
+    const changed = await tx.comProspect.updateMany({ where: { id, deletedAt: null, updatedAt: p.updatedAt }, data: g
+      ? { lat: g.lat, lng: g.lng, geocodedAt: new Date(), geocodeNote: g.note }
+      : { lat: null, lng: null, geocodedAt: new Date(), geocodeNote: "Endereço não encontrado no mapa. Confira rua, número e CEP e tente novamente pela ficha." } });
+    if (!changed.count) throw new ConflictError("O endereço foi alterado durante a consulta. Tente novamente.");
+    return !!g;
+  }, { timeout: 60_000, maxWait: 5000 });
 }
 
 /** Lote pequeno por chamada (a política do OpenStreetMap pede no máximo 1 consulta por segundo). */
@@ -555,10 +565,17 @@ export async function addFromBase(cx: ComCtx, cnpj: string) {
   const b = await db.commercialProspect.findUnique({ where: { cnpj: normalizeCnpj(cnpj) } });
   if (!b) throw new NotFoundError("Cadastro não encontrado na base da Receita.");
   await assertCnpjFree(b.cnpj);
+  const p = await db.comProspect.create({ data: baseProspectData(b, cx.userId) });
+  await audit({ action: "comercial.prospect_create", userId: cx.userId, resourceType: "com_prospect", resourceId: p.id, metadata: { via: "base_receita" }, meta: cx.meta });
+  return p;
+}
+
+export function baseProspectData(b: import("@prisma/client").CommercialProspect, ownerId: string | null): Prisma.ComProspectCreateManyInput {
   const hasPoint = b.latitude != null && b.longitude != null;
-  const p = await db.comProspect.create({
-    data: {
+  return {
       cnpj: b.cnpj,
+      notes: b.notes || null,
+      nextActionAt: !b.doNotContact && b.nextContactOn ? new Date(`${b.nextContactOn}T12:00:00Z`) : null,
       name: titleCase(b.tradeName || b.legalName).slice(0, 160),
       legalName: titleCase(b.legalName),
       phone: b.phone || null,
@@ -575,12 +592,20 @@ export async function addFromBase(cx: ComCtx, cnpj: string) {
       rankingSource: `Base da Receita (competência ${b.sourceMonth})`,
       doNotContact: b.doNotContact,
       contactVerified: b.contactVerified,
-      ownerId: cx.userId,
+      ownerId,
       areas: [],
       tags: [],
       addonKeys: [],
-    },
-  });
-  await audit({ action: "comercial.prospect_create", userId: cx.userId, resourceType: "com_prospect", resourceId: p.id, metadata: { via: "base_receita" }, meta: cx.meta });
-  return p;
+    };
+}
+
+/** Até 200 da base local, sem duplicar ou sobrescrever negociações já existentes. */
+export async function addBaseSample(cx: ComCtx) {
+  const verified = await resolveComContext(cx.userId, cx.meta);
+  if (!verified) throw new ForbiddenError();
+  assertManager(verified);
+  const rows = await db.commercialProspect.findMany({ orderBy: { cnpj: "asc" }, take: 200 });
+  const result = await db.comProspect.createMany({ data: rows.map(row => baseProspectData(row, null)), skipDuplicates: true });
+  await audit({ action: "comercial.base_sample_import", userId: cx.userId, metadata: { selected: rows.length, created: result.count }, meta: cx.meta });
+  return { created: result.count, existing: rows.length - result.count };
 }

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/form";
 import { formatCnpj } from "@/lib/validation/br-documents";
+import { AddBaseSample } from "@/modules/comercial/add-base-sample";
 import { AddFromBase } from "@/modules/comercial/add-from-base";
 import { requireComercial } from "@/server/comercial";
 import { searchBase } from "@/server/services/comercial.service";
@@ -24,6 +25,7 @@ export default async function BasePage({ searchParams }: { searchParams: Promise
         description="Escritórios de advocacia já importados da base pública (Receita Federal). Escolha um e leve para o funil com um clique: o telefone, o endereço, o ponto no mapa e a marca de “não contatar” vão junto."
         actions={cx.isPlatformAdmin ? <Link href="/admin/comercial/prospeccao" className="text-sm underline">Mapa e conferência da base</Link> : undefined}
       />
+      {cx.role === "GERENTE" && total > 0 ? <AddBaseSample /> : null}
       <form className="flex gap-2" role="search">
         <Input name="q" defaultValue={q ?? ""} placeholder="Buscar por razão social, nome fantasia ou CNPJ" aria-label="Buscar na base" className="max-w-xl" />
         <Button type="submit">Buscar</Button>

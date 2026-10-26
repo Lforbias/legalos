@@ -9,17 +9,19 @@ export function useRun() {
   const [pending, start] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState<string | null>(null);
-  const run = <T,>(fn: () => Promise<ActionState<T>>, after?: (data: T | undefined) => void, okMsg?: string) => {
+  const run = <T,>(fn: () => Promise<ActionState<T>>, after?: (data: T | undefined) => void, okMsg?: string | ((data: T | undefined) => string)) => {
     setError(null);
     setOk(null);
     start(async () => {
+      try {
       const r = await fn();
       if (!r.ok) setError(Object.values(r.fieldErrors ?? {})[0]?.[0] ?? r.message ?? "Não foi possível concluir.");
       else {
-        if (okMsg) setOk(okMsg);
+        if (okMsg) setOk(typeof okMsg === "function" ? okMsg(r.data) : okMsg);
         after?.(r.data);
       }
       router.refresh();
+      } catch { setError("Não foi possível concluir. Confira sua conexão e tente novamente."); }
     });
   };
   return { run, pending, error, ok };

@@ -185,3 +185,12 @@ export async function updateMemberAction(userId: string, input: { role?: string;
     return undefined;
   });
 }
+
+export async function addBaseSampleAction(): Promise<ActionState<{ created: number; existing: number }>> {
+  return runAction(async () => {
+    const { cx } = await requireComercial();
+    const result = await svc.addBaseSample(cx);
+    touch();
+    return result;
+  });
+}

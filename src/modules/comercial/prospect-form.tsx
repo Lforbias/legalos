@@ -59,7 +59,7 @@ export function ProspectForm({ p, owners, plans }: { p: ProspectFormData; owners
       <div className="flex flex-wrap gap-2">
         <Button type="submit" loading={pending}>Salvar</Button>
         <Button type="button" variant="secondary" loading={pending} disabled={!p.cnpj} onClick={() => run(() => enrichAction(p.id), undefined, "Dados atualizados pela Receita.")}>Atualizar pelo CNPJ</Button>
-        <Button type="button" variant="secondary" loading={pending} onClick={() => run(() => geocodeAction(p.id), undefined, "Localização refeita.")}>Refazer ponto no mapa</Button>
+        <Button type="button" variant="secondary" loading={pending} onClick={() => run(() => geocodeAction(p.id), undefined, result => result?.found ? "Localização encontrada. Veja o mapa." : "Endereço não encontrado. Confira rua, número e CEP.")}>Refazer ponto no mapa</Button>
       </div>
     </form>
   );
