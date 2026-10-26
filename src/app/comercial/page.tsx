@@ -6,6 +6,7 @@ import { brl } from "@/lib/comercial/format";
 import { OPEN_STAGES, STAGE_INFO, STAGE_KEYS } from "@/lib/comercial/stages";
 import { ProjectionChart } from "@/modules/comercial/projection-chart";
 import { requireComercial } from "@/server/comercial";
+import { acquisitionSummary } from "@/server/audience/store";
 import { dashboard } from "@/server/services/comercial.service";
 
 export const metadata: Metadata = { title: "LegalOS Comercial — painel" };
@@ -25,11 +26,13 @@ function Kpi({ label, value, hint, href }: { label: string; value: string; hint?
 export default async function ComercialHome() {
   const { cx } = await requireComercial();
   const d = await dashboard(cx);
+  const acquisition=await acquisitionSummary();
   const maxCount = Math.max(1, ...STAGE_KEYS.map((k) => d.byStage[k].count));
   const real = d.projection.series.find((s) => s.key === "realista")!;
   return (
     <div className="space-y-6">
       <PageHeader title="Painel comercial" description="Funil, receita já fechada e projeção. A projeção é uma estimativa a partir das premissas da aba Projeção; ela melhora conforme vocês registram o que acontece." />
+      <Card><CardHeader title="Aquisição por conteúdo" description="Contas gratuitas, aceite opcional e demonstrações solicitadas; fechamento registrado no funil comercial."/><CardBody><div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr><th className="text-left">Origem</th><th>Cadastros</th><th>Novidades aceitas</th><th>Demonstrações</th><th>Escritórios ganhos</th></tr></thead><tbody>{acquisition.map(a=><tr key={a.origin}><td className="py-2">{a.origin}</td><td className="text-center">{a.signups}</td><td className="text-center">{a.optins}</td><td className="text-center">{a.demos}</td><td className="text-center">{a.won}</td></tr>)}</tbody></table></div></CardBody></Card>
       {d.total === 0 ? (
         <Card><CardBody>
           <p className="text-sm">Ainda não há escritórios. Comece por <Link className="underline" href="/comercial/importar">Importar</Link> (planilha com nome e CNPJ) ou <Link className="underline" href="/comercial/escritorios">adicione um escritório pelo CNPJ</Link>.</p>
