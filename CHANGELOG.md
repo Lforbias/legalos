@@ -63,6 +63,20 @@ Migração aditiva: `20261219000000_box_operation`. Não altera status de tarefa
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.
 
+## 8.0.0
+LegalOS Comercial: espaço separado (`/comercial`) para a equipe de vendas do próprio LegalOS. Migração nova: `20261226000000_comercial_8_0` (7 tabelas `com_*`, sem relação com dados de escritórios). Sem rotina nova no agendador.
+
+- Acesso: super-administradores ou membros ativos da equipe comercial (`ComMember`: gerência ou vendas), sempre com 2FA; quem não tem acesso recebe 404. Admin ganhou o atalho "Comercial".
+- Funil de 8 etapas (identificado, qualificado, contato, demonstração, proposta, negociação, ganho, perdido) com cartões por etapa; perdido exige motivo e ganho exige o valor mensal fechado.
+- Escritórios: cadastro editável (telefones, e-mail, endereço, áreas, posição na lista dos 100, responsável, plano e valor previstos, próximo retorno), contatos, histórico de ligações/WhatsApp/reuniões, busca e filtros.
+- CNPJ: consulta na BrasilAPI (dados públicos da Receita) preenche razão social, telefone, e-mail, endereço e atividade (dados de sócios não são guardados, por LGPD); telefone/e-mail digitados pela equipe não são trocados por vazio.
+- Mapa: Leaflet + OpenStreetMap; ponto por escritório colorido pela etapa; geocodificação pelo Nominatim em lotes de 8 (limite de 1 consulta por segundo) e identificação própria no User-Agent. CSP liberou só `tile.openstreetmap.org` para imagens.
+- Base da Receita (junção com a prospecção): aba `/comercial/base` busca na base `commercial_prospects` já importada e leva o escritório para o funil com um clique, herdando telefone, endereço, ponto no mapa, "contato conferido" e "não contatar". Escritório marcado como não contatar só aceita anotações e sai dos retornos atrasados.
+- Preços: os planos são os oficiais de `src/config/pricing.ts` (Simples, Básico, Intermediário, Avançado); aditivos (RUTE e assinatura de contratos já cadastrados, sem preço até a gerência definir) por mês, fixos ou por usuário; simulador e propostas com desconto e implantação; proposta sem preço definido não salva.
+- Painel e projeção: MRR fechado, funil aberto e ponderado, conversão, retornos atrasados, equipe; projeção de 12 meses em 3 cenários (conservador 0,6x, realista 1x, otimista 1,3x sobre a chance de fechar) com churn mensal; premissas editáveis pela gerência.
+- Importação por CSV (separador `,` ou `;`) com CNPJ validado, sem duplicar (mesmo CNPJ atualiza) e opção de consultar a Receita linha a linha.
+- Limites conhecidos: não existe API pública que liste "todos os advogados" nem ranking; a lista dos 100 é montada pela equipe (nome + CNPJ). Consultas externas (BrasilAPI, Nominatim) só testadas contra servidores falsos neste ambiente; dados da Receita podem estar desatualizados. A projeção é estimativa a partir de premissas iniciais (chances e prazos por etapa) que devem ser calibradas com a realidade. `scripts/demo-seed-comercial.ts` cria 12 escritórios FICTÍCIOS para demonstração.
+
 ## 6.0.0
 RUTE, a IA do LegalOS. Migração nova: `20261218000000_rute_6_0` (10 tabelas). Sem rotina nova no agendador (retenção roda de forma preguiçosa).
 

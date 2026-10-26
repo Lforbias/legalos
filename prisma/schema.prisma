@@ -61,6 +61,7 @@ model User {
   timeEntries       TimeEntry[]
   mfa               UserMfa?
   platformAdmin     PlatformAdmin?
+  comMember         ComMember?
   ownedCertificates Certificate[]     @relation("CertificateOwner")
   mfaRecoveryCodes  MfaRecoveryCode[]
   mfaChallenges     MfaChallenge[]
@@ -3656,4 +3657,222 @@ model TaskDependency {
  predecessor Task @relation("PredecessorTask",fields:[predecessorId,organizationId],references:[id,organizationId],onDelete:Cascade)
  @@index([organizationId,predecessorId])
  @@map("task_dependencies")
+}
+
+// Base comercial da plataforma. Não pertence aos escritórios clientes.
+model CommercialProspect {
+  cnpj             String   @id @db.VarChar(14)
+  legalName        String   @map("legal_name")
+  tradeName        String   @default("") @map("trade_name")
+  legalNature      String   @default("") @map("legal_nature")
+  companySize      String   @default("") @map("company_size")
+  openedOn         String   @default("") @map("opened_on")
+  address          String
+  neighborhood     String   @default("")
+  postalCode       String   @default("") @map("postal_code")
+  phone            String   @default("")
+  email            String   @default("")
+  cnae             String
+  sourceMonth      String   @map("source_month")
+  importedAt       DateTime @default(now()) @map("imported_at") @db.Timestamptz(3)
+  latitude         Float?
+  longitude        Float?
+  locationSource   String?  @map("location_source")
+  locationAccuracy String?  @map("location_accuracy")
+  stage            String   @default("NEW")
+  doNotContact     Boolean  @default(false) @map("do_not_contact")
+  contactVerified  Boolean  @default(false) @map("contact_verified")
+  notes            String   @default("")
+  nextContactOn    String?  @map("next_contact_on")
+  version          Int      @default(0)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([neighborhood])
+  @@index([stage, doNotContact])
+  @@index([sourceMonth])
+  @@map("commercial_prospects")
+}
+
+// ───────────────────────── LegalOS Comercial (8.0) ─────────────────────────
+// Espaço separado, só da plataforma: prospecção de escritórios para vender o LegalOS. Nada daqui toca dados dos escritórios clientes.
+
+enum ComStage {
+  IDENTIFICADO
+  QUALIFICADO
+  CONTATO
+  DEMONSTRACAO
+  PROPOSTA
+  NEGOCIACAO
+  GANHO
+  PERDIDO
+}
+
+enum ComActivityKind {
+  LIGACAO
+  WHATSAPP
+  EMAIL
+  REUNIAO
+  DEMONSTRACAO
+  NOTA
+  ETAPA
+}
+
+enum ComProposalStatus {
+  RASCUNHO
+  ENVIADA
+  ACEITA
+  RECUSADA
+}
+
+enum ComMemberRole {
+  GERENTE
+  VENDEDOR
+}
+
+model ComMember {
+  userId           String        @id @map("user_id") @db.Uuid
+  role             ComMemberRole @default(VENDEDOR)
+  active           Boolean       @default(true)
+  goalMonthlyCents Int?          @map("goal_monthly_cents")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("com_members")
+}
+
+model ComProspect {
+  id                   String      @id @default(uuid()) @db.Uuid
+  cnpj                 String?     @unique
+  name                 String
+  legalName            String?     @map("legal_name")
+  phone                String?
+  phone2               String?     @map("phone_2")
+  whatsapp             String?
+  email                String?
+  website              String?
+  street               String?
+  number               String?
+  complement           String?
+  district             String?
+  city                 String      @default("São Paulo")
+  state                String      @default("SP")
+  zip                  String?
+  lat                  Float?
+  lng                  Float?
+  geocodedAt           DateTime?   @map("geocoded_at") @db.Timestamptz(3)
+  geocodeNote          String?     @map("geocode_note")
+  cnae                 String?
+  openedAt             DateTime?   @map("opened_at") @db.Date
+  companySize          String?     @map("company_size")
+  lawyersEstimate      Int?        @map("lawyers_estimate")
+  areas                String[]    @default([])
+  rankingPosition      Int?        @map("ranking_position")
+  rankingSource        String?     @map("ranking_source")
+  tags                 String[]    @default([])
+  stage                ComStage    @default(IDENTIFICADO)
+  stageChangedAt       DateTime    @default(now()) @map("stage_changed_at") @db.Timestamptz(3)
+  lostReason           String?     @map("lost_reason")
+  doNotContact         Boolean     @default(false) @map("do_not_contact")
+  contactVerified      Boolean     @default(false) @map("contact_verified")
+  ownerId              String?     @map("owner_id") @db.Uuid
+  planKey              String?     @map("plan_key")
+  expectedUsers        Int?        @map("expected_users")
+  addonKeys            String[]    @default([]) @map("addon_keys")
+  expectedMonthlyCents Int?        @map("expected_monthly_cents")
+  probabilityPct       Int?        @map("probability_pct")
+  expectedCloseAt      DateTime?   @map("expected_close_at") @db.Date
+  nextActionAt         DateTime?   @map("next_action_at") @db.Timestamptz(3)
+  nextActionNote       String?     @map("next_action_note")
+  wonAt                DateTime?   @map("won_at") @db.Timestamptz(3)
+  wonMonthlyCents      Int?        @map("won_monthly_cents")
+  notes                String?
+  enrichedAt           DateTime?   @map("enriched_at") @db.Timestamptz(3)
+  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt            DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  contacts   ComContact[]
+  activities ComActivity[]
+  proposals  ComProposal[]
+
+  @@index([stage, deletedAt])
+  @@index([ownerId])
+  @@index([rankingPosition])
+  @@map("com_prospects")
+}
+
+model ComContact {
+  id              String      @id @default(uuid()) @db.Uuid
+  prospectId      String      @map("prospect_id") @db.Uuid
+  name            String
+  role            String?
+  phone           String?
+  email           String?
+  isDecisionMaker Boolean     @default(false) @map("is_decision_maker")
+  notes           String?
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  prospect        ComProspect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@map("com_contacts")
+}
+
+model ComActivity {
+  id           String          @id @default(uuid()) @db.Uuid
+  prospectId   String          @map("prospect_id") @db.Uuid
+  userId       String?         @map("user_id") @db.Uuid
+  kind         ComActivityKind
+  summary      String
+  outcome      String?
+  nextActionAt DateTime?       @map("next_action_at") @db.Timestamptz(3)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  prospect     ComProspect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId, createdAt])
+  @@index([userId, createdAt])
+  @@map("com_activities")
+}
+
+model ComAddon {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  name        String
+  description String?
+  priceCents  Int?     @map("price_cents")
+  perUser     Boolean  @default(false) @map("per_user")
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+
+  @@map("com_addons")
+}
+
+model ComProposal {
+  id           String            @id @default(uuid()) @db.Uuid
+  prospectId   String            @map("prospect_id") @db.Uuid
+  planKey      String            @map("plan_key")
+  users        Int
+  addonKeys    String[]          @default([]) @map("addon_keys")
+  discountPct  Int               @default(0) @map("discount_pct")
+  monthlyCents Int               @map("monthly_cents")
+  setupCents   Int               @default(0) @map("setup_cents")
+  validUntil   DateTime?         @map("valid_until") @db.Date
+  status       ComProposalStatus @default(RASCUNHO)
+  notes        String?
+  snapshot     Json              @default("{}")
+  createdById  String?           @map("created_by_id") @db.Uuid
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  prospect     ComProspect       @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId, createdAt])
+  @@map("com_proposals")
+}
+
+model ComSettings {
+  id                 String   @id @default("default")
+  stageProbabilities Json     @default("{}") @map("stage_probabilities")
+  cycleDays          Json     @default("{}") @map("cycle_days")
+  churnMonthlyPct    Float    @default(2) @map("churn_monthly_pct")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("com_settings")
 }

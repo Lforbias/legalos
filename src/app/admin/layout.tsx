@@ -4,6 +4,7 @@ import { requirePlatform } from "@/server/platform";
 
 const LINKS = [
   { href: "/admin", label: "Visão geral" },
+  { href: "/admin/comercial", label: "Comercial" },
   { href: "/admin/escritorios", label: "Escritórios" },
   { href: "/admin/planos", label: "Planos e preços" },
   { href: "/admin/usuarios", label: "Usuários" },

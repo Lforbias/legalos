@@ -296,3 +296,22 @@ textarea { font: inherit; }
 }
 
 .desktop-shell input:focus-visible { outline: none; }
+
+[data-space="comercial"] {
+  --primary: #ea580c;
+  --primary-hover: #f97316;
+  --primary-text: #fdba74;
+  --accent: #f59e0b;
+  --accent-text: #fcd34d;
+  --ring: #fb923c;
+}
+:root[data-theme="light"] [data-space="comercial"] {
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-text: #c2410c;
+  --accent: #b45309;
+  --accent-text: #b45309;
+  --ring: #c2410c;
+}
+
+@theme inline {
