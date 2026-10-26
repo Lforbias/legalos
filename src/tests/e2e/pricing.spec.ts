@@ -1,0 +1,46 @@
+import { expect, test } from "@playwright/test";
+
+test("public pricing compares sources, searches the catalogue and shows approved prices and limits", async ({ page }) => {
+  const response = await page.goto("/produto/precos");
+  expect(response?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("Antes do preço");
+  for (const id of ["legalmail", "advbox", "astrea", "chatguru"]) {
+    const card = page.getByTestId(`competitor-${id}`);
+    const img = card.getByRole("img");
+    await img.scrollIntoViewIfNeeded();
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+    await expect(card.getByRole("link", { name: "Conferir fonte oficial" })).toHaveAttribute("href", /^https:\/\//);
+  }
+  await expect(page.getByTestId("competitor-chatguru")).toContainText("Não calculável");
+  await expect(page.getByTestId("competitor-astrea")).toContainText("equivalente / mês");
+  const catalogue = page.getByTestId("pricing-catalogue");
+  await expect(catalogue.getByRole("status")).toHaveText("300 de 300 recursos e operações");
+  await page.getByRole("searchbox", { name: "Buscar recurso" }).fill("campanha");
+  await expect(catalogue.getByText("Criar campanha com até 10 mil destinatários")).toBeVisible();
+  await expect(catalogue.getByText("Cadastrar cliente", { exact: true })).toHaveCount(0);
+  await page.getByRole("searchbox", { name: "Buscar recurso" }).fill("zzzzsemresultado");
+  await expect(catalogue.getByText(/Nenhum recurso encontrado/)).toBeVisible();
+  await page.getByRole("searchbox", { name: "Buscar recurso" }).clear();
+  await page.getByRole("combobox", { name: "Filtrar área de recursos" }).selectOption({ label: "LegalOS Desktop" });
+  await expect(catalogue.getByRole("status")).toHaveText("2 de 300 recursos e operações");
+  await page.getByRole("combobox", { name: "Filtrar área de recursos" }).selectOption("all");
+  await page.getByRole("link", { name: "Ver planos LegalOS", exact: true }).click();
+  await expect(page).toHaveURL(/#planos$/);
+  const plans = page.getByTestId("legalos-plans");
+  await expect(plans.getByText("Em definição", { exact: true })).toHaveCount(0);
+  for (const [name, price, users, cases, numbers] of [["Simples", 79, 2, "150", null], ["Básico", 149, 5, "500", null], ["Intermediário", 349, 10, "1.000", "1 número de WhatsApp"], ["Avançado", 599, 20, "2.000", "2 números de WhatsApp"]] as const) {
+    const card = plans.getByRole("article").filter({ has: page.getByRole("heading", { name, exact: true }) });
+    await expect(card).toContainText(new RegExp(`R\\$\\s*${price}`));
+    await expect(card).toContainText(`${users} usuários`);
+    await expect(card).toContainText(`Até ${cases} processos`);
+    if (numbers) await expect(card).toContainText(numbers);
+  }
+  for (const width of [390, 768, 1024, 1440]) {
+    await page.setViewportSize({ width, height: 960 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+  }
+  await page.goto("/produto/precos");
+  await page.screenshot({ path: "/tmp/legalos-precos.png", fullPage: true, animations: "disabled" });
+  await plans.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: "/tmp/legalos-precos-planos.png", animations: "disabled" });
+});

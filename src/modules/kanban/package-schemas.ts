@@ -4,7 +4,11 @@ import { isYmd } from "@/lib/dates/ymd";
 export const stepSchema = z.object({
   title: z.string().trim().min(3, "Informe o título da tarefa (mín. 3 caracteres).").max(200),
   description: z.string().trim().max(2000).default(""),
-  dueDays: z.number().int().min(0, "Prazo inválido.").max(365, "Prazo máximo: 365 dias."),
+  dueDays: z.number().int().min(-365, "Prazo mínimo: -365 dias.").max(365, "Prazo máximo: 365 dias."),
+  countType: z.enum(["CALENDAR","BUSINESS"]).default("CALENDAR"),
+  relativeTo: z.enum(["BASE","PREVIOUS_DUE","PREVIOUS_DONE"]).default("BASE"),
+  waitForPrevious: z.boolean().default(false),
+  assigneeMode: z.enum(["TRIGGER_USER","CASE_RESPONSIBLE","FIXED"]).default("TRIGGER_USER"),
   priority: z.enum(["LOW", "NORMAL", "HIGH", "URGENT"]).default("NORMAL"),
   assigneeId: z.union([z.string().uuid(), z.literal("")]).default(""),
   ask: z.string().trim().max(120).default(""),
@@ -15,7 +19,7 @@ export const packageSchema = z.object({
   description: z.string().trim().max(500).default(""),
   active: z.boolean().default(true),
   steps: z.array(stepSchema).min(1, "Inclua ao menos uma tarefa.").max(20, "No máximo 20 tarefas por pacote."),
-});
+}).superRefine((v,ctx)=>{v.steps.forEach((s,i)=>{if(i===0&&(s.relativeTo!=="BASE"||s.waitForPrevious))ctx.addIssue({code:"custom",path:["steps",i,"relativeTo"],message:"A primeira tarefa usa a data base, sem dependência."});if(s.assigneeMode==="FIXED"&&!s.assigneeId)ctx.addIssue({code:"custom",path:["steps",i,"assigneeId"],message:"Escolha a pessoa responsável."});});});
 export type PackageInput = z.input<typeof packageSchema>;
 
 export const runSchema = z.object({
@@ -24,6 +28,7 @@ export const runSchema = z.object({
   baseDate: z.string().refine(isYmd, "Data inválida."),
   answers: z.record(z.string(), z.string().max(300)).default({}),
   boardId: z.union([z.string().uuid(), z.literal("")]).default(""),
+  nonWorkingDates: z.array(z.string().refine(isYmd,"Data inválida.")).max(100).default([]),
   force: z.boolean().default(false),
 });
 export type RunInput = z.input<typeof runSchema>;

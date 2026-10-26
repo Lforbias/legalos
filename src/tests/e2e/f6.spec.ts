@@ -70,7 +70,7 @@ test("2FA obrigatório: o dono liga, quem não ativou fica preso na tela de ativ
   await page.goto("/conta");
   await page.getByRole("button", { name: "Ativar verificação em duas etapas" }).click();
   await enableMfa(page);
-  await page.goto("/configuracoes");
+  await page.goto("/configuracoes/seguranca");
   const card = page.getByTestId("require-mfa-card");
   await expect(card.getByTestId("require-mfa-status")).toHaveText("Desligado");
   await card.getByRole("button", { name: "Ligar" }).click();

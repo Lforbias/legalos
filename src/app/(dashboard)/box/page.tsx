@@ -1,27 +1,31 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { ArrowUpRight, Inbox } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
+import { PageActionsMenu } from "@/components/layout/page-actions-menu";
+import { buttonVariants } from "@/components/ui/button";
 import { ReportBars } from "@/components/reports/report-charts";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDate, relativeTime } from "@/lib/dates/format";
 import { getBoxDashboard } from "@/server/services/box.service";
+import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Visão geral do Box" };
 
 function Kpi({ label, value, hint, href, tone }: { label: string; value: React.ReactNode; hint?: string; href?: string; tone?: "warning" | "danger" }) {
   const body = (
-    <Card className={href ? "transition-colors hover:border-primary/50" : undefined}>
+    <Card className={`h-full ${href ? "transition-colors hover:border-primary/50 hover:bg-surface-2/40" : ""}`}>
       <CardBody>
-        <p className="text-xs text-muted">{label}</p>
-        <p className={`mt-1 text-2xl font-semibold tabular-nums ${tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : ""}`}>{value}</p>
-        {hint ? <p className="mt-1 text-xs text-muted">{hint}</p> : null}
+        <div className="flex items-start justify-between gap-2"><p className="text-xs leading-5 text-muted">{label}</p>{href ? <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-muted" aria-hidden /> : null}</div>
+        <p className={`mt-3 text-3xl font-semibold tracking-tight tabular-nums ${tone === "danger" ? "text-danger" : tone === "warning" ? "text-warning" : ""}`}>{value}</p>
+        {hint ? <p className="mt-2 text-xs leading-5 text-muted">{hint}</p> : null}
       </CardBody>
     </Card>
   );
-  return href ? <Link href={href}>{body}</Link> : body;
+  return href ? <Link href={href} className="rounded-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary">{body}</Link> : body;
 }
 
 function statusTone(s: string | null): "success" | "danger" | "neutral" {
@@ -35,35 +39,44 @@ export default async function BoxOverviewPage() {
   if (!d.notices && !d.captures && !d.certificates && !d.petitions && !d.integrations) return <AccessDenied />;
 
   return (
-    <div className="mx-auto max-w-6xl" data-testid="box-dashboard">
+    <div className="mx-auto max-w-7xl" data-testid="box-dashboard">
       <PageHeader
         title="LegalOS Box"
-        description="Intimações, capturas dos tribunais, peticionamento e certificados. Tudo calculado do banco, sem números fictícios."
+        description="Acompanhe o que chegou, distribua as intimações e siga até o protocolo."
         actions={
-          <Link href="/" className="text-sm text-primary-text hover:underline" data-testid="box-to-func">
-            Ir para o LegalOS Func →
-          </Link>
+          <>
+            <Link href="/" className={buttonVariants({ variant: "ghost" })} data-testid="box-to-func">Ir para o Func</Link>
+            <PageActionsMenu label="Mais ações do Box" items={[
+              ...(can(ctx, "inbox:read") ? [{ href: "/caixa-de-entrada?leitura=1", label: "Leitura integrada" }] : []),
+              ...(can(ctx, "integrations:manage") ? [{ href: "/box/operacao", label: "Operação e auditoria" }, { href: "/integracoes", label: "Gerenciar conexões" }] : []),
+            ]} />
+            {d.notices ? <Link href="/caixa-de-entrada" className={buttonVariants({})}><Inbox className="h-4 w-4" aria-hidden /> Abrir caixa de entrada</Link> : null}
+          </>
         }
       />
 
       {d.notices ? (
         <>
+          <h2 className="mb-3 text-sm font-semibold">Sua fila de trabalho</h2>
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
             <Kpi label="Na caixa de entrada" value={d.notices.boxes.entrada} hint="sem distribuição" href="/caixa-de-entrada" />
             <Kpi label="Para mim" value={d.notices.boxes.minhas} href="/caixa-de-entrada?responsavel=eu" />
             <Kpi label="Paradas há mais de 3 dias" value={d.notices.stale} hint="novas e sem distribuição" tone={d.notices.stale ? "warning" : undefined} href="/caixa-de-entrada" />
-            <Kpi label={`Recebidas em ${d.notices.byDay.length} dias`} value={d.notices.total14} hint={`${d.notices.bySource.imported} capturada(s) · ${d.notices.bySource.manual} manual(is)`} />
+            <Kpi label={`Registradas em ${d.notices.byDay.length} dias`} value={d.notices.total14} hint={`${d.notices.bySource.captured} capturas DJEN/PJe · ${d.notices.bySource.otherImports} outras importações · ${d.notices.bySource.manual} registros manuais/arquivo`} />
           </div>
-          <Card className="mt-4">
-            <CardHeader title="Intimações recebidas por dia" description="Capturadas pelos tribunais e registradas manualmente, respeitando o sigilo." />
+          <details className="group mt-5 rounded-xl border border-border bg-surface">
+          <summary className="cursor-pointer px-5 py-4 text-sm font-medium">Histórico de recebimentos</summary>
+          <Card className="rounded-t-none border-x-0 border-b-0 shadow-none">
+            <CardHeader title="Intimações registradas por dia" description="Data de entrada no LegalOS, no fuso do escritório. Inclui importação de histórico; não representa a data da publicação nem comprova captura automática." />
             <CardBody>
               <ReportBars title="Intimações por dia" data={d.notices.byDay.map((x) => ({ label: x.day.slice(8, 10) + "/" + x.day.slice(5, 7), count: x.count }))} series={[{ key: "count", label: "Intimações", color: "primary" }]} />
             </CardBody>
           </Card>
+          </details>
         </>
       ) : null}
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid gap-5 lg:grid-cols-2">
         {d.petitions ? (
           <Card>
             <CardHeader title="Peticionamento" description="Petições dos processos que você pode ver." />
@@ -91,7 +104,7 @@ export default async function BoxOverviewPage() {
               {d.certificates.expiring.length ? (
                 <ul className="mt-3 divide-y divide-border text-sm">
                   {d.certificates.expiring.map((c) => (
-                    <li key={c.id} className="flex items-center justify-between gap-3 py-2">
+                    <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
                       <span className="truncate">{c.label}</span>
                       <Badge tone="warning">vence em {c.daysLeft} dia(s) · {formatDate(c.notAfter, ctx.timezone)}</Badge>
                     </li>
@@ -131,12 +144,15 @@ export default async function BoxOverviewPage() {
       ) : null}
 
       {d.integrations ? (
-        <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <details className="mt-5 rounded-xl border border-border bg-surface">
+        <summary className="cursor-pointer px-5 py-4 text-sm font-medium">Integrações e entregas{d.integrations.failedDeliveries ? ` · ${d.integrations.failedDeliveries} com falha` : ""}</summary>
+        <div className="grid grid-cols-2 gap-3 px-4 pb-4 lg:grid-cols-4">
           <Kpi label="Chaves de API ativas" value={d.integrations.activeKeys} href="/integracoes" />
           <Kpi label="Webhooks" value={d.integrations.endpoints} hint={d.integrations.disabledEndpoints ? `${d.integrations.disabledEndpoints} desativado(s)` : undefined} href="/integracoes" />
           <Kpi label="Entregas pendentes" value={d.integrations.pendingDeliveries} href="/integracoes" />
           <Kpi label="Entregas com falha (7 dias)" value={d.integrations.failedDeliveries} tone={d.integrations.failedDeliveries ? "danger" : undefined} href="/integracoes" />
         </div>
+        </details>
       ) : null}
     </div>
   );

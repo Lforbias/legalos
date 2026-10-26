@@ -21,7 +21,7 @@ export default async function MonitoringPage() {
   await runMonitoringCheck(ctx.organizationId).catch(() => null);
   const o = await getMonitoringOverview(ctx);
   const tz = organization.timezone;
-  const max = Math.max(1, ...o.importedByDay.map((d) => d.count));
+  const max = Math.max(1, ...o.registeredByDay.map((d) => d.count));
   return (
     <div className="mx-auto max-w-4xl space-y-4">
       <PageHeader title="Monitoramento de intimações" description="Mostra se a captura automática (DJEN e PJe/MNI) está rodando. Quem administra integrações recebe aviso quando uma fonte falha ou para." />
@@ -44,10 +44,10 @@ export default async function MonitoringPage() {
         </CardBody>
       </Card>
       <Card>
-        <CardHeader title="Intimações importadas (7 dias)" description={`${o.importedTotal} no total, somando DJEN, PJe/MNI e DataJud.`} />
+        <CardHeader title="Intimações registradas (7 dias)" description={`${o.registeredTotal} registros: ${o.bySource.captured} capturas DJEN/PJe, ${o.bySource.otherImports} outras importações e ${o.bySource.manual} manuais/arquivo. Data de entrada no LegalOS, no fuso do escritório; importação de histórico não comprova captura automática.`} />
         <CardBody>
           <ul className="space-y-1.5 text-sm" data-testid="monitoring-days">
-            {o.importedByDay.map((d) => (
+            {o.registeredByDay.map((d) => (
               <li key={d.day} className="flex items-center gap-2">
                 <span className="w-24 tabular-nums text-muted">{d.day.split("-").reverse().join("/")}</span>
                 <span className="h-2 rounded bg-primary" style={{ width: `${Math.max(2, (d.count / max) * 60)}%` }} aria-hidden />

@@ -6,7 +6,7 @@ import { NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { eventSchema, type EventInput } from "@/modules/agenda/schemas";
 import { can, assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service";
+import { assertActiveMember, assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service";
 
 function assertRead(ctx: TenantContext) {
   if (!can(ctx, "deadlines:read") && !can(ctx, "tasks:read")) assertCan(ctx, "deadlines:read");
@@ -57,11 +57,13 @@ function toData(ctx: TenantContext, i: EventInput) {
     title: i.title.trim(), kind: i.kind, startsAt, endsAt, allDay: i.allDay,
     location: i.location.trim() || null, description: i.description.trim() || null,
     caseId: i.caseId || null, clientId: i.clientId || null,
+    ...(i.assigneeId!==undefined?{assigneeId:i.assigneeId||null}:{}),
   };
 }
 
 async function validateLinks(ctx: TenantContext, d: ReturnType<typeof toData>) {
   if (d.caseId) await assertCaseVisible(ctx, d.caseId);
+  if (d.assigneeId) await assertActiveMember(ctx,d.assigneeId);
   if (d.clientId) {
     assertCan(ctx, "clients:read");
     const c = await db.client.findFirst({ where: { id: d.clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true } });
@@ -98,5 +100,18 @@ export async function deleteEvent(ctx: TenantContext, id: string) {
   await db.$transaction(async (tx) => {
     await tx.agendaEvent.update({ where: { id }, data: { deletedAt: new Date() } });
     await audit({ action: "agenda.delete", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "agenda_event", resourceId: id, meta: ctx.meta }, tx);
+  });
+}
+
+/** Situação do compromisso original, compartilhada por agenda, gestão e ferramentas. */
+export async function changeEventStatus(ctx: TenantContext, id: string, status: "TODO" | "IN_PROGRESS" | "WAITING" | "DONE" | "CANCELED") {
+  assertWrite(ctx);
+  const current = await getEvent(ctx, id);
+  if (!["TODO", "IN_PROGRESS", "WAITING", "DONE", "CANCELED"].includes(status)) throw new ValidationError("Situação inválida.");
+  await db.$transaction(async tx => {
+    const updated = await tx.agendaEvent.updateMany({ where: { id, organizationId: ctx.organizationId, deletedAt: null, updatedAt: current.updatedAt }, data: { status, completedAt: status === "DONE" ? current.completedAt ?? new Date() : null } });
+    if (updated.count !== 1) throw new ValidationError("O compromisso mudou. Recarregue antes de alterar.");
+    if (current.caseId && status !== current.status) await logCaseEvent(tx, ctx, current.caseId, { kind: "AGENDA_STATUS", title: `Situação do compromisso: ${current.title}`, description: `${current.status} → ${status}` });
+    await audit({ action: "agenda.status", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "agenda_event", resourceId: id, metadata: { from: current.status, to: status }, meta: ctx.meta }, tx);
   });
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { COURT_SYSTEMS } from "@/lib/court-systems";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { fieldError, useServerForm } from "@/components/forms/use-server-form";
@@ -13,7 +14,7 @@ import { createCaseAction, updateCaseAction } from "./actions";
 import { CASE_AREAS, CASE_STATUS_LABEL, PARTY_ROLE_LABEL, createCaseSchema, type CreateCaseInput } from "./schemas";
 
 export const EMPTY_CASE: CreateCaseInput = {
-  number: "", legacyNumber: "", title: "", area: "", court: "", courtUnit: "", courtState: "", subject: "", claimValue: "", status: "ACTIVE", phase: "",
+  courtSystem: "", number: "", legacyNumber: "", title: "", area: "", court: "", courtUnit: "", courtState: "", subject: "", claimValue: "", status: "ACTIVE", phase: "",
   distributedAt: "", confidential: false, notes: "", responsibleId: "", clientId: "", clientRole: "PLAINTIFF",
 };
 
@@ -134,6 +135,9 @@ export function CaseForm({
       <Card>
         <CardHeader title="Juízo e valores" />
         <CardBody className="grid gap-4 md:grid-cols-2">
+          <Field label="Sistema do processo" htmlFor="case-system" hint="Escolha quando o tribunal usa mais de um sistema. Vazio usa o mapa do escritório.">
+            <Select id="case-system" {...form.register("courtSystem")}><option value="">Usar mapa do tribunal</option>{COURT_SYSTEMS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</Select>
+          </Field>
           <Field label="Tribunal / órgão" htmlFor="court" error={err("court")}>
             <Input id="court" placeholder="Ex.: TJSP" {...form.register("court")} />
           </Field>

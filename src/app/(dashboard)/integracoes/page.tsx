@@ -1,3 +1,5 @@
+import Link from "next/link";
+import { formatDateTime } from "@/lib/dates/format";
 import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
@@ -13,7 +15,7 @@ import { ConnectionForm, ConnectionList } from "@/modules/mni/mni-ui";
 import { listTribunals } from "@/lib/mni/tribunals";
 import { listCertificates, vaultAvailable } from "@/server/services/certificate.service";
 import { listConnections } from "@/server/services/mni.service";
-import { DatajudToggle } from "@/modules/organizations/datajud-toggle";
+import { DatajudKeyForm, DatajudToggle } from "@/modules/organizations/datajud-toggle";
 import { ApiKeyForm, ApiKeyList } from "@/modules/api-keys/api-keys-ui";
 import { API_SCOPES, listApiKeys } from "@/server/services/apikey.service";
 import { WebhookForm, WebhookList } from "@/modules/webhooks/webhooks-ui";
@@ -50,6 +52,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Integrações" description="Conectores reais, sempre desligados até haver credenciais e consentimento do escritório." />
       <div className="space-y-4">
+        <Link href="/integracoes/diagnostico" className="inline-block text-sm text-primary-text underline">Abrir diagnóstico de WhatsApp, tribunais e migração</Link>
         {sp.google === "ok" ? <Alert tone="success">Google conectado. Falta só ligar o Drive neste escritório.</Alert> : null}
         {sp.google === "erro" ? <Alert tone="error">Não foi possível conectar ao Google{sp.msg ? `: ${sp.msg.slice(0, 160)}` : "."}</Alert> : null}
         <Card>
@@ -60,10 +63,13 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="DataJud (CNJ)" action={active ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>} />
+          <CardHeader title="DataJud (CNJ)" action={active ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-3 text-sm">
             <p>Importa os andamentos públicos de um processo a partir do número CNJ (Justiça Estadual, Federal, do Trabalho, Eleitoral, STJ e TST). Só o número do processo é enviado ao CNJ; processos sigilosos nunca são consultados. Cada andamento é importado uma única vez.</p>
-            {!s.keyConfigured ? <Alert tone="warning">Falta a chave pública do DataJud neste sistema (variável DATAJUD_API_KEY). Nada é simulado.</Alert> : null}
+            {!s.keyConfigured ? <Alert tone="warning">Cadastre a chave pública do DataJud abaixo para habilitar a consulta.</Alert> : null}
+            <p className="text-xs text-muted">Fonte: Conselho Nacional de Justiça (CNJ), Base Nacional de Dados do Poder Judiciário (DataJud). Habilitar a consulta não confirma a disponibilidade do CNJ.</p>
+            <p className="text-xs" role="status">{s.lastTest ? `Último teste: ${formatDateTime(s.lastTest.at, ctx.timezone)} — ${s.lastTest.ok ? "autenticação aceita pelo CNJ" : ({ TIMEOUT: "tempo de resposta esgotado", NETWORK: "falha de conexão", AUTH: "acesso recusado (chave ou permissão)", RATE_LIMIT: "limite de consultas atingido", UNAVAILABLE: "serviço indisponível ou resposta incompleta", INVALID_RESPONSE: "resposta inválida" }[s.lastTest.reason ?? ""] ?? "não concluído")}.` : "Conexão ainda não testada com a chave atual."}</p>
+            <DatajudKeyForm ownKey={s.ownKey} vaultAvailable={s.vaultAvailable} configured={s.keyConfigured} />
             {s.keyConfigured ? <DatajudToggle enabled={s.orgEnabled} /> : null}
           </CardBody>
         </Card>
@@ -76,11 +82,11 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="PJe (MNI) — intimações e movimentos" action={conns.some((c) => c.enabled) ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>} />
+          <CardHeader title="Conexões de tribunais — MNI 2.2.2" action={conns.some((c) => c.enabled) ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-4 text-sm">
-            <p>Conector direto ao serviço de interoperabilidade (MNI) do PJe. Lista os avisos pendentes sem abrir o teor (abrir geraria ciência e abriria o prazo) e consulta movimentos de um processo. Ainda não foi validado contra um tribunal real: use primeiro um tribunal que tenha ambiente de homologação e confirme com ele o endereço e a forma de autenticação.</p>
+            <p>Conexões de PJe, eproc, e-SAJ e PROJUDI que disponibilizem MNI 2.2.2. MNI 3.0 e webservices proprietários ainda exigem adaptadores específicos. Lista os avisos pendentes sem abrir o teor (abrir geraria ciência e abriria o prazo) e consulta movimentos de um processo. Ainda não foi validado contra um tribunal real: use primeiro um tribunal que tenha ambiente de homologação e confirme com ele o endereço e a forma de autenticação.</p>
             {!vault ? <Alert tone="warning">Falta a chave do cofre (CERT_ENCRYPTION_KEY): cadastro de conexões fica indisponível.</Alert> : null}
-            <ConnectionList items={conns.map((c) => ({ id: c.id, label: c.label, jtr: c.jtr, tribunal: names.get(c.jtr) ?? c.jtr, endpointUrl: c.endpointUrl, authMode: c.authMode, certificateLabel: c.certificateLabel, enabled: c.enabled, lastSyncAt: c.lastSyncAt ? c.lastSyncAt.toISOString() : null, lastStatus: c.lastStatus, lastMessage: c.lastMessage, petitionTypes: c.petitionTypes }))} />
+            <ConnectionList items={conns.map((c) => ({ wsdlUrl: c.wsdlUrl, authProfile: c.authProfile, system: c.system, environment: c.environment, wsdlStatus: c.wsdlStatus, wsdlCheckedAt: c.wsdlCheckedAt?.toISOString() ?? null, wsdlOperations: c.wsdlOperations, id: c.id, label: c.label, jtr: c.jtr, tribunal: names.get(c.jtr) ?? c.jtr, endpointUrl: c.endpointUrl, authMode: c.authMode, certificateLabel: c.certificateLabel, enabled: c.enabled, lastSyncAt: c.lastSyncAt ? c.lastSyncAt.toISOString() : null, lastStatus: c.lastStatus, lastMessage: c.lastMessage, petitionTypes: c.petitionTypes }))} />
             {vault ? <ConnectionForm tribunals={tribunals.map((t) => ({ jtr: t.jtr, label: t.label }))} certificates={usableCerts} /> : null}
           </CardBody>
         </Card>

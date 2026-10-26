@@ -1,7 +1,81 @@
+## Produto — valores dos planos (2026-10-26)
+
+- Preços mensais aprovados: Simples R$ 79, Básico R$ 149, Intermediário R$ 349 e Avançado R$ 599.
+- Limites divulgados: 2/5/10/20 usuários e 150/500/1.000/2.000 processos; 1 e 2 números WhatsApp nos planos Intermediário e Avançado.
+- Atualiza a página comercial, sem reajustes de assinaturas existentes ou alterações de provisionamento. Não publica economia baseada em preço ChatGuru não confirmado.
+
+## Produto — co-founders (2026-10-26)
+
+- Nova página `/produto/fundadores` e três perfis individuais com os nomes e fotografias fornecidos pelo usuário; todos com título Co-founder.
+- Links no menu público e na página Sobre, com fotografias preservadas e enquadramento adaptado à apresentação.
+- Sem cargos adicionais, credenciais ou biografias não fornecidas.
+
+## Produto — preços e comparativo (2026-10-26)
+
+- Página pública `/produto/precos`, com valores oficiais e condições de LegalMail, ADVBOX, Astrea e ChatGuru, médias calculáveis e fontes datadas.
+- Comparativo de cobertura distingue falta de evidência, dependência de plano/configuração e integrações do LegalOS ainda em validação.
+- Catálogo pesquisável de 300 recursos e operações com referência à implementação; contagem granular, sem alegar 300 módulos independentes.
+- Quatro planos propostos (Simples, Básico, Intermediário e Avançado), preços e composição em definição. Não altera assinatura nem habilita contratação.
+
+## LegalOS Desktop — identidade e produto (2026-10-26)
+
+- Marca vetorial própria em preto e branco, com versões para os temas claro e escuro, aplicada ao cabeçalho do Desktop.
+- Destaque em `/produto`, navegação pública e recursos; apresentação dedicada em `/produto/desktop`, com dados fictícios e indicação de uso em computador.
+- Documentadas as funções disponíveis e as ideias futuras de voz, organização automática e conexão a notebooks. A animação de entrada atual foi mantida.
+
+## DataJud — chave por escritório (2026-10-23)
+
+Migração aditiva: `20261220000000_datajud_org`.
+
+- Campo de chave pública do DataJud em Integrações, guardada com AES-GCM e incluída na rotação de MFA_ENCRYPTION_KEY. Não volta ao navegador nem aparece em auditoria.
+- Cada escritório usa sua configuração; a variável DATAJUD_API_KEY permanece como alternativa do servidor. Ligar/desligar é independente de guardar a chave.
+- Teste de autenticação sem consultar dados de processos (size 0 / match_none). Consulta de andamentos continua respeitando o sigilo e evitando duplicatas.
+
+## BOX — leitura, autos e operação (2026-10-23)
+
+Migração aditiva: `20261219000000_box_operation`. Não altera status de tarefas existentes nem ativa integrações.
+
+- Leitura integrada da caixa: lista à esquerda, teor e providências ao centro, notas/contexto à direita. Filtros e paginação preservados; controles existentes reutilizados.
+- Autos digitais por processo: índice paginado, busca por nome/descrição/texto extraído (inclusive versões anteriores), favoritos pessoais, download, prévia autenticada de PDF/PNG/JPEG e evidência da última sincronização MNI. Outros formatos continuam como anexo. Prévia aplica as mesmas permissões e sigilo do download.
+- Automações com até 10 condições combinadas por E/OU, comparações sem distinção de acento/caixa e ações opcionais de distribuição individual/etiquetas para intimações. Distribuição, etiquetas e tarefa ficam na mesma transação; destinatários passam pela conferência de sigilo. Execuções ignoradas/falhas seguem registradas.
+- Etapas de tarefas personalizáveis (ex.: Aguardando protocolo), ordenação e desativação. Status-base fixo preserva a semântica de conclusão e os indicadores. Troca de etapa registra histórico; seleção de status padrão limpa a etapa.
+- Box → Operação e auditoria reúne saúde das fontes, separação de histórico/captura, situação real dos conectores e diagnóstico somente leitura da migração do Astrea.
+- Homologação externa pendente: usuário ainda não dispõe de OAB/credenciais/ambiente de teste. MNI continua sem validação real; eproc/e-SAJ/PROJUDI continuam sem conector. Nenhum protocolo real foi enviado.
+
 # Changelog
+
+## Box — filtros, paginação e ações em lote
+
+- Compatibilidade do build: wrapper da API v1 passa a exigir o contexto de rota fornecido pelo Next.js; testes diretos passam contexto explícito.
+
+- Caixa com paginação (25/50/100), ordenação e filtros por tipo, origem, tribunal/órgão, recebimento e publicação. Intervalos inclusivos e validados; filtros preservados na paginação e troca de caixa.
+- Distribuição para pessoa/equipe, adição de etiquetas sem remover as anteriores, adormecimento e tratamento de até 100 intimações selecionadas. Revisão antes da confirmação, transação atômica, auditoria por item, notificações e proteção contra versões antigas/concorrência.
+- Destinatários precisam ser ativos, ter acesso à caixa e enxergar todos os processos do lote.
+- Corrigida a consulta de etiquetas para respeitar sigilo; coluna de origem distingue DJEN/PJe de outras importações.
+
+## Box — leitura e origem das intimações
+
+- O teor das publicações exibe quebras e destaques como texto legível, sem executar HTML nem modificar o original no banco.
+- Box e Monitoramento distinguem capturas identificadas do DJEN/PJe das demais importações (incluindo histórico e API) e registros manuais/arquivo. Gráficos e totais usam o mesmo período no fuso do escritório, por data de entrada no LegalOS.
+- Removido o corte silencioso de 20 mil registros no gráfico do Box; contagens respeitam sigilo e escritório.
+- Novo `npm run audit:astrea-tasks -- --org <id>`: diagnóstico somente leitura de tarefas importadas ainda abertas cujo comentário registra conclusão antiga. São indícios para conferência com o CSV e histórico de reabertura, nunca correções automáticas.
 
 ## Infra — publicação automática
 GitHub Actions (`.github/workflows/deploy.yml`) + `scripts/server/deploy.sh` e `deploy-entry.sh`: só publica o que passou no CI; chave de deploy presa a um único comando; backup antes, migração, conferência de `/api/ready` e volta automática do código. Passo a passo em `docs/deploy-github.md`. Ainda não testada no servidor real.
+
+## 8.0.0
+LegalOS Comercial: espaço separado (`/comercial`) para a equipe de vendas do próprio LegalOS. Migração nova: `20261226000000_comercial_8_0` (7 tabelas `com_*`, sem relação com dados de escritórios). Sem rotina nova no agendador.
+
+- Acesso: super-administradores ou membros ativos da equipe comercial (`ComMember`: gerência ou vendas), sempre com 2FA; quem não tem acesso recebe 404. Admin ganhou o atalho "Comercial".
+- Funil de 8 etapas (identificado, qualificado, contato, demonstração, proposta, negociação, ganho, perdido) com cartões por etapa; perdido exige motivo e ganho exige o valor mensal fechado.
+- Escritórios: cadastro editável (telefones, e-mail, endereço, áreas, posição na lista dos 100, responsável, plano e valor previstos, próximo retorno), contatos, histórico de ligações/WhatsApp/reuniões, busca e filtros.
+- CNPJ: consulta na BrasilAPI (dados públicos da Receita) preenche razão social, telefone, e-mail, endereço e atividade (dados de sócios não são guardados, por LGPD); telefone/e-mail digitados pela equipe não são trocados por vazio.
+- Mapa: Leaflet + OpenStreetMap; ponto por escritório colorido pela etapa; geocodificação pelo Nominatim em lotes de 8 (limite de 1 consulta por segundo) e identificação própria no User-Agent. CSP liberou só `tile.openstreetmap.org` para imagens.
+- Base da Receita (junção com a prospecção): aba `/comercial/base` busca na base `commercial_prospects` já importada e leva o escritório para o funil com um clique, herdando telefone, endereço, ponto no mapa, "contato conferido" e "não contatar". Escritório marcado como não contatar só aceita anotações e sai dos retornos atrasados.
+- Preços: os planos são os oficiais de `src/config/pricing.ts` (Simples, Básico, Intermediário, Avançado); aditivos (RUTE e assinatura de contratos já cadastrados, sem preço até a gerência definir) por mês, fixos ou por usuário; simulador e propostas com desconto e implantação; proposta sem preço definido não salva.
+- Painel e projeção: MRR fechado, funil aberto e ponderado, conversão, retornos atrasados, equipe; projeção de 12 meses em 3 cenários (conservador 0,6x, realista 1x, otimista 1,3x sobre a chance de fechar) com churn mensal; premissas editáveis pela gerência.
+- Importação por CSV (separador `,` ou `;`) com CNPJ validado, sem duplicar (mesmo CNPJ atualiza) e opção de consultar a Receita linha a linha.
+- Limites conhecidos: não existe API pública que liste "todos os advogados" nem ranking; a lista dos 100 é montada pela equipe (nome + CNPJ). Consultas externas (BrasilAPI, Nominatim) só testadas contra servidores falsos neste ambiente; dados da Receita podem estar desatualizados. A projeção é estimativa a partir de premissas iniciais (chances e prazos por etapa) que devem ser calibradas com a realidade. `scripts/demo-seed-comercial.ts` cria 12 escritórios FICTÍCIOS para demonstração.
 
 ## 6.0.0
 RUTE, a IA do LegalOS. Migração nova: `20261218000000_rute_6_0` (10 tabelas). Sem rotina nova no agendador (retenção roda de forma preguiçosa).

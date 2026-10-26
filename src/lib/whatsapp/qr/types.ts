@@ -17,6 +17,7 @@ export type QrInbound = {
 };
 
 export type QrEvent =
+  | { type:"call"; call:{id:string;chat:string;status:"offer"|"ringing"|"accept"|"reject"|"timeout"|"terminate";video:boolean;at:Date} }
   | { type: "qr"; qr: string }
   | { type: "open"; phone: string | null }
   | { type: "close"; loggedOut: boolean; reason: string }

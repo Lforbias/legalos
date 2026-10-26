@@ -9,6 +9,61 @@ export type Release = { id: string; when: string; title: string; items: string[]
 
 /** Mais recente primeiro. */
 export const RELEASES: Release[] = [
+  { id: "produto-precos-definidos", when: "2026-10-26", title: "Produto: valores e limites dos quatro planos", items: ["Página comercial atualizada com Simples R$ 79/mês (2 usuários, 150 processos), Básico R$ 149/mês (5 usuários, 500 processos), Intermediário R$ 349/mês (10 usuários, 1.000 processos, 1 número WhatsApp) e Avançado R$ 599/mês (20 usuários, 2.000 processos, 2 números WhatsApp).", "Percentuais que dependiam de preço ChatGuru não confirmado não foram anunciados. A mudança é da página pública; não reajusta assinaturas nem muda os limites operacionais existentes."] },
+  { id: "produto-co-founders", when: "2026-10-26", title: "Produto: páginas dos co-founders", items: ["Página pública /produto/fundadores com Luiz Felipe de Oliveira Roweder Bernardes, Talita Silva de Brito e Arthur Camilo da Silva, todos identificados como Co-founder.", "Fotografias fornecidas pelo usuário, perfis individuais, links entre os perfis e destaque na página Sobre. Sem cargos adicionais ou biografias inferidas."] },
+  { id: "produto-precos-comparativo", when: "2026-10-26", title: "Produto: preços públicos, comparativo e estrutura de quatro planos", items: ["Nova página /produto/precos com preços e condições de LegalMail, ADVBOX, Astrea e ChatGuru, fontes e data de consulta. Recursos não confirmados não são tratados como ausentes.", "Catálogo pesquisável de 300 recursos e operações granulares, com referências de implementação. Não são 300 módulos nem garantia de inclusão em todos os planos.", "Planos Simples, Básico, Intermediário e Avançado apresentados como estrutura proposta. Preços, quotas e composição permanecem em definição, sem checkout ou alteração das assinaturas atuais."] },
+  { id: "desktop-identidade", when: "2026-10-26", title: "LegalOS Desktop: identidade própria e apresentação no produto", items: ["Área de trabalho independente para computador, sem a barra lateral do Func. Busca por nome, CPF ou processo e pastas por cliente com múltiplos casos, trabalho, conversas, documentos, intimações e financeiro, conforme vínculos e permissões.", "Nova logo vetorial LegalOS Desktop em preto e branco, com versões para os temas claro e escuro. A animação de entrada existente foi mantida; a alternativa mais elaborada não será aplicada.", "Desktop destacado na página de produto, com apresentação própria em /produto/desktop e telas de demonstração fictícias. Organização automática, voz e análise conectada a notebooks permanecem como ideias futuras, sem integração anunciada como pronta."] },
+  {id:"chat-operacao-7",when:"2026-10-24",title:"Chat: campanhas maiores, situações, ligações e pareamento",migration:"20261224000000_chat_operations",items:["Campanhas com até 10 mil destinatários, busca paginada, seleção de todos os clientes do filtro e relatório paginado. Criação atômica, aprovação humana, opt-out e lotes graduais; envio incerto não é repetido automaticamente.","Seis situações de atendimento, atualização por resposta humana e retorno do cliente e redistribuição após intervalo configurável por número. Status personalizados continuam separados.","Ligações recebidas pelo driver QR viram registros no chat, sem gravação de áudio ou atendimento automático. Registro manual identificado para todos os tipos de conexão; Meta Calling não está integrado.","Novo pareamento preserva conta, conversas, mensagens e vínculos, exige 2FA cadastrado e pausa campanhas para revisão. Não importa sessões ou histórico de outros fornecedores."]},
+  {id:"atividades-workflows-catalogo",when:"2026-10-23",title:"Atividades integradas, recorrência e workflows",migration:"20261223000000_activity_operations",items:["Gestão reúne tarefas, compromissos e prazos originais. Agenda tem lista, dia, semana e mês com filtros. Quadros livres continuam disponíveis separadamente.","Checklists, colaboradores e séries de tarefas/compromissos, com limite de 120 ocorrências por dois anos. Edição e cancelamento das próximas preservam concluídas.","Pacotes com datas relativas, dias úteis operacionais, exceções de calendário e dependência da conclusão anterior. Execução atômica, sem duplicação em reenvio.","Catálogo compartilhado RUTE/REST/MCP ampliado a 52 ferramentas: 32 consultas e 20 propostas, sempre com confirmação humana para executar.","Diagnóstico de WhatsApp, tribunais e migração em Integrações. Busca pública Google/Gemini com fontes recuperadas e síntese identificada. Homologação externa continua dependente de acesso real."]},
+  { id: "visao-geral-gestao", when: "2026-10-23", title: "Visão geral orientada à gestão do escritório", items: ["Prioridades de prazos, tarefas e intimações; resumo financeiro com baixas e saldos reais; agenda, distribuição de trabalho e carteira de clientes e processos substituem auditoria, plano e indicadores técnicos na página inicial.", "Indicadores respeitam permissões, processos sigilosos e fuso do escritório. Processos no acervo não entram na carteira em gestão. Cadastros do mês incluem importações; volume de tarefas não representa complexidade."] },
+  { id: "rute-acoes-na-conversa", when: "2026-10-23", title: "Ações operacionais e confirmação dentro da conversa", items: ["RUTE, MCP e REST compartilham 35 ferramentas: cadastro/atualização de clientes, edição/comentário/situação de tarefas e criação/edição/cancelamento de compromissos por propostas. A pessoa revisa e executa a ação no próprio chat.", "Capacidades disponíveis e consulta de propostas/resultados. Esquemas de propostas publicados a partir da validação do servidor; alterações guardam a versão do registro e recusam aprovação com contexto antigo."] },
+  { id: "api-ferramentas-compartilhadas", when: "2026-10-23", title: "REST, RUTE e MCP com catálogo compartilhado", items: ["REST descobre e chama as mesmas ferramentas da RUTE/MCP com escopos tools:read/tools:propose, origem API auditada e propostas sujeitas à decisão humana. Contrato OpenAPI autenticado acompanha o catálogo.", "Novas consultas de detalhe de tarefa, prazo, compromisso e equipe. Inventário técnico documenta as 24 ferramentas, rotas HTTP, serviços internos e lacunas por módulo."] },
+  { id: "rute-indicadores", when: "2026-10-23", title: "RUTE consulta os totais do painel", items: ["Ferramenta de indicadores usa as mesmas contagens da visão geral, com permissões por módulo e visibilidade dos processos. A busca de clientes também aceita situação; a assistente é orientada a consultar os totais em vez de contar listas paginadas."] },
+  { id: "ajuda-completa-ia-config", when: "2026-10-23", title: "Ajuda ampliada e configuração de IA unificada", items: ["Guias de uso por módulo, configurações, solução de problemas e glossário, com filtros, busca por palavras e leitura em lotes. Atalhos respeitam permissões.", "Configurações → IA centraliza provedor e chave do escritório, também usados pelas ferramentas de IA. O formulário preserva os dados em erro, informa que a chave salva não volta ao campo e permite testar a configuração sem enviar dados do escritório."] },
+  { id: "central-ajuda", when: "2026-10-23", title: "Central de ajuda com guias de uso", items: ["Ajuda no menu dos três espaços e no topo, com busca por assunto, filtros por área e 11 guias de primeiros passos e uso. Atalhos respeitam as permissões e os guias explicam as dependências de conexões, certificados e IA."] },
+  { id: "workspace-ux-rute", when: "2026-10-23", title: "Navegação organizada e RUTE no canto da tela", items: ["RUTE em botão discreto que abre uma conversa em painel, com histórico pessoal, nova conversa e fechamento por Escape; mantém a página e o rascunho durante a navegação interna. A IA continua dependendo do provedor e das permissões já configurados.", "Menu lateral separa atalhos do dia a dia de Gestão, Ferramentas e Relacionamento; conexões do Box ficam agrupadas. Configurações permanecem no rodapé.", "Configurações com busca e cinco grupos por assunto. Dados do escritório, plano/cobrança e segurança agora têm páginas próprias, sem a antiga faixa de abas."] },
+  { id: "datajud-diagnostico", when: "2026-10-23", title: "DataJud: falhas identificadas e último teste visível", items: ["Testes e consultas distinguem tempo esgotado, rede, acesso recusado, limite de consultas e respostas inválidas/incompletas. A tela mostra o último teste e diferencia habilitação de disponibilidade. Falhas não registram sincronização concluída nem importam respostas parciais. Consultas MNI usam os namespaces dos parâmetros declarados no contrato público do TJPR; acesso real continua sujeito às permissões do tribunal."] },
+  {
+    id: "autos-fila-box-fluxo", when: "2026-10-23", title: "Autos em fila e validação do ciclo da BOX", migration: "20261222000000_autos_queue",
+    items: [
+      "Download de autos em lotes automáticos, persistido no banco: progresso, retomada após interrupções, três tentativas por falha e reenvio manual. Arquivos já recebidos são preservados; arquivos ignorados não bloqueiam os próximos lotes.",
+      "Notificações de conclusão/falha e autorização conferida a cada execução. A página de autos permite acompanhar a fila ao retornar.",
+      "Fluxo da BOX verificado com dados de teste: recebimento, distribuição, tarefa, prazo com validação humana, documentos, conclusão, histórico e notificações. Testes não equivalem a homologação de tribunal real.",
+    ],
+  },
+  {
+    id: "tribunais-mni-condicional", when: "2026-10-23", title: "Conexões por sistema e contrato MNI 2.2.2", migration: "20261221000000_court_connectors",
+    items: ["Sistema por processo, ambiente e inspeção do WSDL limitam as operações ao contrato cadastrado. eproc, e-SAJ e PROJUDI são condicionados à disponibilidade de MNI 2.2.2; MNI 3.0 e interfaces proprietárias não estão implementados. Perfil SCMPP/TJPR atende apenas movimentações públicas. Nenhum novo tribunal foi homologado nesta entrega."],
+  },
+  {
+    id: "datajud-chave-escritorio", when: "2026-10-23", title: "DataJud: chave e teste de conexão em Integrações", migration: "20261220000000_datajud_org",
+    items: ["Guarde a chave pública do CNJ com cifra por escritório, teste a autenticação e ligue a consulta sem precisar editar o servidor. A chave não volta ao navegador nem à auditoria. Configuração do servidor continua disponível como alternativa."],
+  },
+  {
+    id: "box-operacao", when: "2026-10-23", title: "BOX: leitura integrada, autos, automações e etapas", migration: "20261219000000_box_operation",
+    items: [
+      "Leitor integrado preserva filtros e página; teor, notas, providências e contexto do processo juntos.",
+      "Autos digitais com índice paginado, busca, favoritos pessoais, prévia autenticada e estado da sincronização MNI.",
+      "Automações com condições E/OU e distribuição/etiquetas de intimações na mesma transação da tarefa.",
+      "Etapas personalizáveis de tarefas, incluindo Aguardando protocolo, mantendo status-base e métricas consistentes.",
+      "Painel de operação e auditoria do histórico importado. Captura/protocolo reais aguardam acesso de homologação; conectores ausentes permanecem identificados.",
+    ],
+  },
+  {
+    id: "box-filtros-lotes", when: "2026-10-22", title: "Box: paginação, filtros e ações em lote",
+    items: [
+      "Caixa com páginas de 25, 50 ou 100 itens, ordem crescente/decrescente e filtros por tipo, origem, órgão, recebimento e publicação. Filtros são preservados ao mudar de página ou caixa.",
+      "Selecionar até 100 intimações da página, revisar e confirmar distribuição para pessoa/equipe, adição de etiquetas, adormecimento ou tratamento. O lote é atômico e auditado: alterações concorrentes ou falta de acesso recusam tudo. Distribuição respeita o sigilo também para os destinatários.",
+      "A lista de etiquetas passa a respeitar o sigilo dos processos; a tabela mostra a origem de cada intimação.",
+    ],
+  },
+  {
+    id: "box-leitura-origem", when: "2026-10-22", title: "Box: leitura das publicações e indicadores de origem",
+    items: [
+      "Publicações com HTML são apresentadas como texto legível, preservando o original. Box e Monitoramento separam capturas DJEN/PJe de outras importações e usam o mesmo período no fuso do escritório.",
+      "Diagnóstico de tarefas migradas do Astrea sinaliza comentários de conclusão com tarefa ainda aberta, sem alterar dados. Conferir CSV de origem e reaberturas antes de corrigir.",
+    ],
+  },
   {
     id: "6.0.0", when: "2026-10-22", title: "Versão 6.0.0: RUTE, a IA do LegalOS (conecte Claude, ChatGPT e Gemini; assistente embutido; propostas com confirmação)", migration: "20261218000000_rute_6_0",
     items: [
@@ -283,7 +338,7 @@ export const PHASES_3: Phase[] = [
   { id: "3.0-F9", title: "Certificado com usuários autorizados e webhooks de protocolo", status: "feita" },
   { id: "3.0-F10", title: "Créditos e custos", status: "feita" },
   { id: "3.0-F6b", title: "Credenciais por tribunal e usuário no cofre", status: "feita" },
-  { id: "3.0-F11", title: "Completar com o que aparecer nas telas do LegalMail", status: "a fazer" },
+  { id: "3.0-F11", title: "Completar com o que aparecer nas telas do LegalMail", status: "em andamento" },
 ];
 
 export const PHASES_4: Phase[] = [
@@ -348,6 +403,7 @@ export const PHASES_7: Phase[] = [
 
 /** Ações que dependem da equipe (sem código). Tire da lista quando forem feitas. */
 export const TEAM_TODO: string[] = [
+  "Box: executar audit:astrea-tasks no escritório migrado e conferir os candidatos com o CSV do Astrea e o histórico de reaberturas antes de corrigir qualquer status.",
   "6.0: validar com contas reais o que só foi testado contra simuladores e documentação: conexão do Claude, do ChatGPT e do Gemini ao /api/mcp (cada um tem regras de plano e de administrador próprias) e as chamadas do assistente embutido aos provedores.",
   "6.0: em RUTE → Situação, ligar a conexão de IAs com o consentimento, informar a chave do provedor do assistente (ou definir ANTHROPIC_API_KEY / GEMINI_API_KEY / OPENAI_API_KEY no servidor) e cadastrar a biblioteca do escritório antes de liberar para a equipe.",
   "4.0: fornecer a chave do Gemini (GEMINI_API_KEY, opcional GEMINI_MODEL) para a transcrição de áudio e conferir o modelo na conta Google; só foi testada contra simulador.",

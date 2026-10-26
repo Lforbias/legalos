@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 
 // /api/cron e /api/v1 não usam cookie de sessão: autenticam por conta própria (segredo do agendador / chave de API).
-const PUBLIC_PREFIXES = ["/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook"];
+const PUBLIC_PREFIXES = ["/brand", "/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook"];
 
 /**
  * Proxy (middleware do Next 16): correlation id + redirecionamento rápido de visitantes sem cookie.
@@ -17,7 +17,7 @@ function buildCsp(nonce: string): string {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isProd ? "" : " 'unsafe-eval'"}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob:",
+    "img-src 'self' data: blob: https://tile.openstreetmap.org",
     "font-src 'self' data:",
     "connect-src 'self'",
     "worker-src 'self'",
@@ -33,7 +33,8 @@ function buildCsp(nonce: string): string {
 export function proxy(request: NextRequest) {
   const requestId = request.headers.get("x-request-id") ?? crypto.randomUUID();
   const nonce = btoa(crypto.randomUUID());
-  const csp = buildCsp(nonce);
+  const preview = /^\/api\/documents\/[0-9a-f-]{36}$/i.test(request.nextUrl.pathname) && request.nextUrl.searchParams.get("inline") === "1";
+  const csp = preview ? "default-src 'none'; frame-ancestors 'self'" : buildCsp(nonce);
   const headers = new Headers(request.headers);
   headers.set("x-request-id", requestId);
   headers.set("x-nonce", nonce);
@@ -50,7 +51,7 @@ export function proxy(request: NextRequest) {
     return res;
   }
   const isPublic = PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  if (!isPublic && !request.cookies.has(SESSION_COOKIE)) {
+  if (!isPublic && !preview && !request.cookies.has(SESSION_COOKIE)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = pathname === "/" ? "" : `?next=${encodeURIComponent(pathname + search)}`;

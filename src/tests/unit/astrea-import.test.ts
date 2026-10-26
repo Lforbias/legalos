@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mapCase, mapContact, mapDeadline, mapEvent, mapHearing, mapPublication, mapTask, parseDate, parseDateTime } from "@/lib/import/astrea-map";
+import { hasLegacyCompletionNote, mapCase, mapContact, mapDeadline, mapEvent, mapHearing, mapPublication, mapTask, parseDate, parseDateTime } from "@/lib/import/astrea-map";
 import { parseCsv } from "@/lib/import/csv";
 
 describe("CSV", () => {
@@ -28,6 +28,13 @@ describe("datas do Astrea", () => {
 });
 
 describe("mapeamentos", () => {
+  it("sinaliza conclusão explícita no comentário legado sem mudar o status do CSV", () => {
+    const comment = "Tarefa 'concluída' em '24 de Janeiro' por 'Talita'.";
+    expect(hasLegacyCompletionNote(comment)).toBe(true);
+    expect(hasLegacyCompletionNote("Concluir a tarefa em janeiro")).toBe(false);
+    expect(hasLegacyCompletionNote(null)).toBe(false);
+    expect(mapTask({ Código: "audit", Descrição: "Revisar", Realizada: "Não", Comentários: comment })?.done).toBe(false);
+  });
   const contact = { Código: "10", Nome: "Maria Teste", "Tipo do contato": "Pessoa Física", CPF: "529.982.247-25", "Endereços de email": "MARIA@Exemplo.com; b@x.com", "Número dos telefones": "(11) 91234-5678", Estados: "SP; SP", CEP: "01001-000", "Dia de nascimento": "3", "Mês de nascimento": "5", "Ano de nascimento": "1974", RG: "12.345", Cidades: "null" };
   it("contato → cliente: documento válido, e-mail em minúsculas, telefone só dígitos, UF e CEP", () => {
     const c = mapContact(contact)!;

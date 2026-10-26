@@ -13,7 +13,7 @@ export async function saveBillingProfileAction(input: unknown): Promise<ActionSt
   return runAction(async () => {
     const { ctx } = await requireTenant();
     await saveBillingProfile(ctx, parse(profileSchema, input));
-    revalidatePath("/configuracoes");
+    revalidatePath("/configuracoes/plano");
     return undefined;
   });
 }
@@ -21,7 +21,7 @@ export async function contractPlanAction(planKey: string): Promise<ActionState> 
   return runAction(async () => {
     const { ctx } = await requireTenant();
     await contractPlan(ctx, parse(z.string().min(1).max(60), planKey));
-    revalidatePath("/configuracoes");
+    revalidatePath("/configuracoes/plano");
     return undefined;
   });
 }
@@ -29,7 +29,7 @@ export async function cancelSubscriptionAction(): Promise<ActionState> {
   return runAction(async () => {
     const { ctx } = await requireTenant();
     await cancelSubscription(ctx);
-    revalidatePath("/configuracoes");
+    revalidatePath("/configuracoes/plano");
     return undefined;
   });
 }
@@ -37,7 +37,7 @@ export async function refreshBillingAction(): Promise<ActionState> {
   return runAction(async () => {
     const { ctx } = await requireTenant();
     await refreshBilling(ctx);
-    revalidatePath("/configuracoes");
+    revalidatePath("/configuracoes/plano");
     return undefined;
   });
 }

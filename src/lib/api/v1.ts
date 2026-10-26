@@ -36,7 +36,7 @@ type PrincipalWithCtx = ApiPrincipal;
 
 /** Envolve uma rota da API v1: autenticação por chave, escopo, limite de taxa, parsing de corpo e mapeamento de erros. */
 export function v1Route<P = Record<string, never>>(scope: ApiScope | null, handler: V1Handler<P>) {
-  return async (req: Request, routeCtx?: { params: Promise<P> }): Promise<NextResponse> => {
+  return async (req: Request, routeCtx: { params: Promise<P> }): Promise<NextResponse> => {
     const correlationId = crypto.randomUUID().slice(0, 8);
     const ip = clientIp(req);
     try {
@@ -49,7 +49,7 @@ export function v1Route<P = Record<string, never>>(scope: ApiScope | null, handl
       }
       if (!limiters.apiKey.check(`key:${principal.keyId}`)) return jsonError(429, "rate_limited", "Limite de requisições excedido (120 por minuto).", undefined, { "Retry-After": "60" });
       if (scope && !principal.scopes.has(scope)) return jsonError(403, "insufficient_scope", `Esta chave não tem o acesso necessário: ${scope}.`);
-      const params = (routeCtx?.params ? await routeCtx.params : {}) as P;
+      const params = await routeCtx.params;
       const url = new URL(req.url);
       const body = async () => {
         const ct = req.headers.get("content-type") ?? "";

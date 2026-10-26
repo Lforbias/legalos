@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { PHASES_2, PHASES_3, RELEASES } from "@/lib/updates";
 import { CtaLink, SectionTitle } from "../_parts";
 import { Reveal } from "../showcase-client";
+import { FounderCards } from "../fundadores/founder-cards";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Sobre", description: "A história do LegalOS, o que já foi entregue e o que vem a seguir." };
@@ -25,6 +27,12 @@ export default function Sobre() {
           <p className="text-muted">Cada recurso é construído em cima da rotina de quem advoga e passa por testes antes de chegar ao escritório. Quando algo ainda não pode ser validado, dizemos. Quando uma automação mexe com o cliente, ela nasce desligada e só roda com a sua autorização.</p>
           <p className="mt-4 text-muted">O sistema convive com as ferramentas que o escritório já usa durante a migração, inclusive com a importação dos dados do Astrea.</p>
         </Reveal>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 pb-24">
+        <SectionTitle eyebrow="Co-founders" title="As pessoas por trás do LegalOS." />
+        <div className="mt-12"><FounderCards /></div>
+        <Link href="/produto/fundadores" className="mt-8 inline-block text-sm font-medium underline underline-offset-4">Conhecer os co-founders</Link>
       </section>
 
       <section className="border-y border-border bg-surface py-24">

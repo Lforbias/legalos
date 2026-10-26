@@ -25,6 +25,7 @@ PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * * * * *  root $S/cron-call.sh chat-extras
 */15 * * * * root $S/cron-call.sh push-due
 * * * * *    root $S/cron-call.sh petition-queue
+* * * * *    root $S/cron-call.sh autos-queue
 */30 * * * * root $S/cron-call.sh monitoring
 0 3 * * *    root $S/backup-docker.sh >> /var/log/legalos-backup.log 2>&1
 0 4 * * 0    root $S/verify-backup-docker.sh >> /var/log/legalos-backup.log 2>&1

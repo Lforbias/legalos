@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell, Building2, CheckSquare, Check, CircleHelp, LogOut, Menu as MenuIcon, Plus, Scale, Search, User, UserPlus, Users } from "lucide-react";
+import { Command, Bell, Building2, CheckSquare, Check, CircleHelp, LogOut, Menu as MenuIcon, Plus, Scale, Search, User, UserPlus, Users } from "lucide-react";
 import * as React from "react";
 import { Menu, MenuItem } from "@/components/ui/menu";
 import Link from "next/link";
@@ -50,7 +50,7 @@ export function Topbar({
 
   return (
     <>
-    <header className="flex h-14 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 md:px-4">
+    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border/80 bg-surface/95 px-3 backdrop-blur-xl md:px-5">
       <button type="button" aria-label="Abrir menu" onClick={onOpenMobile} className="cursor-pointer rounded-md p-2 text-muted hover:bg-surface-2 md:hidden">
         <MenuIcon className="h-5 w-5" aria-hidden />
       </button>
@@ -59,8 +59,8 @@ export function Topbar({
         label="Trocar de escritório"
         align="left"
         trigger={
-          <span className="flex h-9 max-w-[200px] items-center gap-2 rounded-md border border-border bg-surface-2 px-2.5 text-sm hover:bg-surface-3">
-            <Building2 className="h-4 w-4 shrink-0 text-muted" aria-hidden />
+          <span className="flex h-10 max-w-[200px] items-center gap-2 rounded-lg border border-border/80 bg-bg/50 px-3 text-sm transition-colors hover:bg-surface-2">
+            <Building2 className="h-4 w-4 shrink-0 text-primary-text" aria-hidden />
             <span className="hidden truncate sm:inline">{active?.name ?? "Escritório"}</span>
           </span>
         }
@@ -115,10 +115,12 @@ export function Topbar({
         <Search className="h-4 w-4" aria-hidden />
       </button>
 
+      {visibleKeys.includes("workspace") ? <Link href="/area-de-trabalho" aria-label="Abrir LegalOS Desktop" title="Abrir LegalOS Desktop" className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium transition hover:bg-surface-2"><Command className="h-4 w-4" /><span>Desktop</span></Link> : null}
+
       <Menu
         label="Criação rápida"
         trigger={
-          <span className="flex h-9 items-center gap-1.5 rounded-md bg-primary px-3 text-sm font-medium text-primary-fg hover:bg-primary-hover">
+          <span className="flex h-10 items-center gap-1.5 rounded-lg bg-primary px-3.5 text-sm font-semibold text-primary-fg shadow-sm transition hover:bg-primary-hover">
             <Plus className="h-4 w-4" aria-hidden />
             <span className="hidden sm:inline">Criar</span>
           </span>
@@ -173,7 +175,7 @@ export function Topbar({
       <Menu
         label={notifications.unread > 0 ? `Notificações (${notifications.unread} não lidas)` : "Notificações"}
         trigger={
-          <span className="relative flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg">
+          <span className="relative flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg">
             <Bell className="h-4 w-4" aria-hidden />
             {notifications.unread > 0 ? (
               <span className="absolute right-1 top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-semibold text-white">{notifications.unread > 99 ? "99+" : notifications.unread}</span>
@@ -238,7 +240,7 @@ export function Topbar({
       <Menu
         label="Ajuda e suporte"
         trigger={
-          <span className="flex h-9 w-9 items-center justify-center rounded-md text-muted hover:bg-surface-2 hover:text-fg">
+          <span className="flex h-10 w-10 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface-2 hover:text-fg">
             <CircleHelp className="h-4 w-4" aria-hidden />
           </span>
         }
@@ -248,9 +250,12 @@ export function Topbar({
             <MenuItem
               onClick={() => {
                 close();
-                router.push("/modulos/ajuda");
+                router.push("/ajuda");
               }}
             >
+              Central de ajuda
+            </MenuItem>
+            <MenuItem onClick={() => { close(); router.push("/modulos/ajuda"); }}>
               Roadmap e status dos módulos
             </MenuItem>
           </>
@@ -263,7 +268,7 @@ export function Topbar({
       <Menu
         label="Menu do usuário"
         trigger={
-          <span className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-br from-primary to-accent text-xs font-semibold text-white">{initials || "?"}</span>
+          <span className="flex h-9 w-9 items-center justify-center rounded-full border border-primary/20 bg-primary/10 text-xs font-semibold text-primary-text">{initials || "?"}</span>
         }
       >
         {(close) => (

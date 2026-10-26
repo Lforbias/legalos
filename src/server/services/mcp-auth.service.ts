@@ -14,7 +14,7 @@ import { resolveTenantContext } from "./tenant.service";
  *  2) Chave de API `lgos_…` com escopo mcp:read / mcp:propose (Gemini CLI, Claude Code, scripts).
  * Em ambas a IA age COMO A PESSOA que conectou: mesmas permissões e mesmo sigilo.
  */
-export const MCP_SCOPES = { "mcp:read": "Consultar processos, clientes, prazos, tarefas e intimações (somente leitura)", "mcp:propose": "Propor tarefas, prazos, anotações e minutas (nada vale sem a sua confirmação)" } as const;
+export const MCP_SCOPES = { "mcp:execute": "Criar e alterar registros diretamente, sem aprovação posterior", "mcp:read": "Consultar processos, clientes, prazos, tarefas e intimações (somente leitura)", "mcp:propose": "Propor tarefas, prazos, anotações e minutas (nada vale sem a sua confirmação)" } as const;
 export type McpScope = keyof typeof MCP_SCOPES;
 export const MCP_SCOPE_LIST = Object.keys(MCP_SCOPES) as McpScope[];
 
@@ -41,6 +41,7 @@ export const toolScopes = (scopes: Iterable<string>): Set<ToolScope> => {
   const out = new Set<ToolScope>();
   for (const s of scopes) {
     if (s === "mcp:read") out.add("read");
+    if (s === "mcp:execute") out.add("execute");
     if (s === "mcp:propose") out.add("propose");
   }
   return out;
@@ -48,7 +49,7 @@ export const toolScopes = (scopes: Iterable<string>): Set<ToolScope> => {
 
 export function parseScopes(raw: string | null | undefined): McpScope[] {
   const asked = (raw ?? "").split(/\s+/).filter(Boolean);
-  if (asked.length === 0) return [...MCP_SCOPE_LIST];
+  if (asked.length === 0) return ["mcp:read", "mcp:propose"];
   if (asked.some((s) => !(s in MCP_SCOPES))) throw new OAuthError("invalid_scope", "Escopo desconhecido.");
   return [...new Set(asked)] as McpScope[];
 }
@@ -162,6 +163,7 @@ export async function authenticateMcpBearer(token: string, meta: RequestMeta = {
     if (!p) return null;
     const scopes = new Set<ToolScope>();
     if (p.scopes.has("mcp:read")) scopes.add("read");
+    if (p.scopes.has("mcp:execute")) scopes.add("execute");
     if (p.scopes.has("mcp:propose")) scopes.add("propose");
     if (scopes.size === 0) return null;
     const k = await db.apiKey.findUnique({ where: { id: p.keyId }, select: { name: true } });
@@ -194,7 +196,7 @@ export async function listMcpConnections(ctx: TenantContext): Promise<McpConnect
     status: t.revokedAt ? "REVOKED" : t.refreshExpiresAt <= now ? "EXPIRED" : "ACTIVE",
   }));
   if (all) {
-    const keys = await db.apiKey.findMany({ where: { organizationId: ctx.organizationId, OR: [{ scopes: { has: "mcp:read" } }, { scopes: { has: "mcp:propose" } }] }, orderBy: { createdAt: "desc" }, take: 100 });
+    const keys = await db.apiKey.findMany({ where: { organizationId: ctx.organizationId, OR: [{ scopes: { has: "mcp:read" } }, { scopes: { has: "mcp:propose" } }, { scopes: { has: "mcp:execute" } }] }, orderBy: { createdAt: "desc" }, take: 100 });
     const ku = await db.user.findMany({ where: { id: { in: keys.map((k) => k.createdById).filter((x): x is string => !!x) } }, select: { id: true, name: true } });
     const kn = new Map(ku.map((u) => [u.id, u.name]));
     for (const k of keys) {

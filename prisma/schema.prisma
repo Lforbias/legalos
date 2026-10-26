@@ -61,6 +61,7 @@ model User {
   timeEntries       TimeEntry[]
   mfa               UserMfa?
   platformAdmin     PlatformAdmin?
+  comMember         ComMember?
   ownedCertificates Certificate[]     @relation("CertificateOwner")
   mfaRecoveryCodes  MfaRecoveryCode[]
   mfaChallenges     MfaChallenge[]
@@ -122,6 +123,7 @@ model Organization {
   currency                String                   @default("BRL")
   settings                Json                     @default("{}")
   aiEnabled               Boolean                  @default(false) @map("ai_enabled")
+  datajudApiKeyEnc        String?                  @map("datajud_api_key_enc")
   datajudEnabled          Boolean                  @default(false) @map("datajud_enabled")
   /// 3.0-F5: permite agendar o protocolo de petições aprovadas (nasce desligado).
   petitionScheduleEnabled Boolean                  @default(false) @map("petition_schedule_enabled")
@@ -461,6 +463,7 @@ model Case {
   organizationId String     @map("organization_id") @db.Uuid
   number         String?
   legacyNumber   String?    @map("legacy_number")
+  courtSystem    String?    @map("court_system")
   title          String
   area           String?
   court          String?
@@ -600,6 +603,7 @@ model Document {
   petitionAttachments PetitionAttachment[]
   texts               DocumentText[]
   driveLink           DocumentDriveLink?
+  bookmarks           DocumentBookmark[]
   classifications     DocumentClassification[]
 
   @@unique([organizationId, externalKey])
@@ -649,6 +653,9 @@ enum AgendaEventKind {
 }
 
 model Task {
+  blockedBy TaskDependency[] @relation("BlockedTask")
+  unblocks TaskDependency[] @relation("PredecessorTask")
+  @@unique([id, organizationId])
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   title          String
@@ -662,6 +669,8 @@ model Task {
   createdById    String?      @map("created_by_id") @db.Uuid
   completedAt    DateTime?    @map("completed_at") @db.Timestamptz(3)
   sourceNoticeId String?      @map("source_notice_id") @db.Uuid
+  stageId        String?      @map("stage_id") @db.Uuid
+  stage          TaskStage?   @relation(fields: [stageId], references: [id], onDelete: Restrict)
   typeId         String?      @map("type_id") @db.Uuid
   createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -800,6 +809,9 @@ model Deadline {
 }
 
 model AgendaEvent {
+  status         TaskStatus      @default(TODO)
+  assigneeId     String?         @map("assignee_id") @db.Uuid
+  completedAt    DateTime?       @map("completed_at") @db.Timestamptz(3)
   id             String          @id @default(uuid()) @db.Uuid
   organizationId String          @map("organization_id") @db.Uuid
   title          String
@@ -1174,6 +1186,9 @@ model WorkflowRule {
   organizationId  String           @map("organization_id") @db.Uuid
   name            String
   trigger         WorkflowTrigger
+  conditions      Json             @default("{\"mode\":\"ALL\",\"items\":[]}")
+  noticeAssigneeId String?          @map("notice_assignee_id") @db.Uuid
+  noticeTags      String[]         @default([]) @map("notice_tags")
   taskTitle       String           @map("task_title")
   taskDescription String?          @map("task_description")
   dueDays         Int              @default(0) @map("due_days")
@@ -1549,6 +1564,14 @@ model CourtConnection {
   organizationId String    @map("organization_id") @db.Uuid
   label          String
   jtr            String
+  system         String    @default("pje-mni")
+  authProfile    String    @default("STATIC") @map("auth_profile")
+  environment    String    @default("UNSPECIFIED")
+  wsdlUrl        String?   @map("wsdl_url")
+  wsdlActions    Json      @default("{}") @map("wsdl_actions")
+  wsdlStatus     String?   @map("wsdl_status")
+  wsdlCheckedAt  DateTime? @map("wsdl_checked_at") @db.Timestamptz(3)
+  wsdlOperations String[]  @default([]) @map("wsdl_operations")
   endpointUrl    String    @map("endpoint_url")
   authMode       String    @map("auth_mode")
   certificateId  String?   @map("certificate_id") @db.Uuid
@@ -1748,6 +1771,9 @@ model MailOutbox {
 }
 
 model WhatsappAccount {
+  autoStatusEnabled Boolean @default(true) @map("auto_status_enabled")
+  reopenAfterMinutes Int @default(30) @map("reopen_after_minutes")
+  reassignOnReopen Boolean @default(true) @map("reassign_on_reopen")
   id                String    @id @default(uuid()) @db.Uuid
   organizationId    String    @map("organization_id") @db.Uuid
   /// 2.0-F8: vários números por escritório. O principal (is_primary) é o que as telas de configuração editam; os demais são números adicionais.
@@ -1787,6 +1813,8 @@ model WhatsappAccount {
 }
 
 model WhatsappConversation {
+  serviceStatus String @default("OPEN") @map("service_status")
+  closedAt DateTime? @map("closed_at") @db.Timestamptz(3)
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   accountId      String    @map("account_id") @db.Uuid
@@ -1864,6 +1892,7 @@ model WhatsappAgent {
 }
 
 model WhatsappMessage {
+  callData Json? @map("call_data")
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
   conversationId String   @map("conversation_id") @db.Uuid
@@ -2682,6 +2711,10 @@ model WorkflowPackage {
 }
 
 model WorkflowPackageStep {
+  countType String @default("CALENDAR") @map("count_type")
+  relativeTo String @default("BASE") @map("relative_to")
+  waitForPrevious Boolean @default(false) @map("wait_for_previous")
+  assigneeMode String @default("TRIGGER_USER") @map("assignee_mode")
   id             String       @id @default(uuid()) @db.Uuid
   organizationId String       @map("organization_id") @db.Uuid
   packageId      String       @map("package_id") @db.Uuid
@@ -3035,6 +3068,7 @@ model WhatsappIntent {
 }
 
 model WhatsappCampaign {
+  lastBatchAt DateTime? @map("last_batch_at") @db.Timestamptz(3)
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
   name           String
@@ -3054,6 +3088,7 @@ model WhatsappCampaign {
 }
 
 model WhatsappCampaignRecipient {
+  claimedAt DateTime? @map("claimed_at") @db.Timestamptz(3)
   id             String    @id @default(uuid()) @db.Uuid
   campaignId     String    @map("campaign_id") @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
@@ -3498,4 +3533,346 @@ model AiSendLog {
   @@index([organizationId, createdAt])
   @@index([organizationId, clientId])
   @@map("ai_send_logs")
+}
+
+/// Favorito pessoal: não concede acesso ao documento nem ao processo.
+model DocumentBookmark {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  documentId String @map("document_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@unique([organizationId, userId, documentId])
+  @@map("document_bookmarks")
+}
+
+/// Etapa operacional personalizável; status-base mantém métricas e conclusão consistentes.
+model TaskStage {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  name String
+  status TaskStatus @default(WAITING)
+  position Int @default(0)
+  active Boolean @default(true)
+  tasks Task[]
+  @@unique([organizationId, name])
+  @@map("task_stages")
+}
+
+model AutosDownloadJob {
+  initialCount Int @default(0) @map("initial_count")
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  caseId String @map("case_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  status String @default("QUEUED")
+  attempts Int @default(0)
+  listed Int @default(0)
+  imported Int @default(0)
+  remaining Int @default(0)
+  skipped Int @default(0)
+  excludedIds String[] @default([]) @map("excluded_ids")
+  error String?
+  nextRunAt DateTime @default(now()) @map("next_run_at") @db.Timestamptz(3)
+  leaseUntil DateTime? @map("lease_until") @db.Timestamptz(3)
+  leaseToken String? @map("lease_token") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  @@index([status, nextRunAt])
+  @@index([organizationId, caseId, createdAt])
+  @@map("autos_download_jobs")
+}
+
+/// Recursos compartilhados de uma atividade; o serviço valida origem, tenant e sigilo em toda operação.
+model ActivityChecklist {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  activityId String @map("activity_id") @db.Uuid
+  title String
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  items ActivityChecklistItem[]
+  @@unique([id, organizationId])
+  @@index([organizationId, activityKind, activityId])
+  @@map("activity_checklists")
+}
+model ActivityChecklistItem {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  checklistId String @map("checklist_id") @db.Uuid
+  body String
+  done Boolean @default(false)
+  position Int @default(0)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  checklist ActivityChecklist @relation(fields:[checklistId, organizationId], references:[id, organizationId], onDelete:Cascade)
+  @@index([organizationId, checklistId])
+  @@map("activity_checklist_items")
+}
+model ActivityCollaborator {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  activityId String @map("activity_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  @@unique([organizationId, activityKind, activityId, userId])
+  @@map("activity_collaborators")
+}
+model ActivitySeries {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  rule Json
+  createdById String @map("created_by_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  occurrences ActivityOccurrence[]
+  @@unique([id,organizationId])
+  @@index([organizationId])
+  @@map("activity_series")
+}
+model ActivityOccurrence {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  seriesId String @map("series_id") @db.Uuid
+  activityKind String @map("activity_kind")
+  activityId String @map("activity_id") @db.Uuid
+  date DateTime @db.Date
+  series ActivitySeries @relation(fields:[seriesId,organizationId],references:[id,organizationId],onDelete:Cascade)
+  @@unique([organizationId,activityKind,activityId])
+  @@unique([seriesId,date])
+  @@map("activity_occurrences")
+}
+
+model TaskDependency {
+ id String @id @default(uuid()) @db.Uuid
+ organizationId String @map("organization_id") @db.Uuid
+ taskId String @unique @map("task_id") @db.Uuid
+ predecessorId String @map("predecessor_id") @db.Uuid
+ offsetDays Int @default(0) @map("offset_days")
+ countType String @default("CALENDAR") @map("count_type")
+ onCompletion Boolean @default(false) @map("on_completion")
+ nonWorkingDates String[] @default([]) @map("non_working_dates")
+ task Task @relation("BlockedTask",fields:[taskId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ predecessor Task @relation("PredecessorTask",fields:[predecessorId,organizationId],references:[id,organizationId],onDelete:Cascade)
+ @@index([organizationId,predecessorId])
+ @@map("task_dependencies")
+}
+
+// Base comercial da plataforma. Não pertence aos escritórios clientes.
+model CommercialProspect {
+  cnpj             String   @id @db.VarChar(14)
+  legalName        String   @map("legal_name")
+  tradeName        String   @default("") @map("trade_name")
+  legalNature      String   @default("") @map("legal_nature")
+  companySize      String   @default("") @map("company_size")
+  openedOn         String   @default("") @map("opened_on")
+  address          String
+  neighborhood     String   @default("")
+  postalCode       String   @default("") @map("postal_code")
+  phone            String   @default("")
+  email            String   @default("")
+  cnae             String
+  sourceMonth      String   @map("source_month")
+  importedAt       DateTime @default(now()) @map("imported_at") @db.Timestamptz(3)
+  latitude         Float?
+  longitude        Float?
+  locationSource   String?  @map("location_source")
+  locationAccuracy String?  @map("location_accuracy")
+  stage            String   @default("NEW")
+  doNotContact     Boolean  @default(false) @map("do_not_contact")
+  contactVerified  Boolean  @default(false) @map("contact_verified")
+  notes            String   @default("")
+  nextContactOn    String?  @map("next_contact_on")
+  version          Int      @default(0)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@index([neighborhood])
+  @@index([stage, doNotContact])
+  @@index([sourceMonth])
+  @@map("commercial_prospects")
+}
+
+// ───────────────────────── LegalOS Comercial (8.0) ─────────────────────────
+// Espaço separado, só da plataforma: prospecção de escritórios para vender o LegalOS. Nada daqui toca dados dos escritórios clientes.
+
+enum ComStage {
+  IDENTIFICADO
+  QUALIFICADO
+  CONTATO
+  DEMONSTRACAO
+  PROPOSTA
+  NEGOCIACAO
+  GANHO
+  PERDIDO
+}
+
+enum ComActivityKind {
+  LIGACAO
+  WHATSAPP
+  EMAIL
+  REUNIAO
+  DEMONSTRACAO
+  NOTA
+  ETAPA
+}
+
+enum ComProposalStatus {
+  RASCUNHO
+  ENVIADA
+  ACEITA
+  RECUSADA
+}
+
+enum ComMemberRole {
+  GERENTE
+  VENDEDOR
+}
+
+model ComMember {
+  userId           String        @id @map("user_id") @db.Uuid
+  role             ComMemberRole @default(VENDEDOR)
+  active           Boolean       @default(true)
+  goalMonthlyCents Int?          @map("goal_monthly_cents")
+  createdAt        DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  user             User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("com_members")
+}
+
+model ComProspect {
+  id                   String      @id @default(uuid()) @db.Uuid
+  cnpj                 String?     @unique
+  name                 String
+  legalName            String?     @map("legal_name")
+  phone                String?
+  phone2               String?     @map("phone_2")
+  whatsapp             String?
+  email                String?
+  website              String?
+  street               String?
+  number               String?
+  complement           String?
+  district             String?
+  city                 String      @default("São Paulo")
+  state                String      @default("SP")
+  zip                  String?
+  lat                  Float?
+  lng                  Float?
+  geocodedAt           DateTime?   @map("geocoded_at") @db.Timestamptz(3)
+  geocodeNote          String?     @map("geocode_note")
+  cnae                 String?
+  openedAt             DateTime?   @map("opened_at") @db.Date
+  companySize          String?     @map("company_size")
+  lawyersEstimate      Int?        @map("lawyers_estimate")
+  areas                String[]    @default([])
+  rankingPosition      Int?        @map("ranking_position")
+  rankingSource        String?     @map("ranking_source")
+  tags                 String[]    @default([])
+  stage                ComStage    @default(IDENTIFICADO)
+  stageChangedAt       DateTime    @default(now()) @map("stage_changed_at") @db.Timestamptz(3)
+  lostReason           String?     @map("lost_reason")
+  doNotContact         Boolean     @default(false) @map("do_not_contact")
+  contactVerified      Boolean     @default(false) @map("contact_verified")
+  ownerId              String?     @map("owner_id") @db.Uuid
+  planKey              String?     @map("plan_key")
+  expectedUsers        Int?        @map("expected_users")
+  addonKeys            String[]    @default([]) @map("addon_keys")
+  expectedMonthlyCents Int?        @map("expected_monthly_cents")
+  probabilityPct       Int?        @map("probability_pct")
+  expectedCloseAt      DateTime?   @map("expected_close_at") @db.Date
+  nextActionAt         DateTime?   @map("next_action_at") @db.Timestamptz(3)
+  nextActionNote       String?     @map("next_action_note")
+  wonAt                DateTime?   @map("won_at") @db.Timestamptz(3)
+  wonMonthlyCents      Int?        @map("won_monthly_cents")
+  notes                String?
+  enrichedAt           DateTime?   @map("enriched_at") @db.Timestamptz(3)
+  createdAt            DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt            DateTime    @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+  deletedAt            DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  contacts   ComContact[]
+  activities ComActivity[]
+  proposals  ComProposal[]
+
+  @@index([stage, deletedAt])
+  @@index([ownerId])
+  @@index([rankingPosition])
+  @@map("com_prospects")
+}
+
+model ComContact {
+  id              String      @id @default(uuid()) @db.Uuid
+  prospectId      String      @map("prospect_id") @db.Uuid
+  name            String
+  role            String?
+  phone           String?
+  email           String?
+  isDecisionMaker Boolean     @default(false) @map("is_decision_maker")
+  notes           String?
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  prospect        ComProspect @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId])
+  @@map("com_contacts")
+}
+
+model ComActivity {
+  id           String          @id @default(uuid()) @db.Uuid
+  prospectId   String          @map("prospect_id") @db.Uuid
+  userId       String?         @map("user_id") @db.Uuid
+  kind         ComActivityKind
+  summary      String
+  outcome      String?
+  nextActionAt DateTime?       @map("next_action_at") @db.Timestamptz(3)
+  createdAt    DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  prospect     ComProspect     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId, createdAt])
+  @@index([userId, createdAt])
+  @@map("com_activities")
+}
+
+model ComAddon {
+  id          String   @id @default(uuid()) @db.Uuid
+  key         String   @unique
+  name        String
+  description String?
+  priceCents  Int?     @map("price_cents")
+  perUser     Boolean  @default(false) @map("per_user")
+  active      Boolean  @default(true)
+  sortOrder   Int      @default(0) @map("sort_order")
+
+  @@map("com_addons")
+}
+
+model ComProposal {
+  id           String            @id @default(uuid()) @db.Uuid
+  prospectId   String            @map("prospect_id") @db.Uuid
+  planKey      String            @map("plan_key")
+  users        Int
+  addonKeys    String[]          @default([]) @map("addon_keys")
+  discountPct  Int               @default(0) @map("discount_pct")
+  monthlyCents Int               @map("monthly_cents")
+  setupCents   Int               @default(0) @map("setup_cents")
+  validUntil   DateTime?         @map("valid_until") @db.Date
+  status       ComProposalStatus @default(RASCUNHO)
+  notes        String?
+  snapshot     Json              @default("{}")
+  createdById  String?           @map("created_by_id") @db.Uuid
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  prospect     ComProspect       @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  @@index([prospectId, createdAt])
+  @@map("com_proposals")
+}
+
+model ComSettings {
+  id                 String   @id @default("default")
+  stageProbabilities Json     @default("{}") @map("stage_probabilities")
+  cycleDays          Json     @default("{}") @map("cycle_days")
+  churnMonthlyPct    Float    @default(2) @map("churn_monthly_pct")
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@map("com_settings")
 }

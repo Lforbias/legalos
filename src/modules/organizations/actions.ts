@@ -52,7 +52,7 @@ export async function setRequireMfaAction(required: boolean): Promise<ActionStat
   return runAction(async () => {
     const { ctx } = await requireTenant();
     await setRequireMfa(ctx, parse(z.boolean(), required));
-    revalidatePath("/configuracoes");
+    revalidatePath("/configuracoes/seguranca");
     return undefined;
   });
 }

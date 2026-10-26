@@ -15,6 +15,7 @@ import { TaskStatusSelect } from "@/modules/tasks/task-controls";
 import { dueState, PRIORITY_TONE } from "@/modules/tasks/tone";
 import { can } from "@/server/context";
 import { listActiveMembers } from "@/server/services/members";
+import { listTaskStages } from "@/server/services/task-stage.service";
 import { listTasks } from "@/server/services/task.service";
 import { listTaskLabels, listTaskTypes, pointsReport } from "@/server/services/task-extras.service";
 import { LabelBadge } from "@/modules/tasks/extras-ui";
@@ -22,7 +23,7 @@ import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Tarefas" };
 
-type SP = { etiqueta?: string; tipo?: string; q?: string; status?: string; responsavel?: string; atrasadas?: string; visao?: string };
+type SP = { etapa?: string; etiqueta?: string; tipo?: string; q?: string; status?: string; responsavel?: string; atrasadas?: string; visao?: string };
 const BOARD_COLUMNS = ["TODO", "IN_PROGRESS", "WAITING", "DONE"] as const;
 
 const DUE_TONE = { overdue: "danger", today: "warning", soon: "warning", ok: "neutral", none: "neutral" } as const;
@@ -42,18 +43,18 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
   const now = new Date();
   const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
   const monthEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1));
-  const [result, members, labels, types, points] = await Promise.all([
-    listTasks(ctx, { q: sp.q, status, assigneeId, labelId, typeId, overdue, includeClosed: board || Boolean(status) }),
+  const [result, members, labels, types, points, stages] = await Promise.all([
+    listTasks(ctx, { stageId: uuid(sp.etapa), q: sp.q, status, assigneeId, labelId, typeId, overdue, includeClosed: board || Boolean(status) }),
     listActiveMembers(ctx),
     listTaskLabels(ctx),
     listTaskTypes(ctx),
-    pointsReport(ctx, monthStart, monthEnd),
+    pointsReport(ctx, monthStart, monthEnd), listTaskStages(ctx),
   ]);
   const canWrite = can(ctx, "tasks:write");
-  const filtered = Boolean(sp.q || status || assigneeId || overdue || labelId || typeId);
+  const filtered = Boolean(sp.etapa || sp.q || status || assigneeId || overdue || labelId || typeId);
   const viewHref = (v: "lista" | "quadro") => {
     const q = new URLSearchParams();
-    for (const [k, val] of Object.entries({ q: sp.q, status, responsavel: sp.responsavel, etiqueta: labelId, tipo: typeId, atrasadas: overdue ? "1" : undefined })) if (val) q.set(k, val);
+    for (const [k, val] of Object.entries({ q: sp.q, status, responsavel: sp.responsavel, etapa: sp.etapa, etiqueta: labelId, tipo: typeId, atrasadas: overdue ? "1" : undefined })) if (val) q.set(k, val);
     if (v === "quadro") q.set("visao", "quadro");
     const qs = q.toString();
     return qs ? `/tarefas?${qs}` : "/tarefas";
@@ -77,7 +78,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         </p>
         {canWrite ? (
           <div className="mt-2">
-            <TaskStatusSelect taskId={t.id} status={t.status} compact />
+            <TaskStatusSelect stages={stages} stageId={t.stageId} taskId={t.id} status={t.status} compact />
           </div>
         ) : null}
       </article>
@@ -109,9 +110,11 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
         }
       />
 
-      <form method="get" className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_170px_200px_160px_160px_auto_auto]" role="search" aria-label="Filtrar tarefas">
+      <div className="mb-3 flex gap-3 text-sm">{can(ctx, "organization:manage") ? <Link className="underline" href="/tarefas/etapas">Personalizar etapas</Link> : null}</div>
+      <form method="get" className="mb-5 grid items-end gap-3 rounded-xl border border-border bg-surface p-4 sm:grid-cols-2 lg:grid-cols-8" role="search" aria-label="Filtrar tarefas">
         {board ? <input type="hidden" name="visao" value="quadro" /> : null}
-        <div className="relative">
+        <label className="text-xs font-medium text-muted lg:col-span-2">Etapa<Select name="etapa" defaultValue={sp.etapa ?? ""}><option value="">Todas as etapas</option>{stages.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}</Select></label>
+        <div className="relative sm:col-span-2 lg:col-span-2">
           <label htmlFor="q" className="sr-only">Buscar tarefas</label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
           <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Título ou descrição" className="pl-9" />
@@ -149,10 +152,10 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
             {types.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
           </Select>
         </div>
-        <label className="flex h-9 items-center gap-2 text-sm">
-          <input type="checkbox" name="atrasadas" value="1" defaultChecked={overdue} className="h-4 w-4" /> Só atrasadas
+        <label className="flex min-h-10 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium text-muted">
+          <input type="checkbox" name="atrasadas" value="1" defaultChecked={overdue} className="h-4 w-4 accent-primary" /> Só atrasadas
         </label>
-        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Filtrar</button>
+        <button type="submit" className={buttonVariants({ variant: "secondary" })}>Aplicar filtros</button>
       </form>
 
       {points.length ? (
@@ -227,7 +230,7 @@ export default async function TasksPage({ searchParams }: { searchParams: Promis
                     </td>
                     <td className="px-3 py-2.5"><Badge tone={PRIORITY_TONE[t.priority]}>{TASK_PRIORITY_LABEL[t.priority]}</Badge></td>
                     <td className="px-3 py-2.5 text-muted">{t.assigneeName ?? "—"}</td>
-                    <td className="px-3 py-2.5 text-xs">{TASK_STATUS_LABEL[t.status]}</td>
+                    <td className="px-3 py-2.5 text-xs">{t.stage?.name ?? TASK_STATUS_LABEL[t.status]}</td>
                   </tr>
                 );
               })}

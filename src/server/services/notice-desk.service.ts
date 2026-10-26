@@ -1,7 +1,8 @@
+import { officeAiProvider } from "./office-ai-provider.service";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { maskSensitive } from "@/lib/ai/mask";
-import { aiMonthlyTokenLimit, AiProviderError, getAiProvider } from "@/lib/ai/provider";
+import { aiMonthlyTokenLimit, AiProviderError } from "@/lib/ai/provider";
 import { addDays, todayYmd, ymdToDate } from "@/lib/dates/ymd";
 import { zonedToUtc } from "@/lib/dates/zoned";
 import { ConflictError, ValidationError } from "@/lib/permissions/check";
@@ -85,7 +86,7 @@ export type SuggestAvailability = { available: boolean; reason: string | null };
 
 export async function suggestAvailability(ctx: TenantContext): Promise<SuggestAvailability> {
   if (!can(ctx, "ai:use")) return { available: false, reason: "Você não tem permissão para usar a IA." };
-  if (!getAiProvider()) return { available: false, reason: "A IA não está configurada neste sistema (falta a chave do provedor)." };
+  if (!(await officeAiProvider(ctx.organizationId))) return { available: false, reason: "A IA não está configurada neste sistema (falta a chave do provedor)." };
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { aiEnabled: true } });
   if (!org?.aiEnabled) return { available: false, reason: "A IA está desligada neste escritório (liga-se em IA)." };
   return { available: true, reason: null };
@@ -95,7 +96,7 @@ export async function suggestAvailability(ctx: TenantContext): Promise<SuggestAv
 export async function suggestForNotice(ctx: TenantContext, noticeId: string): Promise<NoticeSuggestion & { tokens: number }> {
   assertCan(ctx, "ai:use");
   assertCan(ctx, "inbox:read");
-  const provider = getAiProvider();
+  const provider = await officeAiProvider(ctx.organizationId);
   if (!provider) throw new ConflictError("A IA não está configurada neste sistema (falta a chave do provedor).");
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { aiEnabled: true } });
   if (!org?.aiEnabled) throw new ConflictError("A IA está desligada neste escritório. Peça a quem administra as integrações para ligá-la.");

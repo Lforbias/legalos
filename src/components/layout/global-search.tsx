@@ -74,7 +74,7 @@ export function GlobalSearch({ visibleKeys, idSuffix = "" }: { visibleKeys: stri
   const shownCases = enough ? cases : [];
   const showPanel = open && q.trim().length > 0;
   return (
-    <div ref={ref} className="relative w-full max-w-md">
+    <div ref={ref} className="relative w-full max-w-lg">
       <label htmlFor={`global-search${idSuffix}`} className="sr-only">
         Busca global
       </label>
@@ -91,7 +91,7 @@ export function GlobalSearch({ visibleKeys, idSuffix = "" }: { visibleKeys: stri
         onFocus={() => setOpen(true)}
         placeholder="Buscar clientes, processos, páginas…  (Ctrl/⌘ K)"
         autoComplete="off"
-        className="h-9 w-full rounded-md border border-border bg-surface-2 pl-9 pr-3 text-sm placeholder:text-muted/70 focus:border-primary"
+        className="h-10 w-full rounded-lg border border-border/80 bg-bg/50 pl-10 pr-3 text-sm transition-colors placeholder:text-muted/70 focus:border-primary focus:bg-surface"
       />
       {showPanel ? (
         <div className="lo-pop absolute left-0 right-0 z-50 mt-2 max-h-96 overflow-y-auto rounded-lg border border-border bg-surface p-1 shadow-xl shadow-black/30">

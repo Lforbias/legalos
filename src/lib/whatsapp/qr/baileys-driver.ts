@@ -43,6 +43,13 @@ export const baileysDriver: QrDriver = {
         emit({ type: "close", loggedOut: code === B.DisconnectReason.loggedOut, reason: code ? `código ${code}` : "conexão encerrada" });
       }
     });
+    sock.ev.on("call", calls=>{
+      for(const c of calls){
+        if(c.isGroup||!["offer","ringing","accept","reject","timeout","terminate"].includes(c.status))continue;
+        const chat=chatFromKey({remoteJid:c.chatId||c.from,remoteJidAlt:c.callerPn});if(!chat)continue;
+        emit({type:"call",call:{id:c.id,chat,status:c.status as "offer"|"ringing"|"accept"|"reject"|"timeout"|"terminate",video:!!c.isVideo,at:c.date}});
+      }
+    });
     sock.ev.on("messages.update", (list) => {
       for (const { key, update } of list) {
         if (!key.fromMe || !key.id) continue;

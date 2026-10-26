@@ -2,10 +2,10 @@ import * as React from "react";
 import { cn } from "@/lib/utils";
 
 const controlClass =
-  "w-full rounded-md border border-border bg-surface-2 px-3 text-sm text-fg placeholder:text-muted/70 transition-colors focus:border-primary disabled:opacity-60 aria-[invalid=true]:border-danger";
+  "w-full rounded-lg border border-border/90 bg-bg/45 px-3.5 text-sm text-fg placeholder:text-muted/70 shadow-[inset_0_1px_1px_rgba(0,0,0,0.02)] transition-colors focus:border-primary focus:bg-surface focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:opacity-60 aria-[invalid=true]:border-danger";
 
 export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...props }, ref) {
-  return <input ref={ref} className={cn(controlClass, "h-9", className)} {...props} />;
+  return <input ref={ref} className={cn(controlClass, "h-10", className)} {...props} />;
 });
 
 export const Textarea = React.forwardRef<HTMLTextAreaElement, React.TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea(
@@ -20,7 +20,7 @@ export const Select = React.forwardRef<HTMLSelectElement, React.SelectHTMLAttrib
   ref,
 ) {
   return (
-    <select ref={ref} className={cn(controlClass, "h-9 pr-8", className)} {...props}>
+    <select ref={ref} className={cn(controlClass, "h-10 pr-8", className)} {...props}>
       {children}
     </select>
   );
@@ -41,7 +41,7 @@ export function Field({
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={htmlFor} className="block text-xs font-medium text-muted">
+    <label htmlFor={htmlFor} className="block text-[13px] font-medium text-fg/85">
         {label}
       </label>
       {children}

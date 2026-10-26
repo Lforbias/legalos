@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { contentHash, parseNoticeText } from "@/lib/notices/parse";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { noticeListOptionsSchema } from "@/modules/inbox/list-schemas";
 import { assignSchema, discardSchema, noticeSchema, toNoticeData, type NoticeInput } from "@/modules/inbox/schemas";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
@@ -26,7 +27,7 @@ export function analyzeText(ctx: TenantContext, text: string) {
 
 export const NOTICE_BOXES = ["entrada", "minhas", "geral", "equipe", "acervo", "adormecidas", "descartadas"] as const;
 export type NoticeBox = (typeof NOTICE_BOXES)[number];
-export type NoticeFilters = { q?: string; status?: Status; assigneeId?: string; caseId?: string; duplicates?: boolean; box?: NoticeBox; teamId?: string; tag?: string };
+export type NoticeFilters = { q?: string; status?: Status; assigneeId?: string; caseId?: string; duplicates?: boolean; box?: NoticeBox; teamId?: string; tag?: string; kind?: string; origin?: string; court?: string; receivedFrom?: string; receivedTo?: string; publishedFrom?: string; publishedTo?: string; page?: number; pageSize?: number; sort?: string };
 
 /** Intimações adormecidas só reaparecem a partir da data escolhida. */
 function awake(ctx: TenantContext): Prisma.CourtNoticeWhereInput {
@@ -48,6 +49,9 @@ function boxWhere(ctx: TenantContext, box: NoticeBox, teamId?: string): Prisma.C
 
 export async function listNotices(ctx: TenantContext, f: NoticeFilters = {}) {
   assertCan(ctx, "inbox:read");
+  const options = noticeListOptionsSchema.safeParse({ pageSize: 200, ...f });
+  if (!options.success) throw new ValidationError("Filtros inválidos. Confira as datas e a paginação.");
+  const o = options.data;
   const and: Prisma.CourtNoticeWhereInput[] = [{ organizationId: ctx.organizationId, deletedAt: null }, visibility(ctx)];
   if (f.box) and.push(...boxWhere(ctx, f.box, f.teamId));
   else if (f.status) {
@@ -60,23 +64,31 @@ export async function listNotices(ctx: TenantContext, f: NoticeFilters = {}) {
   if (f.duplicates) and.push({ duplicateOfId: { not: null } });
   const q = f.q?.trim().slice(0, 80);
   if (q) and.push({ OR: [{ title: { contains: q, mode: "insensitive" } }, { content: { contains: q, mode: "insensitive" } }, { caseNumber: { contains: q } }] });
+  if (o.kind) and.push({ kind: o.kind });
+  if (o.court) and.push({ court: { contains: o.court, mode: "insensitive" } });
+  if (o.origin === "DJEN" || o.origin === "MNI") and.push({ source: "IMPORTED", externalKey: { startsWith: o.origin === "DJEN" ? "djen:" : "mni:" } });
+  else if (o.origin === "OTHER_IMPORT") and.push({ source: "IMPORTED", OR: [{ externalKey: null }, { NOT: [{ externalKey: { startsWith: "djen:" } }, { externalKey: { startsWith: "mni:" } }] }] });
+  else if (o.origin) and.push({ source: o.origin });
+  if (o.receivedFrom || o.receivedTo) and.push({ receivedAt: { ...(o.receivedFrom ? { gte: ymdToDate(o.receivedFrom) } : {}), ...(o.receivedTo ? { lte: ymdToDate(o.receivedTo) } : {}) } });
+  if (o.publishedFrom || o.publishedTo) and.push({ publishedAt: { ...(o.publishedFrom ? { gte: ymdToDate(o.publishedFrom) } : {}), ...(o.publishedTo ? { lte: ymdToDate(o.publishedTo) } : {}) } });
   const where: Prisma.CourtNoticeWhereInput = { AND: and };
-  const [total, rows] = await Promise.all([
-    db.courtNotice.count({ where }),
-    db.courtNotice.findMany({
+  const total = await db.courtNotice.count({ where });
+  const pageCount = Math.max(1, Math.ceil(total / o.pageSize));
+  const page = Math.min(o.page, pageCount);
+  const rows = await db.courtNotice.findMany({
       where,
-      orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }, { id: "asc" }],
-      take: 200,
+      orderBy: [{ receivedAt: o.sort }, { createdAt: o.sort }, { id: "asc" }],
+      skip: (page - 1) * o.pageSize,
+      take: o.pageSize,
       select: {
-        id: true, title: true, kind: true, status: true, source: true, caseNumber: true, court: true, publishedAt: true, receivedAt: true, assigneeId: true, teamId: true, tags: true, snoozedUntil: true, duplicateOfId: true,
+        id: true, title: true, kind: true, status: true, source: true, externalKey: true, updatedAt: true, caseNumber: true, court: true, publishedAt: true, receivedAt: true, assigneeId: true, teamId: true, tags: true, snoozedUntil: true, duplicateOfId: true,
         case: { select: { id: true, title: true } },
       },
-    }),
-  ]);
+    });
   const ids = [...new Set(rows.map((r) => r.assigneeId).filter((x): x is string => !!x))];
   const users = ids.length ? await db.user.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } }) : [];
   const names = new Map(users.map((u) => [u.id, u.name]));
-  return { total, truncated: total > rows.length, items: rows.map((r) => ({ ...r, assigneeName: r.assigneeId ? (names.get(r.assigneeId) ?? null) : null })) };
+  return { total, page, pageSize: o.pageSize, pageCount, truncated: total > rows.length, items: rows.map((r) => ({ ...r, assigneeName: r.assigneeId ? (names.get(r.assigneeId) ?? null) : null })) };
 }
 
 export async function noticeCounts(ctx: TenantContext) {
@@ -168,6 +180,18 @@ async function load(ctx: TenantContext, id: string) {
   return n;
 }
 
+/** Distribuição não concede acesso a processo sigiloso nem revela seu título em notificações. */
+export async function assertNoticeRecipients(ctx: TenantContext, noticeId: string, userIds: string[]) {
+  const ids = [...new Set(userIds)];
+  if (!ids.length) throw new ValidationError("Escolha destinatários ativos com acesso à caixa.");
+  const members = await db.membership.findMany({ where: { organizationId: ctx.organizationId, userId: { in: ids }, status: "ACTIVE", user: { disabledAt: null }, role: { permissions: { has: "inbox:read" } } }, select: { userId: true, role: { select: { permissions: true } } } });
+  if (members.length !== ids.length) throw new ValidationError("Há destinatários inativos ou sem acesso à caixa.");
+  for (const member of members) {
+    const targetCtx = { ...ctx, userId: member.userId, permissions: new Set(member.role.permissions) };
+    if (!await db.courtNotice.count({ where: { AND: [{ id: noticeId, organizationId: ctx.organizationId, deletedAt: null }, visibility(targetCtx)] } })) throw new ValidationError("Um destinatário não tem acesso ao processo. Confira o sigilo antes de distribuir.");
+  }
+}
+
 export async function assignNotice(ctx: TenantContext, id: string, raw: { userId: string }) {
   assertCan(ctx, "inbox:write");
   const { userId } = assignSchema.parse(raw);
@@ -176,6 +200,7 @@ export async function assignNotice(ctx: TenantContext, id: string, raw: { userId
   await assertActiveMember(ctx, userId);
   const target = await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId, status: "ACTIVE" }, select: { role: { select: { permissions: true } } } });
   if (!target?.role.permissions.includes("inbox:read")) throw new ValidationError("Este membro não tem acesso à caixa de intimações.", { userId: ["Escolha um membro com acesso à caixa de intimações."] });
+  await assertNoticeRecipients(ctx, id, [userId]);
   await db.$transaction(async (tx) => {
     await tx.courtNotice.update({ where: { id }, data: { assigneeId: userId, teamId: null, assignedById: ctx.userId, status: "DISTRIBUTED" } });
     await audit({ action: "notice.assign", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: id, metadata: { to: userId }, meta: ctx.meta }, tx);

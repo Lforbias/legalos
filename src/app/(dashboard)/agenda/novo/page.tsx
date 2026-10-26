@@ -1,3 +1,4 @@
+import { listActiveMembers } from "@/server/services/members";
 import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
@@ -14,6 +15,7 @@ export default async function NewEventPage({ searchParams }: { searchParams: Pro
   const { ctx } = await requireTenant();
   if (!can(ctx, "deadlines:write") && !can(ctx, "tasks:write")) return <AccessDenied />;
   const sp = await searchParams;
+  const members=await listActiveMembers(ctx);
   const cases = can(ctx, "cases:read") ? await listCaseOptions(ctx) : [];
   return (
     <div className="mx-auto max-w-3xl">
@@ -21,6 +23,7 @@ export default async function NewEventPage({ searchParams }: { searchParams: Pro
       <EventForm
         initial={{ ...EMPTY_EVENT, date: sp.data && isYmd(sp.data) ? sp.data : todayYmd(ctx.timezone), caseId: cases.some((c) => c.id === sp.processo) ? (sp.processo as string) : "" }}
         cases={cases}
+        members={members.map(m=>({id:m.id,name:m.name}))}
       />
     </div>
   );

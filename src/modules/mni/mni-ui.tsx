@@ -1,15 +1,18 @@
 "use client";
 
+import { COURT_SYSTEMS } from "@/lib/court-systems";
+import { connectionSupports, ENVIRONMENT_LABEL } from "@/lib/connectors/capabilities";
 import { useRouter } from "next/navigation";
+import { AutosQueue } from "@/modules/documents/autos-queue";
 import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
 import { PETITION_TYPE_KEYS, PETITION_TYPE_LABEL } from "@/lib/petitioning/types";
-import { consultCaseMniAction, importAutosMniAction, createConnectionAction, deleteConnectionAction, setConnectionEnabledAction, setPetitionTypesAction, syncAvisosAction } from "./actions";
+import { inspectContractAction, consultCaseMniAction, createConnectionAction, deleteConnectionAction, setConnectionEnabledAction, setPetitionTypesAction, syncAvisosAction } from "./actions";
 
-export type ConnectionView = { id: string; label: string; jtr: string; tribunal: string; endpointUrl: string; authMode: string; certificateLabel: string | null; enabled: boolean; lastSyncAt: string | null; lastStatus: string | null; lastMessage: string | null; petitionTypes: Record<string, string> };
+export type ConnectionView = { wsdlUrl?: string | null; authProfile?: string; system?: string; environment?: string; wsdlStatus?: string | null; wsdlCheckedAt?: string | null; wsdlOperations?: string[]; id: string; label: string; jtr: string; tribunal: string; endpointUrl: string; authMode: string; certificateLabel: string | null; enabled: boolean; lastSyncAt: string | null; lastStatus: string | null; lastMessage: string | null; petitionTypes: Record<string, string> };
 
 function PetitionTypesEditor({ id, initial }: { id: string; initial: Record<string, string> }) {
   const router = useRouter();
@@ -19,7 +22,7 @@ function PetitionTypesEditor({ id, initial }: { id: string; initial: Record<stri
   return (
     <details className="mt-2 rounded-md border border-slate-200 p-2" data-testid={`types-${id}`}>
       <summary className="cursor-pointer text-xs font-medium">Protocolo de petições: códigos de tipo de documento do tribunal</summary>
-      <p className="mt-2 text-xs text-slate-600">Cada tribunal tem os seus códigos (tabela do PJe). Preencha só o que o tribunal informou; sem o código da petição, o protocolo é recusado.</p>
+      <p className="mt-2 text-xs text-muted">Cada tribunal tem os seus códigos (tabela do PJe). Preencha só o que o tribunal informou; sem o código da petição, o protocolo é recusado.</p>
       {msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : null}
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {PETITION_TYPE_KEYS.map((k) => (
@@ -45,7 +48,7 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
   const [msg, setMsg] = React.useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
   const [pending, start] = React.useTransition();
   const run = (fn: () => Promise<void>) => start(fn);
-  if (!items.length) return <p className="text-sm text-slate-600">Nenhuma conexão cadastrada.</p>;
+  if (!items.length) return <p className="text-sm text-muted">Nenhuma conexão cadastrada.</p>;
   return (
     <div className="space-y-3">
       {msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : null}
@@ -54,25 +57,32 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <div className="font-medium">{c.label}</div>
-              <div className="text-xs text-slate-600">
-                {c.tribunal} · {MODE_LABEL[c.authMode] ?? c.authMode}
+              <div className="text-xs text-muted">
+                {COURT_SYSTEMS.find(s => s.key === c.system)?.label ?? "PJe (MNI)"} · {ENVIRONMENT_LABEL[(c.environment ?? "UNSPECIFIED") as keyof typeof ENVIRONMENT_LABEL]} · {c.tribunal} · {MODE_LABEL[c.authMode] ?? c.authMode}
                 {c.certificateLabel ? ` · ${c.certificateLabel}` : ""}
               </div>
-              <div className="break-all text-xs text-slate-500">{c.endpointUrl}</div>
+              <div className="break-all text-xs text-muted">{c.endpointUrl}</div>
             </div>
             {c.enabled ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>}
           </div>
           {c.lastSyncAt ? (
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 text-xs text-muted">
               Última sincronização: {new Date(c.lastSyncAt).toLocaleString("pt-BR")} — {c.lastStatus === "OK" ? "ok" : "falhou"}
               {c.lastMessage ? `: ${c.lastMessage}` : ""}
             </p>
           ) : null}
+          <p className="mt-2 text-xs">Contrato: {c.wsdlStatus === "COMPATIBLE" ? "MNI 2.2.2 compatível (acesso e homologação pendentes)" : c.wsdlStatus === "INCOMPATIBLE" ? "Incompatível com o adaptador atual" : "Ainda não verificado"}{c.wsdlCheckedAt ? ` · ${new Date(c.wsdlCheckedAt).toLocaleString("pt-BR")}` : ""}</p>
+          {c.wsdlOperations?.length ? <p className="text-xs">Operações declaradas: {c.wsdlOperations.join(", ")}</p> : null}
           <PetitionTypesEditor id={c.id} initial={c.petitionTypes} />
           <div className="mt-2 flex flex-wrap gap-2">
+            <Button variant="secondary" loading={pending} onClick={() => run(async () => {
+              const r = await inspectContractAction(c.id);
+              setMsg(r.ok && r.data ? { tone: r.data.compatible ? "success" : "info", text: r.data.message } : { tone: "error", text: r.message ?? "Não foi possível verificar o contrato." });
+              router.refresh();
+            })}>Verificar contrato WSDL</Button>
             <Button
               variant="secondary"
-              disabled={!c.enabled}
+              disabled={!c.enabled || !connectionSupports({ system: c.system ?? "pje-mni", wsdlStatus: c.wsdlStatus ?? null, wsdlOperations: c.wsdlOperations ?? [], authProfile: c.authProfile }, "consultarAvisosPendentes")}
               loading={pending}
               onClick={() =>
                 run(async () => {
@@ -121,17 +131,22 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
 
 export function ConnectionForm({ tribunals, certificates }: { tribunals: { jtr: string; label: string }[]; certificates: { id: string; label: string }[] }) {
   const router = useRouter();
-  const [f, setF] = React.useState({ label: "", jtr: tribunals[0]?.jtr ?? "", endpointUrl: "", authMode: "PASSWORD", certificateId: "", document: "", password: "" });
+  const [f, setF] = React.useState({ wsdlUrl: "", authProfile: "STATIC", system: "pje-mni", environment: "HOMOLOGATION", label: "", jtr: tribunals[0]?.jtr ?? "", endpointUrl: "", authMode: "PASSWORD", certificateId: "", document: "", password: "" });
   const [error, setError] = React.useState<string | null>(null);
   const [ok, setOk] = React.useState(false);
   const [pending, start] = React.useTransition();
-  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((p) => ({ ...p, [k]: e.target.value }));
+  const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setF((p) => ({ ...p, [k]: e.target.value, ...(["system", "jtr"].includes(k) ? { authProfile: "STATIC" } : {}) }));
   const needsCert = f.authMode !== "PASSWORD";
   const needsPassword = f.authMode !== "CERTIFICATE";
   return (
     <div className="space-y-3">
       {error ? <Alert tone="error">{error}</Alert> : null}
-      {ok ? <Alert tone="success">Conexão cadastrada. Use “Sincronizar intimações” para testar.</Alert> : null}
+      {ok ? <Alert tone="success">Conexão cadastrada. Verifique o contrato WSDL antes de ligar e testar as operações autorizadas.</Alert> : null}
+      <Field label="Sistema da conexão" htmlFor="mni-system" hint="O adaptador atende MNI 2.2.2. Não atende MNI 3.0 ou APIs proprietárias.">
+        <Select id="mni-system" value={f.system} onChange={set("system")}>{COURT_SYSTEMS.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</Select>
+      </Field>
+      <Field label="Ambiente" htmlFor="mni-environment"><Select id="mni-environment" value={f.environment} onChange={set("environment")}><option value="HOMOLOGATION">Homologação</option><option value="PRODUCTION">Produção</option></Select></Field>
+      <Field label="Perfil de autenticação" htmlFor="mni-profile"><Select id="mni-profile" value={f.authProfile} onChange={set("authProfile")}><option value="STATIC">Credencial estática do serviço</option>{f.system === "projudi" && f.jtr === "8.16" ? <option value="TJPR_SCMPP">SCMPP/TJPR — código privado, senha diária</option> : null}</Select></Field>
       <Field label="Nome da conexão" htmlFor="mni-label">
         <Input id="mni-label" value={f.label} onChange={set("label")} />
       </Field>
@@ -147,6 +162,7 @@ export function ConnectionForm({ tribunals, certificates }: { tribunals: { jtr: 
       <Field label="Endereço do serviço MNI (https)" htmlFor="mni-url" hint="Informado pelo tribunal; termina geralmente em /intercomunicacao.">
         <Input id="mni-url" value={f.endpointUrl} onChange={set("endpointUrl")} />
       </Field>
+      <Field label="URL do WSDL (opcional)" htmlFor="mni-wsdl" hint="Se o contrato estiver em outro caminho na mesma origem do serviço, informe a URL exata. Vazio consulta ?wsdl."><Input id="mni-wsdl" value={f.wsdlUrl} onChange={set("wsdlUrl")} /></Field>
       <Field label="Forma de autenticação" htmlFor="mni-mode">
         <Select id="mni-mode" value={f.authMode} onChange={set("authMode")}>
           <option value="PASSWORD">Senha</option>
@@ -166,11 +182,11 @@ export function ConnectionForm({ tribunals, certificates }: { tribunals: { jtr: 
           </Select>
         </Field>
       ) : null}
-      <Field label="CPF/CNPJ do advogado (login do PJe)" htmlFor="mni-doc">
+      <Field label={f.system === "pje-mni" ? "CPF/CNPJ do advogado (login do PJe)" : "Identificador do usuário de integração"} htmlFor="mni-doc">
         <Input id="mni-doc" value={f.document} onChange={set("document")} autoComplete="off" />
       </Field>
       {needsPassword ? (
-        <Field label="Senha do PJe" htmlFor="mni-pass" hint="Guardada cifrada; nunca é exibida de novo.">
+        <Field label={f.authProfile === "TJPR_SCMPP" ? "Código privado fornecido pelo TJPR" : f.system === "pje-mni" ? "Senha do PJe" : "Senha do serviço de integração"} htmlFor="mni-pass" hint="Guardada cifrada; nunca é exibida de novo.">
           <Input id="mni-pass" type="password" value={f.password} onChange={set("password")} autoComplete="new-password" />
         </Field>
       ) : null}
@@ -179,11 +195,11 @@ export function ConnectionForm({ tribunals, certificates }: { tribunals: { jtr: 
         onClick={() =>
           start(async () => {
             setOk(false);
-            const r = await createConnectionAction({ ...f, authMode: f.authMode as "PASSWORD" | "CERTIFICATE" | "PASSWORD_AND_CERTIFICATE" });
+            const r = await createConnectionAction({ ...f, system: f.system as "pje-mni" | "eproc" | "esaj" | "projudi", environment: f.environment as "HOMOLOGATION" | "PRODUCTION", authProfile: f.authProfile as "STATIC" | "TJPR_SCMPP", authMode: f.authMode as "PASSWORD" | "CERTIFICATE" | "PASSWORD_AND_CERTIFICATE" });
             if (!r.ok) return setError(Object.values(r.fieldErrors ?? {})[0]?.[0] ?? r.message ?? "Não foi possível cadastrar.");
             setError(null);
             setOk(true);
-            setF((p) => ({ ...p, password: "", label: "", endpointUrl: "", document: "" }));
+            setF((p) => ({ ...p, password: "", label: "", endpointUrl: "", wsdlUrl: "", document: "" }));
             router.refresh();
           })
         }
@@ -219,32 +235,6 @@ export function MniConsultButton({ caseId, label }: { caseId: string; label: str
   );
 }
 
-export function MniAutosButton({ caseId, label }: { caseId: string; label: string }) {
-  const router = useRouter();
-  const [msg, setMsg] = React.useState<{ tone: "success" | "error"; text: string } | null>(null);
-  const [pending, start] = React.useTransition();
-  return (
-    <div className="space-y-2">
-      {msg ? <Alert tone={msg.tone}>{msg.text}</Alert> : null}
-      <Button
-        variant="secondary"
-        loading={pending}
-        onClick={() =>
-          start(async () => {
-            const r = await importAutosMniAction(caseId);
-            if (!r.ok || !r.data) return setMsg({ tone: "error", text: r.message ?? "Não foi possível baixar os autos." });
-            const d = r.data;
-            const skipped = d.skippedSecret + d.skippedUnsupported + d.skippedTooBig;
-            setMsg({
-              tone: "success",
-              text: `Autos (${label}): ${d.imported} documento(s) novo(s) de ${d.listed} no tribunal.${d.alreadyKnown ? ` ${d.alreadyKnown} já estavam aqui.` : ""}${skipped ? ` ${skipped} não importado(s) (sigilosos, tipo não suportado ou grandes demais).` : ""}${d.remaining ? ` Faltam ${d.remaining}: clique de novo para continuar.` : ""}`,
-            });
-            router.refresh();
-          })
-        }
-      >
-        Baixar autos (MNI)
-      </Button>
-    </div>
-  );
+export function MniAutosButton({ caseId }: { caseId: string; label: string }) {
+  return <AutosQueue caseId={caseId} canWrite />;
 }

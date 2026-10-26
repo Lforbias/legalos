@@ -11,6 +11,7 @@ describe("MNI: montagem e leitura de XML", () => {
     const x = buildConsultarAvisosPendentes({ document: "12345678909", password: 'a<b>&"c' });
     expect(x).toContain("a&lt;b&gt;&amp;&quot;c");
     expect(x).toContain("<tns:consultarAvisosPendentes>");
+    expect(x).toContain('xmlns="http://www.cnj.jus.br/tipos-servico-intercomunicacao-2.2.2"');
     const p = buildConsultarProcesso({ document: "1", password: "2" }, CNJ);
     expect(p).toContain(`<numeroProcesso>${CNJ}</numeroProcesso>`);
     expect(p).toContain("<incluirDocumentos>false</incluirDocumentos>");

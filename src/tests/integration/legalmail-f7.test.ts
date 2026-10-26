@@ -33,7 +33,7 @@ describe("3.0-F7 — saúde do monitoramento de intimações", () => {
     const o = await getMonitoringOverview(A.ctx, now);
     expect(o.sources.map((s) => s.label)).toEqual(["OAB A"]);
     expect(o.problems).toBe(0);
-    expect(o.importedByDay).toHaveLength(7);
+    expect(o.registeredByDay).toHaveLength(7);
   });
 
   it("alerta falha e parada, sem duplicar, e só para quem administra integrações", async () => {
@@ -54,12 +54,13 @@ describe("3.0-F7 — saúde do monitoramento de intimações", () => {
     expect(o.problems).toBe(2);
   });
 
-  it("conta intimações importadas por dia (ignora manuais e apagadas)", async () => {
+  it("conta registros por dia, separa importações de capturas e ignora apagadas", async () => {
     const mk = (source: "IMPORTED" | "MANUAL", extra: object = {}) => db.courtNotice.create({ data: { organizationId: A.org.id, source, title: "t", content: "c", receivedAt: now, contentHash: `h-${Math.random()}`, ...extra } });
     await mk("IMPORTED"); await mk("IMPORTED"); await mk("MANUAL"); await mk("IMPORTED", { deletedAt: now });
     const o = await getMonitoringOverview(A.ctx, new Date());
-    expect(o.importedTotal).toBe(2);
-    expect(o.importedByDay.at(-1)?.count).toBe(2);
-    expect((await getMonitoringOverview(B.ctx, new Date())).importedTotal).toBe(0);
+    expect(o.registeredTotal).toBe(3);
+    expect(o.bySource).toEqual({ imported: 2, captured: 0, otherImports: 2, manual: 1 });
+    expect(o.registeredByDay.at(-1)?.count).toBe(3);
+    expect((await getMonitoringOverview(B.ctx, new Date())).registeredTotal).toBe(0);
   });
 });

@@ -1,3 +1,4 @@
+import {Client} from "pg";
 import { expect, test } from "@playwright/test";
 import { totpCode, totpStep } from "../../lib/security/totp";
 import { APP_SECRET, inbound, startFakeWhatsapp, WA_TOKEN } from "../integration/fake-whatsapp";
@@ -274,7 +275,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
 
   // Atribuir a mim e filtrar "Minhas".
-  await page.getByLabel("Responsável").selectOption({ label: `Dona zap${id} (eu)` });
+  await page.getByLabel("Responsável", { exact: true }).selectOption({ label: `Dona zap${id} (eu)` });
   await expect(page.getByTestId("wa-list").locator("li", { hasText: "Maria Teste" }).getByText(`Dona zap${id}`)).toBeVisible();
   await page.getByRole("link", { name: "Minhas" }).click();
   await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toBeVisible();
@@ -284,6 +285,14 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   // Encerrar.
   await page.getByRole("link", { name: "Abertas" }).click();
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
+  await page.getByLabel("Situação do atendimento",{exact:true}).selectOption("WAITING");
+  await expect(page.getByTestId("wa-status")).toHaveText("Aguardando");
+  await page.getByText("Registrar ligação",{exact:true}).click();
+  await page.getByLabel("Resultado da ligação").selectOption("MISSED");
+  await page.getByLabel("Observação da ligação").fill("Retornar a ligação amanhã");
+  await page.getByRole("button",{name:"Salvar registro da ligação",exact:true}).click();
+  await expect(page.getByTestId("wa-msg-note").getByText(/Registro manual de ligação recebida: não atendida/)).toBeVisible();
+  await page.screenshot({path:"/tmp/legalos-chat-status-ligacoes.png",fullPage:true});
   await page.getByRole("button", { name: "Encerrar" }).click();
   await page.getByRole("link", { name: "Encerradas" }).click();
   await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toBeVisible();
@@ -356,7 +365,26 @@ test("WhatsApp por QR-Code: exige 2FA e aceite do risco, mostra o QR, conecta e 
   await expect(page.getByText(/ainda não foi conectado/)).toHaveCount(0);
 
   await page.goto("/atendimento/configuracoes");
+  page.once("dialog",d=>void d.accept());
+  await page.getByRole("button",{name:"Trocar aparelho ou número (preservar histórico)",exact:true}).click();
+  await expect(page.getByTestId("qr-state")).toContainText("Conectado",{timeout:20000});
+  await page.screenshot({path:"/tmp/legalos-chat-pareamento.png",fullPage:true});
   page.once("dialog", (d) => void d.accept());
   await page.getByRole("button", { name: "Desconectar o aparelho" }).click();
   await expect(page.getByTestId("qr-state")).toContainText("Desconectado");
+});
+
+
+test("Campanha de 2.601 contatos: seleção completa, rascunho e relatório paginado sem disparar",async({page})=>{
+ const id=uid(),email=`campanha-${id}@example.test`;
+ await page.goto("/register");await page.getByLabel("Nome completo").fill(`Pessoa campanha ${id}`);await page.getByLabel("E-mail").fill(email);await page.getByLabel("Senha",{exact:true}).fill(password);await page.getByRole("button",{name:"Criar conta",exact:true}).click();await page.getByLabel("Nome do escritório").fill(`Banca campanhas ${id}`);await page.getByRole("button",{name:"Criar escritório",exact:true}).click();await expect(page.getByRole("heading",{name:/Olá/})).toBeVisible();
+ const url=process.env.TEST_DATABASE_URL??"postgresql://legalos:legalos_dev@localhost:5432/legalos_test";if(!/test/i.test(new URL(url).pathname))throw Error("Fixture exige banco de testes");const database=new Client({connectionString:url});await database.connect();
+ try{
+ const {rows:[person]}=await database.query('SELECT m.organization_id FROM users u JOIN memberships m ON m.user_id=u.id WHERE u.email=$1',[email]);
+ await database.query("INSERT INTO whatsapp_accounts(id,organization_id,label,provider,qr_state,risk_ack_at) VALUES(gen_random_uuid(),$1,'Número de teste','QR','DISCONNECTED',now())",[person.organization_id]);
+ await database.query("INSERT INTO whatsapp_extras_settings(organization_id,campaigns_enabled) VALUES($1,true)",[person.organization_id]);
+ await database.query("INSERT INTO clients(id,organization_id,type,name,phone) SELECT gen_random_uuid(),$1,'PERSON','Campanha '||lpad(i::text,4,'0'),'55719'||lpad(i::text,7,'0') FROM generate_series(1,2601) i",[person.organization_id]);
+ await page.goto("/atendimento/configuracoes");const panel=page.getByTestId("campaigns-panel");await panel.getByLabel("Nome (só para vocês)").fill(`Aviso de recesso ${id}`);await panel.getByLabel("Mensagem (use {nome})").fill("Olá {nome}, aviso de recesso.");await expect(panel.getByText(/2601 clientes no filtro/)).toBeVisible();await panel.getByRole("button",{name:"Selecionar todos do filtro",exact:true}).click();await expect(panel.getByText(/2601 selecionado/)).toBeVisible();await panel.getByRole("button",{name:"Criar rascunho",exact:true}).click();await expect(panel.getByText(`Aviso de recesso ${id}`,{exact:true})).toBeVisible();await panel.getByRole("button",{name:"Relatório",exact:true}).click();await expect(panel.getByText(/1\/27 · 2601 destinatários/)).toBeVisible();await panel.getByRole("button",{name:"Próxima",exact:true}).click();await expect(panel.getByText(/2\/27 · 2601 destinatários/)).toBeVisible();
+ const {rows:[counts]}=await database.query('SELECT (SELECT count(*) FROM whatsapp_campaign_recipients WHERE organization_id=$1)::int AS recipients,(SELECT count(*) FROM whatsapp_messages WHERE organization_id=$1)::int AS messages',[person.organization_id]);expect(counts).toEqual({recipients:2601,messages:0});await panel.screenshot({path:"/tmp/legalos-chat-campanha-2601.png"});
+ }finally{await database.end();}
 });

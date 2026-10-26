@@ -17,6 +17,8 @@ import { createAuthCode } from "@/server/services/mcp-auth.service";
 import { setOrgAiEnabled } from "@/server/services/ai.service";
 import { setRuteFeature } from "@/server/services/rute-settings.service";
 import { makeOrgWithOwner } from "./helpers";
+import { z } from "zod";
+import { OPERATION_SCHEMAS } from "@/server/services/rute-operations.service";
 
 type Captured = { url: string; headers: http.IncomingHttpHeaders; body: Record<string, unknown> };
 
@@ -73,10 +75,24 @@ describe("6.0 — adaptadores de IA com servidores falsos", () => {
     s.close();
     expect(r).toMatchObject({ text: "Resposta Gemini", inputTokens: 16, outputTokens: 5, toolCalls: 1 });
     expect(s.calls[0]?.headers["x-goog-api-key"]).toBe("GKEY");
-    const decls = ((s.calls[0]?.body.tools as { functionDeclarations: { name: string; parameters?: unknown }[] }[])[0]?.functionDeclarations) ?? [];
+    const decls = ((s.calls[0]?.body.tools as { functionDeclarations: { name: string; parameters?: unknown; parametersJsonSchema?: unknown }[] }[])[0]?.functionDeclarations) ?? [];
     expect(decls.find((d) => d.name === "hoje")?.parameters).toBeUndefined();
-    expect(decls.find((d) => d.name === "ver_cliente")?.parameters).toBeTruthy();
+    expect(decls.find((d) => d.name === "hoje")?.parametersJsonSchema).toBeUndefined();
+    expect(decls.find((d) => d.name === "ver_cliente")?.parametersJsonSchema).toBeTruthy();
+    expect(decls.find((d) => d.name === "ver_cliente")?.parameters).toBeUndefined();
     expect(JSON.stringify(s.calls[1]?.body.contents)).toContain("functionResponse");
+  });
+  it("Gemini: envia o JSON Schema das operações com defaults pelo campo apropriado", async () => {
+    const s = await fake(() => ({ json: { candidates: [{ content: { parts: [{ text: "Pronto" }] } }] } }));
+    const schema = z.toJSONSchema(OPERATION_SCHEMAS.CLIENT_CREATE, { io: "input" });
+    try {
+      await new GeminiToolChat("GKEY", "gemini-x", s.base).run({ ...input(async () => "OK"), tools: [{ name: "propor_cliente", description: "Cadastrar cliente", input: schema as ToolChatInput["tools"][number]["input"] }] });
+      const decl = (s.calls[0]?.body.tools as { functionDeclarations: Record<string, unknown>[] }[])[0]?.functionDeclarations[0];
+      const { $schema: _dialect, ...expected } = schema;
+      expect(decl?.parametersJsonSchema).toEqual(expected);
+      expect(decl?.parameters).toBeUndefined();
+      expect((decl?.parametersJsonSchema as Record<string, unknown>).$schema).toBeUndefined();
+    } finally { s.close(); }
   });
   it("mapeia 401/429/500 e respeita o limite de passos", async () => {
     for (const [status, re] of [[401, /recusada/], [429, /limite de uso/], [500, /erro \(500\)/]] as const) {

@@ -17,7 +17,7 @@ export function ApiKeyList({ items, scopeLabels }: { items: ApiKeyView[]; scopeL
   const router = useRouter();
   const [msg, setMsg] = React.useState<string | null>(null);
   const [pending, start] = React.useTransition();
-  if (!items.length) return <p className="text-sm text-slate-600">Nenhuma chave criada.</p>;
+  if (!items.length) return <p className="text-sm text-muted">Nenhuma chave criada.</p>;
   return (
     <div className="space-y-3">
       {msg ? <Alert tone="error">{msg}</Alert> : null}
@@ -28,11 +28,11 @@ export function ApiKeyList({ items, scopeLabels }: { items: ApiKeyView[]; scopeL
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <div className="font-medium">{k.name}</div>
-                <div className="text-xs text-slate-600">lgos_{k.prefix}_… · {k.scopes.map((s) => scopeLabels[s] ?? s).join(", ")}</div>
+                <div className="text-xs text-muted">lgos_{k.prefix}_… · {k.scopes.map((s) => scopeLabels[s] ?? s).join(", ")}</div>
               </div>
               <Badge tone={tone}>{label}</Badge>
             </div>
-            <p className="mt-2 text-xs text-slate-600">
+            <p className="mt-2 text-xs text-muted">
               Criada em {new Date(k.createdAt).toLocaleDateString("pt-BR")} · {k.expiresAt ? `vale até ${new Date(k.expiresAt).toLocaleDateString("pt-BR")}` : "sem validade"} · {k.lastUsedAt ? `último uso ${new Date(k.lastUsedAt).toLocaleString("pt-BR")}` : "nunca usada"}
             </p>
             {k.status !== "REVOKED" ? (
@@ -84,7 +84,7 @@ export function ApiKeyForm({ scopes }: { scopes: ScopeOption[] }) {
       <fieldset className="space-y-1">
         <legend className="text-sm font-medium">Acessos</legend>
         {scopes.map((s) => (
-          <label key={s.key} className={`flex items-center gap-2 text-sm ${s.allowed ? "" : "text-slate-400"}`}>
+          <label key={s.key} className={`flex items-center gap-2 text-sm ${s.allowed ? "" : "text-muted"}`}>
             <input type="checkbox" disabled={!s.allowed} checked={picked.includes(s.key)} onChange={() => toggle(s.key)} />
             {s.label}
             {s.allowed ? null : " (seu perfil não permite)"}

@@ -247,6 +247,12 @@ export function mapDeadline(r: Row): DeadlineDraft | null {
 
 // ---------- tarefas ----------
 
+/** Só sinaliza o evento legado explícito. Comentário não é fonte suficiente para
+ * concluir uma tarefa: ela pode ter sido reaberta depois. */
+export function hasLegacyCompletionNote(description: string | null): boolean {
+  return /\bTarefa\s+['"“‘]?conclu[ií]da['"”’]?\s+em\b/i.test(description ?? "");
+}
+
 export type TaskDraft = {
   externalId: string;
   caseCode: string;

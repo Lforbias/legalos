@@ -1,3 +1,7 @@
+import { matchesConditions, EMPTY_CONDITIONS } from "@/modules/workflows/conditions";
+import { bulkUpdateNotices } from "./notice-bulk.service";
+import { normalizeTags } from "./inbox-flow.service";
+import { getNotice } from "./notice.service";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -58,6 +62,9 @@ export async function runWorkflows(ctx: TenantContext, trigger: WorkflowTriggerK
 }
 
 async function executeRule(ctx: TenantContext, rule: Awaited<ReturnType<typeof db.workflowRule.findMany>>[number], src: WorkflowSource): Promise<{ taskId: string | null; message: string }> {
+  const notice = src.noticeId ? await getNotice(ctx, src.noticeId) : null;
+  const caseData = src.caseId ? await db.case.findFirst({ where: { id: src.caseId, organizationId: ctx.organizationId, deletedAt: null }, select: { area: true, court: true } }) : null;
+  if (!matchesConditions(rule.conditions, { label: src.label, content: notice?.content, court: notice?.court ?? caseData?.court, kind: notice?.kind, source: notice ? notice.externalKey?.startsWith("djen:") ? "DJEN" : notice.externalKey?.startsWith("mni:") ? "MNI" : notice.source : null, tag: notice?.tags, area: caseData?.area })) return { taskId: null, message: "Condições não atendidas." };
   let assigneeId: string | null = null;
   if (rule.assigneeMode === "TRIGGER_USER") assigneeId = src.userId;
   else if (rule.assigneeMode === "FIXED") assigneeId = rule.assigneeId;
@@ -79,6 +86,15 @@ async function executeRule(ctx: TenantContext, rule: Awaited<ReturnType<typeof d
   const title = rule.taskTitle.replaceAll("{{gatilho}}", src.label).slice(0, 200);
   const description = rule.taskDescription ? rule.taskDescription.replaceAll("{{gatilho}}", src.label).slice(0, 4000) : null;
   const task = await db.$transaction(async (tx) => {
+    // Distribuição passa pelas mesmas verificações de acesso/sigilo e versão usadas na caixa.
+    if (notice && rule.trigger === "NOTICE_RECEIVED") {
+      if (rule.noticeAssigneeId) await bulkUpdateNotices(ctx, { action: "ASSIGN_USER", userId: rule.noticeAssigneeId, selection: [{ id: notice.id, updatedAt: notice.updatedAt.toISOString() }] }, tx);
+      if (rule.noticeTags.length) {
+        const current = await tx.courtNotice.findFirstOrThrow({ where: { id: notice.id, organizationId: ctx.organizationId, deletedAt: null }, select: { updatedAt: true } });
+        await bulkUpdateNotices(ctx, { action: "ADD_TAGS", tags: rule.noticeTags, selection: [{ id: notice.id, updatedAt: current.updatedAt.toISOString() }] }, tx);
+      }
+    }
+
     const t = await tx.task.create({
       data: {
         organizationId: ctx.organizationId,
@@ -123,7 +139,16 @@ async function ruleData(ctx: TenantContext, raw: unknown) {
     const m = await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId: v.assigneeId, status: "ACTIVE" }, select: { id: true } });
     if (!m) throw new ValidationError("Responsável inválido.", { assigneeId: ["Escolha um membro ativo do escritório."] });
   }
+  if (v.noticeAssigneeId) {
+    assertCan(ctx, "inbox:write");
+    const m = await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId: v.noticeAssigneeId, status: "ACTIVE", user: { disabledAt: null }, role: { permissions: { has: "inbox:read" } } }, select: { id: true } });
+    if (!m) throw new ValidationError("Destinatário da intimação inválido.");
+  }
+  if (v.noticeTags) assertCan(ctx, "inbox:write");
   return {
+    conditions: v.conditions ?? EMPTY_CONDITIONS,
+    noticeAssigneeId: v.noticeAssigneeId || null,
+    noticeTags: normalizeTags((v.noticeTags ?? "").split(",")),
     name: v.name,
     trigger: v.trigger,
     taskTitle: v.taskTitle,

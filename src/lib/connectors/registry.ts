@@ -8,7 +8,7 @@ import { COURT_SYSTEMS, getCourtSystem } from "@/lib/court-systems";
 export type Capability = "consult" | "import" | "petition";
 export type Connector = { system: string; capabilities: Capability[]; validated: boolean };
 
-export const CONNECTORS: Connector[] = [{ system: "pje-mni", capabilities: ["consult", "import", "petition"], validated: false }];
+export const CONNECTORS: Connector[] = ["pje-mni", "eproc", "esaj", "projudi"].map(system => ({ system, capabilities: ["consult", "import", "petition"], validated: false }));
 
 export const CAPABILITY_LABEL: Record<Capability, string> = { consult: "consulta de processo", import: "importação de autos", petition: "protocolo de petição" };
 
@@ -22,7 +22,7 @@ export function readinessOf(system: string): Readiness {
   if (!sys) return { system, label: system, state: "UNKNOWN", capabilities: [], message: "Sistema desconhecido." };
   const c = getConnector(system);
   if (!c) return { system, label: sys.label, state: "NO_CONNECTOR", capabilities: [], message: `${sys.label} ainda não tem conector no LegalOS: consulta e protocolo não são feitos automaticamente (use o sistema do tribunal).` };
-  if (!c.validated) return { system, label: sys.label, state: "UNVALIDATED", capabilities: c.capabilities, message: `${sys.label}: conector pronto, mas ainda não validado em tribunal real. Valide em homologação antes do primeiro protocolo.` };
+  if (!c.validated) return { system, label: sys.label, state: "UNVALIDATED", capabilities: c.capabilities, message: `${sys.label}: adaptador MNI 2.2.2 disponível apenas para instâncias compatíveis. Verifique o contrato de cada conexão; MNI 3.0 e interfaces proprietárias ainda não são suportados. Nenhuma instância homologada em tribunal real.` };
   return { system, label: sys.label, state: "READY", capabilities: c.capabilities, message: `${sys.label}: conector pronto.` };
 }
 

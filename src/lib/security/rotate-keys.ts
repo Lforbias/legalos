@@ -4,11 +4,11 @@ import { decryptSecret, encryptSecret } from "./totp";
 
 export type KeyPair = { old: Buffer; next: Buffer };
 export type RotateInput = { mfa?: KeyPair; cert?: KeyPair };
-export type RotateReport = { mfa: { userMfa: number; webhooks: number } | null; cert: { certificates: number; connections: number; whatsapp: number; courtCredentials: number; clientCredentials: number } | null; applied: boolean };
+export type RotateReport = { mfa: { userMfa: number; webhooks: number; datajud: number } | null; cert: { certificates: number; connections: number; whatsapp: number; courtCredentials: number; clientCredentials: number } | null; applied: boolean };
 
 /**
  * Troca as chaves de cifra em repouso SEM perder dados: abre cada segredo com a chave antiga e regrava com a nova.
- * MFA_ENCRYPTION_KEY protege: segredos do 2FA e segredos de webhooks. CERT_ENCRYPTION_KEY protege: certificados
+ * MFA_ENCRYPTION_KEY protege: segredos do 2FA, segredos de webhooks e chaves DataJud por escritório. CERT_ENCRYPTION_KEY protege: certificados
  * (arquivo e senha), as credenciais das conexões PJe/MNI, as credenciais dos tribunais por usuário, o cofre de senhas de clientes e o token do WhatsApp. Tudo ou nada: numa única transação; se QUALQUER segredo não
  * abrir com a chave antiga, nada é gravado (evita meia-troca). Com `apply: false` só confere e conta.
  */
@@ -20,7 +20,7 @@ export async function rotateKeys(db: PrismaClient, input: RotateInput, opts: { a
 
   if (input.mfa) {
     const { old, next } = input.mfa;
-    const [mfas, hooks] = await Promise.all([db.userMfa.findMany({ select: { userId: true, secretEnc: true } }), db.webhookEndpoint.findMany({ select: { id: true, secretEnc: true } })]);
+    const [mfas, hooks, datajud] = await Promise.all([db.userMfa.findMany({ select: { userId: true, secretEnc: true } }), db.webhookEndpoint.findMany({ select: { id: true, secretEnc: true } }), db.organization.findMany({ where: { datajudApiKeyEnc: { not: null } }, select: { id: true, datajudApiKeyEnc: true } })]);
     const re = (label: string, id: string, stored: string) => {
       try {
         return encryptSecret(decryptSecret(stored, old), next);
@@ -37,7 +37,11 @@ export async function rotateKeys(db: PrismaClient, input: RotateInput, opts: { a
       const v = re("webhook", h.id, h.secretEnc);
       if (v) work.push((tx) => tx.webhookEndpoint.update({ where: { id: h.id }, data: { secretEnc: v } }));
     }
-    report.mfa = { userMfa: mfas.length, webhooks: hooks.length };
+    for (const org of datajud) {
+      const v = re("DataJud do escritório", org.id, org.datajudApiKeyEnc!);
+      if (v) work.push(tx => tx.organization.update({ where: { id: org.id }, data: { datajudApiKeyEnc: v } }));
+    }
+    report.mfa = { userMfa: mfas.length, webhooks: hooks.length, datajud: datajud.length };
   }
 
   if (input.cert) {

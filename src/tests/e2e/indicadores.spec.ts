@@ -15,6 +15,7 @@ test("indicadores e central de alertas: abrem para o dono, abas navegam e o escr
   await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
 
   // Menu lateral leva às duas páginas.
+  await page.getByRole("button", { name: "Gestão do escritório", exact: true }).click();
   await page.getByRole("link", { name: "Indicadores" }).first().click();
   await expect(page.getByTestId("indicators-page")).toBeVisible();
   await expect(page.getByTestId("ind-overdue-tasks")).toContainText("0");

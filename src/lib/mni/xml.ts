@@ -12,7 +12,7 @@ const esc = (s: string) => s.replace(/[<>&"']/g, (c) => ({ "<": "&lt;", ">": "&g
 export type MniCredentials = { document: string; password: string };
 
 function envelope(operation: string, body: string): string {
-  return `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="${MNI_SERVICE_NS}"><soapenv:Header/><soapenv:Body><tns:${operation}>${body}</tns:${operation}></soapenv:Body></soapenv:Envelope>`;
+  return `<?xml version="1.0" encoding="UTF-8"?><soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:tns="${MNI_SERVICE_NS}"${["consultarProcesso", "consultarAvisosPendentes"].includes(operation) ? ' xmlns="http://www.cnj.jus.br/tipos-servico-intercomunicacao-2.2.2"' : ""}><soapenv:Header/><soapenv:Body><tns:${operation}>${body}</tns:${operation}></soapenv:Body></soapenv:Envelope>`;
 }
 const tag = (name: string, v: string | boolean) => `<${name}>${esc(String(v))}</${name}>`;
 

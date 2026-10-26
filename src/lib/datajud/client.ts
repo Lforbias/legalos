@@ -35,7 +35,37 @@ export type DatajudResult = {
   movements: DatajudMovement[];
 };
 
-export class DatajudError extends Error {}
+export type DatajudErrorCode = "TIMEOUT" | "NETWORK" | "AUTH" | "RATE_LIMIT" | "UNAVAILABLE" | "INVALID_RESPONSE" | "CONFIG";
+export class DatajudError extends Error {
+  constructor(message: string, readonly code: DatajudErrorCode = "CONFIG") { super(message); this.name = "DatajudError"; }
+}
+/** Só mensagens fixas: respostas do provedor e credenciais nunca chegam à interface/auditoria. */
+async function requestDatajud(alias: string, key: string, body: object): Promise<unknown> {
+  try {
+    const res = await fetch(`${baseUrl()}/api_publica_${alias}/_search`, {
+      method: "POST", headers: { "content-type": "application/json", authorization: `APIKey ${key}` },
+      body: JSON.stringify(body), signal: AbortSignal.timeout(30_000), cache: "no-store",
+    });
+    if (res.status === 403) throw new DatajudError("O DataJud recusou o acesso à API. Confira a chave e as permissões de acesso do servidor.", "AUTH");
+    if (res.status === 401) throw new DatajudError("O DataJud recusou a chave configurada. Confira a chave pública vigente do CNJ em Integrações.", "AUTH");
+    if (res.status === 429) throw new DatajudError("O DataJud limitou as consultas. Aguarde alguns minutos antes de tentar novamente.", "RATE_LIMIT");
+    if (!res.ok) throw new DatajudError(`O DataJud está indisponível para esta consulta (HTTP ${res.status}). Tente novamente mais tarde.`, "UNAVAILABLE");
+    let json: unknown;
+    try { json = await res.json(); }
+    catch (e) {
+      if (e instanceof Error && ["TimeoutError", "AbortError"].includes(e.name)) throw e;
+      throw new DatajudError("O DataJud retornou uma resposta inválida. Nenhum andamento foi importado.", "INVALID_RESPONSE");
+    }
+    const data = json as { hits?: { hits?: unknown }; timed_out?: boolean; _shards?: { failed?: number } } | null;
+    if (!data || !Array.isArray(data.hits?.hits)) throw new DatajudError("O DataJud retornou uma resposta inválida. Nenhum andamento foi importado.", "INVALID_RESPONSE");
+    if (data.timed_out || (data._shards?.failed ?? 0) > 0) throw new DatajudError("O DataJud retornou dados incompletos. Tente novamente; a consulta não foi concluída.", "UNAVAILABLE");
+    return json;
+  } catch (e) {
+    if (e instanceof DatajudError) throw e;
+    if (e instanceof Error && ["TimeoutError", "AbortError"].includes(e.name)) throw new DatajudError("O DataJud não respondeu em até 30 segundos. Tente novamente mais tarde.", "TIMEOUT");
+    throw new DatajudError("Não foi possível conectar ao DataJud. Confira a conexão do servidor com o CNJ e tente novamente.", "NETWORK");
+  }
+}
 
 export function datajudApiKey(): string | null {
   const k = process.env.DATAJUD_API_KEY?.trim();
@@ -78,36 +108,23 @@ export function parseDatajudResponse(alias: string, raw: unknown): DatajudResult
 }
 
 /** Consulta um processo na API pública do DataJud. Envia SOMENTE o número do processo. Nunca registra a chave. */
-export async function fetchDatajud(cnj: string): Promise<DatajudResult> {
-  const key = datajudApiKey();
+export async function fetchDatajud(cnj: string, configuredKey?: string | null): Promise<DatajudResult> {
+  const key = configuredKey ?? datajudApiKey();
   if (!key) throw new DatajudError("A consulta ao DataJud não está configurada neste sistema (falta DATAJUD_API_KEY).");
   const alias = datajudAlias(cnj);
   const p = parseCnj(cnj);
   if (!alias || !p) throw new DatajudError("Este tribunal não é coberto pelo DataJud (ramos Estadual, Federal, Trabalho, Eleitoral, STJ e TST).");
   const digits = `${p.sequence}${p.check}${p.year}${p.segment}${p.court}${p.origin}`;
-  let res: Response;
-  try {
-    res = await fetch(`${baseUrl()}/api_publica_${alias}/_search`, {
-      method: "POST",
-      headers: { "content-type": "application/json", authorization: `APIKey ${key}` },
-      body: JSON.stringify({ size: 1, query: { match: { numeroProcesso: digits } } }),
-      signal: AbortSignal.timeout(30_000),
-    });
-  } catch {
-    throw new DatajudError("Não foi possível falar com o DataJud agora. Tente novamente em instantes.");
-  }
-  if (res.status === 401 || res.status === 403) throw new DatajudError("O DataJud recusou a chave configurada (DATAJUD_API_KEY).");
-  if (!res.ok) throw new DatajudError(`O DataJud respondeu com erro (HTTP ${res.status}).`);
-  let json: unknown;
-  try {
-    json = await res.json();
-  } catch {
-    throw new DatajudError("Resposta inválida do DataJud.");
-  }
+  const json = await requestDatajud(alias, key, { size: 1, query: { match: { numeroProcesso: digits } } });
   return parseDatajudResponse(alias, json);
 }
 
 /** Chave estável do andamento, para importar sem duplicar. */
 export function movementKey(m: DatajudMovement): string {
   return `datajud:${m.code ?? "x"}:${m.at.toISOString()}:${m.name.toLowerCase()}`.slice(0, 200);
+}
+
+/** Testa autenticação sem consultar dados de qualquer processo. */
+export async function testDatajudKey(key: string): Promise<void> {
+  await requestDatajud("tjsp", key, { size: 0, query: { match_none: {} } });
 }

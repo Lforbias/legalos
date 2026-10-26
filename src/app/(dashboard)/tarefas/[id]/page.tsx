@@ -1,9 +1,11 @@
+import { ActivityDetailsSection } from "@/modules/activities/details-section";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
+import { RecordBackLink } from "@/components/layout/record-back-link";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
@@ -16,6 +18,7 @@ import { DeleteTaskButton } from "@/modules/tasks/delete-task-button";
 import { CommentForm, TaskStatusSelect } from "@/modules/tasks/task-controls";
 import { dueState, PRIORITY_TONE } from "@/modules/tasks/tone";
 import { can } from "@/server/context";
+import { listTaskStages } from "@/server/services/task-stage.service";
 import { getTask } from "@/server/services/task.service";
 import { getTaskClassification, listTaskAttachments, listTaskEvents, listTaskLabels, listTaskTypes } from "@/server/services/task-extras.service";
 import { listActiveMembers } from "@/server/services/members";
@@ -32,15 +35,16 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
   const t = await getTask(ctx, parsed.data).catch((e) => (e instanceof NotFoundError ? null : Promise.reject(e)));
   if (!t) notFound();
   const canWrite = can(ctx, "tasks:write");
-  const [cls, types, labels, attachments, events, members] = await Promise.all([
-    getTaskClassification(ctx, t.id), listTaskTypes(ctx, { onlyActive: true }), listTaskLabels(ctx), listTaskAttachments(ctx, t.id), listTaskEvents(ctx, t.id), listActiveMembers(ctx),
+  const [cls, types, labels, attachments, events, members, stages] = await Promise.all([
+    getTaskClassification(ctx, t.id), listTaskTypes(ctx, { onlyActive: true }), listTaskLabels(ctx), listTaskAttachments(ctx, t.id), listTaskEvents(ctx, t.id), listActiveMembers(ctx), listTaskStages(ctx),
   ]);
   const tz = organization.timezone;
   const due = t.dueDate ? dateToYmd(t.dueDate) : null;
   const ds = dueState(due, t.status !== "DONE" && t.status !== "CANCELED", tz);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-7xl">
+      <RecordBackLink href="/tarefas">Tarefas</RecordBackLink>
       <PageHeader
         title={t.title}
         description={`Criada${t.createdByName ? ` por ${t.createdByName}` : ""} em ${formatDate(t.createdAt, tz)}`}
@@ -52,6 +56,25 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           ) : null
         }
       />
+      <Card className="mb-5">
+        <CardBody className="grid items-start gap-4 sm:grid-cols-[220px_1fr]">
+          <div>
+            <p className="mb-2 text-xs font-medium text-muted">Situação</p>
+            <TaskStatusSelect stages={stages} stageId={t.stageId} taskId={t.id} status={t.status} disabled={!canWrite} />
+            <p className="mt-2 text-xs text-muted">{t.assigneeName ?? "Sem responsável"}</p>
+          </div>
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              <Badge tone={PRIORITY_TONE[t.priority]}>{TASK_PRIORITY_LABEL[t.priority]}</Badge>
+              {due ? <Badge tone={ds === "overdue" ? "danger" : ds === "today" || ds === "soon" ? "warning" : "neutral"}>{formatYmd(due)}{ds === "overdue" ? " · Atrasada" : ds === "today" ? " · Vence hoje" : ds === "soon" ? " · Vence em breve" : ""}</Badge> : <Badge>Sem vencimento</Badge>}
+              <Badge>{t.stage?.name ?? TASK_STATUS_LABEL[t.status]}</Badge>
+            </div>
+            {cls.type ? <p className="text-xs text-muted">Tipo: {cls.type.name} ({cls.type.points} pt)</p> : null}
+            {cls.labels.length ? <div className="flex flex-wrap gap-1.5">{cls.labels.map((l) => <LabelBadge key={l.id} name={l.name} color={l.color} />)}</div> : null}
+            {t.completedAt ? <p className="text-xs text-muted">Concluída em {formatDateTime(t.completedAt, tz)}</p> : null}
+          </div>
+        </CardBody>
+      </Card>
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
           <Card>
@@ -87,20 +110,6 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           </Card>
         </div>
         <div className="space-y-4">
-          <Card>
-            <CardHeader title="Situação" />
-            <CardBody className="space-y-3">
-              <TaskStatusSelect taskId={t.id} status={t.status} disabled={!canWrite} />
-              <div className="flex flex-wrap gap-1.5">
-                <Badge tone={PRIORITY_TONE[t.priority]}>{TASK_PRIORITY_LABEL[t.priority]}</Badge>
-                {due ? <Badge tone={ds === "overdue" ? "danger" : ds === "today" || ds === "soon" ? "warning" : "neutral"}>{formatYmd(due)}{ds === "overdue" ? " · Atrasada" : ""}</Badge> : null}
-                <Badge>{TASK_STATUS_LABEL[t.status]}</Badge>
-              </div>
-              {cls.type ? <p className="text-xs text-muted">Tipo: {cls.type.name} ({cls.type.points} pt)</p> : null}
-              {cls.labels.length ? <div className="flex flex-wrap gap-1.5">{cls.labels.map((l) => <LabelBadge key={l.id} name={l.name} color={l.color} />)}</div> : null}
-              {t.completedAt ? <p className="text-xs text-muted">Concluída em {formatDateTime(t.completedAt, tz)}</p> : null}
-            </CardBody>
-          </Card>
           <ClassificationCard taskId={t.id} canWrite={canWrite} types={types.map((x) => ({ id: x.id, name: x.name, points: x.points }))} labels={labels.map((l) => ({ id: l.id, name: l.name, color: l.color }))} typeId={cls.type?.id ?? ""} labelIds={cls.labels.map((l) => l.id)} />
           <Card>
             <CardHeader title="Vínculos" />
@@ -119,6 +128,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
           {canWrite ? <DeleteTaskButton taskId={t.id} /> : null}
         </div>
       </div>
+      <ActivityDetailsSection ctx={ctx} kind="TASK" id={t.id} />
     </div>
   );
 }

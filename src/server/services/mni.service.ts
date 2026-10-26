@@ -1,3 +1,7 @@
+import { tjprDailyPassword } from "@/lib/connectors/auth";
+import { connectionSoapAction, connectionSupports, CONNECTION_ENVIRONMENTS, type MniOperation } from "@/lib/connectors/capabilities";
+import { inspectMniContract } from "@/lib/connectors/contract";
+import { getCourtSystem } from "@/lib/court-systems";
 import { db } from "@/lib/db/client";
 import { dateToYmd } from "@/lib/dates/ymd";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -5,7 +9,7 @@ import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
 import { isValidCnj, isValidCpf, isValidCnpj, onlyDigits } from "@/lib/validation/br-documents";
 import { isKnownJtr, jtrOfCnj } from "@/lib/mni/tribunals";
 import { systemForJtr } from "./court-system-map.service";
-import { postSoap, assertEndpointUrl, type Mtls } from "@/lib/mni/transport";
+import { postSoap, fetchWsdl, assertEndpointUrl, type Mtls } from "@/lib/mni/transport";
 import { buildConsultarAvisosPendentes, buildConsultarProcesso, MniError, parseAvisosPendentes, parseConsultarProcesso, type MniAviso, type MniDocumento, type MniProcesso } from "@/lib/mni/xml";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
@@ -21,7 +25,7 @@ export const AUTH_MODES = ["PASSWORD", "CERTIFICATE", "PASSWORD_AND_CERTIFICATE"
 export type AuthMode = (typeof AUTH_MODES)[number];
 
 /** Transporte injetável (testes usam um servidor local; produção usa HTTPS real). */
-export type SoapPost = (endpoint: string, xml: string, mtls?: Mtls) => Promise<string>;
+export type SoapPost = (endpoint: string, xml: string, mtls?: Mtls, soapAction?: string) => Promise<string>;
 
 function requireKey(): Buffer {
   const k = certKey();
@@ -36,34 +40,44 @@ const digitsToCnj = (d: string): string | null => {
   return isValidCnj(f) ? f : null;
 };
 
-export type ConnectionRow = { id: string; label: string; jtr: string; endpointUrl: string; authMode: string; certificateId: string | null; certificateLabel: string | null; enabled: boolean; lastSyncAt: Date | null; lastStatus: string | null; lastMessage: string | null; petitionTypes: Record<string, string> };
+export type ConnectionRow = { wsdlUrl: string | null; authProfile: string; system: string; environment: string; wsdlStatus: string | null; wsdlCheckedAt: Date | null; wsdlOperations: string[]; id: string; label: string; jtr: string; endpointUrl: string; authMode: string; certificateId: string | null; certificateLabel: string | null; enabled: boolean; lastSyncAt: Date | null; lastStatus: string | null; lastMessage: string | null; petitionTypes: Record<string, string> };
 
 export async function listConnections(ctx: TenantContext): Promise<ConnectionRow[]> {
   assertCan(ctx, "integrations:manage");
   const rows = await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId }, include: { certificate: { select: { label: true } } }, orderBy: { createdAt: "asc" } });
-  return rows.map((r) => ({ id: r.id, label: r.label, jtr: r.jtr, endpointUrl: r.endpointUrl, authMode: r.authMode, certificateId: r.certificateId, certificateLabel: r.certificate?.label ?? null, enabled: r.enabled, lastSyncAt: r.lastSyncAt, lastStatus: r.lastStatus, lastMessage: r.lastMessage, petitionTypes: (r.petitionTypes && typeof r.petitionTypes === "object" && !Array.isArray(r.petitionTypes) ? (r.petitionTypes as Record<string, string>) : {}) }));
+  return rows.map((r) => ({ wsdlUrl: r.wsdlUrl, authProfile: r.authProfile, system: r.system, environment: r.environment, wsdlStatus: r.wsdlStatus, wsdlCheckedAt: r.wsdlCheckedAt, wsdlOperations: r.wsdlOperations, id: r.id, label: r.label, jtr: r.jtr, endpointUrl: r.endpointUrl, authMode: r.authMode, certificateId: r.certificateId, certificateLabel: r.certificate?.label ?? null, enabled: r.enabled, lastSyncAt: r.lastSyncAt, lastStatus: r.lastStatus, lastMessage: r.lastMessage, petitionTypes: (r.petitionTypes && typeof r.petitionTypes === "object" && !Array.isArray(r.petitionTypes) ? (r.petitionTypes as Record<string, string>) : {}) }));
 }
 
-export type ConnectionInput = { label: string; jtr: string; endpointUrl: string; authMode: AuthMode; certificateId?: string | null; document: string; password?: string };
+export type ConnectionInput = { wsdlUrl?: string; authProfile?: string; system?: string; environment?: string; label: string; jtr: string; endpointUrl: string; authMode: AuthMode; certificateId?: string | null; document: string; password?: string };
 
 export async function createConnection(ctx: TenantContext, input: ConnectionInput) {
   assertCan(ctx, "integrations:manage");
   const key = requireKey();
   await requireMfa(ctx.userId);
+  const system = input.system ?? "pje-mni";
+  const environment = input.environment ?? "UNSPECIFIED";
+  const authProfile = input.authProfile ?? "STATIC";
+  if (!["STATIC", "TJPR_SCMPP"].includes(authProfile) || (authProfile === "TJPR_SCMPP" && (system !== "projudi" || input.jtr !== "8.16" || input.authMode !== "PASSWORD"))) throw new ValidationError("O perfil SCMPP só atende PROJUDI/TJPR com usuário e código privado da integração.");
+  if (!getCourtSystem(system)) throw new ValidationError("Sistema de tribunal inválido.");
+  if (!(CONNECTION_ENVIRONMENTS as readonly string[]).includes(environment)) throw new ValidationError("Ambiente inválido.");
   const label = input.label.trim();
   if (!label || label.length > 120) throw new ValidationError("Informe um nome de até 120 caracteres.", { label: ["Nome obrigatório."] });
   if (!isKnownJtr(input.jtr)) throw new ValidationError("Tribunal inválido.", { jtr: ["Selecione um tribunal da lista."] });
   if (!AUTH_MODES.includes(input.authMode)) throw new ValidationError("Modo de autenticação inválido.");
   try {
-    assertEndpointUrl(input.endpointUrl);
+    const endpoint = assertEndpointUrl(input.endpointUrl);
+    if (input.wsdlUrl?.trim()) {
+      const contract = assertEndpointUrl(input.wsdlUrl.trim());
+      if (endpoint.origin !== contract.origin) throw new MniError("O WSDL deve estar na mesma origem HTTPS do serviço do tribunal.");
+    }
   } catch (e) {
     throw new ValidationError((e as Error).message, { endpointUrl: [(e as Error).message] });
   }
-  const doc = onlyDigits(input.document);
-  if (!(doc.length === 11 ? isValidCpf(doc) : doc.length === 14 ? isValidCnpj(doc) : false)) throw new ValidationError("CPF/CNPJ do consultante inválido.", { document: ["CPF/CNPJ inválido."] });
+  const doc = system === "pje-mni" ? onlyDigits(input.document) : input.document.trim();
+  if (system === "pje-mni" ? !(doc.length === 11 ? isValidCpf(doc) : doc.length === 14 ? isValidCnpj(doc) : false) : !/^[A-Za-z0-9_.@-]{1,120}$/.test(doc)) throw new ValidationError("CPF/CNPJ do consultante inválido.", { document: ["CPF/CNPJ inválido."] });
   const needsPassword = input.authMode !== "CERTIFICATE";
   const needsCert = input.authMode !== "PASSWORD";
-  if (needsPassword && !input.password) throw new ValidationError("Informe a senha do PJe.", { password: ["Senha obrigatória neste modo."] });
+  if (needsPassword && !input.password) throw new ValidationError("Informe a senha do serviço do tribunal.", { password: ["Senha obrigatória neste modo."] });
   let certificateId: string | null = null;
   if (needsCert) {
     const certInputId = input.certificateId ?? "";
@@ -73,13 +87,18 @@ export async function createConnection(ctx: TenantContext, input: ConnectionInpu
     certificateId = cert.id;
   }
   const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document: doc, password: needsPassword ? input.password : "" }), "utf8"), key);
-  const c = await db.courtConnection.create({ data: { organizationId: ctx.organizationId, label, jtr: input.jtr, endpointUrl: input.endpointUrl.trim(), authMode: input.authMode, certificateId, secretEnc, createdById: ctx.userId }, select: { id: true } });
+  const c = await db.courtConnection.create({ data: { organizationId: ctx.organizationId, wsdlUrl: input.wsdlUrl?.trim() || null, authProfile, system, environment, enabled: system === "pje-mni", label, jtr: input.jtr, endpointUrl: input.endpointUrl.trim(), authMode: input.authMode, certificateId, secretEnc, createdById: ctx.userId }, select: { id: true } });
   await audit({ action: "mni.connection_create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: c.id, metadata: { jtr: input.jtr, authMode: input.authMode }, meta: ctx.meta });
   return c;
 }
 
 export async function setConnectionEnabled(ctx: TenantContext, id: string, enabled: boolean) {
   assertCan(ctx, "integrations:manage");
+  if (enabled) {
+    const c = await db.courtConnection.findFirst({ where: { id, organizationId: ctx.organizationId } });
+    if (!c) throw new NotFoundError("Conexão não encontrada.");
+    if (c.system !== "pje-mni" && c.wsdlStatus !== "COMPATIBLE") throw new ConflictError("Verifique o contrato WSDL desta conexão antes de ligá-la.");
+  }
   const r = await db.courtConnection.updateMany({ where: { id, organizationId: ctx.organizationId }, data: { enabled } });
   if (r.count !== 1) throw new NotFoundError("Conexão não encontrada.");
   await audit({ action: enabled ? "mni.connection_enable" : "mni.connection_disable", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: id, meta: ctx.meta });
@@ -98,14 +117,15 @@ export async function deleteConnection(ctx: TenantContext, id: string) {
  * `personal: true` (ações de uma pessoa: consulta, autos, protocolo) usa a credencial pessoal dela para este tribunal, se existir
  * (3.0-F6b); sem ela, ou em rotinas automáticas, vale a credencial da conexão do escritório.
  */
-export async function loadConnection(ctx: TenantContext, id: string, opts: { personal?: boolean } = {}) {
+export async function loadConnection(ctx: TenantContext, id: string, opts: { personal?: boolean; allowDisabled?: boolean } = {}) {
   const c = await db.courtConnection.findFirst({ where: { id, organizationId: ctx.organizationId } });
   if (!c) throw new NotFoundError("Conexão não encontrada.");
-  if (!c.enabled) throw new ConflictError("Esta conexão está desligada.");
+  if (!c.enabled && !opts.allowDisabled) throw new ConflictError("Esta conexão está desligada.");
   const key = requireKey();
   const secret = JSON.parse(openBytes(c.secretEnc, key).toString("utf8")) as { document: string; password: string };
-  if (opts.personal) {
-    const mine = await resolveMyCredential(ctx, "pje-mni", c.jtr);
+  if (c.authProfile === "TJPR_SCMPP") secret.password = tjprDailyPassword(secret.password);
+  if (opts.personal && c.authProfile === "STATIC") {
+    const mine = await resolveMyCredential(ctx, c.system, c.jtr);
     if (mine) return { c: { ...c, authMode: mine.authMode, certificateId: mine.certificateId }, secret: mine.secret, personal: true as const };
   }
   return { c, secret, personal: false as const };
@@ -133,10 +153,11 @@ export type SyncAvisosResult = { found: number; imported: number; alreadyKnown: 
 export async function syncAvisos(ctx: TenantContext, connectionId: string, post: SoapPost = postSoap): Promise<SyncAvisosResult> {
   assertCan(ctx, "inbox:write");
   const { c, secret } = await loadConnection(ctx, connectionId);
+  assertConnectionOperation(c, "consultarAvisosPendentes");
   let avisos: MniAviso[];
   try {
     const mtls = await mtlsFor(ctx, c.certificateId, "mni:consultarAvisosPendentes");
-    avisos = parseAvisosPendentes(await post(c.endpointUrl, buildConsultarAvisosPendentes(secret), mtls));
+    avisos = parseAvisosPendentes(await post(c.endpointUrl, buildConsultarAvisosPendentes(secret), mtls, connectionSoapAction(c, "consultarAvisosPendentes")));
   } catch (err) {
     if (err instanceof MniError) {
       await record(c.id, false, err.message);
@@ -148,7 +169,7 @@ export async function syncAvisos(ctx: TenantContext, connectionId: string, post:
   let alreadyKnown = 0;
   const today = brDate(new Date());
   for (const a of avisos) {
-    const externalKey = `mni:${c.jtr}:${a.idAviso}`;
+    const externalKey = `mni:${c.system === "pje-mni" ? "" : `${c.system}:`}${c.jtr}:${a.idAviso}`;
     if (await db.courtNotice.findFirst({ where: { organizationId: ctx.organizationId, externalKey }, select: { id: true } })) {
       alreadyKnown++;
       continue;
@@ -183,15 +204,18 @@ export async function syncAvisos(ctx: TenantContext, connectionId: string, post:
 }
 
 /** Conexão ativa que atende o tribunal do número CNJ do processo (ou null). */
-export async function connectionForCase(ctx: TenantContext, caseId: string) {
-  assertCan(ctx, "cases:write");
+export async function connectionForCase(ctx: TenantContext, caseId: string, operation: MniOperation = "consultarProcesso") {
+  assertCan(ctx, "cases:read");
   await assertCaseVisible(ctx, caseId);
-  const c = await db.case.findFirst({ where: { id: caseId, organizationId: ctx.organizationId }, select: { number: true } });
+  const c = await db.case.findFirst({ where: { id: caseId, organizationId: ctx.organizationId }, select: { number: true, courtSystem: true } });
   const jtr = c?.number ? jtrOfCnj(c.number) : null;
   if (!jtr) return null;
-  const mapped = await systemForJtr(ctx.organizationId, jtr);
-  if (mapped && mapped !== "pje-mni") return null;
-  return db.courtConnection.findFirst({ where: { organizationId: ctx.organizationId, jtr, enabled: true }, select: { id: true, label: true } });
+  const mapped = c?.courtSystem ?? await systemForJtr(ctx.organizationId, jtr);
+  const candidates = await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, jtr, enabled: true, ...(mapped ? { system: mapped } : {}) }, orderBy: { id: "asc" } });
+  const compatible = candidates.filter(row => connectionSupports(row, operation));
+  if (compatible.length > 1) throw new ConflictError("Há mais de uma conexão para este processo. Defina o sistema no processo e mantenha uma única conexão ativa para ele.");
+  const selected = compatible[0];
+  return selected ? { id: selected.id, label: selected.label, system: selected.system, environment: selected.environment } : null;
 }
 
 export type ConsultCaseResult = { total: number; imported: number; classe: string | null; orgao: string | null };
@@ -206,10 +230,11 @@ export async function consultCaseMni(ctx: TenantContext, caseId: string, post: S
   const conn = await connectionForCase(ctx, caseId);
   if (!conn) throw new ConflictError("Nenhuma conexão PJe/MNI ativa para o tribunal deste processo (cadastre em Integrações).");
   const { c: connection, secret } = await loadConnection(ctx, conn.id, { personal: true });
+  assertConnectionOperation(connection, "consultarProcesso");
   let proc: MniProcesso;
   try {
     const mtls = await mtlsFor(ctx, connection.certificateId, "mni:consultarProcesso", caseId);
-    proc = parseConsultarProcesso(await post(connection.endpointUrl, buildConsultarProcesso(secret, onlyDigits(c.number)), mtls));
+    proc = parseConsultarProcesso(await post(connection.endpointUrl, buildConsultarProcesso(secret, onlyDigits(c.number)), mtls, connectionSoapAction(connection, "consultarProcesso")));
   } catch (err) {
     if (err instanceof MniError) {
       await record(connection.id, false, err.message);
@@ -256,7 +281,7 @@ function categoryOf(d: MniDocumento): string {
  * rode de novo para continuar. Documentos sigilosos, de tipo não suportado ou acima de 8 MB não são importados (são contados).
  * Consulta de autos NÃO gera ciência de comunicações; mesmo assim, o uso do certificado fica registrado.
  */
-export async function importAutosMni(ctx: TenantContext, caseId: string, post: SoapPost = postSoap): Promise<ImportAutosResult> {
+export async function importAutosMni(ctx: TenantContext, caseId: string, post: SoapPost = postSoap, excludedIds: string[] = [], onExcluded?: (id: string) => void, limit = AUTOS_MAX_PER_RUN): Promise<ImportAutosResult> {
   assertCan(ctx, "cases:write");
   assertCan(ctx, "documents:write");
   await assertCaseVisible(ctx, caseId);
@@ -266,40 +291,44 @@ export async function importAutosMni(ctx: TenantContext, caseId: string, post: S
   const conn = await connectionForCase(ctx, caseId);
   if (!conn) throw new ConflictError("Nenhuma conexão PJe/MNI ativa para o tribunal deste processo (cadastre em Integrações).");
   const { c: connection, secret } = await loadConnection(ctx, conn.id, { personal: true });
+  assertConnectionOperation(connection, "consultarProcesso");
+  if (connection.authProfile === "TJPR_SCMPP") throw new ConflictError("SCMPP/TJPR é um serviço de consulta a movimentações públicas; a importação de autos não está habilitada nesse perfil.");
   const cnj = onlyDigits(c.number);
-  const keyOf = (id: string) => `mni:${connection.jtr}:doc:${id}`.slice(0, 200);
+  const keyOf = (id: string) => `mni:${connection.system === "pje-mni" ? "" : `${connection.system}:${cnj}:`}${connection.jtr}:doc:${id}`.slice(0, 200);
   const res: ImportAutosResult = { listed: 0, imported: 0, alreadyKnown: 0, skippedSecret: 0, skippedUnsupported: 0, skippedTooBig: 0, remaining: 0 };
   try {
     const mtls = await mtlsFor(ctx, connection.certificateId, "mni:consultarProcesso:autos", caseId);
-    const list = parseConsultarProcesso(await post(connection.endpointUrl, buildConsultarProcesso(secret, cnj, { movimentos: false }), mtls));
+    const list = parseConsultarProcesso(await post(connection.endpointUrl, buildConsultarProcesso(secret, cnj, { movimentos: false }), mtls, connectionSoapAction(connection, "consultarProcesso")));
     const docs = list.documentos;
     res.listed = docs.length;
     const known = new Set((await db.document.findMany({ where: { organizationId: ctx.organizationId, externalKey: { in: docs.map((d) => keyOf(d.id)) } }, select: { externalKey: true } })).map((d) => d.externalKey));
     const todo: MniDocumento[] = [];
     for (const d of docs) {
+      if (excludedIds.includes(d.id)) continue;
       if (known.has(keyOf(d.id))) res.alreadyKnown++;
-      else if (d.sigilo > 0) res.skippedSecret++;
+      else if (d.sigilo > 0) { res.skippedSecret++; onExcluded?.(d.id); }
       else todo.push(d);
     }
-    const now = todo.slice(0, AUTOS_MAX_PER_RUN);
+    const now = todo.slice(0, Math.max(1, Math.min(AUTOS_MAX_PER_RUN, Math.floor(limit))));
     res.remaining = todo.length - now.length;
     for (let i = 0; i < now.length; i += AUTOS_BATCH) {
       const batch = now.slice(i, i + AUTOS_BATCH);
-      const got = parseConsultarProcesso(await post(connection.endpointUrl, buildConsultarProcesso(secret, cnj, { movimentos: false, documentIds: batch.map((d) => d.id) }), mtls));
+      const got = parseConsultarProcesso(await post(connection.endpointUrl, buildConsultarProcesso(secret, cnj, { movimentos: false, documentIds: batch.map((d) => d.id) }), mtls, connectionSoapAction(connection, "consultarProcesso")));
       const byId = new Map(got.documentos.map((d) => [d.id, d]));
       for (const meta of batch) {
         const d = byId.get(meta.id);
-        if (!d?.content) { res.skippedUnsupported++; continue; }
-        if (d.sigilo > 0) { res.skippedSecret++; continue; }
-        if (d.content.length > MAX_DOCUMENT_BYTES) { res.skippedTooBig++; continue; }
+        if (!d?.content) throw new MniError("O tribunal não retornou o conteúdo de um documento solicitado. Tente novamente.");
+        if (d.sigilo > 0) { res.skippedSecret++; onExcluded?.(meta.id); continue; }
+        if (d.content.length > MAX_DOCUMENT_BYTES) { res.skippedTooBig++; onExcluded?.(meta.id); continue; }
         const ext = MIME_EXT[(d.mimetype ?? meta.mimetype ?? "").toLowerCase().split(";")[0]!.trim()];
-        if (!ext) { res.skippedUnsupported++; continue; }
+        if (!ext) { res.skippedUnsupported++; onExcluded?.(meta.id); continue; }
         const base = sanitizeFileName(`${(meta.descricao ?? meta.tipo ?? "Documento").slice(0, 80)} (${meta.id})`).replace(/\.[a-z0-9]{1,5}$/i, "");
         let cls: { name: string; mime: string };
         try {
           cls = classifyFile(`${base}.${ext}`, d.content);
         } catch {
           res.skippedUnsupported++;
+          onExcluded?.(meta.id);
           continue;
         }
         try {
@@ -318,6 +347,7 @@ export async function importAutosMni(ctx: TenantContext, caseId: string, post: S
       }
     }
   } catch (err) {
+    await audit({ action: "mni.import_autos_failed", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: caseId, metadata: { connectionId: connection.id, imported: res.imported }, meta: ctx.meta });
     if (err instanceof MniError) {
       await record(connection.id, false, err.message);
       throw new ConflictError(err.message);
@@ -336,11 +366,12 @@ export async function importAutosMni(ctx: TenantContext, caseId: string, post: S
 export async function runMniAll(opts: { post?: SoapPost } = {}) {
   const conns = await db.courtConnection.findMany({
     where: { enabled: true, createdById: { not: null }, organization: { deletedAt: null, suspendedAt: null } },
-    select: { id: true, organizationId: true, createdById: true },
+    select: { id: true, organizationId: true, createdById: true, authProfile: true, system: true, wsdlStatus: true, wsdlOperations: true },
     orderBy: { lastSyncAt: { sort: "asc", nulls: "first" } },
   });
-  const out = { total: conns.length, ok: 0, failed: 0, imported: 0 };
-  for (const cn of conns) {
+  const eligible = conns.filter(c => connectionSupports(c, "consultarAvisosPendentes"));
+  const out = { total: eligible.length, ok: 0, failed: 0, imported: 0 };
+  for (const cn of eligible) {
     try {
       const ctx = await resolveTenantContext(cn.createdById as string, cn.organizationId, {});
       if (!ctx || !ctx.permissions.has("inbox:write")) {
@@ -357,4 +388,29 @@ export async function runMniAll(opts: { post?: SoapPost } = {}) {
     }
   }
   return out;
+}
+
+/** Verifica o contrato publicado; não confunde essa verificação com autenticação/homologação. */
+export async function inspectConnectionContract(ctx: TenantContext, id: string, fetcher: typeof fetchWsdl = fetchWsdl) {
+  assertCan(ctx, "integrations:manage");
+  await requireMfa(ctx.userId);
+  const { c } = await loadConnection(ctx, id, { allowDisabled: true });
+  let inspection;
+  try {
+    const material = await mtlsFor(ctx, c.certificateId, "mni:wsdl");
+    inspection = inspectMniContract(await fetcher(c.wsdlUrl ?? c.endpointUrl, material, Boolean(c.wsdlUrl)), c.endpointUrl);
+  } catch (e) {
+    if (e instanceof MniError) throw new ConflictError(e.message);
+    throw e;
+  }
+  await db.$transaction(async tx => {
+    const changed = await tx.courtConnection.updateMany({ where: { id: c.id, organizationId: ctx.organizationId, updatedAt: c.updatedAt }, data: { wsdlStatus: inspection.compatible ? "COMPATIBLE" : "INCOMPATIBLE", wsdlCheckedAt: new Date(), wsdlOperations: inspection.operations, wsdlActions: inspection.actions, ...(!inspection.compatible ? { enabled: false } : {}) } });
+    if (!changed.count) throw new ConflictError("A conexão mudou durante a verificação. Recarregue e tente novamente.");
+    await audit({ action: "court_connection.contract_checked", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: c.id, metadata: { system: c.system, compatible: inspection.compatible, operations: inspection.operations }, meta: ctx.meta }, tx);
+  });
+  return inspection;
+}
+export function assertConnectionOperation(c: { system: string; wsdlStatus: string | null; wsdlOperations: string[]; authProfile?: string }, operation: MniOperation) {
+  if (c.authProfile === "TJPR_SCMPP" && operation !== "consultarProcesso") throw new ConflictError("O perfil SCMPP/TJPR só permite consultar movimentações públicas.");
+  if (!connectionSupports(c, operation)) throw new ConflictError("A conexão não tem contrato compatível verificado para esta operação. Confira o WSDL e a autorização do tribunal.");
 }
