@@ -1,3 +1,9 @@
+## Produto — co-founders (2026-10-26)
+
+- Nova página `/produto/fundadores` e três perfis individuais com os nomes e fotografias fornecidos pelo usuário; todos com título Co-founder.
+- Links no menu público e na página Sobre, com fotografias preservadas e enquadramento adaptado à apresentação.
+- Sem cargos adicionais, credenciais ou biografias não fornecidas.
+
 ## Produto — preços e comparativo (2026-10-26)
 
 - Página pública `/produto/precos`, com valores oficiais e condições de LegalMail, ADVBOX, Astrea e ChatGuru, médias calculáveis e fontes datadas.

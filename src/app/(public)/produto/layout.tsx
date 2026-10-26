@@ -18,6 +18,7 @@ const NAV = [
   { href: "/produto/roadmap", label: "Roadmap" },
   { href: "/produto/seguranca", label: "Segurança" },
   { href: "/produto/sobre", label: "Sobre" },
+  { href: "/produto/fundadores", label: "Co-founders" },
   { href: "/produto/contato", label: "Contato" },
 ];
 
@@ -30,7 +31,7 @@ export default function ProdutoLayout({ children }: { children: React.ReactNode 
           <Link href="/produto" className="flex items-center font-semibold" aria-label="LegalOS — início">
             <Brand />
           </Link>
-          <nav aria-label="Principal" className="hidden items-center gap-4 text-sm text-muted xl:gap-7 lg:flex">
+          <nav aria-label="Principal" className="hidden items-center gap-5 text-sm text-muted xl:flex">
             {NAV.map((n) => <Link key={n.href} href={n.href} className="transition hover:text-fg">{n.label}</Link>)}
           </nav>
           <div className="flex items-center gap-2">
@@ -38,7 +39,7 @@ export default function ProdutoLayout({ children }: { children: React.ReactNode 
             <CtaLink variant="solid" className="h-9 px-4">{c.available ? "Falar com a gente" : "Entrar"}</CtaLink>
           </div>
         </div>
-        <nav aria-label="Principal (celular)" className="flex gap-5 overflow-x-auto border-t border-white/5 px-4 py-2 text-sm text-muted lg:hidden">
+        <nav aria-label="Principal (celular)" className="flex gap-5 overflow-x-auto border-t border-white/5 px-4 py-2 text-sm text-muted xl:hidden">
           {NAV.map((n) => <Link key={n.href} href={n.href} className="whitespace-nowrap">{n.label}</Link>)}
         </nav>
       </header>
