@@ -4,6 +4,7 @@ import { COMING_SOON, FACTS, RUTE_INFO, HONESTY, INTEGRATIONS, MODULES, PWA, SPA
 import { PHASES_2 } from "@/lib/updates";
 import { CtaLink, Eyebrow, SectionTitle } from "./_parts";
 import { BrowserFrame, ModuleTabs, Reveal } from "./showcase-client";
+import { DesktopShowcase } from "./desktop-showcase";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,8 @@ export default function ProdutoHome() {
           </article>
         </Reveal>
       </section>
+
+      <DesktopShowcase />
 
       {/* MÓDULOS */}
       <section className="border-y border-border bg-surface-2/60 py-24">

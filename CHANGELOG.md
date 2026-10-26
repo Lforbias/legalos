@@ -1,3 +1,9 @@
+## LegalOS Desktop — identidade e produto (2026-10-26)
+
+- Marca vetorial própria em preto e branco, com versões para os temas claro e escuro, aplicada ao cabeçalho do Desktop.
+- Destaque em `/produto`, navegação pública e recursos; apresentação dedicada em `/produto/desktop`, com dados fictícios e indicação de uso em computador.
+- Documentadas as funções disponíveis e as ideias futuras de voz, organização automática e conexão a notebooks. A animação de entrada atual foi mantida.
+
 ## DataJud — chave por escritório (2026-10-23)
 
 Migração aditiva: `20261220000000_datajud_org`.

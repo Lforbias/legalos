@@ -29,6 +29,10 @@ test("workspace connects client folders to multiple cases and original records",
     await database.query('INSERT INTO tasks (id, organization_id, title, case_id, updated_at) VALUES ($1,$2,$3,$4,now())', [randomUUID(), org, "Conferir documentos da rescisão", first]);
     await page.getByRole("link", { name: "Abrir LegalOS Desktop", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Qual cliente vamos abrir?", exact: true })).toBeVisible();
+    for (const theme of ["light", "dark"]) {
+      await page.evaluate((value) => document.documentElement.setAttribute("data-theme", value), theme);
+      await expect(page.getByRole("banner").getByRole("img", { name: "LegalOS Desktop", exact: true }).filter({ visible: true })).toHaveAttribute("src", `/brand/legalos-desktop-${theme}.svg`);
+    }
     await expect(page.getByRole("navigation", { name: "Navegação Func", exact: true })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "Ana Carolina Martins", exact: true })).toHaveCount(0);
     await page.screenshot({ path: "/tmp/legalos-desktop-entrada.png", fullPage: true, animations: "disabled" });
