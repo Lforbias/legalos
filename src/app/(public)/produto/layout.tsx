@@ -13,6 +13,7 @@ export const metadata: Metadata = {
 const NAV = [
   { href: "/produto", label: "Início" },
   { href: "/produto/recursos", label: "Recursos" },
+  { href: "/produto/precos", label: "Preços" },
   { href: "/produto/desktop", label: "Desktop" },
   { href: "/produto/roadmap", label: "Roadmap" },
   { href: "/produto/seguranca", label: "Segurança" },
@@ -29,7 +30,7 @@ export default function ProdutoLayout({ children }: { children: React.ReactNode 
           <Link href="/produto" className="flex items-center font-semibold" aria-label="LegalOS — início">
             <Brand />
           </Link>
-          <nav aria-label="Principal" className="hidden items-center gap-7 text-sm text-muted lg:flex">
+          <nav aria-label="Principal" className="hidden items-center gap-4 text-sm text-muted xl:gap-7 lg:flex">
             {NAV.map((n) => <Link key={n.href} href={n.href} className="transition hover:text-fg">{n.label}</Link>)}
           </nav>
           <div className="flex items-center gap-2">

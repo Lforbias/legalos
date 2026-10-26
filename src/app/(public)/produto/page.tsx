@@ -46,6 +46,7 @@ export default function ProdutoHome() {
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <CtaLink variant="solid" />
               <Link href="/produto/recursos" className="inline-flex h-11 items-center gap-2 rounded-full border border-white/20 px-6 text-sm font-semibold text-white transition hover:bg-white/10">Ver os recursos</Link>
+              <Link href="/produto/precos" className="inline-flex h-11 items-center gap-2 px-4 text-sm font-medium text-white/75 underline underline-offset-4 transition hover:text-white">Comparar recursos e planos</Link>
             </div>
           </div>
 

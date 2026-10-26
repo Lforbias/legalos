@@ -1,3 +1,10 @@
+## Produto — preços e comparativo (2026-10-26)
+
+- Página pública `/produto/precos`, com valores oficiais e condições de LegalMail, ADVBOX, Astrea e ChatGuru, médias calculáveis e fontes datadas.
+- Comparativo de cobertura distingue falta de evidência, dependência de plano/configuração e integrações do LegalOS ainda em validação.
+- Catálogo pesquisável de 300 recursos e operações com referência à implementação; contagem granular, sem alegar 300 módulos independentes.
+- Quatro planos propostos (Simples, Básico, Intermediário e Avançado), preços e composição em definição. Não altera assinatura nem habilita contratação.
+
 ## LegalOS Desktop — identidade e produto (2026-10-26)
 
 - Marca vetorial própria em preto e branco, com versões para os temas claro e escuro, aplicada ao cabeçalho do Desktop.
