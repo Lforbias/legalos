@@ -60,7 +60,7 @@ describe("Ações diretas com escopo explícito", () => {
     const enrollment = await startEnrollment(a.owner.id, a.owner.email);
     await confirmEnrollment(a.owner.id, totpCode(enrollment.secret, totpStep()), META);
     const rest = await createApiKey(a.ctx, { name: "Execução REST", scopes: ["tools:execute"] });
-    const req = new Request("http://localhost/api/v1/tools/criar_tarefa", { method: "POST", headers: { authorization: `Bearer ${rest.token}`, "content-type": "application/json" }, body: JSON.stringify({ title: "Criada por REST" }) });
+    const req = new Request("http://localhost/api/v1/tools/criar_tarefa", { method: "POST", headers: { authorization: `Bearer ${rest.token}`, "content-type": "application/json", "Idempotency-Key": "direct-action-rest-test" }, body: JSON.stringify({ title: "Criada por REST" }) });
     const res = await POST(req, { params: Promise.resolve({ name: "criar_tarefa" }) });
     expect(res.status).toBe(200);
     expect((await res.json()).data).toMatchObject({ executed: true, type: "task" });

@@ -94,6 +94,8 @@ describe("Assistant direct actions", () => {
     const c = await createConversation(a.ctx);
     const first = await sendMessage(a.ctx, c.id, "Encontre Cliente Contexto RUTE", { mode: "consult" });
     expect(first.refs[0]?.records).toContainEqual({ id: client.id, label: client.name });
+    await db.assistantMessage.updateMany({ where: { conversationId: c.id }, data: { createdAt: new Date("2026-10-27T12:00:00Z") } });
+    expect((await getConversation(a.ctx, c.id)).messages.map(m => m.role)).toEqual(["user", "assistant"]);
     await sendMessage(a.ctx, c.id, "Quais são as pendências dele?", { mode: "consult" });
   });
   it("does not repeat an interrupted request even when no answer was saved", async () => {

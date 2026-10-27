@@ -102,7 +102,7 @@ async function own(ctx: TenantContext, id: string) {
 export async function getConversation(ctx: TenantContext, id: string) {
   assertCan(ctx, "ai:use");
   const c = await own(ctx, id);
-  const messages = await db.assistantMessage.findMany({ where: { conversationId: id, organizationId: ctx.organizationId }, orderBy: { createdAt: "asc" }, take: MAX_MESSAGES, select: { id: true, role: true, content: true, refs: true, createdAt: true } });
+  const messages = await db.assistantMessage.findMany({ where: { conversationId: id, organizationId: ctx.organizationId }, orderBy: [{ createdAt: "asc" }, { role: "desc" }, { id: "asc" }], take: MAX_MESSAGES, select: { id: true, role: true, content: true, refs: true, createdAt: true } });
   return { ...c, messages };
 }
 
@@ -175,7 +175,7 @@ async function performSendMessage(ctx: TenantContext, conversationId: string, ra
   await assertWithinLimits(ctx);
   const provider = await resolveProvider(ctx.organizationId);
 
-  const prior = await db.assistantMessage.findMany({ where: { conversationId, organizationId: ctx.organizationId }, orderBy: { createdAt: "desc" }, take: HISTORY, select: { role: true, content: true, refs: true } });
+  const prior = await db.assistantMessage.findMany({ where: { conversationId, organizationId: ctx.organizationId }, orderBy: [{ createdAt: "desc" }, { role: "asc" }, { id: "desc" }], take: HISTORY, select: { role: true, content: true, refs: true } });
   let referenceBudget = 12_000;
   // Prefer the most recent IDs when history is long, keeping the added context bounded.
   const turns = prior.map(m => {

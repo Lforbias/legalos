@@ -1,3 +1,4 @@
+import { IDEMPOTENCY_SCHEMA } from "@/server/services/external-tool-request.service";
 import type { toolCatalog } from "@/server/services/rute-tools.service";
 
 type Catalog = ReturnType<typeof toolCatalog>;
@@ -29,7 +30,7 @@ export function buildOpenApi(tools: Catalog) {
   for (const tool of tools) paths[`/api/v1/tools/${tool.name}`] = { post: {
     operationId: tool.name, summary: tool.title, description: tool.description, tags: [tool.scope === "read" ? "Consultas" : tool.scope === "execute" ? "Ações diretas" : "Propostas para aprovação"],
     "x-legalos-scope": `tools:${tool.scope}`, "x-legalos-permission": tool.permission,
-    security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } },
+    security: [{ bearerAuth: [] }], parameters: tool.scope === "read" ? [] : [{ name: "Idempotency-Key", in: "header", required: true, schema: IDEMPOTENCY_SCHEMA }], requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } },
     responses: { "200": response, "401": response, "403": response, "404": response, "409": response, "422": response, "429": response, "500": response },
   } };
   paths["/api/v1/chat/conversations/{id}/messages"]={post:{

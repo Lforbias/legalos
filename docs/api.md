@@ -123,3 +123,8 @@ Catálogo completo, limites e cobertura por módulo: [Inventário de RUTE, REST 
 
 
 O catálogo atual possui 35 ferramentas compartilhadas. Além das consultas, há propostas para cadastro/atualização básica de clientes, edição/comentário/situação de tarefas e criação/edição/cancelamento de compromissos. `capacidades`, `listar_propostas` e `ver_proposta` permitem descobrir e acompanhar operações. A confirmação pode ser feita pela pessoa no chat interno do LegalOS. Campos de destino e versão não podem ser modificados pela edição de uma proposta; alterações concorrentes exigem nova proposta.
+
+
+### Chave obrigatória nas ferramentas externas de escrita
+
+Ferramentas de proposta e execução exigem `Idempotency-Key` na REST e `arguments.idempotencyKey` no MCP. Reenvie a mesma chave com os mesmos argumentos; uma nova chave representa uma nova operação. Consultas dispensam chave. Consulte os contratos atualizados e a seção de idempotência em [rute-function-calling.md](./rute-function-calling.md).

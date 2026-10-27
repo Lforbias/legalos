@@ -82,6 +82,7 @@ Preparar um centro de custo:
 
 ```http
 POST /api/v1/tools/propor_centro_custo
+Idempotency-Key: centro-custo-operacao-001
 
 {"name":"Contencioso"}
 ```
@@ -242,3 +243,8 @@ Os nomes abaixo identificam as 82 funções. Os argumentos obrigatórios e permi
 - `propor_situacao_compromisso`
 - `propor_situacao_tarefa`
 - `propor_tarefa`
+
+
+### Chave obrigatória nas ferramentas externas de escrita
+
+Ferramentas de proposta e execução exigem `Idempotency-Key` na REST e `arguments.idempotencyKey` no MCP. Reenvie a mesma chave com os mesmos argumentos; uma nova chave representa uma nova operação. Consultas dispensam chave. Consulte os contratos atualizados e a seção de idempotência em [rute-function-calling.md](./rute-function-calling.md).

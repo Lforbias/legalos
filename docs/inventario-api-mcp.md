@@ -340,3 +340,8 @@ Além das rotas `/api`, há `GET /.well-known/oauth-authorization-server`, `GET 
 - Edições de propostas não podem trocar ids de destino nem a versão registrada. As permissões e visibilidade são verificadas de novo pelos serviços na execução.
 - As propostas de cada resposta são vinculadas à conversa correspondente, evitando misturar ações de conversas simultâneas da mesma pessoa.
 - O cadastro de clientes nesta rodada usa dados básicos; não inclui os campos de documento, e-mail e telefone. Uma atualização básica preserva esses campos já cadastrados.
+
+
+### Chave obrigatória nas ferramentas externas de escrita
+
+Ferramentas de proposta e execução exigem `Idempotency-Key` na REST e `arguments.idempotencyKey` no MCP. Reenvie a mesma chave com os mesmos argumentos; uma nova chave representa uma nova operação. Consultas dispensam chave. Consulte os contratos atualizados e a seção de idempotência em [rute-function-calling.md](./rute-function-calling.md).

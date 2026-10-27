@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { beforeAll, describe, expect, it } from "vitest";
 import { GET as catalog } from "@/app/api/v1/tools/route";
 import { POST as execute } from "@/app/api/v1/tools/[name]/route";
@@ -10,7 +11,7 @@ import { setEmergencyStop, setRuteFeature } from "@/server/services/rute-setting
 import { callTool, toolCatalog } from "@/server/services/rute-tools.service";
 import { makeOrgWithOwner, META } from "./helpers";
 
-const request = (token: string | null, body?: unknown) => new Request("http://localhost/api/v1/tools/test", { method: body === undefined ? "GET" : "POST", headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), "content-type": "application/json" }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
+const request = (token: string | null, body?: unknown) => new Request("http://localhost/api/v1/tools/test", { method: body === undefined ? "GET" : "POST", headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), "content-type": "application/json", "Idempotency-Key": randomUUID() }, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) });
 const invoke = (token: string | null, name: string, body: unknown = {}) => execute(request(token, body), { params: Promise.resolve({ name }) });
 const list = (token: string | null) => catalog(request(token), { params: Promise.resolve({}) });
 describe("REST, RUTE e MCP compartilham ferramentas", () => {
