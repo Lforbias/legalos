@@ -18,6 +18,7 @@ const NAV = [
   { href: "/comunidade", label: "Comunidade" },
   { href: "/produto/precos", label: "Preços" },
   { href: "/produto/desktop", label: "Desktop" },
+  { href: "/produto/novidades", label: "Novidades" },
   { href: "/produto/roadmap", label: "Roadmap" },
   { href: "/produto/seguranca", label: "Segurança" },
   { href: "/produto/sobre", label: "Sobre" },

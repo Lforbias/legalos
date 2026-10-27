@@ -136,6 +136,7 @@ export default function ProdutoHome() {
         </Reveal>
       </section>
 
+      <section className="mx-auto max-w-7xl px-4 py-12"><Link href="/produto/novidades" className="block rounded-2xl border border-border bg-surface p-6 transition hover:bg-surface-2"><p className="text-xs uppercase tracking-widest text-muted">Novidades do Chat</p><h2 className="mt-3 text-2xl font-semibold tracking-tight">WhatsApp, e-mail e um copiloto para a equipe.</h2><p className="mt-3 text-sm text-muted">Conheça as novas rotinas de atendimento, campanhas, API e o que precisa ser configurado no seu escritório.</p><span className="mt-4 inline-block text-sm font-medium">Ver a atualização →</span></Link></section>
       <DesktopShowcase />
 
       {/* MÓDULOS */}
