@@ -3,7 +3,8 @@ import Link from "next/link";
 import { COMING_SOON, FACTS, RUTE_INFO, HONESTY, INTEGRATIONS, MODULES, PWA, SPACES } from "@/config/showcase";
 import { PHASES_2 } from "@/lib/updates";
 import { CtaLink, Eyebrow, SectionTitle } from "./_parts";
-import { BrowserFrame, ModuleTabs, Reveal } from "./showcase-client";
+import { ModuleTabs, Reveal } from "./showcase-client";
+import { ProductHero } from "./product-hero";
 import { DesktopShowcase } from "./desktop-showcase";
 
 export const dynamic = "force-dynamic";
@@ -28,17 +29,17 @@ export default function ProdutoHome() {
   return (
     <>
       {/* HERO — escuro */}
-      <section className="force-dark relative overflow-hidden bg-[#0a0c13] text-fg">
+      <section className="force-dark relative overflow-hidden text-fg" style={{ background: "#08090b", color: "#f5f5f7" }}>
         <div className="prod-grid-bg pointer-events-none absolute inset-0" aria-hidden />
-        <div className="prod-glow pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-[#FF3B4E]/25 blur-[120px]" aria-hidden />
-        <div className="prod-glow pointer-events-none absolute top-40 -right-40 h-[420px] w-[420px] rounded-full bg-[#7C8CFF]/20 blur-[110px]" aria-hidden />
-        <div className="relative mx-auto max-w-7xl px-4 pb-24 pt-20 md:pt-28">
+        <div className="prod-glow pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-[#ffe168]/10 blur-[120px]" aria-hidden />
+        <div className="prod-glow pointer-events-none absolute top-40 -right-40 h-[420px] w-[420px] rounded-full bg-white/5 blur-[110px]" aria-hidden />
+        <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-16 md:pt-24">
           <div className="prod-hero-in mx-auto max-w-4xl text-center">
             <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-white/80 backdrop-blur">
               <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" aria-hidden /> Feito dentro de um escritório de advocacia, para escritórios de advocacia
             </span>
             <h1 className="mt-7 text-5xl font-semibold leading-[1.02] tracking-tight md:text-7xl">
-              O escritório inteiro.<br /><span className="prod-gradient-text">Num só sistema.</span>
+              O escritório inteiro.<br /><span style={{ background: "linear-gradient(110deg, #fff 15%, #ffe168 85%)", backgroundClip: "text", color: "transparent" }}>Num só sistema.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-white/70 md:text-xl">
               Processos, intimações, prazos, financeiro e WhatsApp conversando entre si. Menos aba aberta, menos prazo na cabeça, mais tempo para advogar.
@@ -50,21 +51,8 @@ export default function ProdutoHome() {
             </div>
           </div>
 
-          <div className="relative mx-auto mt-16 max-w-6xl">
-            <div className="absolute -inset-x-10 -bottom-10 top-10 rounded-[2rem] bg-gradient-to-b from-[#FF3B4E]/15 to-transparent blur-2xl" aria-hidden />
-            <BrowserFrame src="/produto/atendimento.webp" alt="Atendimento por WhatsApp do LegalOS com o painel do cliente e do processo ao lado" priority className="relative" />
-            <div className="prod-float absolute -left-3 top-16 hidden w-64 rounded-2xl border border-white/15 bg-[#11141e]/90 p-4 shadow-2xl backdrop-blur-xl lg:block" aria-hidden>
-              <p className="flex items-center gap-2 text-xs font-medium text-[#5eead4]"><Inbox className="h-3.5 w-3.5" /> Nova intimação</p>
-              <p className="mt-1 text-sm font-medium">Intimação para réplica</p>
-              <p className="mt-1 text-xs text-white/55">Distribuída para Dr. Bruno · prazo em rascunho</p>
-            </div>
-            <div className="prod-float-slow absolute -right-3 bottom-24 hidden w-64 rounded-2xl border border-white/15 bg-[#11141e]/90 p-4 shadow-2xl backdrop-blur-xl lg:block" aria-hidden>
-              <p className="flex items-center gap-2 text-xs font-medium text-[#fbbf24]"><CalendarClock className="h-3.5 w-3.5" /> Prazo calculado</p>
-              <p className="mt-1 text-sm font-medium">15 dias úteis</p>
-              <p className="mt-1 text-xs text-white/55">Aguardando validação de uma pessoa</p>
-            </div>
-          </div>
-          <p className="mt-6 text-center text-xs text-white/40">Telas reais do sistema, com dados de demonstração fictícios.</p>
+          <ProductHero />
+          <p className="mt-5 text-center text-[11px] text-white/40">Composição ilustrativa do ecossistema com tela real e dados fictícios.</p>
         </div>
       </section>
 

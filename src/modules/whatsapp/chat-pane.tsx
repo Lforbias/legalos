@@ -110,7 +110,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
 
   React.useEffect(() => {
     const media = window.matchMedia("(min-width: 1280px)");
-    const sync = () => { setWide(media.matches); setShowSide(media.matches); };
+    const sync = () => { setWide(media.matches); };
     sync();
     media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
@@ -225,7 +225,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col lg:flex-row" data-testid="wa-chat-wrap">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="wa-chat">
-        <div className="flex items-center gap-3 border-b border-border bg-surface px-3 py-2">
+        <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-4">
           <Link href={chat.backHref ?? "/atendimento"} aria-label="Voltar às conversas" className="rounded-full p-1.5 hover:bg-surface-2 lg:hidden"><ArrowLeft className="h-5 w-5" aria-hidden /></Link>
           <Avatar name={chat.title} size={40} />
           <div className="min-w-0 flex-1">
@@ -268,7 +268,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           </>
         ) : null}
 
-        <div className="wa-wallpaper min-h-0 flex-1 space-y-2 overflow-y-auto px-3 py-3 md:px-6" data-testid="wa-messages">
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-surface-2/60 px-4 py-5 md:px-8" data-testid="wa-messages">
           {messages.length === 0 ? <p className="mx-auto w-fit rounded-md bg-surface/80 px-3 py-1 text-sm text-muted">Sem mensagens ainda.</p> : null}
           {grouped.map((g) => (
             <div key={g.key} className="space-y-1.5">
@@ -279,10 +279,10 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           <div ref={endRef} />
         </div>
 
-        {msg ? <div className="border-t border-border bg-surface px-3 py-2"><Alert tone={msg.tone}>{msg.text}</Alert></div> : null}
+        {msg ? <div className="border-t border-border bg-surface px-4 py-4"><Alert tone={msg.tone}>{msg.text}</Alert></div> : null}
 
         {chat.canWrite ? (
-          <div className="space-y-2 border-t border-border bg-surface p-3">
+          <div className="space-y-3 border-t border-border bg-surface p-4">
             {!chat.windowOpen && !note ? (
               <div className="space-y-2 rounded-md border border-warning/40 bg-warning-bg p-3 text-sm text-warning" data-testid="wa-window-closed">
                 <p>A janela de 24 horas está fechada: só é possível enviar um modelo aprovado pela Meta.</p>

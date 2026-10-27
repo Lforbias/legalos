@@ -9,7 +9,7 @@ import { requireTenant } from "@/server/session";
 export default async function PortalLayout({ children }: { children: React.ReactNode }) {
   const { ctx, session, organization } = await requireTenant();
   // equipe do escritório não usa o portal; só contas de cliente
-  if (!can(ctx, "portal:access")) redirect("/");
+  if (!can(ctx, "portal:access")) redirect("/dashboard");
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="border-b border-border bg-surface">

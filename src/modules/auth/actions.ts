@@ -34,7 +34,7 @@ export async function registerAction(input: unknown): Promise<ActionState<Redire
       try {
         const { organizationId } = await acceptInvitation(user.id, data.inviteToken, meta);
         await auth.setActiveOrganization(user.id, session.sessionId, organizationId);
-        return { redirectTo: "/" };
+        return { redirectTo: "/dashboard" };
       } catch {
         // conta criada; o convite segue disponível para nova tentativa na própria página do convite
         return { redirectTo: `/accept-invite?token=${encodeURIComponent(data.inviteToken)}` };
@@ -118,6 +118,6 @@ export async function acceptInviteAction(input: { token: string }): Promise<Acti
     if (!limiters.invitation.check(`accept:${session.user.id}`)) tooMany();
     const { organizationId } = await acceptInvitation(session.user.id, String(input.token ?? ""), meta);
     await auth.setActiveOrganization(session.user.id, session.id, organizationId);
-    return { redirectTo: "/" };
+    return { redirectTo: "/dashboard" };
   });
 }

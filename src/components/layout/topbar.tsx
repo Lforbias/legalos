@@ -76,7 +76,7 @@ export function Topbar({
                   if (o.id === activeOrganizationId) return;
                   startTransition(async () => {
                     await switchOrganizationAction(o.id);
-                    router.push("/");
+                    router.push("/dashboard");
                     router.refresh();
                   });
                 }}

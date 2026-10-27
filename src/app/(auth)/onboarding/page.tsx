@@ -20,7 +20,7 @@ export default async function OnboardingPage() {
       </div>
       <CreateOrganizationForm />
       {orgs.length ? (
-        <Link href="/" className="block text-center text-xs text-primary-text hover:underline">
+        <Link href="/dashboard" className="block text-center text-xs text-primary-text hover:underline">
           Voltar
         </Link>
       ) : null}

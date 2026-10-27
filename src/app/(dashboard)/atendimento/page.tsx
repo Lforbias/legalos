@@ -2,7 +2,7 @@ import { listChatResources } from "@/server/services/chat-workbench.service";
 import { viewHref } from "@/lib/whatsapp/workbench";
 import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus, isClosedService } from "@/lib/whatsapp/lifecycle";
 import type { Metadata } from "next";
-import { BarChart3, MessageSquare, Search, Settings2, SlidersHorizontal } from "lucide-react";
+import { BarChart3, Mail, MoreHorizontal, MessageSquare, Search, Settings2, SlidersHorizontal } from "lucide-react";
 import Link from "next/link";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
@@ -139,32 +139,42 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="atendimento">
       <AutoRefresh />
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
-        <div className="min-w-0"><h1 className="text-sm font-semibold tracking-tight">LegalOS Chat</h1><p className="mt-0.5 truncate text-xs text-muted">{multi ? `${numbers.length} números` : account.displayPhone ?? account.label}{account.enabled ? "" : " · Atendimento desligado"}</p></div>
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-5 py-4">
         <div className="flex items-center gap-3">
-          <Link className="text-xs underline" href="/atendimento/email">E-mail</Link>
-          {writer ? <Link className="text-xs underline" href="/atendimento/operacoes">Operações</Link> : null}
-          {writer ? <AvailabilityButton available={available} /> : null}
-          {manage ? <Link className="inline-flex items-center gap-1.5 rounded-lg p-2 text-xs text-muted hover:bg-surface-2 hover:text-fg" aria-label="Relatórios do Chat" href="/atendimento/relatorios"><BarChart3 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Relatórios</span></Link> : null}
-          {manage ? <Link className="inline-flex items-center gap-1.5 rounded-lg p-2 text-xs text-muted hover:bg-surface-2 hover:text-fg" aria-label="Configurações do Chat" href="/atendimento/configuracoes"><Settings2 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Configurações</span></Link> : null}
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2"><MessageSquare className="h-5 w-5" aria-hidden /></span>
+          <div><h1 className="text-base font-semibold tracking-tight">Atendimento</h1><p className="mt-0.5 text-xs text-muted">LegalOS Chat · {multi ? `${numbers.length} números` : account.displayPhone ?? account.label}</p></div>
         </div>
-      </div>
+        <div className="flex items-center gap-2">
+          <nav aria-label="Canais de atendimento" className="flex items-center rounded-xl bg-surface-2 p-1 text-xs font-medium">
+            <Link href="/atendimento" aria-current="page" className="rounded-lg bg-surface px-3 py-2 shadow-sm">WhatsApp</Link>
+            <Link href="/atendimento/email" className="inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-muted hover:text-fg"><Mail className="h-3.5 w-3.5" aria-hidden />E-mail</Link>
+          </nav>
+          {writer ? <AvailabilityButton available={available} /> : null}
+          <details className="group relative">
+            <summary aria-label="Ferramentas do atendimento" className="flex cursor-pointer list-none items-center rounded-lg p-2 text-muted hover:bg-surface-2 [&::-webkit-details-marker]:hidden"><MoreHorizontal className="h-5 w-5" aria-hidden /></summary>
+            <nav aria-label="Ferramentas do atendimento" className="absolute right-0 top-full z-30 mt-2 w-56 rounded-xl border border-border bg-surface p-1.5 text-sm shadow-xl">
+              {writer ? <Link href="/atendimento/operacoes" className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2"><SlidersHorizontal className="h-4 w-4 text-muted" aria-hidden />Operações e copiloto</Link> : null}
+              {manage ? <><Link href="/atendimento/relatorios" className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2"><BarChart3 className="h-4 w-4 text-muted" aria-hidden />Relatórios</Link><Link href="/atendimento/configuracoes" className="flex items-center gap-3 rounded-lg px-3 py-2.5 hover:bg-surface-2"><Settings2 className="h-4 w-4 text-muted" aria-hidden />Configurações</Link></> : null}
+            </nav>
+          </details>
+        </div>
+      </header>
       {!account.enabled ? <Alert tone="warning" className="m-2">O atendimento está desligado: mensagens novas não estão sendo recebidas.</Alert> : null}
       <div className="flex min-h-0 flex-1">
-        <section className={`${chat ? "hidden lg:flex" : "flex"} min-h-0 w-full flex-col border-r border-border bg-surface lg:w-[340px] xl:w-[360px] lg:shrink-0`} aria-label="Conversas">
+        <section className={`${chat ? "hidden lg:flex" : "flex"} chat-inbox-column min-h-0 w-full flex-col border-r border-border bg-surface lg:shrink-0`} aria-label="Conversas">
           {savedViews.length>0&&<nav aria-label="Listas salvas" className="flex flex-wrap gap-2 border-b border-border p-3 text-xs">{savedViews.map(v=><Link className="rounded-full border border-border px-2 py-1" key={v.id} href={viewHref(v.payload)}>{v.name}</Link>)}</nav>}
-          <form action="/atendimento" className="border-b border-border p-3">
+          <form action="/atendimento" className="px-4 pb-3 pt-4">
             <input type="hidden" name="f" value={filter} />
             {queueId ? <input type="hidden" name="fila" value={queueId} /> : null}
             {labelId ? <input type="hidden" name="etq" value={labelId} /> : null}
             {numId ? <input type="hidden" name="num" value={numId} /> : null}
             <div className="relative">
               <Search className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-muted" aria-hidden="true" />
-              <Input name="q" defaultValue={sp.q ?? ""} aria-label="Buscar conversa" placeholder="Buscar nome, telefone ou campo" className="pl-9" />
+              <Input name="q" defaultValue={sp.q ?? ""} aria-label="Buscar conversa" placeholder="Buscar conversa…" className="rounded-xl bg-surface-2 pl-9" />
             </div>
-            <div className="mt-2 flex items-center gap-2"><Select name="s" aria-label="Filtrar situação do atendimento" defaultValue={serviceStatus??""} className="h-9 min-w-0 flex-1 text-xs"><option value="">Todas as situações</option>{SERVICE_STATUSES.map(s=><option key={s} value={s}>{SERVICE_STATUS_LABEL[s]}</option>)}</Select><button type="submit" className="h-9 rounded-lg border border-border px-3 text-xs hover:bg-surface-2">Aplicar</button></div>
+            <details className="mt-3"><summary className="cursor-pointer text-xs text-muted">Situação do atendimento{serviceStatus ? ` · ${SERVICE_STATUS_LABEL[serviceStatus]}` : ""}</summary><div className="mt-2 flex items-center gap-2"><Select name="s" aria-label="Filtrar situação do atendimento" defaultValue={serviceStatus??""} className="h-9 min-w-0 flex-1 text-xs"><option value="">Todas as situações</option>{SERVICE_STATUSES.map(s=><option key={s} value={s}>{SERVICE_STATUS_LABEL[s]}</option>)}</Select><button type="submit" className="h-9 rounded-lg border border-border px-3 text-xs hover:bg-surface-2">Aplicar</button></div></details>
           </form>
-          <nav aria-label="Caixas de conversa" className="flex flex-wrap gap-1 border-b border-border p-3">
+          <nav aria-label="Caixas de conversa" className="grid grid-cols-2 gap-1 border-b border-border px-4 pb-3">
             {FILTERS.map((f) => (
               <Link key={f.key} aria-current={f.key === filter ? "page" : undefined} href={qs({ f: f.key, q: sp.q, fila: queueId, etq: labelId, num: numId })} className={`rounded-lg px-2.5 py-2 text-xs ${f.key === filter ? "bg-primary/10 font-semibold text-primary-text" : "text-muted hover:bg-surface-2 hover:text-fg"}`}>{f.label}</Link>
             ))}
@@ -199,13 +209,13 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
             </details>
           ) : null}
           <div className="border-b border-border px-3 py-1 text-[11px] text-muted" aria-live="polite">Exibindo {list.length} {list.length === 1 ? "conversa" : "conversas"}</div>
-          <ul className="min-h-0 flex-1 overflow-y-auto" data-testid="wa-list">
-            {list.length === 0 ? <li className="p-4 text-sm text-muted">Nenhuma conversa.</li> : null}
+          <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2" data-testid="wa-list">
+            {list.length === 0 ? <li className="px-5 py-12 text-center"><Search className="mx-auto mb-3 h-6 w-6 text-muted" aria-hidden /><p className="text-sm font-medium">Nenhuma conversa encontrada</p><p className="mt-1 text-xs text-muted">Tente outro nome ou ajuste os filtros.</p></li> : null}
             {list.map((c) => {
               const name = c.client?.name ?? c.contactName ?? formatWaId(c.waId);
               return (
                 <li key={c.id}>
-                  <Link aria-current={c.id === selectedId ? "page" : undefined} href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId, c: c.id })} className={`flex gap-3 border-b border-l-2 border-border px-3 py-3.5 text-sm transition-colors hover:bg-surface-2 ${c.id === selectedId ? "border-l-primary bg-primary/5" : "border-l-transparent"}`}>
+                  <Link aria-current={c.id === selectedId ? "page" : undefined} href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId, c: c.id })} className={`flex gap-3 rounded-xl border border-transparent px-3 py-3.5 text-sm transition-colors hover:bg-surface-2 ${c.id === selectedId ? "border-primary/20 bg-primary/5" : ""}`}>
                     <Avatar name={name} size={40} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
@@ -216,7 +226,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
                         <span className="truncate text-xs text-muted">{c.lastPreview ?? "—"}</span>
                         {c.unreadCount > 0 ? <span className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1 text-[11px] font-semibold text-primary-fg" aria-label={`${c.unreadCount} não lidas`}>{c.unreadCount}</span> : null}
                       </div>
-                      <div className="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+                      <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]">
                         <span className={`rounded px-1.5 py-0.5 font-medium ${c.status === "OPEN" ? "bg-primary/10 text-primary-text" : "bg-surface-2 text-muted"}`}>{SERVICE_STATUS_LABEL[c.serviceStatus as ServiceStatus] ?? (c.status === "OPEN" ? "Aberto" : "Fechado")}</span>
                         {multi ? <span className="rounded bg-surface-2 px-1.5 py-0.5 text-muted" data-testid="wa-number-chip">{c.account.label}</span> : null}
                         <span className="truncate text-muted">{c.assignedTo?.name ?? "Sem responsável"}{c.queue ? ` · ${c.queue.name}` : ""}</span>
@@ -263,11 +273,13 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               templates={templates.map((t) => ({ id: t.id, name: t.name, language: t.language, body: t.body, variableCount: t.variableCount }))}
             />
           ) : (
-            <div className="wa-wallpaper flex h-full w-full items-center justify-center p-6 text-sm text-muted">
-              <div className="rounded-lg bg-surface/90 px-6 py-5 text-center shadow">
-                <MessageSquare className="mx-auto mb-2 h-8 w-8" aria-hidden="true" />
-                <p>Escolha uma conversa ao lado.</p>
-                {can(ctx, "whatsapp:manage") ? <Badge className="mt-2">Mensagens chegam automaticamente</Badge> : null}
+            <div className="flex h-full w-full items-center justify-center bg-surface-2/50 p-8">
+              <div className="max-w-sm text-center">
+                <span className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-surface shadow-sm"><MessageSquare className="h-8 w-8 text-muted" aria-hidden /></span>
+                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Seu espaço de atendimento</p>
+                <h2 className="text-2xl font-semibold tracking-tight">Cada conversa, com contexto.</h2>
+                <p className="mt-3 text-sm leading-6 text-muted">Selecione um atendimento para conversar, consultar o cliente e organizar os próximos passos.</p>
+                <div className="mt-7 flex justify-center gap-2 text-xs text-muted"><Badge>Cliente</Badge><Badge>Processos</Badge><Badge>Tarefas</Badge></div>
               </div>
             </div>
           )}

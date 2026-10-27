@@ -20,7 +20,7 @@ export async function createOrganizationAction(input: unknown): Promise<ActionSt
       await getRequestMeta(),
     );
     await setActiveOrganization(session.user.id, session.id, org.id);
-    return { redirectTo: "/" };
+    return { redirectTo: "/dashboard" };
   });
 }
 

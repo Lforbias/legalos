@@ -56,7 +56,7 @@ describe("safeNext (open redirect)", () => {
   it("aceita só caminhos internos", () => {
     expect(safeNext("/configuracoes/equipe?x=1")).toBe("/configuracoes/equipe?x=1");
     for (const bad of ["https://evil.test", "//evil.test", "/\\evil.test", "javascript:alert(1)", "", null, undefined]) {
-      expect(safeNext(bad as string | null | undefined)).toBe("/");
+      expect(safeNext(bad as string | null | undefined)).toBe("/dashboard");
     }
   });
 });

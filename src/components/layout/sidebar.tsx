@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { Brand } from "./brand";
 
 function isActive(pathname: string, href: string, key: string) {
-  if (key === "overview") return pathname === "/";
+  if (key === "overview") return pathname === "/dashboard";
   if (key === "box-overview") return pathname === "/box";
   if (key === "whatsapp") return pathname === "/atendimento";
   if (key === "settings") return pathname.startsWith("/configuracoes") || pathname.startsWith("/conta");

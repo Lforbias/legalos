@@ -26,7 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           <div className="flex items-center gap-4 text-sm">
             <span className="text-muted">{user.email}</span>
-            <Link href="/" className="underline">Voltar ao sistema</Link>
+            <Link href="/dashboard" className="underline">Voltar ao sistema</Link>
           </div>
         </div>
         <nav aria-label="Administração" className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4">

@@ -16,7 +16,7 @@ export function CreateOrganizationForm() {
     defaultValues: { name: "", legalName: "", timezone: "America/Sao_Paulo" },
     action: createOrganizationAction,
     onSuccess: (data) => {
-      router.replace(data?.redirectTo ?? "/");
+      router.replace(data?.redirectTo ?? "/dashboard");
       router.refresh();
     },
   });

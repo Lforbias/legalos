@@ -45,7 +45,7 @@ export default async function BoxOverviewPage() {
         description="Acompanhe o que chegou, distribua as intimações e siga até o protocolo."
         actions={
           <>
-            <Link href="/" className={buttonVariants({ variant: "ghost" })} data-testid="box-to-func">Ir para o Func</Link>
+            <Link href="/dashboard" className={buttonVariants({ variant: "ghost" })} data-testid="box-to-func">Ir para o Func</Link>
             <PageActionsMenu label="Mais ações do Box" items={[
               ...(can(ctx, "inbox:read") ? [{ href: "/caixa-de-entrada?leitura=1", label: "Leitura integrada" }] : []),
               ...(can(ctx, "integrations:manage") ? [{ href: "/box/operacao", label: "Operação e auditoria" }, { href: "/integracoes", label: "Gerenciar conexões" }] : []),

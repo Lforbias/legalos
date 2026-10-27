@@ -41,10 +41,10 @@ export function proxy(request: NextRequest) {
   headers.set("content-security-policy", csp);
 
   const { pathname, search } = request.nextUrl;
-  // Visitante sem cookie na raiz vê a página pública do escritório (URL continua "/"); quem tem cookie segue para o painel.
-  if (pathname === "/" && !request.cookies.has(SESSION_COOKIE)) {
+  // A raiz apresenta o produto para visitantes e usuários autenticados.
+  if (pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = "/inicio";
+    url.pathname = "/produto";
     const res = NextResponse.rewrite(url, { request: { headers } });
     res.headers.set("x-request-id", requestId);
     res.headers.set("content-security-policy", csp);

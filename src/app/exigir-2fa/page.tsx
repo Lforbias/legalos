@@ -17,7 +17,7 @@ export default async function RequireMfaPage() {
   const session = await requireSession();
   const orgs = await db.membership.findMany({ where: { userId: session.user.id, status: "ACTIVE", role: { key: { not: "CLIENT" } }, organization: { deletedAt: null, requireMfa: true } }, select: { organization: { select: { name: true } } } });
   const st = await mfaStatus(session.user.id);
-  if (orgs.length === 0) redirect("/");
+  if (orgs.length === 0) redirect("/dashboard");
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center gap-4 px-4 py-10" data-testid="require-mfa-page">
       <div className="flex justify-center"><Brand /></div>

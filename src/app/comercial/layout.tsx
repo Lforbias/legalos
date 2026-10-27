@@ -29,7 +29,7 @@ export default async function ComercialLayout({ children }: { children: React.Re
           <div className="flex items-center gap-4 text-sm">
             <span className="text-muted">{user.name || user.email} · {cx.role === "GERENTE" ? "Gerência" : "Vendas"}</span>
             {cx.isPlatformAdmin ? <Link href="/admin" className="underline">Administração</Link> : null}
-            <Link href="/" className="underline">Sair do Comercial</Link>
+            <Link href="/dashboard" className="underline">Sair do Comercial</Link>
           </div>
         </div>
         <nav aria-label="Comercial" className="mx-auto flex max-w-7xl gap-1 overflow-x-auto px-4">

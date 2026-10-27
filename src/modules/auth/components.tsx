@@ -44,7 +44,7 @@ export function LoginForm({ next, inviteToken }: { next?: string; inviteToken?: 
     schema: loginSchema,
     defaultValues: { email: "", password: "", next, inviteToken },
     action: loginAction,
-    onSuccess: (data) => (data?.mfaChallenge ? setChallenge(data.mfaChallenge) : go(data?.redirectTo ?? "/")),
+    onSuccess: (data) => (data?.mfaChallenge ? setChallenge(data.mfaChallenge) : go(data?.redirectTo ?? "/dashboard")),
   });
   if (challenge) return <MfaStep challenge={challenge} onDone={go} onCancel={() => setChallenge(null)} />;
   return (
@@ -84,7 +84,7 @@ function MfaStep({ challenge, onDone, onCancel }: { challenge: string; onDone: (
         e.preventDefault();
         start(async () => {
           const r = await verifyMfaAction({ challenge, code });
-          if (r.ok) onDone(r.data?.redirectTo ?? "/");
+          if (r.ok) onDone(r.data?.redirectTo ?? "/dashboard");
           else {
             setError(r.message ?? "Não foi possível verificar o código.");
             setCode("");
@@ -255,7 +255,7 @@ export function VerifyEmailPanel({ token }: { token: string }) {
           Confirmar meu e-mail
         </Button>
       ) : null}
-      <Link href="/" className="block text-center text-xs text-primary-text hover:underline">
+      <Link href="/dashboard" className="block text-center text-xs text-primary-text hover:underline">
         Ir para o sistema
       </Link>
     </div>
@@ -300,7 +300,7 @@ export function AcceptInvitePanel({ token, organizationName, roleName }: { token
         onClick={() =>
           start(async () => {
             const res = await acceptInviteAction({ token });
-            if (res.ok) go(res.data?.redirectTo ?? "/");
+            if (res.ok) go(res.data?.redirectTo ?? "/dashboard");
             else setMsg(res.message ?? "Não foi possível aceitar o convite.");
           })
         }

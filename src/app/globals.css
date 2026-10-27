@@ -314,3 +314,11 @@ textarea { font: inherit; }
   --ring: #c2410c;
 }
 
+
+/* Keep the inbox bounded while the conversation uses the remaining workspace. */
+@media (min-width: 1024px) {
+  .chat-inbox-column { width: 320px; }
+}
+@media (min-width: 1280px) {
+  .chat-inbox-column { width: 350px; }
+}

@@ -33,7 +33,7 @@ import type { PermissionKey } from "@/lib/permissions/catalog";
 export type Space = "func" | "box" | "chat";
 
 export const SPACES: Record<Space, { name: string; short: string; home: string; summary: string }> = {
-  func: { name: "LegalOS Func", short: "Func", home: "/", summary: "Gestão do escritório: processos, clientes, prazos, tarefas, agenda, documentos, financeiro e relatórios." },
+  func: { name: "LegalOS Func", short: "Func", home: "/dashboard", summary: "Gestão do escritório: processos, clientes, prazos, tarefas, agenda, documentos, financeiro e relatórios." },
   box: { name: "LegalOS Box", short: "Box", home: "/box", summary: "Caixa de intimações, capturas dos tribunais, peticionamento e certificados." },
   chat: { name: "LegalOS Chat", short: "Chat", home: "/atendimento", summary: "Atendimento por WhatsApp: conversas, equipe, respostas rápidas e ligação com os clientes." },
 };
@@ -66,7 +66,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { key: "workspace", space: "both", label: "Área de Trabalho", href: "/area-de-trabalho", icon: FolderOpen, permission: "clients:read", phase: 2, implemented: true, summary: "Pastas por cliente com casos, processos, atividades, conversas, documentos e financeiro conectados." },
-  { key: "overview", space: "func", label: "Visão geral do Func", href: "/", icon: LayoutDashboard, phase: 1, implemented: true, summary: "Indicadores e atividade do escritório." },
+  { key: "overview", space: "func", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, phase: 1, implemented: true, summary: "Indicadores e atividade do escritório." },
   { key: "indicators", space: "func", label: "Indicadores", href: "/indicadores", icon: BarChart3, phase: 9, implemented: true, summary: "Atrasados por tipo, movimentação de processos, evolução da carteira, processos por cliente e os seus números." },
   { key: "alerts", space: "func", label: "Central de alertas", href: "/alertas", icon: Bell, phase: 9, implemented: true, summary: "Publicações, andamentos, processos parados, tarefas, prazos, agenda, financeiro e integrações, com link direto para agir." },
   { key: "box-overview", space: "box", label: "Visão geral do Box", href: "/box", icon: LayoutDashboard, permission: "inbox:read", phase: 4, implemented: true, summary: "Painel do Box: intimações, capturas, certificados e petições." },
