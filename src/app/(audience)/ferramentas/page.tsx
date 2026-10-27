@@ -9,12 +9,12 @@ export default function Tools() {
   return (
     <>
       <Hero
-        eyebrow="LegalOS Tools"
+        eyebrow="Ferramentas LegalOS"
         title="Menos contas à mão. Mais clareza na rotina."
       >
         <p className="aud-lead">
-          Use as calculadoras sem cadastro. Com uma conta gratuita, salve
-          resultados e baixe a memória de cálculo em PDF.
+          Use as calculadoras sem cadastro. Para salvar resultados e baixar PDF,
+          acesse sua conta pública quando o cadastro estiver disponível.
         </p>
       </Hero>
       <div className="aud-wrap aud-content">

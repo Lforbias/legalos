@@ -56,10 +56,10 @@ export function Filters({
 export function ToolsCard() {
   return (
     <section className="aud-card">
-      <h3>LegalOS Tools</h3>
+      <h3>Ferramentas LegalOS</h3>
       <p className="aud-muted">
-        Resultado na tela, sem cadastro. Salve o cálculo e baixe o PDF com sua
-        conta gratuita.
+        Calcule sem cadastro. Para salvar e baixar PDF, é necessário acesso à
+        conta pública, conforme a disponibilidade do cadastro.
       </p>
       <Link className="aud-listlink" href="/ferramentas/prazos">
         Contagem auxiliar de prazos →
@@ -129,4 +129,21 @@ export function Empty({
       <p className="aud-muted">{children}</p>
     </div>
   );
+}
+
+export function PlatformCard() {
+  return <section className="aud-card">
+    <span className="aud-tag">Conheça a plataforma</span>
+    <h3>Do conteúdo à rotina do escritório.</h3>
+    <p className="aud-muted">O espaço público complementa o LegalOS. Os dados e as operações do seu escritório ficam no ambiente autenticado.</p>
+    <dl className="aud-platform">
+      <div><dt>Func</dt><dd>Clientes, processos, tarefas, agenda e financeiro.</dd></div>
+      <div><dt>Box</dt><dd>Intimações e acompanhamento, conforme as integrações configuradas.</dd></div>
+      <div><dt>Chat</dt><dd>Atendimento e conversas vinculadas aos clientes.</dd></div>
+      <div><dt>Desktop</dt><dd>Pastas de clientes com seus processos e informações relacionadas.</dd></div>
+      <div><dt>RUTE</dt><dd>Consultas e ações assistidas, respeitando as permissões da equipe.</dd></div>
+    </dl>
+    <Link className="aud-listlink" href="/produto/recursos">Explorar os recursos →</Link>
+    <Link className="aud-listlink" href="/produto/desktop">Conhecer o Desktop →</Link>
+  </section>;
 }

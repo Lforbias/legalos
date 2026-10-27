@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Brand } from "@/components/layout/brand";
 import { viewer } from "@/server/audience/auth";
 import { publicUrl } from "@/lib/audience/policy";
 import "./audience.css";
@@ -17,7 +18,8 @@ const nav: [string, string][] = [
   ["/blog", "Blog"],
   ["/ferramentas", "Ferramentas"],
   ["/comunidade", "Comunidade"],
-  ["/produto/seguranca", "Segurança"],
+  ["/produto/precos", "Preços"],
+  ["/produto/desktop", "Desktop"],
   ["/produto/contato", "Contato"],
 ];
 export default async function Layout({
@@ -27,12 +29,11 @@ export default async function Layout({
 }) {
   const m = await viewer();
   return (
-    <div className="audience">
-      <header className="aud-head">
+    <div className="audience force-light">
+      <header className="aud-head force-dark">
         <div className="aud-wrap">
           <Link className="aud-brand" href="/produto">
-            <i aria-hidden />
-            LegalOS
+            <Brand />
           </Link>
           <nav aria-label="Principal" className="aud-nav">
             {nav.map(([href, label]) => (
@@ -43,7 +44,7 @@ export default async function Layout({
           </nav>
           <div className="aud-access">
             <Link href={m ? "/minha-conta" : "/acesso"}>
-              {m ? "Minha conta" : "Entrar"}
+              {m ? "Minha conta" : "Conta da comunidade"}
             </Link>
             <Link className="aud-btn primary" href="/login">
               Entrar no sistema
@@ -52,15 +53,15 @@ export default async function Layout({
         </div>
       </header>
       <main>{children}</main>
-      <footer className="aud-footer">
+      <footer className="aud-footer force-dark">
         <div className="aud-wrap">
           <div>
             <Link className="aud-brand" href="/produto">
-              LegalOS
+              <Brand />
             </Link>
             <p>
-              Gestão do escritório, caixa de intimações e atendimento em um só
-              lugar. Conteúdo para a rotina de quem advoga.
+              Func, Box e Chat conectados à rotina do escritório. Desktop para
+              reunir o contexto de cada cliente e RUTE para apoiar a equipe.
             </p>
           </div>
           <div>
@@ -73,7 +74,7 @@ export default async function Layout({
           </div>
           <div>
             <b>Acesso</b>
-            <Link href="/acesso">Conta gratuita</Link>
+            <Link href="/acesso">Acesso à comunidade</Link>
             <Link href="/login">Entrar no sistema</Link>
             <Link href="/produto/contato">Pedir demonstração</Link>
           </div>

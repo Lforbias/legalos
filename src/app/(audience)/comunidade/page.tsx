@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { questions, posts } from "@/server/audience/store";
+import { questions, posts, settings } from "@/server/audience/store";
 import { Hero, Filters, RulesCard, Empty } from "../_parts";
 export const metadata: Metadata = {
   title: "Comunidade — perguntas entre advogados",
@@ -20,11 +20,13 @@ export default async function Community({
   const s = await searchParams,
     page = Math.max(1, Number(s.pagina) || 1),
     rows = await questions(s.q, s.area, s.ordem, page),
-    blog = await posts();
+    blog = await posts(),
+    config = await settings(),
+    available = config.community_enabled && config.legal_approved;
   return (
     <>
       <Hero
-        eyebrow="LegalOS Comunidade · Piloto fechado, acesso por convite"
+        eyebrow={available ? "LegalOS Comunidade · Piloto por convite" : "LegalOS Comunidade · Em preparação"}
         title="Perguntas de colega para colega."
       >
         <p className="aud-lead">
@@ -50,9 +52,7 @@ export default async function Community({
                 />
                 <button className="aud-btn">Buscar</button>
               </form>
-              <Link className="aud-btn primary" href="/comunidade/nova">
-                Fazer pergunta
-              </Link>
+              {available ? <Link className="aud-btn primary" href="/comunidade/nova">Fazer pergunta</Link> : <Link className="aud-btn" href="/comunidade/regras">Conhecer as regras</Link>}
             </div>
             <div style={{ marginTop: 20 }}>
               <Filters
@@ -105,9 +105,7 @@ export default async function Community({
             ))}
             {!rows.length && (
               <Empty title="Uma boa comunidade começa com uma dúvida real.">
-                O piloto será aberto a convidados após a definição da moderação.
-                Perguntas aprovadas aparecerão aqui; não criamos perfis nem
-                discussões fictícias.
+                {available ? "Ainda não há perguntas aprovadas para esta seleção. Ajuste os filtros ou, se você participa do piloto, envie uma pergunta." : "A participação será liberada por convite após a preparação da moderação. Enquanto isso, conheça as regras e explore as ferramentas públicas."}
               </Empty>
             )}
             <div className="aud-actions">
@@ -158,7 +156,7 @@ export default async function Community({
               <h3>Moderação</h3>
               <p className="aud-muted">
                 Viu algo que viola as regras? Use Denunciar em qualquer pergunta
-                ou resposta. No piloto, a meta de análise é de 24 horas úteis.
+                ou resposta. As publicações passam pela equipe de moderação antes de aparecer aqui.
               </p>
             </div>
           </aside>

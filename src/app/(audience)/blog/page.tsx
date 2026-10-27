@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { posts } from "@/server/audience/store";
-import { Hero, Filters, ToolsCard, PostCard, Empty } from "../_parts";
+import { Hero, Filters, ToolsCard, PostCard, Empty, PlatformCard } from "../_parts";
 export const metadata: Metadata = {
   title: "Blog — direito na prática, com fonte e data",
   alternates: {
@@ -28,7 +28,7 @@ export default async function Blog({
             <p>✓ Fonte oficial com link e data de acesso</p>
             <p>✓ Rascunho automático, revisão humana antes de publicar</p>
             <p>✓ Data de atualização e página de correções</p>
-            <Link href="/blog/como-produzimos" style={{ color: "#a6b7ff" }}>
+            <Link href="/blog/como-produzimos" className="aud-editorial-link">
               Como produzimos →
             </Link>
           </div>
@@ -110,19 +110,10 @@ export default async function Blog({
           </section>
           <aside>
             <ToolsCard />
-            <div className="aud-card">
-              <h3>Resumo semanal por e-mail</h3>
-              <p className="aud-muted">
-                Entre na conta gratuita e escolha se quer receber novidades. O
-                aceite é opcional.
-              </p>
-              <Link className="aud-btn black" href="/acesso?origem=blog">
-                Escolher minhas preferências
-              </Link>
-            </div>
+            <PlatformCard />
             <div className="aud-card blue">
               <h3>Ficou com dúvida?</h3>
-              <p>Pergunte a outros advogados na LegalOS Comunidade.</p>
+              <p>Conheça a proposta da comunidade e as condições de acesso ao piloto.</p>
               <Link className="aud-btn primary" href="/comunidade">
                 Ir para a comunidade
               </Link>

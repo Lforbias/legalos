@@ -1,12 +1,12 @@
 .audience {
   --ink: #151821;
-  --soft: #f5f6fa;
+  --soft: #f8f8fa;
   --line: #e0e5ef;
-  --blue: #395eeb;
+  --blue: #E5243B;
   --muted-ink: #536079;
   color: var(--ink);
   background: var(--soft);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
   min-height: 100vh;
   color-scheme: light;
   line-height: 1.6;
@@ -44,14 +44,14 @@
 }
 .aud-brand {
   font-size: 21px;
-  font-weight: 800;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 10px;
   white-space: nowrap;
 }
 .aud-brand i {
-  background: #9eb1ff;
+  background: #ff9aa5;
   width: 28px;
   height: 28px;
   border-radius: 9px;
@@ -70,7 +70,7 @@
 }
 .aud-nav a[aria-current="page"] {
   color: white;
-  border-bottom: 2px solid #9eb1ff;
+  border-bottom: 2px solid #ff9aa5;
 }
 .aud-access {
   display: flex;
@@ -92,25 +92,25 @@
   letter-spacing: 1.8px;
   font-weight: 700;
   text-transform: uppercase;
-  color: #9eb1ff;
+  color: #ff9aa5;
   margin-bottom: 16px;
 }
 .audience h1 {
   font-size: 46px;
   line-height: 1.12;
   letter-spacing: -1.5px;
-  font-weight: 800;
+  font-weight: 600;
   margin: 0 0 22px;
 }
 .audience h2 {
   font-size: 25px;
   line-height: 1.3;
-  font-weight: 750;
+  font-weight: 600;
   margin: 28px 0 18px;
 }
 .audience h3 {
   font-size: 19px;
-  font-weight: 750;
+  font-weight: 600;
   line-height: 1.4;
   margin: 0 0 12px;
 }
@@ -136,8 +136,8 @@
   color: #e9ebf3;
 }
 .aud-card.blue {
-  background: #e8edff;
-  border-color: #e8edff;
+  background: #f8edef;
+  border-color: #f8edef;
 }
 .aud-card.warning {
   background: #fff4df;
@@ -145,7 +145,7 @@
   color: #624200;
 }
 .aud-card.accepted {
-  border: 2px solid #4b68ff;
+  border: 2px solid #E5243B;
 }
 .aud-content {
   padding: 34px 0 70px;
@@ -202,7 +202,7 @@
   font-size: 15px;
 }
 .aud-input:focus {
-  outline: 2px solid #617eff;
+  outline: 2px solid #E5243B;
   outline-offset: 2px;
 }
 .aud-input[aria-invalid="true"] {
@@ -252,7 +252,7 @@
 .aud-tag {
   display: inline-block;
   border-radius: 20px;
-  background: #e8edff;
+  background: #f8edef;
   color: #294bd1;
   padding: 3px 11px;
   font-size: 12px;
@@ -332,7 +332,7 @@
   padding: 0 0 10px;
 }
 .aud-tabs a[aria-current="page"] {
-  border-bottom: 2px solid #5674ff;
+  border-bottom: 2px solid #E5243B;
   font-weight: 700;
 }
 .aud-empty {
@@ -456,7 +456,7 @@
   font-weight: 700;
 }
 .audience :focus-visible {
-  outline: 2px solid #5674ff;
+  outline: 2px solid #E5243B;
   outline-offset: 3px;
 }
 .audience ul {
@@ -543,4 +543,23 @@
   .aud-nav {
     gap: 19px;
   }
+}
+
+/* Public pages share the LegalOS identity; account data remains separate. */
+.aud-head { position: sticky; top: 0; z-index: 30; }
+.aud-head .aud-wrap { gap: 18px; }
+.aud-nav { gap: 18px; }
+.aud-brand { flex-shrink: 0; }
+.aud-content { padding-left: 24px; padding-right: 24px; }
+.aud-card.dark .aud-muted { color: #bec6d8; }
+.aud-editorial-link { color: #ff9aa5; }
+.aud-platform { margin: 20px 0; }
+.aud-platform > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.aud-platform dt { font-size: 14px; font-weight: 600; }
+.aud-platform dd { margin: 4px 0 0; color: var(--muted-ink); font-size: 13px; }
+.aud-btn { transition: background-color 150ms, border-color 150ms; }
+.aud-btn.primary:hover { background: #c71b30; border-color: #c71b30; text-decoration: none; }
+@media (max-width: 720px) {
+  .aud-content { padding-left: 18px; padding-right: 18px; }
+  .aud-access { gap: 10px; font-size: 12px; }
 }
