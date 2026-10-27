@@ -1,3 +1,5 @@
+import { chatContactBlocked } from "./chat-contact-control.service";
+import { emitChatEvent } from "./chat-workbench.service";
 import { applyInboundLifecycle, humanReplyLifecycle } from "./chat-lifecycle.service";
 import { randomUUID } from "node:crypto";
 import { recordSurveyAnswer } from "@/server/services/chat-extras.service";
@@ -21,6 +23,7 @@ export type IngestAccount = { id: string; organizationId: string; awayEnabled: b
 export type IngestMessage = {
   /** Já com o prefixo do meio (QR) quando for o caso: é o que vai para `wa_message_id`. */
   waMessageId: string;
+  referral?: {source:string;adId:string;campaign:string};
   waId: string;
   contactName: string | null;
   type: string;
@@ -117,6 +120,9 @@ export async function ingestMessage(account: IngestAccount, m: IngestMessage): P
     where: { id: conv.id },
     data: { unreadCount: { increment: 1 }, lastInboundAt: m.timestamp, lastMessageAt: m.timestamp, lastPreview: preview, ...(m.contactName ? { contactName: m.contactName } : {}) },
   });
+  if(m.referral)await db.$executeRaw`INSERT INTO chat_contact_events(id,organization_id,conversation_id,kind,payload) VALUES(${randomUUID()}::uuid,${account.organizationId}::uuid,${conv.id}::uuid,'ATTRIBUTION',${JSON.stringify(m.referral)}::jsonb)`;
+  await emitChatEvent(account.organizationId,"chat.message.received",{conversationId:conv.id,providerMessageId:m.waMessageId,type:m.type}).catch(()=>0);
+  if(await chatContactBlocked(account.organizationId,account.id,m.waId))return;
   // Pesquisa de satisfação: resposta só com nota (0 a 10) fica registrada e não aciona robô nem automações.
   if (!created && (await recordSurveyAnswer(account.organizationId, conv.id, m.text).catch(() => false))) return;
   // LegalOS Chat: conversa nova, reaberta ou sem responsável entra na fila e é distribuída.
@@ -151,12 +157,11 @@ const RANK = { SENT: 1, DELIVERED: 2, READ: 3 } as const;
 
 /** Aviso de entrega: só avança (enviada → entregue → lida); falha sempre registra o motivo. Ignora mensagens de outro escritório ou desconhecidas. */
 export async function applyStatusUpdate(organizationId: string, waMessageId: string, status: "sent" | "delivered" | "read" | "failed", error: string | null): Promise<void> {
-  const m = await db.whatsappMessage.findFirst({ where: { waMessageId, organizationId }, select: { id: true, status: true } });
+  const m = await db.whatsappMessage.findFirst({ where: { waMessageId, organizationId }, select: { id: true, status: true, conversationId:true } });
   if (!m) return;
-  if (status === "failed") {
-    await db.whatsappMessage.update({ where: { id: m.id }, data: { status: "FAILED", error: error ?? "O WhatsApp informou falha na entrega." } });
-    return;
-  }
-  const next = status.toUpperCase() as keyof typeof RANK;
-  if (RANK[next] > (RANK[m.status as keyof typeof RANK] ?? 0)) await db.whatsappMessage.update({ where: { id: m.id }, data: { status: next, error: null } });
+  const next = status.toUpperCase();
+  // A late sent/delivered/failed event cannot undo a read receipt.
+  const eligible=status==="failed"?["PENDING","SENT"]:Object.keys(RANK).filter(k=>RANK[k as keyof typeof RANK]<RANK[next as keyof typeof RANK]).concat(["PENDING","FAILED"]);
+  const changed=await db.whatsappMessage.updateMany({where:{id:m.id,organizationId,status:{in:eligible}},data:{status:next,error:status==="failed"?error??"O WhatsApp informou falha na entrega.":null}});
+  if(changed.count)await emitChatEvent(organizationId,"chat.message.status",{conversationId:m.conversationId,messageId:m.id,status:next}).catch(()=>0);
 }

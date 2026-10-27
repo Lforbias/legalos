@@ -1,5 +1,6 @@
 "use client";
 
+import { WorkbenchComposer } from "./workbench-composer";
 import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus } from "@/lib/whatsapp/lifecycle";
 import { serviceStatusAction } from "./operations-actions";
 import { ManualCallForm } from "./operations-ui";
@@ -308,6 +309,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
                 {quickMatch.map((r) => <button key={r.id} type="button" className="rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2" onClick={() => setText(r.body)}>/{r.shortcut} — {r.title}</button>)}
               </div>
             ) : null}
+            <WorkbenchComposer key={chat.id} id={chat.id} text={text} onDraft={setText} />
             <label className="flex w-fit items-center gap-2 rounded-full border border-border px-2.5 py-0.5 text-xs"><input type="checkbox" checked={note} onChange={(e) => setNote(e.target.checked)} /> Nota interna</label>
             {(chat.windowOpen || note) ? (
               <div className={`flex items-end gap-1.5 rounded-2xl border px-1.5 py-1.5 ${note ? "border-warning/50 bg-warning-bg" : "border-border bg-surface-2"}`}>

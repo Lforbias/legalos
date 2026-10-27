@@ -218,14 +218,14 @@ describe("LegalOS Chat — cobrança de honorários pelo WhatsApp", () => {
     await runBillingReminders(NOW);
     fake.requests.length = 0;
     await say(WAID, "Já paguei ontem");
-    expect(texts().some((x) => x.startsWith("Escolha:"))).toBe(false);
+    expect(fake.requests.some(r=>JSON.stringify(r.body).includes("Escolha:"))).toBe(false);
     const c = await db.whatsappConversation.findFirstOrThrow({ where: { organizationId: A.org.id, waId: WAID } });
     expect(c.status).toBe("OPEN"); // reabre para um atendente
     // sem cobrança recente o menu volta a funcionar
     await db.whatsappBillingSend.deleteMany({ where: { organizationId: A.org.id } });
     await db.whatsappConversation.update({ where: { id: c.id }, data: { status: "CLOSED" } });
     await say(WAID, "Oi de novo");
-    expect(texts().some((x) => x.startsWith("Escolha:"))).toBe(true);
+    expect(fake.requests.some(r=>r.body?.type==="interactive"&&JSON.stringify(r.body).includes("Escolha:"))).toBe(true);
     await saveBot(A.ctx, { enabled: false, greeting: "Escolha:", invalidText: "Não entendi.", handoffText: "Um atendente vai falar.", options: [{ label: "Falar de processo", reply: "", actions: [], questions: [] }] });
   });
 

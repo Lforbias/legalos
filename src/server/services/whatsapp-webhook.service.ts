@@ -29,7 +29,7 @@ async function processInbound(account: Account, m: InboundMessage): Promise<void
   if (!waId) return;
   const media = m.media;
   await ingestMessage(account, {
-    waMessageId: m.id, waId, contactName: m.contactName, type: m.type, text: m.text, timestamp: m.timestamp, fromMe: false,
+    waMessageId: m.id, waId, contactName: m.contactName, type: m.type, text: m.text, timestamp: m.timestamp, fromMe: false, referral:m.referral,
     media: media
       ? {
           mime: media.mime, filename: media.filename,

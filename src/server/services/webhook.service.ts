@@ -8,6 +8,10 @@ import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 
 export const WEBHOOK_EVENTS = {
+  "chat.message.received": "Mensagem recebida no Chat",
+  "chat.message.sent": "Mensagem enviada no Chat",
+  "chat.message.status": "Recibo de mensagem do Chat",
+  "chat.conversation.updated": "Atendimento atualizado",
   "notice.created": "Intimação registrada",
   "case.created": "Processo cadastrado",
   "deadline.created": "Prazo cadastrado",

@@ -32,6 +32,13 @@ export function buildOpenApi(tools: Catalog) {
     security: [{ bearerAuth: [] }], requestBody: { required: true, content: { "application/json": { schema: tool.inputSchema } } },
     responses: { "200": response, "401": response, "403": response, "404": response, "409": response, "422": response, "429": response, "500": response },
   } };
+  paths["/api/v1/chat/conversations/{id}/messages"]={post:{
+    summary:"Enviar mensagem aprovada por pessoa",tags:["Chat"],"x-legalos-scope":"chat:send",security:[{bearerAuth:[]}],
+    description:"Exige aprovação humana declarada. Janela de 24 horas da Meta, bloqueio do contato e permissões são conferidos no servidor. Reutilize a mesma chave para consultar o resultado sem repetir o envio; resultado incerto exige conferência manual.",
+    parameters:[{name:"id",in:"path",required:true,schema:{type:"string",format:"uuid"}},{name:"Idempotency-Key",in:"header",required:true,schema:{type:"string",minLength:12,maxLength:120,pattern:"^[A-Za-z0-9_-]+$"}}],
+    requestBody:{required:true,content:{"application/json":{schema:{type:"object",required:["text","approvedByHuman"],properties:{text:{type:"string",minLength:1,maxLength:4096},approvedByHuman:{const:true}}}}}},
+    responses:{"200":response,"401":response,"403":response,"404":response,"409":response,"422":response,"429":response}
+  }};
   return {
     openapi: "3.1.0", info: { title: "LegalOS API", version: "1.1.0", description: "REST de recursos e catálogo compartilhado com a RUTE e o MCP. Ferramentas são filtradas pelas permissões e escopos desta chave. Propostas exigem decisão humana no LegalOS. Escopos REST de recursos são descritos em docs/api.md; tools:read, tools:propose e tools:execute concedem acesso às consultas, propostas e ações diretas respectivamente, condicionado aos interruptores e permissões do escritório. Ações diretas gravam imediatamente e não passam por aprovação posterior." },
     paths, components: { securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "LegalOS API key" } } },

@@ -87,7 +87,7 @@ describe("atendimento por WhatsApp — conexão por QR-Code (driver FALSO)", () 
 
   it("recebe mensagem, casa com o cliente (sem o nono dígito) e não aplica janela de 24h", async () => {
     fakeQr.emit(accountId, { type: "message", msg: inboundMsg("IN1", MARIA, "Bom dia, doutora") });
-    const conv = await until(async () => db.whatsappConversation.findFirst({ where: { organizationId: A.org.id, waId: MARIA } }));
+    const conv = await until(async () => db.whatsappConversation.findFirst({ where: { organizationId: A.org.id, waId: MARIA, unreadCount:{gte:1} } }));
     expect(conv.clientId).not.toBeNull();
     expect(conv.unreadCount).toBe(1);
     const m = await db.whatsappMessage.findFirstOrThrow({ where: { conversationId: conv.id } });

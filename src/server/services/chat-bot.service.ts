@@ -1,9 +1,10 @@
 import type { Prisma } from "@prisma/client";
 import { hadRecentBilling } from "./chat-billing.service";
+import { systemSendInteractive } from "./whatsapp.service";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { ValidationError } from "@/lib/permissions/check";
-import { botOptionSchema, botSchema, BOT_HANDOFF_KEY, menuText, type BotOption } from "@/modules/whatsapp/bot-schema";
+import { botOptionSchema, botSchema, BOT_HANDOFF_KEY, type BotOption } from "@/modules/whatsapp/bot-schema";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { runActionsOnConversation, validateRefs } from "./chat-automation.service";
@@ -91,7 +92,7 @@ export async function runBot(organizationId: string, conversationId: string, m: 
       if (await hadRecentBilling(conversationId)) return; // resposta a uma cobrança: vai direto para uma pessoa
       const data = { organizationId, state: "MENU", optionKey: null, questionIndex: 0, invalidCount: 0, answers: [] as Prisma.InputJsonValue, startedAt: m.now };
       await db.whatsappBotSession.upsert({ where: { conversationId }, create: { conversationId, ...data }, update: { ...data, step: { increment: 1 } } });
-      await say(organizationId, conversationId, conv.waId, menuText(bot.greeting, options));
+      await sayMenu(organizationId,conversationId,{body:bot.greeting,options:[...options.map((o,i)=>({id:`legalos:triage:${i+1}`,title:o.label.slice(0,24)})),{id:"legalos:triage:0",title:"Falar com atendente"}]});
       return;
     }
     // Reserva a vez: duas mensagens simultâneas não geram duas respostas.
@@ -104,6 +105,12 @@ export async function runBot(organizationId: string, conversationId: string, m: 
   } catch (e) {
     logger.error("whatsapp.bot_failed", { error: e instanceof Error ? e.message : String(e) });
   }
+}
+
+async function sayMenu(organizationId:string,conversationId:string,input:{body:string;options:{id:string;title:string}[]}) {
+  const sent=await db.whatsappMessage.count({where:{conversationId,organizationId,direction:"OUT",automatic:true,createdAt:{gt:new Date(Date.now()-SESSION_TTL_MS)}}});
+  if(sent>=DAILY_CAP)return;
+  return systemSendInteractive(organizationId,conversationId,input);
 }
 
 type Ctx = { organizationId: string; conversationId: string; waId: string; bot: { greeting: string; invalidText: string; handoffText: string }; options: BotOption[]; ses: Ses; text: string };
@@ -130,7 +137,7 @@ async function onMenu(c: Ctx) {
     const invalid = c.ses.invalidCount + 1;
     if (invalid >= MAX_INVALID) return finish(c, "o cliente não escolheu uma opção (passou para um atendente)", []);
     await db.whatsappBotSession.update({ where: { conversationId: c.conversationId }, data: { invalidCount: invalid } });
-    await say(c.organizationId, c.conversationId, c.waId, `${c.bot.invalidText}\n\n${menuText("Opções:", c.options)}`);
+    await sayMenu(c.organizationId,c.conversationId,{body:c.bot.invalidText,options:[...c.options.map((o,i)=>({id:`legalos:triage:${i+1}`,title:o.label.slice(0,24)})),{id:"legalos:triage:0",title:"Falar com atendente"}]});
     return;
   }
   const { done, failed } = await runActionsOnConversation(c.organizationId, c.conversationId, `Menu: ${opt.label}`, c.organizationId, { trigger: "NEW_CONVERSATION", eventKey: `bot:${idx}:${Date.now()}`, text: c.text }, opt.actions);

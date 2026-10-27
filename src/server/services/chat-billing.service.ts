@@ -124,8 +124,14 @@ async function deliverOne(organizationId: string, e: EntryRow, c: ClientRow | nu
   const conv = found ?? (await db.whatsappConversation.create({ data: { organizationId, accountId: account.id, waId, clientId: c.id, status: "CLOSED" }, select: { id: true } }));
   const vars = varsFor(e, c);
   try {
+    // Only reuse an existing charge for this entry/client and the current remaining amount.
+    // This does not create a financial transaction or a new charge at Asaas.
+    const charges=await db.feeCharge.findMany({where:{organizationId,entryId:e.id,clientId:c.id,status:{in:["PENDING","OVERDUE"]}},orderBy:{createdAt:"desc"},take:10});
+    const charge=charges.find(p=>toCents(p.value.toString())===toCents(remainingOf(e)));
+    const url=charge?.invoiceUrl??charge?.boletoUrl;
+    const paymentLink=url&&/^https:\/\//i.test(url)&&url.length<=500?`\n\nPagar cobrança: ${url}`:"";
     const r = (await windowAllowsText(organizationId, conv.id))
-      ? await systemSendText(organizationId, conv.id, textFor(s, kind, vars))
+      ? await systemSendText(organizationId, conv.id, textFor(s, kind, vars)+paymentLink)
       : s.templateId
         ? await systemSendTemplate(organizationId, conv.id, s.templateId, [vars.nome, vars.valor, vars.vencimento, vars.parcela, vars.descricao])
         : null;

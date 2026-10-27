@@ -306,6 +306,8 @@ export async function runChatExtras() {
   const { runDialogs } = await import("./chat-dialogs.service");
   const { runCampaigns } = await import("./chat-campaigns.service");
   const { runReportSchedules } = await import("./chat-report.service");
+  const { runEmailInboxes } = await import("./chat-email.service");
+  await part("email_", runEmailInboxes);
   await part("", runScheduledMessages);
   await part("", runFollowUpReminders);
   await part("arquivo_", () => runAutoArchive(new Date()));

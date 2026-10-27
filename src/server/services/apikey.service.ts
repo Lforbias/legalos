@@ -8,6 +8,7 @@ import { resolveTenantContext } from "./tenant.service";
 
 /** Escopos da API pública. Cada escopo exige, além disso, a permissão equivalente de quem criou a chave. */
 export const API_SCOPES = {
+  "chat:send": { label: "Chat: enviar mensagem aprovada por pessoa", permission: "whatsapp:write" },
   "cases:read": { label: "Ler processos", permission: "cases:read" },
   "clients:read": { label: "Ler clientes", permission: "clients:read" },
   "deadlines:read": { label: "Ler prazos", permission: "deadlines:read" },

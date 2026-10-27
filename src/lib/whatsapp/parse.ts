@@ -8,6 +8,7 @@ export type InboundMessage = {
   text: string | null;
   media: InboundMedia | null;
   contactName: string | null;
+  referral?: {source:string;adId:string;campaign:string};
 };
 export type StatusUpdate = { id: string; status: "sent" | "delivered" | "read" | "failed"; timestamp: Date; recipient: string | null; error: string | null };
 export type ParsedChange = { phoneNumberId: string; messages: InboundMessage[]; statuses: StatusUpdate[] };
@@ -54,13 +55,15 @@ export function parseWebhook(body: unknown): ParsedChange[] {
         else if (type === "interactive" && isObj(m.interactive)) {
           const i = m.interactive;
           const r = isObj(i.button_reply) ? i.button_reply : isObj(i.list_reply) ? i.list_reply : null;
-          text = r ? str(r.title) : null;
+          const replyId = r ? str(r.id) : null;
+          text = replyId && /^legalos:triage:\d{1,2}$/.test(replyId) ? replyId.replace("legalos:triage:", "") : r ? str(r.title) : null;
         } else if (type === "location" && isObj(m.location)) {
           const lat = m.location.latitude;
           const lng = m.location.longitude;
           if (typeof lat === "number" && typeof lng === "number") text = `Localização: ${lat}, ${lng}${str(m.location.name) ? ` (${str(m.location.name)})` : ""}`;
         }
-        messages.push({ id, from, timestamp: toDate(m.timestamp), type, text, media, contactName: names.get(from) ?? null });
+        const referral = isObj(m.referral) ? {source:"meta_ads",adId:(str(m.referral.source_id)??"").slice(0,120),campaign:(str(m.referral.headline)??"").slice(0,120)} : undefined;
+        messages.push({ id, from, timestamp: toDate(m.timestamp), type, text, media, contactName: names.get(from) ?? null, ...(referral?{referral}:{}) });
       }
 
       const statuses: StatusUpdate[] = [];

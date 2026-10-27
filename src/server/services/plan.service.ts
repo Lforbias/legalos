@@ -63,13 +63,14 @@ function monthStart(): Date {
 }
 
 export async function getUsage(organizationId: string): Promise<Usage> {
-  const [users, pendingInvites, storage, ai] = await Promise.all([
+  const [users, pendingInvites, storage, ai, emailStorage] = await Promise.all([
     db.membership.count({ where: { organizationId, status: "ACTIVE" } }),
     db.invitation.count({ where: { organizationId, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } } }),
     db.documentVersion.aggregate({ where: { organizationId, document: { is: { deletedAt: null } } }, _sum: { sizeBytes: true } }),
     db.aiUsage.aggregate({ where: { organizationId, createdAt: { gte: monthStart() } }, _sum: { inputTokens: true, outputTokens: true } }),
+    db.$queryRaw<{bytes:string}[]>`SELECT coalesce(sum((file->>'size')::bigint),0)::text bytes FROM chat_email_messages m CROSS JOIN LATERAL jsonb_array_elements(m.attachments) file WHERE m.organization_id=${organizationId}::uuid`,
   ]);
-  return { users, pendingInvites, storageBytes: storage._sum.sizeBytes ?? 0, aiTokensMonth: (ai._sum.inputTokens ?? 0) + (ai._sum.outputTokens ?? 0) };
+  return { users, pendingInvites, storageBytes: (storage._sum.sizeBytes ?? 0) + Number(emailStorage[0]?.bytes ?? 0), aiTokensMonth: (ai._sum.inputTokens ?? 0) + (ai._sum.outputTokens ?? 0) };
 }
 
 const STATE_MESSAGE: Record<string, string> = {

@@ -1,0 +1,19 @@
+import Link from "next/link";
+import { AccessDenied } from "@/components/layout/access-denied";
+import { PageHeader } from "@/components/layout/page-header";
+import { requireTenant } from "@/server/session";
+import { can } from "@/server/context";
+import { emailInbox,emailThread } from "@/server/services/chat-email.service";
+import { listQueues } from "@/server/services/chat-queue.service";
+import { teamForAssignment } from "@/server/services/whatsapp.service";
+import { attendanceProtocol } from "@/lib/whatsapp/workbench";
+import { EmailReply,EmailControls } from "@/modules/whatsapp/email-ui";
+import { z } from "zod";
+export const dynamic="force-dynamic";
+export const metadata={title:"E-mail · LegalOS Chat"};
+export default async function ChatEmail({searchParams}:{searchParams:Promise<{c?:string}>}) {
+ const {ctx}=await requireTenant();if(!can(ctx,"whatsapp:read"))return <AccessDenied/>;
+ const sp=await searchParams;const inbox=await emailInbox(ctx);const selected=sp.c&&z.uuid().safeParse(sp.c).success?await emailThread(ctx,sp.c).catch(()=>null):null;
+ const writer=can(ctx,"whatsapp:write");const [queues,team]=writer?await Promise.all([listQueues(ctx),teamForAssignment(ctx)]):[[],[]];
+ return <div className="mx-auto max-w-7xl space-y-5 pb-12"><PageHeader title="E-mail do escritório" description="Atendimento por e-mail com histórico de respostas e responsável." actions={<div className="flex gap-4 text-sm underline"><Link href="/atendimento">WhatsApp</Link>{can(ctx,"whatsapp:manage")&&<Link href="/atendimento/operacoes">Configurar e-mail</Link>}</div>}/><div className="grid gap-5 lg:grid-cols-[300px_minmax(0,1fr)]"><aside className="rounded-xl border border-border bg-surface"><p className="border-b border-border p-3 text-xs text-muted">Até 200 atendimentos, do mais recente ao mais antigo.</p>{inbox.map(c=><Link className={`block border-b border-border p-3 hover:bg-surface-2 ${selected?.conversation.id===c.id?"bg-surface-2":""}`} key={c.id} href={`/atendimento/email?c=${c.id}`}><p className="truncate text-sm font-medium">{c.subject}</p><p className="truncate text-xs text-muted">{c.contact_email}</p><p className="text-xs text-muted">{c.status==="OPEN"?"Aberto":"Encerrado"}{c.blocked?" · Bloqueado":""}</p></Link>)}{!inbox.length&&<p className="p-5 text-sm text-muted">Nenhum e-mail importado. Configure uma caixa e sincronize em Operações do Chat.</p>}</aside><section className="min-w-0 rounded-xl border border-border bg-surface p-5">{selected?<><h2 className="text-lg font-semibold">{selected.conversation.subject}</h2><p className="break-all text-xs text-muted">{attendanceProtocol(selected.conversation.id,selected.conversation.created_at)}</p>{writer&&<EmailControls id={selected.conversation.id} status={selected.conversation.status} blocked={selected.conversation.blocked} assignedToId={selected.conversation.assigned_to_id} queueId={selected.conversation.queue_id} team={team} queues={queues}/>}<p className="mb-3 text-xs text-muted">Últimas 100 mensagens. Endereço do remetente não comprova identidade; confirme antes de compartilhar dados do cliente.</p>{selected.messages.map(m=><article className="mb-3 rounded-lg border border-border p-3" key={m.id}><p className="mb-2 text-xs text-muted">{m.direction==="IN"?"Recebido":"Resposta da equipe"} · {new Date(m.created_at).toLocaleString("pt-BR")} · {m.status}</p><p className="whitespace-pre-wrap break-words text-sm">{m.body}</p>{m.attachments.map((f,i)=><a className="mt-2 block break-all text-xs underline" key={i} href={f.url} download>{f.filename} · {Math.ceil(f.size/1024)} KB</a>)}</article>)}{writer&&!selected.conversation.blocked&&<EmailReply key={selected.conversation.id} id={selected.conversation.id} to={selected.conversation.contact_email} subject={selected.conversation.subject}/>}</>:<p className="py-10 text-center text-muted">Selecione um atendimento de e-mail.</p>}</section></div></div>;
+}

@@ -1,3 +1,4 @@
+import { CHAT_TOOLS } from "./rute-chat-tools";
 import { ACTION_TOOLS } from "./rute-action-tools";
 import { DOMAIN_TOOLS } from "./rute-domain-tools";
 import { EXPANDED_TOOLS } from "./rute-expanded-tools";
@@ -53,6 +54,7 @@ async function visibleCaseIds(ctx: TenantContext, where: object, take = 50) {
 }
 
 const TOOLS: ToolDef[] = [
+  ...CHAT_TOOLS,
   ...ACTION_TOOLS,
   ...EXPANDED_TOOLS,
   ...DOMAIN_TOOLS,

@@ -42,6 +42,7 @@ export function startFakeWhatsapp() {
         return send(200, { messaging_product: "whatsapp", contacts: [{ wa_id: String(body?.to ?? "") }], messages: [{ id: `wamid.OUT${run}${++n}` }] });
       }
       if (req.method === "POST" && url.pathname.match(/^\/v[\d.]+\/(\d+)\/media$/)) return send(200, { id: `media_up_${++n}` });
+      if (req.method === "POST" && url.pathname.match(/^\/v[\d.]+\/(\d+)\/message_templates$/)) return send(200, { id: `template_${++n}`, status: "PENDING" });
       if (req.method === "GET" && (m = url.pathname.match(/^\/v[\d.]+\/(\d+)\/message_templates$/))) return send(200, { data: state.templates });
       if (req.method === "GET" && (m = url.pathname.match(/^\/v[\d.]+\/([^/]+)$/))) {
         if (media.has(m[1]!)) return send(200, { url: `${base}/dl/${m[1]}`, mime_type: media.get(m[1]!)!.mime, file_size: media.get(m[1]!)!.data.length });

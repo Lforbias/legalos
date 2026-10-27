@@ -1,4 +1,5 @@
 "use client";
+import { parseCampaignContacts } from "@/lib/whatsapp/campaign-import";
 
 import * as React from "react";
 import { Alert } from "@/components/ui/alert";
@@ -226,11 +227,17 @@ const CSTATUS: Record<string, string> = { DRAFT: "Rascunho (aguardando aprovaç�
 export function CampaignsPanel({ campaigns, clients, templates, enabled, canApprove, isMeta }: { campaigns: CampaignRow[]; clients: { id: string; name: string }[]; templates: { id: string; name: string }[]; enabled: boolean; canApprove: boolean; isMeta: boolean }) {
   const { run, pending, error, done } = useRun();
   const [f, setF] = React.useState({ name: "", text: "", templateId: "", q: "" });
+  const [clientTag,setClientTag]=React.useState("");
+  const [clientStatus,setClientStatus]=React.useState("");
+  const [schedule,setSchedule]=React.useState("");
+  const [importText,setImportText]=React.useState("");
+  const [importConsent,setImportConsent]=React.useState(false);
+  let imported:{name:string;phone:string}[]=[];let importError="";try{imported=parseCampaignContacts(importText);}catch(e){importError=e instanceof Error?e.message:"Lista inválida.";}
   const [sel, setSel] = React.useState<Set<string>>(new Set());
   const [rep, setRep] = React.useState<{ id: string; rows: { name: string; status: string; error: string | null }[];page:number;pages:number;total:number } | null>(null);
   const [page,setPage]=React.useState(1);const [clientError,setClientError]=React.useState("");const [loadingClients,setLoadingClients]=React.useState(true);
-  const [options,setOptions]=React.useState({items:clients,total:clients.length,pages:1});const [matching,setMatching]=React.useState<{q:string;total:number}|null>(null);
-  React.useEffect(()=>{let alive=true;const timer=setTimeout(async()=>{setLoadingClients(true);const r=await campaignClientOptionsAction({q:f.q,page});if(!alive)return;setLoadingClients(false);if(r.ok&&r.data){setOptions(r.data);setClientError("");}else setClientError(r.message??"Não foi possível buscar clientes.");},250);return()=>{alive=false;clearTimeout(timer);};},[f.q,page]);
+  const [options,setOptions]=React.useState({items:clients,total:clients.length,pages:1});const [matching,setMatching]=React.useState<{q:string;total:number;clientTag:string;clientStatus:string}|null>(null);
+  React.useEffect(()=>{let alive=true;const timer=setTimeout(async()=>{setLoadingClients(true);const r=await campaignClientOptionsAction({q:f.q,page,clientTag,clientStatus:clientStatus||undefined});if(!alive)return;setLoadingClients(false);if(r.ok&&r.data){setOptions(r.data);setClientError("");}else setClientError(r.message??"Não foi possível buscar clientes.");},250);return()=>{alive=false;clearTimeout(timer);};},[f.q,page,clientTag,clientStatus]);
   const shown=options.items;
   const reportPage=async(id:string,page:number)=>{const r=await campaignReportAction(id,page);if(r.ok&&r.data)setRep({id,...r.data});};
   const toggle = (id: string) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -247,7 +254,7 @@ export function CampaignsPanel({ campaigns, clients, templates, enabled, canAppr
               <div><span className="font-medium">{c.name}</span> <Badge tone={c.status === "DONE" ? "success" : c.status === "DRAFT" ? "warning" : "info"}>{CSTATUS[c.status] ?? c.status}</Badge>
                 <div className="text-xs text-muted">{fmt(c.createdAt)} · enviadas {c.counts.SENT} · na fila {c.counts.PENDING} · falhas {c.counts.FAILED} · ignoradas {c.counts.SKIPPED} · envio incerto {c.counts.UNKNOWN??0}</div></div>
               <div className="flex flex-wrap gap-2">
-                {(c.status === "DRAFT" || c.status === "PAUSED") && canApprove ? <Button size="sm" loading={pending} onClick={() => run(() => approveCampaignAction(c.id), "Campanha aprovada. O envio começa no próximo minuto, aos poucos.")}>Aprovar e enviar</Button> : null}
+                {(c.status === "DRAFT" || c.status === "PAUSED") && canApprove ? <Button size="sm" loading={pending} onClick={() => run(() => approveCampaignAction(c.id), "Campanha aprovada. O envio respeita o horário agendado e acontece aos poucos.")}>Aprovar e enviar</Button> : null}
                 {c.status === "APPROVED" || c.status === "SENDING" ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => pauseCampaignAction(c.id), "Campanha pausada.")}>Pausar</Button> : null}
                 {["DRAFT", "APPROVED", "SENDING", "PAUSED"].includes(c.status) ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => cancelCampaignAction(c.id), "Campanha cancelada.")}>Cancelar</Button> : null}
                 <Button size="sm" variant="secondary" onClick={async () => { const r = await campaignReportAction(c.id); if (r.ok && r.data) setRep({ id: c.id,...r.data }); }}>Relatório</Button>
@@ -265,6 +272,9 @@ export function CampaignsPanel({ campaigns, clients, templates, enabled, canAppr
           <Field label="Nome (só para vocês)" htmlFor="cp-name"><Input id="cp-name" maxLength={80} value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} /></Field>
           <Field label="Mensagem (use {nome})" htmlFor="cp-text"><Textarea id="cp-text" rows={4} maxLength={1000} value={f.text} onChange={(e) => setF({ ...f, text: e.target.value })} /></Field>
           <Field label={isMeta ? "Modelo aprovado (obrigatório na API oficial)" : "Modelo aprovado (opcional)"} htmlFor="cp-tpl"><Select id="cp-tpl" value={f.templateId} onChange={(e) => setF({ ...f, templateId: e.target.value })}><option value="">{isMeta ? "Escolha…" : "Sem modelo"}</option>{templates.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}</Select></Field>
+          <Field label="Agendar envio (horário deste navegador; ainda exige aprovação)" htmlFor="cp-schedule"><Input id="cp-schedule" type="datetime-local" value={schedule} onChange={e=>setSchedule(e.target.value)}/></Field>
+          <div className="grid gap-3 sm:grid-cols-2"><Field label="Etiqueta do cadastro do cliente (nome exato)" htmlFor="cp-tag"><Input id="cp-tag" value={clientTag} onChange={e=>{setClientTag(e.target.value);setLoadingClients(true);setPage(1);setMatching(null);}} maxLength={80}/></Field><Field label="Situação do cliente" htmlFor="cp-client-status"><Select id="cp-client-status" value={clientStatus} onChange={e=>{setClientStatus(e.target.value);setLoadingClients(true);setPage(1);setMatching(null);}}><option value="">Todas</option><option value="ACTIVE">Ativo</option><option value="PROSPECT">Prospect</option><option value="INACTIVE">Inativo</option></Select></Field></div>
+          <details><summary className="cursor-pointer text-sm">Importar lista de destinatários</summary><Field label="Uma linha por contato: Nome;Telefone com DDI" htmlFor="cp-import"><Textarea id="cp-import" rows={5} maxLength={1000000} value={importText} onChange={e=>{setImportText(e.target.value);setMatching(null);setImportConsent(false);}}/></Field><p className="text-xs text-muted">{imported.length} telefones únicos. Não cria clientes no cadastro. Pedidos de parada continuam respeitados.</p>{importError&&<Alert tone="error">{importError}</Alert>}<label className="text-sm"><input type="checkbox" checked={importConsent} onChange={e=>setImportConsent(e.target.checked)}/> Conferi a origem e a autorização para contatar estas pessoas.</label></details>
           <Field label="Buscar cliente" htmlFor="cp-q"><Input id="cp-q" value={f.q} onChange={(e) => {setLoadingClients(true);setF({ ...f, q: e.target.value });setPage(1);setMatching(null);}} /></Field>
           {clientError?<Alert tone="error">{clientError}</Alert>:null}
           <div className="flex items-center gap-2"><Button size="sm" disabled={page<=1||loadingClients} onClick={()=>setPage(p=>p-1)}>Página anterior</Button><span className="text-xs">{page}/{options.pages} · {options.total} clientes no filtro</span><Button size="sm" disabled={page>=options.pages||loadingClients} onClick={()=>setPage(p=>p+1)}>Próxima página</Button></div>
@@ -274,11 +284,11 @@ export function CampaignsPanel({ campaigns, clients, templates, enabled, canAppr
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Button size="sm" variant="secondary" disabled={loadingClients||!!matching} onClick={() => setSel(new Set([...sel, ...shown.map((c) => c.id)]))}>Marcar os exibidos</Button>
-            <Button size="sm" variant="secondary" disabled={loadingClients||options.total>10000||!options.total} onClick={()=>{setMatching({q:f.q,total:options.total});setSel(new Set());}}>Selecionar todos do filtro</Button>
+            <Button size="sm" variant="secondary" disabled={loadingClients||options.total>10000||!options.total} onClick={()=>{setMatching({q:f.q,total:options.total,clientTag,clientStatus});setSel(new Set());}}>Selecionar todos do filtro</Button>
             <Button size="sm" variant="secondary" onClick={() => {setSel(new Set());setMatching(null);}}>Limpar</Button>
             <span className="text-xs text-muted">{matching?.total??sel.size} selecionado(s){matching?" — todos os clientes do filtro":""}</span>
           </div>
-          <Button size="sm" loading={pending} disabled={!f.name.trim() || !f.text.trim() || (sel.size === 0&&!matching)||loadingClients||!!clientError||sel.size>10000} onClick={() => run(() => createCampaignAction({ name: f.name, text: f.text, templateId: f.templateId || null, clientIds: [...sel],allMatching:!!matching,query:matching?.q??"" }), "Campanha criada como rascunho. Falta a aprovação.", () => { setF({ name: "", text: "", templateId: "", q: "" }); setSel(new Set());setMatching(null); })}>Criar rascunho</Button>
+          <Button size="sm" loading={pending} disabled={!f.name.trim() || !f.text.trim() || (sel.size === 0&&!matching&&!imported.length)||!!importError||(!!imported.length&&!importConsent)||loadingClients||!!clientError||sel.size>10000} onClick={() => run(() => createCampaignAction({ name: f.name, text: f.text, templateId: f.templateId || null, clientIds: [...sel],allMatching:!!matching,query:matching?.q??"",clientTag:matching?.clientTag??"",clientStatus:matching?.clientStatus||undefined,scheduledAt:schedule?new Date(schedule).toISOString():null,imported,importConsent }), "Campanha criada como rascunho. Falta a aprovação.", () => { setF({ name: "", text: "", templateId: "", q: "" }); setSel(new Set());setMatching(null);setImportText("");setImportConsent(false);setSchedule(""); })}>Criar rascunho</Button>
         </div>
       ) : null}
     </div>

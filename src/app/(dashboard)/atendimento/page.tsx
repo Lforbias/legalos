@@ -1,3 +1,5 @@
+import { listChatResources } from "@/server/services/chat-workbench.service";
+import { viewHref } from "@/lib/whatsapp/workbench";
 import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus, isClosedService } from "@/lib/whatsapp/lifecycle";
 import type { Metadata } from "next";
 import { BarChart3, MessageSquare, Search, Settings2, SlidersHorizontal } from "lucide-react";
@@ -61,7 +63,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   if (!account) {
     return (
       <div className="mx-auto h-full max-w-5xl overflow-y-auto p-4 md:p-8">
-        <PageHeader title="LegalOS Chat" description="Um espaço para atender clientes, organizar a equipe e acompanhar cada conversa." />
+        <PageHeader title="LegalOS Chat" description="Um espaço para atender clientes, organizar a equipe e acompanhar cada conversa." actions={<div className="flex gap-3 text-sm underline"><Link href="/atendimento/email">E-mail</Link><Link href="/atendimento/operacoes">Operações</Link></div>}/>
         <Card className="mb-5"><CardBody className="py-8 sm:py-12">
           <span className="mb-5 inline-flex rounded-2xl bg-primary/10 p-4 text-primary-text"><MessageSquare className="h-7 w-7" aria-hidden /></span>
           <h2 className="text-xl font-semibold tracking-tight">Prepare seu espaço de atendimento</h2>
@@ -75,6 +77,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
       </div>
     );
   }
+  const savedViews = (await listChatResources(ctx)).filter(r=>r.kind==="VIEW");
   const queues = await listQueues(ctx);
   const queueId = sp.fila && UUID.test(sp.fila) && queues.some((x) => x.id === sp.fila) ? sp.fila : undefined;
   const labels = await listLabels(ctx);
@@ -139,6 +142,8 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-3">
         <div className="min-w-0"><h1 className="text-sm font-semibold tracking-tight">LegalOS Chat</h1><p className="mt-0.5 truncate text-xs text-muted">{multi ? `${numbers.length} números` : account.displayPhone ?? account.label}{account.enabled ? "" : " · Atendimento desligado"}</p></div>
         <div className="flex items-center gap-3">
+          <Link className="text-xs underline" href="/atendimento/email">E-mail</Link>
+          {writer ? <Link className="text-xs underline" href="/atendimento/operacoes">Operações</Link> : null}
           {writer ? <AvailabilityButton available={available} /> : null}
           {manage ? <Link className="inline-flex items-center gap-1.5 rounded-lg p-2 text-xs text-muted hover:bg-surface-2 hover:text-fg" aria-label="Relatórios do Chat" href="/atendimento/relatorios"><BarChart3 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Relatórios</span></Link> : null}
           {manage ? <Link className="inline-flex items-center gap-1.5 rounded-lg p-2 text-xs text-muted hover:bg-surface-2 hover:text-fg" aria-label="Configurações do Chat" href="/atendimento/configuracoes"><Settings2 className="h-4 w-4" aria-hidden /><span className="hidden sm:inline">Configurações</span></Link> : null}
@@ -147,6 +152,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
       {!account.enabled ? <Alert tone="warning" className="m-2">O atendimento está desligado: mensagens novas não estão sendo recebidas.</Alert> : null}
       <div className="flex min-h-0 flex-1">
         <section className={`${chat ? "hidden lg:flex" : "flex"} min-h-0 w-full flex-col border-r border-border bg-surface lg:w-[340px] xl:w-[360px] lg:shrink-0`} aria-label="Conversas">
+          {savedViews.length>0&&<nav aria-label="Listas salvas" className="flex flex-wrap gap-2 border-b border-border p-3 text-xs">{savedViews.map(v=><Link className="rounded-full border border-border px-2 py-1" key={v.id} href={viewHref(v.payload)}>{v.name}</Link>)}</nav>}
           <form action="/atendimento" className="border-b border-border p-3">
             <input type="hidden" name="f" value={filter} />
             {queueId ? <input type="hidden" name="fila" value={queueId} /> : null}

@@ -70,6 +70,13 @@ export async function sendText(cfg: WaConfig, a: WaAuth, to: string, body: strin
   return firstMessageId(await call(cfg, a.token, "POST", `/${a.phoneNumberId}/messages`, { messaging_product: "whatsapp", recipient_type: "individual", to, type: "text", text: { body, preview_url: false } }));
 }
 
+export async function sendInteractive(cfg: WaConfig,a:WaAuth,to:string,interactive:unknown):Promise<string> {
+  return firstMessageId(await call(cfg,a.token,"POST",`/${a.phoneNumberId}/messages`,{messaging_product:"whatsapp",recipient_type:"individual",to,type:"interactive",interactive}));
+}
+export async function createMessageTemplate(cfg:WaConfig,token:string,wabaId:string,input:{name:string;language:string;category:string;body:string}) {
+  return call<{id:string;status?:string;category?:string}>(cfg,token,"POST",`/${encodeURIComponent(wabaId)}/message_templates`,{name:input.name,language:input.language,category:input.category,components:[{type:"BODY",text:input.body}]});
+}
+
 export async function uploadMedia(cfg: WaConfig, a: WaAuth, file: { buffer: Buffer; mime: string; name: string }): Promise<string> {
   const form = new FormData();
   form.set("messaging_product", "whatsapp");

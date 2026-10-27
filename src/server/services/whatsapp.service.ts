@@ -1,6 +1,10 @@
 import { humanReplyLifecycle, setServiceStatus } from "./chat-lifecycle.service";
+import { interactivePayload,interactiveSchema } from "@/lib/whatsapp/interactive";
+import { sendInteractive } from "@/lib/whatsapp/client";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
+import { assertChatContactAllowed } from "./chat-contact-control.service";
+import { emitChatEvent } from "./chat-workbench.service";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { deleteObject, putObject } from "@/lib/storage/local-storage";
@@ -114,14 +118,17 @@ async function providerOf(organizationId: string, accountId?: string): Promise<"
 
 /** Grava a mensagem enviada. Na conexão por QR o WhatsApp devolve um "eco" que pode chegar antes; nesse caso completa a linha já criada. */
 async function saveOut(data: Prisma.WhatsappMessageUncheckedCreateInput) {
+  let m;
   try {
-    return await db.whatsappMessage.create({ data });
+    m = await db.whatsappMessage.create({ data });
   } catch (e) {
     if (!isUniqueViolation(e) || !data.waMessageId) throw e;
     const ex = await db.whatsappMessage.findFirst({ where: { waMessageId: data.waMessageId, organizationId: data.organizationId }, select: { id: true } });
     if (!ex) throw e;
-    return db.whatsappMessage.update({ where: { id: ex.id }, data: { authorId: data.authorId, body: data.body, mediaKey: data.mediaKey, mediaMime: data.mediaMime, mediaName: data.mediaName, mediaSize: data.mediaSize, status: data.status, error: data.error } });
+    m = await db.whatsappMessage.update({ where: { id: ex.id }, data: { authorId: data.authorId, body: data.body, mediaKey: data.mediaKey, mediaMime: data.mediaMime, mediaName: data.mediaName, mediaSize: data.mediaSize, status: data.status, error: data.error } });
   }
+  await emitChatEvent(data.organizationId,"chat.message.sent",{conversationId:data.conversationId,messageId:m.id,status:m.status}).catch(()=>0);
+  return m;
 }
 
 type Delivery = { waMessageId: string | null; status: "SENT" | "FAILED"; error: string | null };
@@ -140,6 +147,7 @@ export async function sendMessage(ctx: TenantContext, conversationId: string, te
   assertCan(ctx, "whatsapp:write");
   const body = cleanText(text);
   const c = await loadConversation(ctx, conversationId);
+  await assertChatContactAllowed(ctx.organizationId,c.accountId,c.waId);
   assertWindow(await providerOf(ctx.organizationId, c.accountId), c.lastInboundAt);
   const tr = await getTransport(ctx.organizationId, c.accountId);
   const d = await deliver(() => tr.sendText(c.waId, body));
@@ -147,6 +155,31 @@ export async function sendMessage(ctx: TenantContext, conversationId: string, te
   await touch(conversationId, body, "text", m.createdAt);
   if(d.status==="SENT")await humanReplyLifecycle(ctx.organizationId,conversationId);
   return { id: m.id, status: d.status, error: d.error };
+}
+
+/** Uses the official interactive format on Meta and an explicit numbered fallback on QR. */
+export async function systemSendInteractive(organizationId:string,conversationId:string,raw:unknown,authorId?:string) {
+  const d=interactiveSchema.parse(raw);
+  const c=await db.whatsappConversation.findFirst({where:{id:conversationId,organizationId}});
+  if(!c)throw new NotFoundError("Conversa não encontrada.");
+  await assertChatContactAllowed(organizationId,c.accountId,c.waId);
+  if(await providerOf(organizationId,c.accountId)==="QR") {
+    const body=`${d.body}\n\n${d.options.map(o=>`${o.id.replace("legalos:triage:","")} - ${o.title}`).join("\n")}`;
+    const r=await systemSendText(organizationId,conversationId,body);
+    if(authorId) {
+      await db.whatsappMessage.update({where:{id:r.id},data:{authorId,automatic:false}});
+      if(r.status==="SENT")await humanReplyLifecycle(organizationId,conversationId);
+    }
+    return r;
+  }
+  assertWindow("META",c.lastInboundAt);
+  const {auth,cfg}=await loadAuth(organizationId,c.accountId);
+  const result=await deliver(()=>sendInteractive(cfg,auth,c.waId,interactivePayload(d)));
+  const body=`${d.body}\n${d.options.map(o=>o.title).join(" · ")}`;
+  const m=await saveOut({organizationId,conversationId,direction:"OUT",type:"interactive",body,status:result.status,error:result.error,waMessageId:result.waMessageId,automatic:!authorId,authorId});
+  await touch(conversationId,body,"interactive",m.createdAt);
+  if(authorId&&result.status==="SENT")await humanReplyLifecycle(organizationId,conversationId);
+  return {id:m.id,status:result.status,error:result.error};
 }
 
 const FILE_RULES: { test: (mime: string) => boolean; kind: OutKind; max: number }[] = [
@@ -168,6 +201,7 @@ function sniffOk(mime: string, b: Buffer): boolean {
 export async function sendFile(ctx: TenantContext, conversationId: string, file: { name: string; buffer: Buffer }, caption?: string | null) {
   assertCan(ctx, "whatsapp:write");
   const c = await loadConversation(ctx, conversationId);
+  await assertChatContactAllowed(ctx.organizationId,c.accountId,c.waId);
   assertWindow(await providerOf(ctx.organizationId, c.accountId), c.lastInboundAt);
   const name = sanitizeFileName(file.name);
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
@@ -204,6 +238,7 @@ function fillTemplate(body: string, params: string[]): string {
 export async function sendTemplateMessage(ctx: TenantContext, conversationId: string, templateId: string, rawParams: string[]) {
   assertCan(ctx, "whatsapp:write");
   const c = await loadConversation(ctx, conversationId);
+  await assertChatContactAllowed(ctx.organizationId,c.accountId,c.waId);
   if ((await providerOf(ctx.organizationId, c.accountId)) === "QR") throw new ConflictError("Modelos de mensagem existem só na conexão oficial da Meta. Na conexão por QR-Code, escreva a mensagem normalmente.");
   const t = await db.whatsappTemplate.findFirst({ where: { id: templateId, organizationId: ctx.organizationId } });
   if (!t) throw new NotFoundError("Modelo não encontrado.");
@@ -321,6 +356,7 @@ export async function systemSendText(organizationId: string, conversationId: str
   const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { waId: true, lastInboundAt: true, accountId: true } });
   if (!c) throw new NotFoundError("Conversa não encontrada.");
   assertWindow(await providerOf(organizationId, c.accountId), c.lastInboundAt);
+  await assertChatContactAllowed(organizationId,c.accountId,c.waId);
   const body = text.trim().slice(0, MAX_TEXT);
   const tr = await getTransport(organizationId, c.accountId);
   const d = await deliver(() => tr.sendText(c.waId, body));
@@ -333,6 +369,7 @@ export async function systemSendText(organizationId: string, conversationId: str
 export async function systemSendTemplate(organizationId: string, conversationId: string, templateId: string, rawParams: string[]) {
   const c = await db.whatsappConversation.findFirst({ where: { id: conversationId, organizationId }, select: { waId: true, accountId: true } });
   if (!c) throw new NotFoundError("Conversa não encontrada.");
+  await assertChatContactAllowed(organizationId,c.accountId,c.waId);
   if ((await providerOf(organizationId, c.accountId)) === "QR") throw new ConflictError("Modelos existem só na conexão oficial da Meta.");
   const t = await db.whatsappTemplate.findFirst({ where: { id: templateId, organizationId } });
   if (!t || t.status !== "APPROVED") throw new ConflictError("Modelo inexistente ou não aprovado pela Meta.");

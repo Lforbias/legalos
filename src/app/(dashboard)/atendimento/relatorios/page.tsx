@@ -1,3 +1,4 @@
+import { workbenchReport } from "@/server/services/chat-workbench-report.service";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessDenied } from "@/components/layout/access-denied";
@@ -40,11 +41,20 @@ export default async function ChatReportsPage({ searchParams }: { searchParams: 
       else throw e;
     }
   }
+  const workbench=range&&!err?await workbenchReport(ctx,range):null;
   const numbers = await listNumbers(ctx);
   const schedule = await getReportSchedule(ctx);
   return (
     <div className="mx-auto max-w-4xl space-y-4 p-4" data-testid="chat-reports">
       <PageHeader title="Relatórios do Chat" description="Números reais das conversas e mensagens do período." actions={<Link className="text-sm underline" href="/atendimento">Voltar às conversas</Link>} />
+      {workbench&&<section className="rounded-xl border border-border bg-surface p-4">
+        <h2 className="font-semibold">Campanhas, automações e funil</h2>
+        <div className="mt-3 grid gap-4 text-sm md:grid-cols-3">
+          <div><h3 className="font-medium">Recibos de campanhas</h3>{workbench.receipts.map(r=><p key={r.status}>{r.status}: {r.total}</p>)}<p className="mt-2 text-xs text-muted">Campanhas criadas no período. Envios antigos sem vínculo não comprovam entrega nem leitura. Respostas não são atribuídas à campanha.</p></div>
+          <div><h3 className="font-medium">Execuções no período</h3>{workbench.automations.map(r=><p key={r.status}>Automação {r.status}: {r.total}</p>)}{workbench.bot.map(r=><p key={r.state}>Triagem {r.state}: {r.total}</p>)}<p className="mt-2 text-xs text-muted">A triagem mostra a situação atual das sessões iniciadas no período.</p></div>
+          <div><h3 className="font-medium">Oportunidades ligadas ao Chat</h3>{workbench.funnel===null?<p>Exige acesso ao CRM.</p>:workbench.funnel.length?workbench.funnel.map(r=><p key={r.stage}>{r.stage}: {r.total}</p>):<p>Nenhuma oportunidade vinculada.</p>}<p className="mt-2 text-xs text-muted">Etapa atual dos leads com conversa iniciada no período; não é uma taxa histórica de conversão.{workbench.truncated?" Limitado a 10.000 leads.":""}</p></div>
+        </div>
+      </section>}
       <form className="flex flex-wrap items-end gap-2 text-sm" action="/atendimento/relatorios">
         <label className="space-y-1"><span className="block text-xs text-muted">De</span><input type="date" name="from" defaultValue={from} className="h-9 rounded-md border border-border bg-surface px-2" /></label>
         <label className="space-y-1"><span className="block text-xs text-muted">Até</span><input type="date" name="to" defaultValue={to} className="h-9 rounded-md border border-border bg-surface px-2" /></label>

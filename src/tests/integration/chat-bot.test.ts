@@ -18,7 +18,13 @@ const PNID = "400500600";
 const post = (b: { body: string; signature: string }) => handleWebhook(b.body, b.signature);
 let seq = 0;
 const say = (from: string, text: string) => post(inbound(PNID, { id: `wamid.BT${++seq}`, from, text, name: "Cliente Bot" }));
-const sentTexts = () => fake.requests.filter((r) => r.method === "POST" && /\/messages$/.test(r.path) && (r.body as { type?: string })?.type === "text").map((r) => (r.body as { text: { body: string } }).text.body);
+const sentTexts = () => fake.requests.filter(r=>r.method==="POST"&&/\/messages$/.test(r.path)).map(r=>{
+ const b=r.body as {type:string;text?:{body:string};interactive?:{body:{text:string};action:{buttons?:{reply:{id:string;title:string}}[];sections?:{rows:{id:string;title:string}[]}[]}}};
+ if(b.type==="text")return b.text!.body;
+ if(b.type!=="interactive")return "";
+ const i=b.interactive!;const rows=i.action.buttons?.map(b=>b.reply)??i.action.sections?.flatMap(s=>s.rows)??[];
+ return i.body.text+"\n\n"+rows.filter(r=>r.id!=="legalos:triage:0").map(r=>`${r.id.replace("legalos:triage:","")} - ${r.title}`).join("\n")+"\n\n0 - Falar com um atendente";
+});
 const conv = (waId: string) => db.whatsappConversation.findFirstOrThrow({ where: { waId }, include: { labels: { select: { label: { select: { name: true } } } }, fieldValues: true } });
 const notes = (id: string) => db.whatsappMessage.findMany({ where: { conversationId: id, direction: "NOTE" }, orderBy: { createdAt: "asc" }, select: { body: true } });
 
@@ -85,6 +91,7 @@ describe("LegalOS Chat — menu de triagem", () => {
     await reset();
     await saveBot(A.ctx, config());
     await say("5571966660001", "Oi");
+    expect(fake.requests.filter(r=>r.path.endsWith("/messages")).at(-1)?.body).toMatchObject({type:"interactive",interactive:{type:"button"}});
     expect(sentTexts().at(-1)).toBe("Olá! Escolha:\n\n1 - Já sou cliente\n2 - Novo caso\n\n0 - Falar com um atendente");
     await say("5571966660001", "1");
     const t = sentTexts();

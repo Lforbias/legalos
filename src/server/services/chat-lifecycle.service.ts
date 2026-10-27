@@ -1,3 +1,4 @@
+import { emitChatEvent } from "./chat-workbench.service";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { NotFoundError } from "@/lib/permissions/check";
@@ -20,6 +21,7 @@ export async function setServiceStatus(ctx: TenantContext, id: string, raw: stri
         await audit({ action: "whatsapp.service_status", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "whatsapp_conversation", resourceId: id, metadata: { from: c.serviceStatus, to: status }, meta: ctx.meta }, tx);
         return c.status;
     });
+    await emitChatEvent(ctx.organizationId,"chat.conversation.updated",{conversationId:id,serviceStatus:status}).catch(()=>0);
     if (isClosedService(status) && previous !== "CLOSED") {
         const { autoSurveyOnClose } = await import("./chat-extras.service");
         await autoSurveyOnClose(ctx.organizationId, id, ctx.userId).catch(() => undefined);
