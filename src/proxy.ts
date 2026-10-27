@@ -62,6 +62,7 @@ export function proxy(request: NextRequest) {
   }
 
   const res = NextResponse.next({ request: { headers } });
+  if (!isPublic && !pathname.startsWith("/api/") && request.cookies.has(SESSION_COOKIE)) res.headers.set("permissions-policy", "camera=(), microphone=(self), geolocation=()");
   res.headers.set("x-request-id", requestId);
   res.headers.set("content-security-policy", csp);
   return res;

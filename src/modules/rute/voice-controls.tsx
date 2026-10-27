@@ -49,6 +49,7 @@ export function SpeakAnswer({ text }: { text: string }) {
     utterance.lang = "pt-BR";
     const local = window.speechSynthesis.getVoices().find(v => v.localService && v.lang.startsWith("pt"));
     if (local) utterance.voice = local;
+    else if (!window.confirm("Não foi encontrada uma voz local em português. O serviço de voz do navegador pode processar o texto desta resposta remotamente. Deseja ouvir mesmo assim?")) return;
     utterance.onend = () => setSpeaking(false); utterance.onerror = () => setSpeaking(false);
     setSpeaking(true); window.speechSynthesis.speak(utterance);
   }
