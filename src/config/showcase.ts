@@ -115,7 +115,7 @@ export const SPACES = [
 export const RUTE_INFO = {
   name: "RUTE",
   tone: "#d7263d",
-  text: "A IA do LegalOS, com nome próprio e uma aba só dela no menu. Conecte o Claude, o ChatGPT ou o Gemini ao LegalOS, ou converse com o assistente dentro do sistema. A IA lê o que o seu perfil permite e propõe; só grava depois da confirmação de uma pessoa.",
+  text: "A IA do LegalOS, com nome próprio e uma aba só dela no menu. Conecte o Claude, o ChatGPT ou o Gemini ao LegalOS, ou converse com o assistente dentro do sistema. A IA consulta os dados permitidos pelo seu perfil. No modo Criar e alterar, executa os comandos disponíveis quando você pede explicitamente; propostas continuam exigindo revisão e confirmação.",
   items: ["Conexão com as IAs que a equipe já usa", "Assistente embutido, com contexto de processo e cliente", "Propostas que só valem depois de confirmadas", "Biblioteca do escritório, limites, auditoria e relatório de LGPD"],
 } as const;
 

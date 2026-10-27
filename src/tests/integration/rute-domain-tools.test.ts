@@ -23,7 +23,7 @@ describe("Expansão do catálogo compartilhado", () => {
       const data = r.data as {ferramentas: {nome: string}[]};
       data.ferramentas.forEach(t => names.add(t.nome));
     }
-    expect(names.size).toBe(82);
+    expect(names.size).toBe(87);
     expect(toolCatalog(a.ctx, scopes)).toHaveLength(names.size);
     const limited = {...a.ctx, isOwner: false, permissions: new Set(["ai:use"] as const)};
     expect((await callTool(limited, scopes, origin, "listar_contas_financeiras", {})).status).toBe(403);

@@ -18,9 +18,9 @@ describe("Ações diretas com escopo explícito", () => {
     a = await makeOrgWithOwner("direct-a"); b = await makeOrgWithOwner("direct-b");
     await setRuteFeature(a.ctx, "mcp", true, { consent: true });
   });
-  it("descobre 19 ações sem ampliar escopos existentes ou o padrão OAuth", () => {
-    expect(toolCatalog(a.ctx, scopes)).toHaveLength(19);
-    expect(toolCatalog(a.ctx, new Set(["read", "propose"]))).toHaveLength(82);
+  it("descobre 20 ações sem ampliar escopos existentes ou o padrão OAuth", () => {
+    expect(toolCatalog(a.ctx, scopes)).toHaveLength(20);
+    expect(toolCatalog(a.ctx, new Set(["read", "propose"]))).toHaveLength(87);
     expect(parseScopes(null)).not.toContain("mcp:execute");
     expect(parseScopes("mcp:execute")).toEqual(["mcp:execute"]);
   });

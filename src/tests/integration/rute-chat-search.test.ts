@@ -98,7 +98,7 @@ describe("RUTE encontra conversas por nome e lê a última fala recebida", () =>
   const conv = await createConversation(a.ctx);
   const reply = await sendMessage(a.ctx, conv.id, "Veja a última mensagem recebida do Luiz Felipe");
   expect(reply.answer).toContain("enviou o documento");
-  expect(reply.refs).toEqual([{type: "tool", name: "listar_conversas_chat", ok: true}, {type: "tool", name: "ler_conversa_chat", ok: true}]);
+  expect(reply.refs.map(({type,name,ok})=>({type,name,ok}))).toEqual([{type: "tool", name: "listar_conversas_chat", ok: true}, {type: "tool", name: "ler_conversa_chat", ok: true}]);
   expect((await db.whatsappConversation.findUniqueOrThrow({where: {id: contactId}})).unreadCount).toBe(7);
  });
 });

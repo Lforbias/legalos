@@ -58,3 +58,18 @@ Resposta: `data.executed = true`, `data.type = "task"`, ID e link do registro. P
 Atualizações de cliente, tarefa e compromisso aceitam `expectedUpdatedAt` (ISO) para rejeitar contexto antigo com 409. Campos omitidos são preservados. A data deve vir do registro consultado. Esta precondição utiliza a proteção de versão existente nos serviços e não representa uma transação de múltiplas ações.
 
 Não existe garantia de idempotência para criações: repetir uma chamada pode duplicar um registro. Após timeout ou erro de conexão, consulte antes de repetir. As ações internas podem acionar notificações e regras que o próprio serviço da plataforma já possui. Os comandos não acrescentam envio de WhatsApp, protocolo judicial, transferência, emissão de cobrança, exclusão permanente ou concessão de acesso.
+
+## Confiabilidade das consultas e ações no chat
+
+O seletor da conversa agora controla os escopos no servidor em cada mensagem:
+
+- **Consultar** anuncia e permite somente ferramentas de leitura. Mesmo uma chamada de escrita inventada pelo provedor é recusada.
+- **Criar e alterar** disponibiliza as ações permitidas pelo perfil. A pessoa ainda precisa fazer um pedido explícito; perguntas e dados retornados das ferramentas não autorizam gravações.
+
+O seletor continua visível depois da primeira resposta. A data, hora e o fuso do escritório entram no contexto da conversa. As referências persistidas incluem os argumentos mascarados, até 20 IDs e nomes retornados por consulta e o tipo do registro criado. Até oito referências por mensagem anterior são reapresentadas como dados históricos, com limite de tamanho. A RUTE deve consultar o estado atual antes de alterar. Isso vale dentro da mesma conversa, sem memória global entre conversas.
+
+Cada envio da interface recebe um UUID. O servidor registra a solicitação antes de chamar a IA e conserva o resultado. Repetir a mesma solicitação concluída devolve a resposta anterior sem chamar novamente o provedor ou criar outro registro. Reutilizar o UUID com outro texto/modo é recusado. Duas solicitações simultâneas na mesma conversa são bloqueadas. Em interrupção, o mesmo UUID não executa novamente; a pessoa precisa conferir o histórico e os registros antes de fazer outro pedido. Uma execução abandonada deixa de bloquear novas solicitações após 30 minutos, sem liberar a repetição do pedido original.
+
+Essa proteção é por identificador de envio do **chat interno**, não por semelhança de texto: um novo pedido tem outro identificador. Ela não acrescenta idempotência às ações diretas de REST/MCP. Registros de solicitação seguem a exclusão/retencão da conversa por vínculo com exclusão em cascata.
+
+Os cartões de ação usam o tipo retornado para abrir também oportunidades, modelos, autotextos e cadastros financeiros. A etapa mantém as funções de domínio existentes; voz e operações compostas com recuperação por etapa continuam para entregas futuras.

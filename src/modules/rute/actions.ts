@@ -124,10 +124,10 @@ export async function createConversationAction(input: { caseId?: string | null; 
   });
 }
 
-export async function sendMessageAction(conversationId: string, text: string): Promise<ActionState<{ answer: string; refs: MessageRef[] }>> {
+export async function sendMessageAction(conversationId: string, text: string, options: { requestId?: string; mode?: "consult" | "act" } = {}): Promise<ActionState<{ answer: string; refs: MessageRef[] }>> {
   return runAction(async () => {
     const { ctx } = await requireTenant();
-    const r = await sendMessage(ctx, parse(uuidSchema, conversationId), parse(z.string().max(6000), text));
+    const r = await sendMessage(ctx, parse(uuidSchema, conversationId), parse(z.string().max(6000), text), parse(z.object({ requestId: uuidSchema.optional(), mode: z.enum(["consult", "act"]).default("consult") }), options));
     if (r.refs.some(ref => ref.type === "action")) revalidatePath("/", "layout");
     done();
     return { answer: r.answer, refs: r.refs };
