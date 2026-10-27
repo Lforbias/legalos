@@ -8,6 +8,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/form";
 import { useRun } from "@/modules/kanban/use-run";
+import { MemoryPanel } from "./memory-panel";
+import { VoiceInput, SpeakAnswer } from "./voice-controls";
 import { InlineProposal } from "./inline-proposal";
 import { createConversationAction, deleteConversationAction, sendMessageAction } from "./actions";
 
@@ -95,6 +97,7 @@ export function Chat({ conversationId, caseId, clientId, messages, contextLabel,
   return (
     <div className={embedded ? "flex h-full min-h-0 flex-col gap-3" : "space-y-3"}>
       <div role="group" aria-label="Tipo de pedido" className="inline-flex gap-1 rounded-full border border-border bg-surface p-1">{([["consult", "Consultar"], ["act", "Criar e alterar"]] as const).map(([key, label]) => <button key={key} type="button" aria-pressed={mode === key} disabled={pending} onClick={() => setMode(key)} className={`rounded-full px-3 py-1.5 text-xs transition ${mode === key ? "bg-fg text-surface" : "text-muted hover:bg-surface-2"}`}>{label}</button>)}</div>
+      <MemoryPanel clientId={clientId} caseId={caseId} />
       {contextLabel ? <Alert tone="info">Conversa sobre: {contextLabel}. A IA só alcança o que você pode ver.</Alert> : null}
       <div className={embedded ? "min-h-0 flex-1 space-y-4 overflow-y-auto rounded-xl bg-surface-2/30 p-3 sm:p-4" : "max-h-[28rem] space-y-3 overflow-y-auto rounded-md border border-border p-3"}>
         {all.length === 0 ? <section className="mx-auto w-full max-w-xl space-y-7 py-4 sm:py-7" aria-label="Comece uma conversa com a RUTE">
@@ -107,20 +110,21 @@ export function Chat({ conversationId, caseId, clientId, messages, contextLabel,
 
             <div className="grid gap-2 sm:grid-cols-2">{(mode === "act" ? CREATION_STARTERS : STARTERS).map(({ label, prompt, icon: Icon }) => <button key={label} type="button" onClick={() => { setText(prompt); input.current?.focus(); }} className="group flex min-h-16 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-left text-sm transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"><Icon className="h-4 w-4 shrink-0 text-muted" aria-hidden /><span className="flex-1">{label}</span><ArrowUpRight className="h-3.5 w-3.5 text-muted transition group-hover:text-primary-text" aria-hidden /></button>)}</div>
           </div>
-          <p className="text-xs leading-relaxed text-muted">Ao pedir uma criação ou alteração, a RUTE pode salvar diretamente. Para conferir antes, peça uma proposta.</p>
+          <p className="text-xs leading-relaxed text-muted">{mode === "act" ? "Neste modo, pedidos explícitos podem criar ou alterar registros. Para conferir antes, peça uma proposta." : "Neste modo, a RUTE só consulta. Se quiser salvar uma criação ou alteração, selecione Criar e alterar."}</p>
         </section> : null}
         {all.map((m) => (
           <div key={m.id} className={m.role === "user" ? "text-right" : ""}>
             <div className={`inline-block max-w-[90%] whitespace-pre-wrap rounded-lg px-3 py-2 text-left text-sm ${m.role === "user" ? "bg-primary text-primary-fg" : "bg-surface-2"}`}>{m.content}</div>
             {m.role === "assistant" && m.refs.some(r => r.type === "tool") ? <details className="mt-2 text-[11px] text-muted"><summary className="inline-flex cursor-pointer items-center gap-1">Fontes e atividades <ChevronDown className="h-3 w-3" /></summary><div className="mt-2 flex flex-wrap gap-1">{m.refs.filter(r => r.type === "tool").map((r, i) => <Badge key={i} tone={r.ok ? "neutral" : "warning"}>{r.name?.replaceAll("_", " ")}{r.ok ? "" : " · não concluído"}</Badge>)}</div></details> : null}
             {m.role === "assistant" ? m.refs.filter(r => r.type === "action" && r.id).map((r, i) => { const href = actionHref(r.name, r.id, r.resourceType); return <div key={`action-${i}`} className="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 p-3 text-xs" role="status"><Check className="h-4 w-4 text-primary-text" /><div className="min-w-0 flex-1"><p className="font-medium">Ação concluída</p><p className="mt-1 text-muted">{r.title ?? r.name}</p></div>{href ? <a href={href} className="inline-flex items-center gap-1 font-medium text-primary-text">Abrir registro<ArrowUpRight className="h-3 w-3" /></a> : <span className="max-w-full break-all font-mono text-muted">{r.id}</span>}</div>; }) : null}
-            {m.role === "assistant" ? <div className="mt-1"><CopyAnswer text={m.content} /></div> : null}
+            {m.role === "assistant" ? <div className="mt-1"><CopyAnswer text={m.content} /><SpeakAnswer text={m.content} /></div> : null}
             {m.role === "assistant" ? m.refs.filter(r => r.type === "proposal" && r.id).map(r => <InlineProposal key={r.id} id={r.id!} />) : null}
           </div>
         ))}
         {pending ? <p role="status" className="flex items-center gap-2 py-3 text-xs text-muted"><Sparkles className="h-4 w-4 motion-safe:animate-pulse" />A RUTE está trabalhando no seu pedido…</p> : null}
         <div ref={end} />
       </div>
+      <VoiceInput disabled={pending} onTranscript={transcript=>{setText(value=>`${value}${value?" ":""}${transcript}`.slice(0,4000));input.current?.focus();}} />
       {error ? <Alert tone="error">{error}</Alert> : null}
       <div className={embedded ? "shrink-0 rounded-xl border border-border bg-surface p-2 shadow-sm focus-within:border-primary/60" : "space-y-2"}>
         <div className={embedded ? "flex items-end gap-2" : "space-y-2"}>

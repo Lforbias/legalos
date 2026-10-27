@@ -1,3 +1,4 @@
+import { MemoryPanel } from "@/modules/rute/memory-panel";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessDenied } from "@/components/layout/access-denied";
@@ -39,6 +40,7 @@ export default async function RutePage({ searchParams }: { searchParams: Promise
     { key: "conexoes", label: "Conexões" },
     { key: "propostas", label: "Propostas", count: pending },
     { key: "assistente", label: "Assistente" },
+    { key: "memorias", label: "Minhas memórias" },
     { key: "biblioteca", label: "Biblioteca" },
     { key: "historico", label: "Histórico" },
     ...(manage ? [{ key: "governanca", label: "Governança" }] : []),
@@ -66,6 +68,8 @@ export default async function RutePage({ searchParams }: { searchParams: Promise
       {current === "propostas" ? <Proposals ctx={ctx} /> : null}
 
       {current === "assistente" ? <Assistant ctx={ctx} sp={sp} enabled={settings.assistantEnabled} tz={tz} /> : null}
+
+      {current === "memorias" ? <Card><CardHeader title="Minhas memórias" description="Revise o que a RUTE pode levar para suas próximas conversas. Memórias vinculadas respeitam o acesso atual ao cliente e ao processo." /><CardBody><MemoryPanel all clientId={null} caseId={null} /></CardBody></Card> : null}
 
       {current === "biblioteca" ? <Library ctx={ctx} canEdit={library} /> : null}
 

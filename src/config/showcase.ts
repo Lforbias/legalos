@@ -121,7 +121,7 @@ export const RUTE_INFO = {
 
 /** Em breve (fila da 7.0). Nada disso existe ainda; só entra aqui o que está na fila aprovada. */
 export const COMING_SOON = [
-  "RUTE por voz: falar e ouvir, de mãos livres",
+  "Conversa por voz contínua, com interrupção e confirmação falada",
   "RUTE faz tarefas pequenas sozinha, com interruptor por ação",
   "Resumo da manhã de cada pessoa",
   "Preparar audiência e conferir peça antes de protocolar",

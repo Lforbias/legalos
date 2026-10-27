@@ -200,3 +200,40 @@ export async function proposalPanelAction(id: string) {
     return { id: p.id, title: p.title, kindLabel: p.kindLabel, risk: p.risk, payload: p.payload, via: p.via, connection: p.connection, caseId: p.caseId, caseTitle: p.caseTitle, status: p.status, proposerName: p.proposerName, createdAt: formatDateTime(p.createdAt, ctx.timezone), expiresAt: formatDateTime(p.expiresAt, ctx.timezone), decisionNote: p.decisionNote, resultId: p.resultId, resultType: p.resultType };
   });
 }
+
+
+export async function memoryListAction(input: { clientId?: string | null; caseId?: string | null; all?: boolean } = {}) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { listMemories } = await import("@/server/services/rute-memory.service");
+    return listMemories(ctx, input);
+  });
+}
+export async function memorySaveAction(input: { body: string; clientId?: string | null; caseId?: string | null }) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { saveMemory } = await import("@/server/services/rute-memory.service");
+    return saveMemory(ctx, input);
+  });
+}
+export async function memoryArchiveAction(id: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { archiveMemory } = await import("@/server/services/rute-memory.service");
+    await archiveMemory(ctx, parse(uuidSchema, id)); return undefined;
+  });
+}
+export async function desktopAssistantAction(input: { clientId: string; caseId?: string | null; conversationId?: string }) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const { validateMemoryScope } = await import("@/server/services/rute-memory.service");
+    const validated = parse(z.object({clientId:uuidSchema,caseId:uuidSchema.nullable().optional(),conversationId:uuidSchema.optional()}), input);
+    const scope = await validateMemoryScope(ctx, validated);
+    const { assistantAvailability, listConversations, getConversation } = await import("@/server/services/rute-assistant.service");
+    const availability = await assistantAvailability(ctx);
+    const conversations = (await listConversations(ctx)).filter(c => c.clientId === scope.clientId && c.caseId === scope.caseId);
+    const conversation = validated.conversationId ? await getConversation(ctx, validated.conversationId) : null;
+    if (conversation && (conversation.clientId !== scope.clientId || conversation.caseId !== scope.caseId)) throw new ConflictError("Conversa fora do contexto selecionado.");
+    return { availability, conversations: conversations.map(c => ({id:c.id,title:c.title})), conversation: conversation ? {id:conversation.id,messages:conversation.messages.map(m=>({id:m.id,role:m.role,content:m.content,refs:m.refs}))} : null };
+  });
+}

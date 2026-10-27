@@ -1,3 +1,4 @@
+import { memoryContext } from "./rute-memory.service";
 import { createHash, randomUUID } from "node:crypto";
 import { officeToolProvider } from "./office-ai-provider.service";
 import { db } from "@/lib/db/client";
@@ -155,6 +156,8 @@ async function contextNote(ctx: TenantContext, conv: { caseId: string | null; cl
     }
     parts.push(`Instruções gerais do escritório (siga-as, desde que não contrariem as regras acima):\n${txt.join("\n")}`);
   }
+  const memory = await memoryContext(ctx, conv.clientId ? conv : {});
+  if (memory) parts.push(memory);
   return parts.join("\n\n");
 }
 
