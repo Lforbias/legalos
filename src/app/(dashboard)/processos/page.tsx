@@ -10,16 +10,16 @@ import { Input, Select } from "@/components/ui/form";
 import { Pagination } from "@/components/ui/pagination";
 import { cn } from "@/lib/utils";
 import { formatMoneyBR } from "@/lib/validation/money";
-import { CASE_AREAS, CASE_STATUS_LABEL, CASE_STATUSES } from "@/modules/cases/schemas";
+import { CASE_AREAS, CASE_NATURE_LABEL, CASE_NATURES, CASE_STATUS_LABEL, CASE_STATUSES } from "@/modules/cases/schemas";
 import { StatusControl } from "@/modules/cases/case-panels";
 import { CaseActionsMenu } from "@/modules/cases/case-actions-menu";
 import { can } from "@/server/context";
-import { listAssignableMembers, listCases } from "@/server/services/case.service";
+import { listAssignableMembers, listCaseDepartments, listCases } from "@/server/services/case.service";
 import { requireTenant } from "@/server/session";
 
-export const metadata: Metadata = { title: "Processos" };
+export const metadata: Metadata = { title: "Processos e casos" };
 
-type SP = { q?: string; status?: string; area?: string; responsavel?: string; visao?: string; acervo?: string; pagina?: string };
+type SP = { q?: string; natureza?: string; departamento?: string; status?: string; area?: string; responsavel?: string; visao?: string; acervo?: string; pagina?: string };
 
 const TONE = { ACTIVE: "success", SUSPENDED: "warning", ARCHIVED: "neutral", CLOSED: "neutral" } as const;
 
@@ -31,17 +31,20 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   const status = (CASE_STATUSES as readonly string[]).includes(sp.status ?? "") ? (sp.status as (typeof CASE_STATUSES)[number]) : undefined;
   const area = (CASE_AREAS as readonly string[]).includes(sp.area ?? "") ? sp.area : undefined;
   const responsibleId = /^[0-9a-f-]{36}$/i.test(sp.responsavel ?? "") ? sp.responsavel : undefined;
+  const nature = CASE_NATURES.find(n => n === sp.natureza);
+  const departmentId = /^[0-9a-f-]{36}$/i.test(sp.departamento ?? "") ? sp.departamento : undefined;
   const page = Math.max(1, Number.parseInt(sp.pagina ?? "1", 10) || 1);
   const acervo = sp.acervo === "1" ? "only" : undefined;
-  const [result, members] = await Promise.all([
-    listCases(ctx, { q: sp.q, status, area, responsibleId, page, board, acervo }),
+  const [result, members, departments] = await Promise.all([
+    listCases(ctx, { q: sp.q, status, area, nature, departmentId, responsibleId, page, board, acervo }),
     listAssignableMembers(ctx),
+    listCaseDepartments(ctx),
   ]);
   const canWrite = can(ctx, "cases:write");
-  const filtered = Boolean(sp.q || status || area || responsibleId || acervo);
+  const filtered = Boolean(sp.q || status || area || nature || departmentId || responsibleId || acervo);
   const viewHref = (v: "tabela" | "quadro", ac: boolean = Boolean(acervo)) => {
     const q = new URLSearchParams();
-    for (const [k, val] of Object.entries({ q: sp.q, status, area, responsavel: responsibleId, acervo: ac ? "1" : undefined })) if (val) q.set(k, val);
+    for (const [k, val] of Object.entries({ q: sp.q, status, area, natureza: nature, departamento: departmentId, responsavel: responsibleId, acervo: ac ? "1" : undefined })) if (val) q.set(k, val);
     if (v === "quadro") q.set("visao", "quadro");
     const qs = q.toString();
     return qs ? `/processos?${qs}` : "/processos";
@@ -50,11 +53,12 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   return (
     <div className="mx-auto max-w-7xl">
       <PageHeader
-        title="Processos"
-        description="Carteira de processos do escritório. Processos sigilosos só aparecem para a equipe do processo e administradores."
+        title="Processos e casos"
+        description="Casos pré-processuais, administrativos e processos judiciais, organizados por departamento. O sigilo continua valendo para cada cadastro."
         actions={
           <div className="flex flex-wrap items-center gap-2">
             <CaseActionsMenu canWrite={canWrite} />
+            {can(ctx, "organization:manage") ? <Link href="/processos/departamentos" className={buttonVariants({ variant: "ghost" })}>Departamentos</Link> : null}
             <div className="inline-flex rounded-md border border-border p-0.5" role="group" aria-label="Modo de visualização">
               <Link href={viewHref("tabela")} aria-current={!board ? "page" : undefined} className={cn("flex h-8 items-center gap-1.5 rounded px-2.5 text-xs", !board ? "bg-surface-3 font-medium" : "text-muted hover:text-fg")}>
                 <Rows3 className="h-3.5 w-3.5" aria-hidden /> Tabela
@@ -65,14 +69,14 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
             </div>
             {canWrite ? (
               <Link href="/processos/novo" className={buttonVariants({})}>
-                <Plus className="h-4 w-4" aria-hidden /> Novo processo
+                <Plus className="h-4 w-4" aria-hidden /> Novo caso ou processo
               </Link>
             ) : null}
           </div>
         }
       />
 
-      <form method="get" className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-[1fr_190px_170px_200px_auto]" role="search" aria-label="Filtrar processos">
+      <form method="get" className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3" role="search" aria-label="Filtrar processos">
         {board ? <input type="hidden" name="visao" value="quadro" /> : null}
         <div className="flex items-center gap-4 text-xs text-muted sm:col-span-2 lg:col-span-full">
           <span>Carteira:</span>
@@ -86,6 +90,20 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
           </label>
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden />
           <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Número, título, parte ou cliente" className="pl-9" />
+        </div>
+        <div>
+          <label htmlFor="natureza" className="sr-only">Natureza</label>
+          <Select id="natureza" name="natureza" defaultValue={nature ?? ""}>
+            <option value="">Casos e processos — todas as naturezas</option>
+            {CASE_NATURES.map(n => <option key={n} value={n}>{CASE_NATURE_LABEL[n]}</option>)}
+          </Select>
+        </div>
+        <div>
+          <label htmlFor="departamento" className="sr-only">Departamento</label>
+          <Select id="departamento" name="departamento" defaultValue={departmentId ?? ""}>
+            <option value="">Todos os departamentos</option>
+            {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+          </Select>
         </div>
         <div>
           <label htmlFor="status" className="sr-only">Situação</label>
@@ -119,10 +137,10 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
 
       {result.items.length === 0 ? (
         <Card className="p-10 text-center text-sm text-muted">
-          {filtered ? "Nenhum processo encontrado com esses filtros." : "Nenhum processo cadastrado ainda."}
+          {filtered ? "Nenhum processo encontrado com esses filtros." : "Nenhum caso ou processo cadastrado ainda."}
           {canWrite && !filtered ? (
             <div className="mt-3">
-              <Link href="/processos/novo" className={buttonVariants({ variant: "secondary" })}>Cadastrar o primeiro processo</Link>
+              <Link href="/processos/novo" className={buttonVariants({ variant: "secondary" })}>Cadastrar o primeiro caso</Link>
             </div>
           ) : null}
         </Card>
@@ -144,7 +162,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
                           {c.confidential ? <Lock className="mr-1 inline h-3 w-3 text-warning" aria-label="Sigiloso" /> : null}
                           {c.title}
                         </Link>
-                        <p className="mt-0.5 text-xs text-muted">{c.number ?? c.legacyNumber ?? "Sem número"}</p>
+                        <p className="mt-0.5 text-xs text-muted">{CASE_NATURE_LABEL[c.nature as keyof typeof CASE_NATURE_LABEL]} · {c.number ?? c.legacyNumber ?? "Sem número"}</p>
                         <p className="mt-1 truncate text-xs text-muted">{c.parties.map((p) => p.client?.name ?? p.name).join(", ") || "Sem cliente vinculado"}</p>
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <span className="truncate text-[11px] text-muted">{c.responsible?.name ?? "Sem responsável"}</span>
@@ -169,7 +187,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
                   <tr>
                     <th scope="col" className="px-4 py-2 font-medium">Processo</th>
                     <th scope="col" className="hidden px-4 py-2 font-medium md:table-cell">Cliente(s)</th>
-                    <th scope="col" className="hidden px-4 py-2 font-medium lg:table-cell">Área / órgão</th>
+                    <th scope="col" className="hidden px-4 py-2 font-medium lg:table-cell">Departamento / área / órgão</th>
                     <th scope="col" className="hidden px-4 py-2 font-medium lg:table-cell">Responsável</th>
                     <th scope="col" className="px-4 py-2 font-medium">Situação</th>
                     <th scope="col" className="hidden px-4 py-2 text-right font-medium xl:table-cell">Valor da causa</th>
@@ -183,11 +201,11 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
                           {c.confidential ? <Lock className="mr-1 inline h-3.5 w-3.5 text-warning" aria-label="Sigiloso" /> : null}
                           {c.title}
                         </Link>
-                        <p className="text-xs tabular-nums text-muted">{c.number ?? c.legacyNumber ?? "Sem número"}</p>
+                        <p className="text-xs tabular-nums text-muted">{CASE_NATURE_LABEL[c.nature as keyof typeof CASE_NATURE_LABEL]} · {c.number ?? c.legacyNumber ?? "Sem número"}</p>
                       </td>
                       <td className="hidden px-4 py-2.5 text-xs text-muted md:table-cell">{c.parties.map((p) => p.client?.name ?? p.name).join(", ") || "—"}</td>
                       <td className="hidden px-4 py-2.5 text-xs text-muted lg:table-cell">
-                        {c.area ?? "—"}
+                        {c.department?.name ?? "Sem departamento"}<p>{c.area ?? "Sem área jurídica"}</p>
                         {c.court ? <p>{c.court}</p> : null}
                       </td>
                       <td className="hidden px-4 py-2.5 text-xs text-muted lg:table-cell">{c.responsible?.name ?? "—"}</td>
@@ -201,7 +219,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
               </table>
             </div>
           </Card>
-          <Pagination basePath="/processos" params={{ q: sp.q, status, area, responsavel: responsibleId }} page={result.page} pages={result.pages} total={result.total} />
+          <Pagination basePath="/processos" params={{ q: sp.q, status, area, natureza: nature, departamento: departmentId, responsavel: responsibleId }} page={result.page} pages={result.pages} total={result.total} />
         </>
       )}
     </div>

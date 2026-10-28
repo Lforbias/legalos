@@ -28,7 +28,12 @@ export const taskSchema = z.object({
 });
 export type TaskInput = z.infer<typeof taskSchema>;
 
-export const commentSchema = z.object({ body: z.string().trim().min(1, "Escreva o comentário.").max(2000) });
+export const commentSchema = z.object({
+  body: z.string().trim().min(1, "Escreva o comentário.").max(2000),
+  reschedule: z.boolean().optional(),
+  dueDate: text(10).refine(v => isYmd(v), "Informe uma data válida.").optional(),
+  expectedUpdatedAt: z.iso.datetime().optional(),
+});
 export type CommentInput = z.infer<typeof commentSchema>;
 
 export function toTaskData(i: TaskInput) {

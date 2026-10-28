@@ -11,10 +11,10 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { UF_LIST } from "@/lib/validation/br-states";
 import { ClientPicker } from "@/modules/clients/client-picker";
 import { createCaseAction, updateCaseAction } from "./actions";
-import { CASE_AREAS, CASE_STATUS_LABEL, PARTY_ROLE_LABEL, createCaseSchema, type CreateCaseInput } from "./schemas";
+import { CASE_AREAS, CASE_NATURE_LABEL, CASE_STATUS_LABEL, PARTY_ROLE_LABEL, createCaseSchema, type CreateCaseInput } from "./schemas";
 
 export const EMPTY_CASE: CreateCaseInput = {
-  courtSystem: "", number: "", legacyNumber: "", title: "", area: "", court: "", courtUnit: "", courtState: "", subject: "", claimValue: "", status: "ACTIVE", phase: "",
+  nature: "CASE", departmentId: "", courtSystem: "", number: "", legacyNumber: "", title: "", area: "", court: "", courtUnit: "", courtState: "", subject: "", claimValue: "", status: "ACTIVE", phase: "",
   distributedAt: "", confidential: false, notes: "", responsibleId: "", clientId: "", clientRole: "PLAINTIFF",
 };
 
@@ -22,11 +22,13 @@ export function CaseForm({
   caseId,
   initial,
   members,
+  departments = [],
   initialClientLabel = "",
 }: {
   caseId?: string;
   initial: CreateCaseInput;
   members: { id: string; name: string }[];
+  departments?: { id: string; name: string; area: string }[];
   initialClientLabel?: string;
 }) {
   const router = useRouter();
@@ -58,18 +60,29 @@ export function CaseForm({
         <CardHeader title="Identificação" />
         <CardBody className="grid gap-4 md:grid-cols-2">
           <div className="md:col-span-2">
-            <Field label="Título do processo" htmlFor="title" error={err("title")} hint="Nome interno para identificar o caso (ex.: “Silva x Banco Alfa — revisional”).">
+            <Field label="Título do caso ou processo" htmlFor="title" error={err("title")} hint="Nome interno para identificar o caso (ex.: “Silva x Banco Alfa — revisional”).">
               <Input id="title" aria-invalid={Boolean(err("title"))} {...form.register("title")} />
             </Field>
           </div>
-          <Field label="Número CNJ" htmlFor="number" error={err("number")} hint="Formato NNNNNNN-DD.AAAA.J.TR.OOOO. Deixe em branco para casos sem número (ex.: consultivo).">
+          <Field label="Natureza" htmlFor="nature" error={err("nature")} hint="Um caso pode virar processo judicial sem perder tarefas, documentos e histórico.">
+            <Select id="nature" {...form.register("nature")}>
+              {Object.entries(CASE_NATURE_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </Select>
+          </Field>
+          <Field label="Departamento" htmlFor="departmentId" error={err("departmentId")} hint="Automático encaminha para o departamento da área jurídica selecionada.">
+            <Select id="departmentId" {...form.register("departmentId")}>
+              <option value="">Automático pela área jurídica</option>
+              {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="Número CNJ" htmlFor="number" error={err("number")} hint="Preencha apenas para processo judicial. Casos e procedimentos administrativos não precisam de CNJ.">
             <Input id="number" autoComplete="off" aria-invalid={Boolean(err("number"))} {...form.register("number")} />
           </Field>
           <Field label="Número antigo / outro" htmlFor="legacyNumber" error={err("legacyNumber")} hint="Numeração anterior à Resolução CNJ 65 ou administrativa.">
             <Input id="legacyNumber" {...form.register("legacyNumber")} />
           </Field>
           <Field label="Área" htmlFor="area" error={err("area")}>
-            <Select id="area" {...form.register("area")}>
+            <Select id="area" {...form.register("area")} onChange={e => { form.setValue("area", e.target.value, { shouldDirty: true }); form.setValue("departmentId", "", { shouldDirty: true }); }}>
               <option value="">—</option>
               {CASE_AREAS.map((a) => (
                 <option key={a} value={a}>
@@ -188,7 +201,7 @@ export function CaseForm({
 
       <div className="flex gap-2">
         <Button type="submit" loading={pending}>
-          {editing ? "Salvar alterações" : "Cadastrar processo"}
+          {editing ? "Salvar alterações" : "Cadastrar caso ou processo"}
         </Button>
         <Button variant="ghost" onClick={() => router.back()} disabled={pending}>
           Cancelar

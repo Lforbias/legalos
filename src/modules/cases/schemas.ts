@@ -7,6 +7,11 @@ const text = (max: number) => z.string().trim().max(max, `Máximo de ${max} cara
 const isDate = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(Date.parse(`${v}T00:00:00Z`));
 const uuidOrEmpty = z.string().refine((v) => v === "" || z.uuid().safeParse(v).success, "Identificador inválido.");
 
+export const CASE_NATURES = ["CASE", "ADMINISTRATIVE", "JUDICIAL"] as const;
+export const CASE_NATURE_LABEL: Record<(typeof CASE_NATURES)[number], string> = {
+  CASE: "Caso / pré-processual", ADMINISTRATIVE: "Caso administrativo", JUDICIAL: "Processo judicial",
+};
+
 export const CASE_STATUSES = ["ACTIVE", "SUSPENDED", "ARCHIVED", "CLOSED"] as const;
 export const PARTY_ROLES = ["PLAINTIFF", "DEFENDANT", "THIRD_PARTY", "OTHER"] as const;
 export const CASE_MEMBER_ROLES = ["RESPONSIBLE", "COLLABORATOR"] as const;
@@ -26,6 +31,9 @@ export const PARTY_ROLE_LABEL: Record<(typeof PARTY_ROLES)[number], string> = {
 export const CASE_AREAS = ["Cível", "Trabalhista", "Previdenciário", "Penal", "Tributário", "Família e sucessões", "Consumidor", "Administrativo", "Empresarial", "Outra"] as const;
 
 export const caseSchema = z.object({
+  // Optional for existing REST/MCP callers. Creation infers from CNJ; edits preserve stored nature.
+  nature: z.enum(CASE_NATURES).optional(),
+  departmentId: uuidOrEmpty.optional(),
   number: text(30).refine((v) => v === "" || isValidCnj(v), "Número CNJ inválido. Verifique os dígitos (NNNNNNN-DD.AAAA.J.TR.OOOO)."),
   legacyNumber: text(60),
   courtSystem: z.enum(["", "pje-mni", "eproc", "esaj", "projudi"]).optional(),
@@ -79,6 +87,7 @@ const emptyToNull = (v: string) => (v.trim() === "" ? null : v.trim());
 
 export function toCaseData(input: CaseInput) {
   return {
+    ...(input.nature === undefined ? {} : { nature: input.nature }),
     number: input.number ? formatCnj(input.number) : null,
     legacyNumber: emptyToNull(input.legacyNumber),
     ...(input.courtSystem === undefined ? {} : { courtSystem: input.courtSystem || null }),
@@ -98,7 +107,8 @@ export function toCaseData(input: CaseInput) {
 }
 
 export const EVENT_KIND_LABEL: Record<string, string> = {
-  CASE_CREATED: "Processo cadastrado",
+  CASE_CREATED: "Caso ou processo cadastrado",
+  DEPARTMENT_CHANGED: "Departamento alterado",
   CASE_UPDATED: "Dados atualizados",
   STATUS_CHANGED: "Situação alterada",
   NOTE: "Anotação",

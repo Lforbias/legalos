@@ -51,7 +51,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
         }
       />
       {stage === "WON" && l.clientId ? (
-        <Alert tone="success" className="mb-4">Convertido em cliente. <Link href={`/clientes/${l.clientId}`} className="underline">Abrir ficha do cliente</Link></Alert>
+        <Alert tone="success" className="mb-4">Convertido em cliente. <Link href={`/clientes/${l.clientId}`} className="underline">Abrir ficha do cliente</Link>{can(ctx, "cases:write") ? <> · <Link href={`/processos/novo?cliente=${l.clientId}`} className="underline">Abrir um caso para este cliente</Link></> : null}</Alert>
       ) : null}
       {stage === "LOST" ? <Alert tone="warning" className="mb-4">Perdido: {l.lostReason}</Alert> : null}
 

@@ -1,3 +1,4 @@
+import { CASE_NATURE_LABEL } from "@/modules/cases/schemas";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -152,7 +153,7 @@ export default async function CaseDetailPage({
       <RecordBackLink href="/processos">Processos</RecordBackLink>
       <PageHeader
         title={c.title}
-        description={c.number ? `Nº ${formatCnj(c.number)}` : c.legacyNumber ? `Nº ${c.legacyNumber}` : "Processo sem número"}
+        description={c.number ? `Nº ${formatCnj(c.number)}` : c.legacyNumber ? `Nº ${c.legacyNumber}` : (CASE_NATURE_LABEL[c.nature as keyof typeof CASE_NATURE_LABEL] ?? "Caso")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
             {canDocs ? <Link href={`/processos/${c.id}/autos`} className={buttonVariants({ variant: "secondary" })}>Autos digitais</Link> : null}
@@ -190,7 +191,9 @@ export default async function CaseDetailPage({
               <dl className="grid gap-4 sm:grid-cols-2">
                 <Item label="Número CNJ">{c.number}</Item>
                 <Item label="Número antigo / outro">{c.legacyNumber}</Item>
-                <Item label="Área">{c.area}</Item>
+                <Item label="Natureza">{CASE_NATURE_LABEL[c.nature as keyof typeof CASE_NATURE_LABEL]}</Item>
+                <Item label="Departamento">{c.department?.name ?? "Sem departamento"}</Item>
+                <Item label="Área jurídica">{c.area}</Item>
                 <Item label="Fase">{c.phase}</Item>
                 <Item label="Tribunal / órgão">{c.court}</Item>
                 <Item label="Vara / unidade">{c.courtUnit}</Item>

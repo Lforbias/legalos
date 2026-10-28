@@ -50,7 +50,7 @@ export async function getClientWorkspace(ctx: TenantContext, clientId: string) {
     { OR: [{ caseId: null }, { caseId: { in: financeCases.map(c => c.id) } }] },
   ] };
   const [cases, caseCount, work, documents, documentCount, notices, noticeCount, chats, chatCount, finance, financeTotals, movements] = await Promise.all([
-    can(ctx, "cases:read") ? db.case.findMany({ where: casesWhere, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 40, select: { id: true, title: true, number: true, status: true, area: true, phase: true, updatedAt: true } }) : null,
+    can(ctx, "cases:read") ? db.case.findMany({ where: casesWhere, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 40, select: { id: true, title: true, number: true, nature: true, department: { select: { name: true } }, status: true, area: true, phase: true, updatedAt: true } }) : null,
     can(ctx, "cases:read") ? db.case.count({ where: casesWhere }) : null,
     can(ctx, "tasks:read") || can(ctx, "deadlines:read") ? listActivities(ctx, { clientId }) : null,
     can(ctx, "documents:read") ? db.document.findMany({ where: docsWhere, orderBy: [{ updatedAt: "desc" }, { id: "asc" }], take: 40, select: { id: true, name: true, category: true, caseId: true, updatedAt: true, currentVersion: true } }) : null,

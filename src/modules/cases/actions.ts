@@ -12,6 +12,7 @@ import {
   archiveCase,
   changeCaseStatus,
   createCase,
+  renameCaseDepartment,
   removeCaseMember,
   removeParty,
   updateCase,
@@ -111,6 +112,15 @@ export async function deleteDocumentAction(documentId: string, revalidate: strin
     await deleteDocument(ctx, parse(uuidSchema, documentId));
     // só revalida caminhos internos conhecidos
     if (/^\/(processos|clientes)\/[0-9a-f-]{36}$/.test(revalidate)) revalidatePath(revalidate);
+    return undefined;
+  });
+}
+
+export async function renameDepartmentAction(id: string, name: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    await renameCaseDepartment(ctx, parse(uuidSchema, id), parse(z.string().trim().min(2).max(80), name));
+    revalidatePath("/processos", "layout");
     return undefined;
   });
 }

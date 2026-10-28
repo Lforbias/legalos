@@ -45,6 +45,8 @@ export type CaseListFilters = {
   q?: string;
   status?: (typeof import("@/modules/cases/schemas").CASE_STATUSES)[number];
   area?: string;
+  departmentId?: string;
+  nature?: (typeof import("@/modules/cases/schemas").CASE_NATURES)[number];
   responsibleId?: string;
   clientId?: string;
   /** 3.0-F1: "only" = só o acervo; padrão = só a carteira ativa (fora do acervo); "all" = tudo. */
@@ -60,6 +62,8 @@ export async function listCases(ctx: TenantContext, f: CaseListFilters = {}) {
   const and: Prisma.CaseWhereInput[] = [{ organizationId: ctx.organizationId, deletedAt: null }, caseVisibility(ctx)];
   if (f.status) and.push({ status: f.status });
   if (f.area) and.push({ area: f.area });
+  if (f.departmentId) and.push({ departmentId: f.departmentId });
+  if (f.nature) and.push({ nature: f.nature });
   if (f.responsibleId) and.push({ members: { some: { userId: f.responsibleId, role: "RESPONSIBLE" } } });
   if (f.clientId) and.push({ parties: { some: { clientId: f.clientId } } });
   if (f.acervo === "only") and.push({ archivedAt: { not: null } });
@@ -93,7 +97,7 @@ export async function listCases(ctx: TenantContext, f: CaseListFilters = {}) {
       skip: f.board ? 0 : (page - 1) * PAGE_SIZE,
       take,
       select: {
-        id: true, number: true, legacyNumber: true, title: true, area: true, court: true, status: true, phase: true, confidential: true, claimValue: true, updatedAt: true, archivedAt: true,
+        id: true, number: true, legacyNumber: true, title: true, area: true, nature: true, department: { select: { id: true, name: true } }, court: true, status: true, phase: true, confidential: true, claimValue: true, updatedAt: true, archivedAt: true,
         parties: { where: { isOurClient: true }, select: { name: true, clientId: true, client: { select: { name: true } } }, take: 3 },
         members: { where: { role: "RESPONSIBLE" }, select: { user: { select: { id: true, name: true } } }, take: 1 },
       },
@@ -114,6 +118,7 @@ export async function getCase(ctx: TenantContext, id: string) {
   const c = await db.case.findFirst({
     where: { AND: [{ id, organizationId: ctx.organizationId, deletedAt: null }, caseVisibility(ctx)] },
     include: {
+      department: true,
       parties: { orderBy: [{ isOurClient: "desc" }, { createdAt: "asc" }], include: { client: { select: { id: true, name: true, deletedAt: true } } } },
       members: { orderBy: [{ role: "asc" }, { createdAt: "asc" }], include: { user: { select: { id: true, name: true, email: true } } } },
     },
@@ -182,12 +187,41 @@ async function setResponsibleTx(tx: Tx, ctx: TenantContext, caseId: string, user
   });
 }
 
+/** Departments classify work; they never grant access to confidential cases. */
+export async function listCaseDepartments(ctx: TenantContext) {
+  assertCan(ctx, "cases:read");
+  return db.caseDepartment.findMany({ where: { organizationId: ctx.organizationId }, orderBy: { name: "asc" } });
+}
+
+export async function renameCaseDepartment(ctx: TenantContext, id: string, name: string) {
+  assertCan(ctx, "organization:manage");
+  const clean = name.trim();
+  if (clean.length < 2 || clean.length > 80) throw new ValidationError("Informe um nome entre 2 e 80 caracteres.");
+  const row = await db.caseDepartment.findFirst({ where: { id, organizationId: ctx.organizationId } });
+  if (!row) throw new NotFoundError("Departamento não encontrado.");
+  await db.$transaction(async tx => {
+    await tx.caseDepartment.update({ where: { id }, data: { name: clean } });
+    await audit({ action: "case_department.rename", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case_department", resourceId: id, meta: ctx.meta }, tx);
+  });
+}
+
+async function resolveDepartment(tx: Tx, ctx: TenantContext, area: string | null, selected?: string) {
+  if (selected) {
+    const row = await tx.caseDepartment.findFirst({ where: { id: selected, organizationId: ctx.organizationId } });
+    if (!row) throw new ValidationError("Departamento inválido.", { departmentId: ["Escolha um departamento deste escritório."] });
+    return row.id;
+  }
+  if (!area) return null;
+  return (await tx.caseDepartment.upsert({ where: { organizationId_area: { organizationId: ctx.organizationId, area } }, create: { organizationId: ctx.organizationId, name: area, area }, update: {} })).id;
+}
+
 // ---------- criação / edição ----------
 
 export async function createCase(ctx: TenantContext, raw: CreateCaseInput) {
   assertCan(ctx, "cases:write");
   const input = createCaseSchema.parse(raw);
   const data = toCaseData(input);
+  if (data.number && input.nature && input.nature !== "JUDICIAL") throw new ValidationError("Um cadastro com número CNJ deve ter natureza Processo judicial.", { nature: ["Selecione Processo judicial para informar um número CNJ."] });
   await assertNumberFree(ctx, data.number);
   const responsibleId = input.responsibleId || ctx.userId;
   await assertActiveMember(ctx, responsibleId);
@@ -201,7 +235,8 @@ export async function createCase(ctx: TenantContext, raw: CreateCaseInput) {
 
   try {
     const created = await db.$transaction(async (tx) => {
-      const c = await tx.case.create({ data: { ...data, organizationId: ctx.organizationId, createdById: ctx.userId } });
+      const departmentId = await resolveDepartment(tx, ctx, data.area, input.departmentId);
+      const c = await tx.case.create({ data: { ...data, nature: input.nature ?? (data.number ? "JUDICIAL" : "CASE"), departmentId, organizationId: ctx.organizationId, createdById: ctx.userId } });
       await tx.caseMember.create({ data: { caseId: c.id, organizationId: ctx.organizationId, userId: responsibleId, role: "RESPONSIBLE" } });
       // quem cadastra sempre mantém acesso (relevante para processos sigilosos)
       if (responsibleId !== ctx.userId) {
@@ -212,7 +247,7 @@ export async function createCase(ctx: TenantContext, raw: CreateCaseInput) {
           data: { caseId: c.id, organizationId: ctx.organizationId, clientId: client.id, role: input.clientRole, name: client.name, document: client.document, isOurClient: true },
         });
       }
-      await logCaseEvent(tx, ctx, c.id, { kind: "CASE_CREATED", title: "Processo cadastrado no sistema" });
+      await logCaseEvent(tx, ctx, c.id, { kind: "CASE_CREATED", title: c.nature === "JUDICIAL" ? "Processo judicial cadastrado no sistema" : "Caso cadastrado no sistema" });
       await audit(
         { action: "case.create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: c.id, metadata: { confidential: c.confidential }, meta: ctx.meta },
         tx,
@@ -229,7 +264,7 @@ export async function createCase(ctx: TenantContext, raw: CreateCaseInput) {
 }
 
 const FIELD_LABEL: Record<string, string> = {
-  number: "número", legacyNumber: "número antigo", title: "título", area: "área", court: "tribunal/órgão", courtUnit: "vara/unidade", courtState: "UF",
+  nature: "natureza", number: "número", legacyNumber: "número antigo", title: "título", area: "área", court: "tribunal/órgão", courtUnit: "vara/unidade", courtState: "UF",
   subject: "assunto", claimValue: "valor da causa", phase: "fase", distributedAt: "data de distribuição", confidential: "sigilo", notes: "observações",
 };
 
@@ -239,16 +274,21 @@ export async function updateCase(ctx: TenantContext, id: string, raw: CaseInput)
   const existing = await db.case.findFirstOrThrow({ where: { id, organizationId: ctx.organizationId } });
   const input = caseSchema.parse(raw);
   const data = toCaseData(input);
+  if (input.nature === undefined && data.number) data.nature = "JUDICIAL";
+  if (data.number && input.nature && input.nature !== "JUDICIAL") throw new ValidationError("Um cadastro com número CNJ deve ter natureza Processo judicial.", { nature: ["Selecione Processo judicial para informar um número CNJ."] });
   await assertNumberFree(ctx, data.number, id);
   if (input.responsibleId) await assertActiveMember(ctx, input.responsibleId);
 
   const norm = (v: unknown) => (v instanceof Date ? v.toISOString() : v == null ? null : String(v));
-  const changed = (Object.keys(FIELD_LABEL) as (keyof typeof data)[]).filter((k) => norm(data[k]) !== norm(existing[k as keyof typeof existing]));
+  const changed = (Object.keys(FIELD_LABEL) as (keyof typeof data)[]).filter((k) => k in data && norm(data[k]) !== norm(existing[k as keyof typeof existing]));
   const statusChanged = existing.status !== data.status;
 
   try {
     await db.$transaction(async (tx) => {
-      await tx.case.update({ where: { id }, data });
+      const departmentId = input.departmentId === undefined && data.area === existing.area
+        ? existing.departmentId : await resolveDepartment(tx, ctx, data.area, input.departmentId);
+      await tx.case.update({ where: { id }, data: { ...data, departmentId } });
+      if (departmentId !== existing.departmentId) await logCaseEvent(tx, ctx, id, { kind: "DEPARTMENT_CHANGED", title: "Departamento alterado" });
       if (input.responsibleId) {
         const current = await tx.caseMember.findFirst({ where: { caseId: id, role: "RESPONSIBLE" }, select: { userId: true } });
         if (current?.userId !== input.responsibleId) {

@@ -5,7 +5,7 @@ import * as React from "react";
 import { fieldError, useServerForm } from "@/components/forms/use-server-form";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { Select, Textarea } from "@/components/ui/form";
+import { Input, Select, Textarea } from "@/components/ui/form";
 import { addTaskCommentAction, changeTaskStatusAction } from "./actions";
 import { selectStageAction } from "./stage-actions";
 import { MentionPicker } from "./extras-ui";
@@ -44,26 +44,32 @@ export function TaskStatusSelect({ taskId, status, disabled, compact, stages = [
   );
 }
 
-export function CommentForm({ taskId, members = [] }: { taskId: string; members?: { id: string; name: string }[] }) {
+export function CommentForm({ taskId, members = [], dueDate, updatedAt }: { taskId: string; members?: { id: string; name: string }[]; dueDate?: string; updatedAt?: string }) {
   const router = useRouter();
   const { form, submit, pending, message } = useServerForm<CommentInput, undefined>({
     schema: commentSchema,
     defaultValues: { body: "" },
-    action: (v) => addTaskCommentAction(taskId, v),
+    action: (v) => addTaskCommentAction(taskId, { ...v, dueDate: v.reschedule ? v.dueDate : undefined, expectedUpdatedAt: v.reschedule ? updatedAt : undefined }),
     onSuccess: (_d, f) => {
-      f.reset({ body: "" });
+      f.reset({ body: "", reschedule: false });
       router.refresh();
     },
   });
+  const reschedule = form.watch("reschedule");
   const err = fieldError(form, "body");
   return (
     <form onSubmit={submit} noValidate className="space-y-2">
       {message ? <Alert tone="error">{message}</Alert> : null}
       <label htmlFor="comment-body" className="sr-only">Comentário</label>
-      <Textarea id="comment-body" rows={3} placeholder="Escreva um comentário…" aria-invalid={Boolean(err)} {...form.register("body")} />
+      <Textarea id="comment-body" rows={3} placeholder="Registre o retorno do cliente ou mencione um colega com @Nome…" aria-invalid={Boolean(err)} {...form.register("body")} />
       {err ? <p role="alert" className="text-xs text-danger">{err}</p> : null}
+      <p className="text-xs text-muted">Use Mencionar colega para escolher quem deve receber uma notificação. Menções respeitam o acesso à tarefa.</p>
+      {updatedAt ? <div className="space-y-2">
+        <label className="flex items-center gap-2 text-sm"><input type="checkbox" {...form.register("reschedule")} onChange={e => { form.setValue("reschedule", e.target.checked); form.setValue("dueDate", e.target.checked ? dueDate : undefined); }} />Alterar vencimento com este comentário</label>
+        {reschedule ? <div><label htmlFor="comment-due" className="text-xs text-muted">Novo vencimento</label><Input id="comment-due" type="date" {...form.register("dueDate")} required aria-invalid={Boolean(fieldError(form, "dueDate"))} />{fieldError(form, "dueDate") ? <p role="alert" className="text-xs text-danger">{fieldError(form, "dueDate")}</p> : null}</div> : null}
+      </div> : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="submit" size="sm" loading={pending}>Comentar</Button>
+        <Button type="submit" size="sm" loading={pending}>{reschedule ? "Comentar e remarcar" : "Comentar"}</Button>
         {members.length ? <MentionPicker members={members} onPick={(name) => form.setValue("body", `${form.getValues("body")}${form.getValues("body") && !form.getValues("body").endsWith(" ") ? " " : ""}@${name} `, { shouldDirty: true })} /> : null}
       </div>
     </form>

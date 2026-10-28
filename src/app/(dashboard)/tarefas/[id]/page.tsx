@@ -50,9 +50,12 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         description={`Criada${t.createdByName ? ` por ${t.createdByName}` : ""} em ${formatDate(t.createdAt, tz)}`}
         actions={
           canWrite ? (
-            <Link href={`/tarefas/${t.id}/editar`} className={buttonVariants({ variant: "secondary" })}>
-              <Pencil className="h-4 w-4" aria-hidden /> Editar
-            </Link>
+            <div className="flex gap-2">
+              <Link href="#comentarios" className={buttonVariants({ variant: "secondary" })}>Comentários ({t.comments.length})</Link>
+              <Link href={`/tarefas/${t.id}/editar`} className={buttonVariants({ variant: "secondary" })}>
+                <Pencil className="h-4 w-4" aria-hidden /> Editar
+              </Link>
+            </div>
           ) : null
         }
       />
@@ -81,8 +84,8 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             <CardHeader title="Descrição" />
             <CardBody className="whitespace-pre-wrap text-sm">{t.description ?? <span className="text-muted">Sem descrição.</span>}</CardBody>
           </Card>
-          <Card>
-            <CardHeader title={`Comentários (${t.comments.length})`} />
+          <Card id="comentarios" className="scroll-mt-6">
+            <CardHeader title={`Comentários (${t.comments.length})`} description="Registre combinações, mencione colegas e atualize o vencimento da tarefa no mesmo envio." />
             <CardBody className="space-y-4">
               {t.comments.length === 0 ? <p className="text-sm text-muted">Nenhum comentário ainda.</p> : null}
               {t.comments.map((c) => (
@@ -91,7 +94,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
                   <p className="mt-0.5 whitespace-pre-wrap text-sm">{c.body}</p>
                 </div>
               ))}
-              {canWrite ? <CommentForm taskId={t.id} members={members} /> : null}
+              {canWrite ? <CommentForm taskId={t.id} members={members} dueDate={due ?? undefined} updatedAt={t.updatedAt.toISOString()} /> : null}
             </CardBody>
           </Card>
           <AttachmentsCard taskId={t.id} canWrite={canWrite} tz={tz} items={attachments.map((a) => ({ ...a, createdAt: a.createdAt.toISOString() }))} />

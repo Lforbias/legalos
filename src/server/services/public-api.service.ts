@@ -1,3 +1,4 @@
+import { CASE_NATURES } from "@/modules/cases/schemas";
 import { CaseStatus, ClientStatus, DeadlineStatus, NoticeStatus, type Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { dateToYmd, isYmd, todayYmd, ymdToDate } from "@/lib/dates/ymd";
@@ -63,12 +64,12 @@ async function paginate<T extends { id: string; createdAt: Date }>(rows: T[], li
 
 // ---- Processos ----
 const caseSelect = {
-  id: true, number: true, legacyNumber: true, title: true, area: true, court: true, courtUnit: true, courtState: true, subject: true,
+  id: true, number: true, legacyNumber: true, title: true, area: true, nature: true, departmentId: true, department: { select: { name: true } }, court: true, courtUnit: true, courtState: true, subject: true,
   claimValue: true, status: true, phase: true, distributedAt: true, confidential: true, createdAt: true, updatedAt: true,
 } satisfies Prisma.CaseSelect;
 type CaseRow = Prisma.CaseGetPayload<{ select: typeof caseSelect }>;
 const caseDto = (c: CaseRow) => ({
-  id: c.id, number: c.number, legacyNumber: c.legacyNumber, title: c.title, area: c.area, court: c.court, courtUnit: c.courtUnit, courtState: c.courtState,
+  id: c.id, number: c.number, legacyNumber: c.legacyNumber, title: c.title, area: c.area, nature: c.nature, departmentId: c.departmentId, departmentName: c.department?.name ?? null, court: c.court, courtUnit: c.courtUnit, courtState: c.courtState,
   subject: c.subject, claimValue: c.claimValue ? c.claimValue.toFixed(2) : null, status: c.status, phase: c.phase, distributedAt: dayOrNull(c.distributedAt),
   confidential: c.confidential, createdAt: iso(c.createdAt), updatedAt: iso(c.updatedAt),
 });
@@ -76,9 +77,11 @@ const caseDto = (c: CaseRow) => ({
 export async function apiListCases(ctx: TenantContext, q: Q) {
   const limit = parseLimit(q.limit);
   const status = oneOf(q.status, Object.values(CaseStatus), "status");
+  const nature = oneOf(q.nature, [...CASE_NATURES], "nature");
+  const departmentId = uuid(q.departmentId, "departmentId");
   const where: Prisma.CaseWhereInput = {
     AND: [
-      { organizationId: ctx.organizationId, deletedAt: null, ...(status ? { status } : {}), ...(q.number ? { number: q.number.slice(0, 40) } : {}) },
+      { organizationId: ctx.organizationId, deletedAt: null, ...(status ? { status } : {}), ...(nature ? { nature } : {}), ...(departmentId ? { departmentId } : {}), ...(q.number ? { number: q.number.slice(0, 40) } : {}) },
       caseVisibility(ctx),
       cursorWhere(decodeCursor(q.cursor)),
     ],

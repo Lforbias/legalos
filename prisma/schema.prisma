@@ -157,6 +157,7 @@ model Organization {
   auditLogs               AuditLog[]
   subscription            Subscription?
   clients                 Client[]
+  caseDepartments         CaseDepartment[]
   cases                   Case[]
   partyRegistry           PartyRegistry[]
   customFieldDefs         CustomFieldDef[]
@@ -458,10 +459,24 @@ model ClientContact {
   @@map("client_contacts")
 }
 
+model CaseDepartment {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  name String
+  area String
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  cases Case[]
+  @@unique([organizationId, area])
+  @@map("case_departments")
+}
+
 model Case {
   id             String     @id @default(uuid()) @db.Uuid
   organizationId String     @map("organization_id") @db.Uuid
   number         String?
+  nature String @default("CASE")
+  departmentId String? @map("department_id") @db.Uuid
+  department CaseDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   legacyNumber   String?    @map("legacy_number")
   courtSystem    String?    @map("court_system")
   title          String
@@ -508,6 +523,7 @@ model Case {
   fees                  CaseFee[]
   appeals               CaseAppeal[]
 
+  @@index([organizationId, departmentId, nature])
   @@index([organizationId, archivedAt])
   @@map("cases")
 }

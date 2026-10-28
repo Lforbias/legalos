@@ -244,6 +244,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
           id,
           organizationId,
           number,
+          nature: number ? "JUDICIAL" : "CASE",
           legacyNumber: legacy,
           title: d.title,
           courtUnit: d.courtUnit,

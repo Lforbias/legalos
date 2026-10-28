@@ -1,3 +1,4 @@
+import { CASE_NATURES } from "@/modules/cases/schemas";
 import { CHAT_TOOLS } from "./rute-chat-tools";
 import { ACTION_TOOLS } from "./rute-action-tools";
 import { DOMAIN_TOOLS } from "./rute-domain-tools";
@@ -50,7 +51,7 @@ const iso = (d: Date | null | undefined) => (d ? d.toISOString() : null);
 const day = (d: Date | null | undefined) => (d ? d.toISOString().slice(0, 10) : null);
 
 async function visibleCaseIds(ctx: TenantContext, where: object, take = 50) {
-  return db.case.findMany({ where: { AND: [{ organizationId: ctx.organizationId, deletedAt: null, ...where }, caseVisibility(ctx)] }, orderBy: { updatedAt: "desc" }, take, select: { id: true, number: true, title: true, area: true, court: true, status: true, phase: true, updatedAt: true } });
+  return db.case.findMany({ where: { AND: [{ organizationId: ctx.organizationId, deletedAt: null, ...where }, caseVisibility(ctx)] }, orderBy: { updatedAt: "desc" }, take, select: { id: true, number: true, title: true, area: true, nature: true, departmentId: true, department: { select: { name: true } }, court: true, status: true, phase: true, updatedAt: true } });
 }
 
 const TOOLS: ToolDef[] = [
@@ -141,23 +142,25 @@ const TOOLS: ToolDef[] = [
       const c = await apiGetClient(ctx, a.id as string);
       const parties = can(ctx, "cases:read") ? await db.caseParty.findMany({ where: { organizationId: ctx.organizationId, clientId: c.id }, select: { caseId: true, role: true }, take: 100 }) : [];
       const cases = parties.length ? await visibleCaseIds(ctx, { id: { in: parties.map((p) => p.caseId) } }, 50) : [];
-      return { cliente: c, processos: cases.map((p) => ({ id: p.id, numero: p.number, titulo: p.title, area: p.area, situacao: p.status, papel: parties.find((x) => x.caseId === p.id)?.role })) };
+      return { cliente: c, processos: cases.map((p) => ({ id: p.id, numero: p.number, titulo: p.title, area: p.area, natureza: p.nature, departamento_id: p.departmentId, departamento: p.department?.name ?? null, situacao: p.status, papel: parties.find((x) => x.caseId === p.id)?.role })) };
     },
   },
   {
     name: "buscar_processos", title: "Buscar processos", scope: "read", permission: "cases:read",
-    description: "Busca processos por parte do número ou do título. Só devolve os que você pode ver (sigilosos ficam de fora).",
-    input: { type: "object", properties: { q: S("parte do número ou do título"), status: S("ACTIVE, SUSPENDED, ARCHIVED..."), clientId: S("filtrar por cliente"), limit: { type: "integer" } } },
-    schema: z.object({ q: z.string().max(80).optional(), status: z.string().max(20).optional(), clientId: uuid.optional(), limit: lim }),
+    description: "Busca casos e processos por número, título, natureza ou departamento. Natureza CASE = pré-processual, ADMINISTRATIVE = caso administrativo, JUDICIAL = processo judicial. Respeita o sigilo e o acesso de quem consulta.",
+    input: { type: "object", properties: { q: S("parte do número ou do título"), status: S("ACTIVE, SUSPENDED, ARCHIVED..."), clientId: S("filtrar por cliente"), nature: { type: "string", enum: [...CASE_NATURES] }, departmentId: S("ID do departamento"), limit: { type: "integer" } } },
+    schema: z.object({ q: z.string().max(80).optional(), status: z.string().max(20).optional(), clientId: uuid.optional(), nature: z.enum(CASE_NATURES).optional(), departmentId: uuid.optional(), limit: lim }),
     subject: (a) => ({ clientId: a.clientId as string | undefined }),
     run: async (ctx, a) => {
       const q = (a.q as string | undefined)?.trim();
       const where: Json = {};
       if (q) where.OR = [{ title: { contains: q, mode: "insensitive" } }, { number: { contains: q } }, { legacyNumber: { contains: q } }];
       if (a.status) where.status = a.status;
+      if (a.nature) where.nature = a.nature;
+      if (a.departmentId) where.departmentId = a.departmentId;
       if (a.clientId) where.parties = { some: { clientId: a.clientId } };
       const rows = await visibleCaseIds(ctx, where, Number(a.limit ?? 20));
-      return rows.map((p) => ({ id: p.id, numero: p.number, titulo: p.title, area: p.area, tribunal: p.court, situacao: p.status, fase: p.phase, atualizado_em: iso(p.updatedAt) }));
+      return rows.map((p) => ({ id: p.id, numero: p.number, titulo: p.title, area: p.area, natureza: p.nature, departamento_id: p.departmentId, departamento: p.department?.name ?? null, tribunal: p.court, situacao: p.status, fase: p.phase, atualizado_em: iso(p.updatedAt) }));
     },
   },
   {

@@ -4,7 +4,7 @@ import { db } from "@/lib/db/client";
 import { formatYmd, todayYmd } from "@/lib/dates/ymd";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { commentSchema, taskSchema, toTaskData, TASK_STATUS_LABEL, type CommentInput, type TaskInput } from "@/modules/tasks/schemas";
-import { assertCan, type TenantContext } from "@/server/context";
+import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertActiveMember, assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service";
 import { listActiveMembers, userNames } from "./members";
@@ -12,6 +12,7 @@ import { recordTaskEvent } from "./task-event";
 import { findMentions } from "@/modules/tasks/mentions";
 import { TASK_PRIORITY_LABEL } from "@/modules/tasks/schemas";
 import { assertNoticeUsable } from "./notice-guard";
+import { resolveTenantContext } from "./tenant.service";
 import { notify } from "./notification.service";
 import { runWorkflows } from "./workflow.service";
 
@@ -60,7 +61,7 @@ export async function getTask(ctx: TenantContext, id: string) {
       stage: { select: { id: true, name: true } },
       case: { select: { id: true, title: true, number: true } },
       client: { select: { id: true, name: true } },
-      comments: { orderBy: { createdAt: "asc" }, take: 200 },
+      comments: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 200 },
     },
   });
   if (!t) throw new NotFoundError("Tarefa não encontrada.");
@@ -69,7 +70,7 @@ export async function getTask(ctx: TenantContext, id: string) {
     ...t,
     assigneeName: t.assigneeId ? (names.get(t.assigneeId) ?? null) : null,
     createdByName: t.createdById ? (names.get(t.createdById) ?? null) : null,
-    comments: t.comments.map((c) => ({ ...c, authorName: c.authorId ? (names.get(c.authorId) ?? "Usuário removido") : "Sistema" })),
+    comments: t.comments.reverse().map((c) => ({ ...c, authorName: c.authorId ? (names.get(c.authorId) ?? "Usuário removido") : "Sistema" })),
   };
 }
 
@@ -185,9 +186,28 @@ export async function addTaskComment(ctx: TenantContext, taskId: string, raw: Co
   const input = commentSchema.parse(raw);
   const t = await getTask(ctx, taskId);
   const members = await listActiveMembers(ctx);
-  const mentioned = findMentions(input.body, members).filter((m) => m !== ctx.userId);
-  await db.taskComment.create({ data: { organizationId: ctx.organizationId, taskId, authorId: ctx.userId, body: input.body, mentionedIds: mentioned } });
-  const targets = new Set([t.assigneeId, t.createdById].filter((x): x is string => !!x && x !== ctx.userId && !mentioned.includes(x)));
+  const requestedMentions = findMentions(input.body, members).filter(m => m !== ctx.userId);
+  const candidates = [...new Set([...requestedMentions, t.assigneeId, t.createdById].filter((id): id is string => Boolean(id) && id !== ctx.userId))];
+  // A mention never grants access or leaks a confidential task in notification previews.
+  const accessible = new Set<string>();
+  await Promise.all(candidates.map(async userId => {
+    const target = await resolveTenantContext(userId, ctx.organizationId);
+    if (!target || !can(target, "tasks:read")) return;
+    if (t.caseId && (!can(target, "cases:read") || !await db.case.count({ where: { AND: [{ id: t.caseId, organizationId: ctx.organizationId, deletedAt: null }, caseVisibility(target)] } }))) return;
+    accessible.add(userId);
+  }));
+  const mentioned = requestedMentions.filter(id => accessible.has(id));
+  await db.$transaction(async tx => {
+    if (input.reschedule) {
+      if (!input.dueDate || !input.expectedUpdatedAt) throw new ValidationError("Informe o novo vencimento e recarregue a tarefa antes de salvar.");
+      const changed = await tx.task.updateMany({ where: { id: taskId, organizationId: ctx.organizationId, deletedAt: null, updatedAt: new Date(input.expectedUpdatedAt) }, data: { dueDate: new Date(`${input.dueDate}T00:00:00Z`) } });
+      if (changed.count !== 1) throw new ConflictError("A tarefa mudou. Recarregue antes de alterar o vencimento.");
+      await recordTaskEvent(tx, ctx, taskId, "update", `Vencimento: ${t.dueDate ? formatYmd(t.dueDate.toISOString().slice(0, 10)) : "sem data"} → ${formatYmd(input.dueDate)}`);
+    }
+    await tx.taskComment.create({ data: { organizationId: ctx.organizationId, taskId, authorId: ctx.userId, body: input.body, mentionedIds: mentioned } });
+    await audit({ action: "task.comment", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "task", resourceId: taskId, metadata: { rescheduled: Boolean(input.reschedule), mentionedCount: mentioned.length }, meta: ctx.meta }, tx);
+  });
+  const targets = new Set([t.assigneeId, t.createdById].filter((x): x is string => !!x && accessible.has(x) && !mentioned.includes(x)));
   const msgs = [
     ...[...targets].map((userId) => ({
       organizationId: ctx.organizationId, userId, kind: "task.comment", title: `Novo comentário em: ${t.title}`, body: input.body.slice(0, 200), link: `/tarefas/${taskId}`,
