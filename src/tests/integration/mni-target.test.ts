@@ -9,6 +9,7 @@ import { uploadCertificate, restrictCertificateToConsultation } from "@/server/s
 import { startEnrollment, confirmEnrollment } from "@/server/services/mfa.service";
 import { makeTestPfx } from "../fixtures/make-pfx";
 import { makeOrgWithOwner, META } from "./helpers";
+import { MniError, MNI_SERVICE_NS } from "@/lib/mni/xml";
 const valid = "https://pjehml1g.trf1.jus.br/pje/intercomunicacao";
 const swagger = "https://mni-client.stg.cnj.cloud/swagger-ui/index.html";
 describe("correção de destino do MNI sem enviar credenciais a Swagger", () => {
@@ -54,5 +55,21 @@ describe("correção de destino do MNI sem enviar credenciais a Swagger", () => 
     await db.certificate.update({ where: { id: certId }, data: { consultationOnly: false } });
     await restrictCertificateToConsultation(a.ctx, certId);
     expect((await db.certificate.findUniqueOrThrow({ where: { id: certId } })).consultationOnly).toBe(true);
+  });
+  it("registra falha de WSDL sem alegar sincronização, apagar contrato anterior ou alterar processos", async () => {
+    const at = new Date("2026-10-01T10:00:00Z");
+    await db.courtConnection.update({ where: { id }, data: { wsdlStatus: "COMPATIBLE", wsdlCheckedAt: at, wsdlOperations: ["consultarProcesso"], lastSyncAt: null } });
+    const fetcher = vi.fn(async () => { throw new MniError("O tribunal bloqueou o IP de saída do servidor (HTTP 403)."); });
+    await expect(inspectConnectionContract(a.ctx, id, fetcher)).rejects.toThrow(/bloqueou o IP/);
+    expect(fetcher).toHaveBeenCalledOnce();
+    expect(await db.courtConnection.findUniqueOrThrow({ where: { id } })).toMatchObject({ lastStatus: "ERROR", lastMessage: expect.stringMatching(/^Verificação WSDL:.*bloqueou o IP/), lastSyncAt: null, wsdlStatus: "COMPATIBLE", wsdlCheckedAt: at, enabled: false });
+    expect(await db.auditLog.count({ where: { resourceId: id, action: "court_connection.contract_check_failed" } })).toBe(1);
+    expect(await db.courtNotice.count({ where: { organizationId: a.org.id } })).toBe(0);
+    expect(await db.case.count({ where: { organizationId: a.org.id } })).toBe(0);
+  });
+  it("limpa o erro após recuperar o WSDL, sem alegar acesso autenticado ou ativar a conexão", async () => {
+    const wsdl = `<definitions targetNamespace="${MNI_SERVICE_NS}" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/"><portType name="Port"><operation name="consultarProcesso"/></portType><binding name="Binding" type="tns:Port"><soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/><operation name="consultarProcesso"/></binding><service name="Mni"><port binding="tns:Binding"><soap:address location="${valid}"/></port></service></definitions>`;
+    expect(await inspectConnectionContract(a.ctx, id, async () => wsdl)).toMatchObject({ compatible: true });
+    expect(await db.courtConnection.findUniqueOrThrow({ where: { id } })).toMatchObject({ enabled: false, lastMessage: null, lastStatus: "PENDING", lastSyncAt: null, wsdlStatus: "COMPATIBLE" });
   });
 });

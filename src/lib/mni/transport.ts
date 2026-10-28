@@ -5,6 +5,7 @@ import net from "node:net";
 import tls from "node:tls";
 import fs from "node:fs";
 import { MniError } from "./xml";
+import { mniHttpError, mniNetworkError } from "./transport-errors";
 
 const MAX_RESPONSE_BYTES = 20 * 1024 * 1024;
 const TIMEOUT_MS = 60_000;
@@ -106,12 +107,12 @@ function requestXml(endpoint: string, xml: string | null, mtls?: Mtls, soapActio
         // SOAP Fault chega como HTTP 500 com corpo XML: deixamos o parser mostrar a mensagem
         if (status >= 200 && status < 300) return resolve(text);
         if (status === 500 && text.includes("Fault")) return resolve(text);
-        if (status === 401 || status === 403) return reject(new MniError("O tribunal recusou o acesso (credenciais ou certificado)."));
-        reject(new MniError(`O tribunal respondeu com erro HTTP ${status}.`));
+        reject(new MniError(mniHttpError(status, text)));
       });
+      res.on("error", e => reject(new MniError(mniNetworkError(e))));
     });
     req.on("timeout", () => req.destroy(new MniError("O tribunal demorou demais para responder.")));
-    req.on("error", (e) => reject(e instanceof MniError ? e : new MniError(/certificate|SSL|TLS|self.signed|unable to verify/i.test(e.message) ? "Falha de TLS/certificado ao falar com o tribunal (veja MNI_EXTRA_CA_FILE para cadeias ICP-Brasil)." : "Não foi possível falar com o tribunal.")));
+    req.on("error", (e) => reject(e instanceof MniError ? e : new MniError(mniNetworkError(e))));
     req.end(body);
   });
 }

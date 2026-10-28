@@ -87,9 +87,10 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
           {c.lastSyncAt ? (
             <p className="mt-2 text-xs text-muted">
               Última sincronização: {new Date(c.lastSyncAt).toLocaleString("pt-BR")} — {c.lastStatus === "OK" ? "ok" : "falhou"}
-              {c.lastMessage ? `: ${c.lastMessage}` : ""}
+              {c.lastMessage && !c.lastMessage.startsWith("Verificação WSDL:") ? `: ${c.lastMessage}` : ""}
             </p>
           ) : null}
+          {c.lastMessage?.startsWith("Verificação WSDL:") ? <Alert tone="error" className="mt-2">{c.lastMessage}</Alert> : null}
           <p className="mt-2 text-xs">Contrato: {c.wsdlStatus === "COMPATIBLE" ? "MNI 2.2.2 compatível (acesso e homologação pendentes)" : c.wsdlStatus === "INCOMPATIBLE" ? "Incompatível com o adaptador atual" : "Ainda não verificado"}{c.wsdlCheckedAt ? ` · ${new Date(c.wsdlCheckedAt).toLocaleString("pt-BR")}` : ""}</p>
           {c.wsdlOperations?.length ? <p className="text-xs">Operações declaradas: {c.wsdlOperations.join(", ")}</p> : null}
           <PetitionTypesEditor id={c.id} initial={c.petitionTypes} />

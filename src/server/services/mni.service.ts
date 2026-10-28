@@ -428,11 +428,18 @@ export async function inspectConnectionContract(ctx: TenantContext, id: string, 
     const material = await mtlsFor(ctx, c.certificateId, "mni:wsdl");
     inspection = inspectMniContract(await fetcher(c.wsdlUrl ?? c.endpointUrl, material, Boolean(c.wsdlUrl)), c.endpointUrl);
   } catch (e) {
-    if (e instanceof MniError) throw new ConflictError(e.message);
+    if (e instanceof MniError) {
+      // Um WSDL indisponível não equivale a sincronização executada nem invalida um contrato anterior.
+      await db.$transaction(async tx => {
+        const changed = await tx.courtConnection.updateMany({ where: { id: c.id, organizationId: ctx.organizationId, updatedAt: c.updatedAt }, data: { lastStatus: "ERROR", lastMessage: `Verificação WSDL: ${e.message}`.slice(0, 300) } });
+        if (changed.count) await audit({ action: "court_connection.contract_check_failed", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: c.id, metadata: { stage: "wsdl", message: e.message.slice(0, 300) }, meta: ctx.meta }, tx);
+      });
+      throw new ConflictError(e.message);
+    }
     throw e;
   }
   await db.$transaction(async tx => {
-    const changed = await tx.courtConnection.updateMany({ where: { id: c.id, organizationId: ctx.organizationId, updatedAt: c.updatedAt }, data: { wsdlStatus: inspection.compatible ? "COMPATIBLE" : "INCOMPATIBLE", wsdlCheckedAt: new Date(), wsdlOperations: inspection.operations, wsdlActions: inspection.actions, ...(!inspection.compatible ? { enabled: false } : {}) } });
+    const changed = await tx.courtConnection.updateMany({ where: { id: c.id, organizationId: ctx.organizationId, updatedAt: c.updatedAt }, data: { wsdlStatus: inspection.compatible ? "COMPATIBLE" : "INCOMPATIBLE", wsdlCheckedAt: new Date(), wsdlOperations: inspection.operations, wsdlActions: inspection.actions, ...(c.lastMessage?.startsWith("Verificação WSDL:") ? { lastStatus: "PENDING", lastMessage: null } : {}), ...(!inspection.compatible ? { enabled: false } : {}) } });
     if (!changed.count) throw new ConflictError("A conexão mudou durante a verificação. Recarregue e tente novamente.");
     await audit({ action: "court_connection.contract_checked", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: c.id, metadata: { system: c.system, compatible: inspection.compatible, operations: inspection.operations }, meta: ctx.meta }, tx);
   });

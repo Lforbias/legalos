@@ -107,9 +107,11 @@ export async function setPetitionTypesAction(id: string, types: Record<string, s
 export async function inspectContractAction(id: string) {
   return runAction(async () => {
     const { ctx } = await requireTenant();
-    const result = await inspectConnectionContract(ctx, parse(uuidSchema, id));
-    revalidatePath("/integracoes");
-    return result;
+    try {
+      return await inspectConnectionContract(ctx, parse(uuidSchema, id));
+    } finally {
+      revalidatePath("/integracoes");
+    }
   });
 }
 
