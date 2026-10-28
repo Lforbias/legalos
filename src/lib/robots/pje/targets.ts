@@ -10,6 +10,9 @@ export const PJE_SSO_ORIGIN = "https://sso.cloud.pje.jus.br";
 export const PJE_TARGETS: readonly PjeTarget[] = [
   { key: "trf1-1g", label: "TRF1 · 1º grau (Justiça Federal da 1ª Região)", origin: "https://pje1g.trf1.jus.br", clientId: "pje-trf1-1g" },
   { key: "trf1-2g", label: "TRF1 · 2º grau (Justiça Federal da 1ª Região)", origin: "https://pje2g.trf1.jus.br", clientId: "pje-trf1-2g" },
+  { key: "trf3-1g", label: "TRF3 · 1º grau (Justiça Federal da 3ª Região)", origin: "https://pje1g.trf3.jus.br", clientId: "pje-trf3-1g" },
+  { key: "trf3-2g", label: "TRF3 · 2º grau (Justiça Federal da 3ª Região)", origin: "https://pje2g.trf3.jus.br", clientId: "pje-trf3-2g" },
+  { key: "tjmg-1g", label: "TJMG · 1º grau (Tribunal de Justiça de Minas Gerais)", origin: "https://pje.tjmg.jus.br", clientId: "pje-tjmg-1g" },
 ];
 
 export const getPjeTarget = (key: string): PjeTarget | null => PJE_TARGETS.find((t) => t.key === key) ?? null;

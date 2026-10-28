@@ -56,7 +56,7 @@ async function readQr(file: File): Promise<string> {
 export function PjeConnectForm({ targets, hasAccess }: { targets: { key: string; label: string }[]; hasAccess: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(!hasAccess);
-  const [chosen, setChosen] = useState<string[]>(targets[0] ? [targets[0].key] : []);
+  const [chosen, setChosen] = useState<string[]>([]);
   const [document_, setDocument] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
@@ -95,7 +95,7 @@ export function PjeConnectForm({ targets, hasAccess }: { targets: { key: string;
       }}
     >
       <fieldset className="space-y-2">
-        <legend className="text-[13px] font-medium text-fg/85">Onde você atua?</legend>
+        <legend className="text-[13px] font-medium text-fg/85">Em quais tribunais você tem acesso ao PJe?</legend>
         <div className="flex flex-wrap gap-3">
           {targets.map((t) => (
             <label key={t.key} className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm">

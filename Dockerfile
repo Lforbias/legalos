@@ -21,13 +21,13 @@ CMD ["npx", "tsx", "scripts/migrate.ts"]
 #   docker compose --profile robot build robot && docker compose --profile robot up -d robot
 FROM deps AS robot
 WORKDIR /app
-ENV NEXT_TELEMETRY_DISABLED=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+ENV NEXT_TELEMETRY_DISABLED=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright HOME=/tmp
 RUN npx playwright-core install --with-deps chromium && rm -rf /var/lib/apt/lists/*
-COPY . .
+RUN groupadd -r robot && useradd -r -g robot -d /tmp robot && chmod -R a+rX /ms-playwright
+COPY --chown=robot:robot . .
 RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
-RUN groupadd -r robot && useradd -r -g robot -d /app robot && chown -R robot:robot /app && chmod -R a+rX /ms-playwright
 USER robot
-CMD ["npx", "tsx", "scripts/robot-worker.ts"]
+CMD ["node_modules/.bin/tsx", "scripts/robot-worker.ts"]
 
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
