@@ -11,7 +11,7 @@ import { listMonitors } from "@/server/services/djen.service";
 import { listActiveMembers } from "@/server/services/members";
 import { listTeams } from "@/server/services/inbox-flow.service";
 import { UFS } from "@/lib/mni/tribunals";
-import { ConnectionForm, ConnectionList } from "@/modules/mni/mni-ui";
+import { OfficialTargetsForm, ConnectionForm, ConnectionList } from "@/modules/mni/mni-ui";
 import { listTribunals } from "@/lib/mni/tribunals";
 import { listCertificates, vaultAvailable } from "@/server/services/certificate.service";
 import { listConnections } from "@/server/services/mni.service";
@@ -87,6 +87,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           <CardBody className="space-y-4 text-sm">
             <p>Conexões de PJe, eproc, e-SAJ e PROJUDI que disponibilizem MNI 2.2.2. MNI 3.0 e webservices proprietários ainda exigem adaptadores específicos. Lista os avisos pendentes sem abrir o teor (abrir geraria ciência e abriria o prazo) e consulta movimentos de um processo. Ainda não foi validado contra um tribunal real: use primeiro um tribunal que tenha ambiente de homologação e confirme com ele o endereço e a forma de autenticação.</p>
             {!vault ? <Alert tone="warning">Falta a chave do cofre (CERT_ENCRYPTION_KEY): cadastro de conexões fica indisponível.</Alert> : null}
+            {vault ? <OfficialTargetsForm certificates={usableCerts} /> : null}
             <ConnectionList items={conns.map((c) => ({ wsdlUrl: c.wsdlUrl, authProfile: c.authProfile, system: c.system, environment: c.environment, wsdlStatus: c.wsdlStatus, wsdlCheckedAt: c.wsdlCheckedAt?.toISOString() ?? null, wsdlOperations: c.wsdlOperations, id: c.id, label: c.label, jtr: c.jtr, tribunal: names.get(c.jtr) ?? c.jtr, endpointUrl: c.endpointUrl, authMode: c.authMode, certificateLabel: c.certificateLabel, enabled: c.enabled, lastSyncAt: c.lastSyncAt ? c.lastSyncAt.toISOString() : null, lastStatus: c.lastStatus, lastMessage: c.lastMessage, petitionTypes: c.petitionTypes }))} />
             {vault ? <ConnectionForm tribunals={tribunals.map((t) => ({ jtr: t.jtr, label: t.label }))} certificates={usableCerts} /> : null}
           </CardBody>

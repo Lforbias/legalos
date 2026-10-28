@@ -1,5 +1,5 @@
 "use server";
-import { restrictCertificateToConsultation } from "@/server/services/certificate.service";
+import { testCertificateTls, restrictCertificateToConsultation } from "@/server/services/certificate.service";
 
 import { revalidatePath } from "next/cache";
 import { uuidSchema, type ActionState } from "@/lib/validation/common";
@@ -36,4 +36,8 @@ export async function unauthorizeCertificateUserAction(certificateId: string, us
 
 export async function restrictCertificateAction(id: string): Promise<ActionState> {
   return runAction(async () => { const { ctx } = await requireTenant(); await restrictCertificateToConsultation(ctx, parse(uuidSchema, id)); revalidatePath("/certificados"); return undefined; });
+}
+
+export async function testCertificateTlsAction(id: string) {
+  return runAction(async () => { const { ctx } = await requireTenant(); return testCertificateTls(ctx, parse(uuidSchema, id)); });
 }

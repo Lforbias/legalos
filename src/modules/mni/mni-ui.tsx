@@ -1,4 +1,5 @@
 "use client";
+import { OFFICIAL_MNI_TARGETS } from "@/lib/connectors/official-targets";
 
 import { mniEndpointProblem, TRF1_MNI_SOURCE, TRF1_MNI_TARGETS } from "@/lib/connectors/endpoint";
 import { COURT_SYSTEMS } from "@/lib/court-systems";
@@ -11,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
 import { PETITION_TYPE_KEYS, PETITION_TYPE_LABEL } from "@/lib/petitioning/types";
-import { updateConnectionTargetAction, inspectContractAction, consultCaseMniAction, createConnectionAction, deleteConnectionAction, setConnectionEnabledAction, setPetitionTypesAction, syncAvisosAction } from "./actions";
+import { prepareOfficialTargetsAction, updateConnectionTargetAction, inspectContractAction, consultCaseMniAction, createConnectionAction, deleteConnectionAction, setConnectionEnabledAction, setPetitionTypesAction, syncAvisosAction } from "./actions";
 
 export type ConnectionView = { wsdlUrl?: string | null; authProfile?: string; system?: string; environment?: string; wsdlStatus?: string | null; wsdlCheckedAt?: string | null; wsdlOperations?: string[]; id: string; label: string; jtr: string; tribunal: string; endpointUrl: string; authMode: string; certificateLabel: string | null; enabled: boolean; lastSyncAt: string | null; lastStatus: string | null; lastMessage: string | null; petitionTypes: Record<string, string> };
 
@@ -255,4 +256,16 @@ export function MniConsultButton({ caseId, label }: { caseId: string; label: str
 
 export function MniAutosButton({ caseId }: { caseId: string; label: string }) {
   return <AutosQueue caseId={caseId} canWrite />;
+}
+
+export function OfficialTargetsForm({ certificates }: { certificates: { id: string; label: string }[] }) {
+  const router = useRouter(); const [pending, start] = React.useTransition(); const [message, setMessage] = React.useState<string>();
+  return <details className="rounded-xl border border-border p-4"><summary className="cursor-pointer font-medium">Preparar destinos MNI com endereços oficiais</summary><form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); const fd = new FormData(event.currentTarget); setMessage(undefined); start(async () => { const res = await prepareOfficialTargetsAction({ certificateId: String(fd.get("certificateId")), document: String(fd.get("document")), keys: fd.getAll("keys").map(String) }); if (!res.ok) setMessage(res.message ?? "Confira o certificado, CPF e destinos."); else { setMessage(`${res.data?.created ?? 0} conexão(ões) preparada(s); ${res.data?.existing ?? 0} já existente(s). Novas conexões ficaram desligadas, aguardando verificação e autorização.`); router.refresh(); } }); }}>
+    <p className="text-xs text-muted">Catálogo inicial: TRF1, TJBA, TJPE, TRT6 e TRT15, com serviços publicados pelos próprios tribunais. Preparar não autentica: MNI pode exigir convênio, liberação de IP e credenciais específicas. Não abrange todos os tribunais brasileiros.</p>
+    <Field label="Certificado para consultas" htmlFor="official-cert"><Select id="official-cert" name="certificateId" required><option value="">Escolha o certificado</option>{certificates.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}</Select></Field>
+    <Field label="CPF do titular para os destinos selecionados" htmlFor="official-cpf"><Input id="official-cpf" name="document" required inputMode="numeric" maxLength={14} autoComplete="off" /></Field>
+    <fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium">Destinos para preparar</legend>{OFFICIAL_MNI_TARGETS.map(target => <div key={target.key} className="flex items-start gap-2 text-xs"><label className="flex flex-1 gap-2"><input type="checkbox" name="keys" value={target.key} defaultChecked />{target.label}</label><a href={target.source} target="_blank" rel="noreferrer" className="underline">Fonte oficial</a></div>)}</fieldset>
+    <p className="text-xs text-muted">O certificado será limitado a consultas. Cadastros existentes são preservados; novos ficam desligados. Nenhum processo é consultado ou alterado ao preparar.</p>
+    {message ? <p role="status" className="text-sm">{message}</p> : null}<Button type="submit" loading={pending}>Preparar conexões somente consulta</Button>
+  </form></details>;
 }

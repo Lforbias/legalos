@@ -1,7 +1,8 @@
+import { createSecureContext } from "node:tls";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
-import { certKey, openBytes, parsePfx, sealBytes } from "@/lib/security/pfx";
+import { certKey, openBytes, parsePfx, pfxForTls, sealBytes } from "@/lib/security/pfx";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { notify } from "./notification.service";
@@ -142,7 +143,7 @@ export type CertificateMaterial = { pfx: Buffer; passphrase: string; subjectCn: 
  * Permitido ao titular do certificado ou a quem tem `certificates:manage`; recusa revogado/vencido.
  * Nenhuma tela, rota ou API devolve este material.
  */
-const READ_ONLY_PURPOSES = new Set(["mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos"]);
+const READ_ONLY_PURPOSES = new Set(["local:tls-check", "mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos"]);
 async function enforceCertificatePurpose(ctx: TenantContext, certificate: { id: string; consultationOnly: boolean }, purpose: string) {
   if (!certificate.consultationOnly || READ_ONLY_PURPOSES.has(purpose)) return;
   await audit({ action: "certificate.use_blocked", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificate.id, metadata: { purpose, consultationOnly: true }, meta: ctx.meta });
@@ -222,4 +223,12 @@ export async function restrictCertificateToConsultation(ctx: TenantContext, id: 
   const changed = await db.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null }, data: { consultationOnly: true } });
   if (!changed.count) throw new NotFoundError("Certificado não encontrado.");
   await audit({ action: "certificate.restrict_consultation", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: id, meta: ctx.meta });
+}
+
+/** Local crypto validation only: no network, no login, no protocol and no change to the stored certificate. */
+export async function testCertificateTls(ctx: TenantContext, id: string) {
+  const material = await getCertificateMaterial(ctx, id, "local:tls-check");
+  try { createSecureContext({ pfx: pfxForTls(material.pfx, material.passphrase), passphrase: material.passphrase }); }
+  catch { throw new ValidationError("O certificado não pôde ser preparado para TLS. Confira o arquivo e a senha ou refaça a exportação A1."); }
+  return { compatible: true, message: "Certificado preparado para TLS com sucesso. Teste local: não acessou tribunal, não validou credenciais e não alterou processos." };
 }

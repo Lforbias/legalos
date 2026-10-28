@@ -5,7 +5,7 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
-import { RestrictCertificateButton, AuthorizedUsers, RevokeCertificateButton, UploadCertificateForm } from "@/modules/certificates/certificate-ui";
+import { TestCertificateTlsButton, RestrictCertificateButton, AuthorizedUsers, RevokeCertificateButton, UploadCertificateForm } from "@/modules/certificates/certificate-ui";
 import { can } from "@/server/context";
 import { listAuthorizedUsers, listCertificates, runCertificateExpiryCheck, vaultAvailable, type CertStatus } from "@/server/services/certificate.service";
 import { listActiveMembers } from "@/server/services/members";
@@ -65,7 +65,7 @@ export default async function CertificatesPage() {
                     </p>
                     {!c.revokedAt ? <AuthorizedUsers certificateId={c.id} authorized={authorizedById.get(c.id) ?? []} candidates={members.filter((m) => m.id !== c.ownerUserId).map((m) => ({ id: m.id, name: m.name }))} /> : null}
                   </div>
-                  {!c.revokedAt ? <div className="flex flex-wrap gap-2">{!c.consultationOnly ? <RestrictCertificateButton id={c.id} /> : null}<RevokeCertificateButton id={c.id} /></div> : null}
+                  {!c.revokedAt ? <div className="flex flex-wrap gap-2"><TestCertificateTlsButton id={c.id} />{!c.consultationOnly ? <RestrictCertificateButton id={c.id} /> : null}<RevokeCertificateButton id={c.id} /></div> : null}
                 </li>
               ))}
             </ul>

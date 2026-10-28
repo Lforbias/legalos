@@ -19,6 +19,7 @@ import {
   type SyncAvisosResult,
 } from "@/server/services/mni.service";
 import { setPetitionTypes } from "@/server/services/mni-petition.service";
+import { prepareOfficialMniTargets } from "@/server/services/mni-catalog.service";
 import { requireTenant } from "@/server/session";
 
 const connectionSchema = z.object({
@@ -120,4 +121,8 @@ export async function updateConnectionTargetAction(id: string, input: unknown): 
     revalidatePath("/integracoes"); revalidatePath("/certificados");
     return undefined;
   });
+}
+
+export async function prepareOfficialTargetsAction(input: unknown) {
+  return runAction(async () => { const { ctx } = await requireTenant(); const result = await prepareOfficialMniTargets(ctx, input); revalidatePath("/integracoes"); revalidatePath("/certificados"); return result; });
 }

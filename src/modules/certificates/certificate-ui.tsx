@@ -5,7 +5,7 @@ import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
-import { restrictCertificateAction, authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction } from "./actions";
+import { testCertificateTlsAction, restrictCertificateAction, authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction } from "./actions";
 
 export function UploadCertificateForm({ members }: { members: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -120,7 +120,7 @@ export function AuthorizedUsers({ certificateId, authorized, candidates }: { cer
     });
   return (
     <div className="mt-2 space-y-1.5 text-xs">
-      <p className="text-muted">Também podem usar para protocolar: {authorized.length ? "" : "ninguém além do titular."}</p>
+      <p className="text-muted">Também podem usar este certificado: {authorized.length ? "" : "ninguém além do titular."}</p>
       {authorized.length ? (
         <ul className="flex flex-wrap gap-1.5">
           {authorized.map((a) => (
@@ -156,4 +156,9 @@ export function AuthorizedUsers({ certificateId, authorized, candidates }: { cer
 export function RestrictCertificateButton({ id }: { id: string }) {
   const router = useRouter(); const [pending, start] = React.useTransition(); const [error, setError] = React.useState<string>();
   return <div><Button variant="secondary" loading={pending} onClick={() => { setError(undefined); start(async () => { const res = await restrictCertificateAction(id); if (!res.ok) setError(res.message); else router.refresh(); }); }}>Restringir a somente consulta</Button>{error ? <p role="alert" className="text-xs text-danger">{error}</p> : null}</div>;
+}
+
+export function TestCertificateTlsButton({ id }: { id: string }) {
+  const [pending, start] = React.useTransition(); const [result, setResult] = React.useState<{ ok: boolean; text: string }>();
+  return <div><Button variant="secondary" loading={pending} onClick={() => { setResult(undefined); start(async () => { const res = await testCertificateTlsAction(id); setResult({ ok: res.ok, text: res.data?.message ?? res.message ?? "Não foi possível testar o arquivo." }); }); }}>Testar arquivo para conexão</Button>{result ? <p role="status" className={`mt-2 max-w-md text-xs ${result.ok ? "text-muted" : "text-danger"}`}>{result.text}</p> : null}</div>;
 }

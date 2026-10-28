@@ -4,7 +4,7 @@ import { computeCnjCheck } from "@/lib/validation/br-documents";
 import { totpCode, totpStep } from "@/lib/security/totp";
 import { createCaseSchema } from "@/modules/cases/schemas";
 import { createCase } from "@/server/services/case.service";
-import { uploadCertificate, getCertificateMaterial, assertCertificatePurpose, listCertificates } from "@/server/services/certificate.service";
+import { uploadCertificate, getCertificateMaterial, assertCertificatePurpose, listCertificates, testCertificateTls } from "@/server/services/certificate.service";
 import { createConnection, mtlsFor } from "@/server/services/mni.service";
 import { mniAdapter } from "@/server/services/mni-petition.service";
 import { startEnrollment, confirmEnrollment } from "@/server/services/mfa.service";
@@ -33,9 +33,15 @@ describe("certificado novo estritamente informacional", () => {
     expect(await db.petitionFiling.count({ where: { organizationId: a.org.id } })).toBe(0);
   });
   it("permite apenas as quatro finalidades de leitura conhecidas", async () => {
-    for (const purpose of ["mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos"]) {
+    for (const purpose of ["mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos", "local:tls-check"]) {
       expect((await getCertificateMaterial(a.ctx, certificateId, purpose)).passphrase).toBe(pass);
     }
+  });
+  it("testa o certificado para TLS localmente sem alterar o cofre", async () => {
+    const before = await db.certificate.findUniqueOrThrow({ where: { id: certificateId } });
+    expect(await testCertificateTls(a.ctx, certificateId)).toMatchObject({ compatible: true });
+    const after = await db.certificate.findUniqueOrThrow({ where: { id: certificateId } });
+    expect(after.pfxEnc).toBe(before.pfxEnc); expect(after.passEnc).toBe(before.passEnc); expect(after.consultationOnly).toBe(true);
   });
   it("nega protocolo, assinatura, ciência e finalidade desconhecida antes de entregar a chave", async () => {
     const before = await db.certificateUsage.count({ where: { certificateId } });

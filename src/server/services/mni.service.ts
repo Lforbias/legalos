@@ -6,7 +6,7 @@ import { getCourtSystem } from "@/lib/court-systems";
 import { db } from "@/lib/db/client";
 import { dateToYmd } from "@/lib/dates/ymd";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
-import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
+import { certKey, openBytes, sealBytes, pfxForTls } from "@/lib/security/pfx";
 import { isValidCnj, isValidCpf, isValidCnpj, onlyDigits } from "@/lib/validation/br-documents";
 import { isKnownJtr, jtrOfCnj } from "@/lib/mni/tribunals";
 import { systemForJtr } from "./court-system-map.service";
@@ -49,7 +49,7 @@ export async function listConnections(ctx: TenantContext): Promise<ConnectionRow
   return rows.map((r) => ({ wsdlUrl: r.wsdlUrl, authProfile: r.authProfile, system: r.system, environment: r.environment, wsdlStatus: r.wsdlStatus, wsdlCheckedAt: r.wsdlCheckedAt, wsdlOperations: r.wsdlOperations, id: r.id, label: r.label, jtr: r.jtr, endpointUrl: r.endpointUrl, authMode: r.authMode, certificateId: r.certificateId, certificateLabel: r.certificate?.label ?? null, enabled: r.enabled, lastSyncAt: r.lastSyncAt, lastStatus: r.lastStatus, lastMessage: r.lastMessage, petitionTypes: (r.petitionTypes && typeof r.petitionTypes === "object" && !Array.isArray(r.petitionTypes) ? (r.petitionTypes as Record<string, string>) : {}) }));
 }
 
-export type ConnectionInput = { wsdlUrl?: string; authProfile?: string; system?: string; environment?: string; label: string; jtr: string; endpointUrl: string; authMode: AuthMode; certificateId?: string | null; document: string; password?: string };
+export type ConnectionInput = { enabled?: boolean; wsdlUrl?: string; authProfile?: string; system?: string; environment?: string; label: string; jtr: string; endpointUrl: string; authMode: AuthMode; certificateId?: string | null; document: string; password?: string };
 
 export async function createConnection(ctx: TenantContext, input: ConnectionInput) {
   assertCan(ctx, "integrations:manage");
@@ -92,7 +92,7 @@ export async function createConnection(ctx: TenantContext, input: ConnectionInpu
     certificateId = cert.id;
   }
   const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document: doc, password: needsPassword ? input.password : "" }), "utf8"), key);
-  const c = await db.courtConnection.create({ data: { organizationId: ctx.organizationId, wsdlUrl: input.wsdlUrl?.trim() || null, authProfile, system, environment, enabled: system === "pje-mni", label, jtr: input.jtr, endpointUrl: input.endpointUrl.trim(), authMode: input.authMode, certificateId, secretEnc, createdById: ctx.userId }, select: { id: true } });
+  const c = await db.courtConnection.create({ data: { organizationId: ctx.organizationId, wsdlUrl: input.wsdlUrl?.trim() || null, authProfile, system, environment, enabled: input.enabled ?? (system === "pje-mni"), label, jtr: input.jtr, endpointUrl: input.endpointUrl.trim(), authMode: input.authMode, certificateId, secretEnc, createdById: ctx.userId }, select: { id: true } });
   await audit({ action: "mni.connection_create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: c.id, metadata: { jtr: input.jtr, authMode: input.authMode }, meta: ctx.meta });
   return c;
 }
@@ -162,7 +162,7 @@ export async function loadConnection(ctx: TenantContext, id: string, opts: { per
 export async function mtlsFor(ctx: TenantContext, certificateId: string | null, purpose: string, caseId?: string): Promise<Mtls | undefined> {
   if (!certificateId) return undefined;
   const m = await getCertificateMaterial(ctx, certificateId, purpose, caseId ?? null);
-  return { pfx: m.pfx, passphrase: m.passphrase };
+  return { pfx: pfxForTls(m.pfx, m.passphrase), passphrase: m.passphrase };
 }
 
 export async function record(connectionId: string, ok: boolean, message: string) {

@@ -57,5 +57,26 @@ export function parsePfx(buf: Buffer, password: string): PfxInfo {
   };
 }
 
+/** Re-encodes a supported A1 in memory for OpenSSL 3; never overwrites the encrypted original. */
+export function pfxForTls(buf: Buffer, password: string): Buffer {
+  parsePfx(buf, password); // Same key/certificate validation used at upload.
+  try {
+    const p12 = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(forge.util.createBuffer(buf.toString("binary"))), false, password);
+    const certOid = forge.pki.oids.certBag!;
+    const keyOid = forge.pki.oids.keyBag!;
+    const shroudedOid = forge.pki.oids.pkcs8ShroudedKeyBag!;
+    const certs = (p12.getBags({ bagType: certOid })[certOid] ?? []).map(b => b.cert).filter((c): c is forge.pki.Certificate => Boolean(c));
+    const keys = [...(p12.getBags({ bagType: keyOid })[keyOid] ?? []), ...(p12.getBags({ bagType: shroudedOid })[shroudedOid] ?? [])].map(b => b.key).filter((k): k is forge.pki.rsa.PrivateKey => Boolean(k));
+    const key = keys.find(k => certs.some(c => (c.publicKey as forge.pki.rsa.PublicKey).n?.compareTo(k.n) === 0));
+    const leaf = key && certs.find(c => (c.publicKey as forge.pki.rsa.PublicKey).n?.compareTo(key.n) === 0);
+    if (!key || !leaf) throw new Error("Certificado e chave não correspondem.");
+    const chain = [leaf, ...certs.filter(c => c !== leaf)];
+    const normalized = forge.pkcs12.toPkcs12Asn1(key, chain, password, { algorithm: "aes256", count: 10000, saltSize: 16, generateLocalKeyId: true });
+    return Buffer.from(forge.asn1.toDer(normalized).getBytes(), "binary");
+  } catch {
+    throw new ValidationError("Não foi possível preparar o certificado A1 para a conexão TLS. Confira a exportação do arquivo e a senha.");
+  }
+}
+
 export const sealBytes = (data: Buffer, key: Buffer) => encryptSecret(data.toString("base64"), key);
 export const openBytes = (sealed: string, key: Buffer) => Buffer.from(decryptSecret(sealed, key), "base64");

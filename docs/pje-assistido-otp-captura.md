@@ -55,7 +55,7 @@ Empacotamento: `npx tsx scripts/package-pje-extension.ts`. Regerar o ZIP a cada 
 
 ## Certificado somente consulta (28/10/2026)
 
-Todo novo upload define `consultationOnly = true` no servidor, sem opção pública para liberar escrita. O material só pode ser aberto para `mni:wsdl`, `mni:consultarAvisosPendentes`, `mni:consultarProcesso` e `mni:consultarProcesso:autos`. Finalidade desconhecida, assinatura, protocolo e leitura de teor de comunicação que pudesse registrar ciência são recusados antes da decifragem. O adaptador MNI real verifica o mesmo bloqueio em preflight e submit, também cobrindo invocações diretas e execuções agendadas. Administradores não têm exceção.
+Todo novo upload define `consultationOnly = true` no servidor, sem opção pública para liberar escrita. O material só pode ser aberto para o teste criptográfico sem rede `local:tls-check`, `mni:wsdl`, `mni:consultarAvisosPendentes`, `mni:consultarProcesso` e `mni:consultarProcesso:autos`. Finalidade desconhecida, assinatura, protocolo e leitura de teor de comunicação que pudesse registrar ciência são recusados antes da decifragem. O adaptador MNI real verifica o mesmo bloqueio em preflight e submit, também cobrindo invocações diretas e execuções agendadas. Administradores não têm exceção.
 
 Uploads não iniciam requisição ao tribunal nem criam/agendam petições. Consultas/importações podem atualizar a cópia dos dados dentro do LegalOS; não concedem autorização para atos processuais externos.
 
@@ -72,3 +72,13 @@ Páginas de Swagger, HTML, PDF e login SSO não são endpoints SOAP. O cadastro 
 Para TRF1, homologação HML1, 1º grau, o WSDL publicado é `https://pjehml1g.trf1.jus.br/pje/intercomunicacao?wsdl`; o campo de serviço usa a mesma origem/caminho sem `?wsdl`. Os outros destinos disponíveis são retirados da mesma orientação oficial: https://www.trf1.jus.br/trf1/conteudo/NUGTI/MNI_Orienta%C3%A7%C3%B5es.pdf
 
 O documento informa necessidade de autorização da Presidência do TRF1 e liberação de IP público da entidade; certificado pessoal e URL correta não substituem essa autorização. Nenhuma chamada autenticada ao TRF1 foi feita nesta correção e não houve alteração de processo no tribunal. A configuração de produção já cadastrada pelo usuário não foi modificada diretamente nesta sessão: requer salvar o destino pela tela autenticada.
+
+## Diagnóstico confirmado do PFX
+
+As referências `78b8c3d7` e `c32fd62d` foram consultadas pela tela administrativa autenticada e correspondem a `Unsupported PKCS12 PFX data`. Portanto, além do Swagger incorreto na primeira configuração, havia incompatibilidade do pacote PFX com a preparação TLS. O código agora reexporta somente em memória para AES-256, preserva o certificado/identidade/cadeia e não altera o material cifrado guardado. O teste local de Certificados prepara um contexto TLS sem qualquer acesso à rede; compatibilidade do arquivo não comprova autorização MNI.
+
+## Preparação de destinos oficiais
+
+Integrações apresenta 12 candidatos de TRF1 (homologação e produção, 1º/2º grau), TJBA, TJPE, TRT6 e TRT15 (produção, 1º/2º grau). As fontes oficiais estão associadas a cada item em `src/lib/connectors/official-targets.ts`. O catálogo não pretende abranger todo o país nem comprova compatibilidade do contrato, autenticação por certificado ou concessão de acesso.
+
+A ação autenticada exige gestão de integrações, acesso ao certificado, permissão para restringi-lo e 2FA ativo. O CPF é validado e, quando a identificação está no CN do certificado, precisa corresponder ao titular. A ação impõe somente consulta, grava credencial cifrada, preserva conexões existentes e deixa os novos cadastros desligados. Não chama tribunais. Repetir a preparação não duplica endpoints já cadastrados. A consulta/contrato de cada destino deve ser validada separadamente antes de ligar.

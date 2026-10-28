@@ -2,6 +2,8 @@ import { beforeAll, describe, expect, it, vi } from "vitest";
 import { db } from "@/lib/db/client";
 import { ValidationError } from "@/lib/permissions/check";
 import { totpCode, totpStep } from "@/lib/security/totp";
+import { prepareOfficialMniTargets } from "@/server/services/mni-catalog.service";
+import { OFFICIAL_MNI_TARGETS } from "@/lib/connectors/official-targets";
 import { createConnection, updateConnectionTarget, inspectConnectionContract, syncAvisos } from "@/server/services/mni.service";
 import { uploadCertificate, restrictCertificateToConsultation } from "@/server/services/certificate.service";
 import { startEnrollment, confirmEnrollment } from "@/server/services/mfa.service";
@@ -36,6 +38,17 @@ describe("correção de destino do MNI sem enviar credenciais a Swagger", () => 
     expect(await db.courtConnection.findUniqueOrThrow({ where: { id } })).toMatchObject({ endpointUrl: valid, certificateId: certId, enabled: false, wsdlStatus: null, wsdlOperations: [] });
     expect(await db.certificate.findUniqueOrThrow({ where: { id: certId } })).toMatchObject({ consultationOnly: true, pfxEnc: before.pfxEnc, passEnc: before.passEnc });
     expect(await db.case.count({ where: { organizationId: a.org.id } })).toBe(0);
+  });
+  it("prepara o catálogo oficial sem duplicar nem ligar conexões e recusa CPF diferente do certificado", async () => {
+    await expect(prepareOfficialMniTargets(a.ctx, { certificateId: certId, document: "52998224725", keys: ["tjba-1"] })).rejects.toThrow(/não corresponde/);
+    const input = { certificateId: certId, document: "12345678909", keys: OFFICIAL_MNI_TARGETS.map(t => t.key) };
+    const result = await prepareOfficialMniTargets(a.ctx, input);
+    expect(result).toEqual({ created: OFFICIAL_MNI_TARGETS.length - 1, existing: 1 });
+    const rows = await db.courtConnection.findMany({ where: { organizationId: a.org.id } });
+    expect(rows).toHaveLength(OFFICIAL_MNI_TARGETS.length);
+    expect(rows.every(c => !c.enabled)).toBe(true);
+    expect(await prepareOfficialMniTargets(a.ctx, input)).toEqual({ created: 0, existing: OFFICIAL_MNI_TARGETS.length });
+    await expect(prepareOfficialMniTargets(a.ctx, { ...input, keys: ["tribunal-inventado"] })).rejects.toThrow();
   });
   it("também permite impor somente consulta ao certificado anterior sem mudar a conexão", async () => {
     await db.certificate.update({ where: { id: certId }, data: { consultationOnly: false } });
