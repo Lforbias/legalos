@@ -4,7 +4,7 @@ import { db } from "@/lib/db/client";
 import { assertCan, type TenantContext } from "@/server/context";
 import { ConflictError, NotFoundError } from "@/lib/permissions/check";
 import { TASK_STATUSES } from "@/modules/tasks/schemas";
-import { getTask } from "./task.service";
+import { getTask, runTaskCompletionWorkflows } from "./task.service";
 import { recordTaskEvent } from "./task-event";
 import { logCaseEvent } from "./case.service";
 import { audit } from "./audit.service";
@@ -47,4 +47,5 @@ export async function setTaskStage(ctx: TenantContext, taskId: string, stageId: 
     if(stage.status!==t.status&&(stage.status==="DONE"||t.status==="DONE"))await advanceTaskDependencies(tx,ctx,t.id,stage.status==="DONE");
     await audit({ action: "task.stage", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "task", resourceId: taskId, metadata: { stageId, from: t.status, to: stage.status }, meta: ctx.meta }, tx);
   });
+  if (stage.status === "DONE" && t.status !== "DONE") await runTaskCompletionWorkflows(ctx, t);
 }

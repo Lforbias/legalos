@@ -2,14 +2,14 @@ import { matchesConditions, EMPTY_CONDITIONS } from "@/modules/workflows/conditi
 import { bulkUpdateNotices } from "./notice-bulk.service";
 import { normalizeTags } from "./inbox-flow.service";
 import { getNotice } from "./notice.service";
-import { db } from "@/lib/db/client";
+import { db, type Tx } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { addDays, ymdToDate } from "@/lib/dates/ymd";
 import { ruleSchema, type WorkflowTriggerKey } from "@/modules/workflows/schemas";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { logCaseEvent } from "./case.service";
+import { assertCaseVisible, logCaseEvent } from "./case.service";
 import { notify } from "./notification.service";
 
 export type WorkflowSource = {
@@ -34,25 +34,35 @@ export type WorkflowSource = {
 export async function runWorkflows(ctx: TenantContext, trigger: WorkflowTriggerKey, src: WorkflowSource): Promise<number> {
   let created = 0;
   try {
+    if (src.userId !== ctx.userId) throw new ValidationError("Origem da automação inválida.");
+    if (src.caseId) await assertCaseVisible(ctx, src.caseId);
+    if (src.clientId && !await db.client.findFirst({ where: { id: src.clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true } })) throw new NotFoundError("Cliente não encontrado.");
     const rules = await db.workflowRule.findMany({ where: { organizationId: ctx.organizationId, trigger, active: true, deletedAt: null }, orderBy: { createdAt: "asc" }, take: 20 });
     for (const rule of rules) {
       try {
-        const claim = await db.workflowRun.createMany({
-          data: [{ organizationId: ctx.organizationId, ruleId: rule.id, sourceType: src.type, sourceId: src.id, status: "SKIPPED" as const, message: "Em execução" }],
-          skipDuplicates: true,
-        });
-        if (claim.count === 0) continue; // já executada para esta origem
-        const result = await executeRule(ctx, rule, src);
-        await db.workflowRun.updateMany({
-          where: { ruleId: rule.id, sourceType: src.type, sourceId: src.id },
-          data: { status: result.taskId ? "CREATED" : "SKIPPED", taskId: result.taskId, message: result.message },
-        });
-        if (result.taskId) created++;
+        const result = await db.$transaction(async tx => {
+          const claim = await tx.workflowRun.createMany({
+            data: [{ organizationId: ctx.organizationId, ruleId: rule.id, sourceType: src.type, sourceId: src.id, status: "SKIPPED" as const, message: "Em execução" }],
+            skipDuplicates: true,
+          });
+          if (claim.count === 0) {
+            const retry = await tx.workflowRun.updateMany({ where: { organizationId: ctx.organizationId, ruleId: rule.id, sourceType: src.type, sourceId: src.id, status: "FAILED" }, data: { status: "SKIPPED", message: "Em execução" } });
+            if (retry.count === 0) return null;
+          }
+          const result = await executeRule(ctx, rule, src, tx);
+          await tx.workflowRun.updateMany({
+            where: { organizationId: ctx.organizationId, ruleId: rule.id, sourceType: src.type, sourceId: src.id },
+            data: { status: result.taskId ? "CREATED" : "SKIPPED", taskId: result.taskId, message: result.message },
+          });
+          return result;
+        }, { timeout: 15000 });
+        if (result?.taskId) created++;
+        // A falha de notificação nunca transforma uma tarefa já confirmada em execução falha.
+        if (result?.notification) await notify(result.notification).catch(err => logger.error("workflow.notification_failed", { ruleId: rule.id, error: err instanceof Error ? err.message : String(err) }));
       } catch (err) {
         logger.error("workflow.rule_failed", { ruleId: rule.id, error: err instanceof Error ? err.message : String(err) });
-        await db.workflowRun
-          .updateMany({ where: { ruleId: rule.id, sourceType: src.type, sourceId: src.id }, data: { status: "FAILED", message: "Falha ao criar a tarefa." } })
-          .catch(() => undefined);
+        // O rollback remove também a reserva. Uma próxima chamada pode tentar novamente.
+        await db.workflowRun.createMany({ data: [{ organizationId: ctx.organizationId, ruleId: rule.id, sourceType: src.type, sourceId: src.id, status: "FAILED", message: "Falha ao criar a tarefa. Uma nova execução pode tentar novamente." }], skipDuplicates: true }).catch(() => undefined);
       }
     }
   } catch (err) {
@@ -61,62 +71,56 @@ export async function runWorkflows(ctx: TenantContext, trigger: WorkflowTriggerK
   return created;
 }
 
-async function executeRule(ctx: TenantContext, rule: Awaited<ReturnType<typeof db.workflowRule.findMany>>[number], src: WorkflowSource): Promise<{ taskId: string | null; message: string }> {
+async function executeRule(ctx: TenantContext, rule: Awaited<ReturnType<typeof db.workflowRule.findMany>>[number], src: WorkflowSource, tx: Tx): Promise<{ taskId: string | null; message: string; notification?: Parameters<typeof notify>[0] }> {
   const notice = src.noticeId ? await getNotice(ctx, src.noticeId) : null;
-  const caseData = src.caseId ? await db.case.findFirst({ where: { id: src.caseId, organizationId: ctx.organizationId, deletedAt: null }, select: { area: true, court: true } }) : null;
+  const caseData = src.caseId ? await tx.case.findFirst({ where: { id: src.caseId, organizationId: ctx.organizationId, deletedAt: null }, select: { area: true, court: true } }) : null;
   if (!matchesConditions(rule.conditions, { label: src.label, content: notice?.content, court: notice?.court ?? caseData?.court, kind: notice?.kind, source: notice ? notice.externalKey?.startsWith("djen:") ? "DJEN" : notice.externalKey?.startsWith("mni:") ? "MNI" : notice.source : null, tag: notice?.tags, area: caseData?.area })) return { taskId: null, message: "Condições não atendidas." };
   let assigneeId: string | null = null;
   if (rule.assigneeMode === "TRIGGER_USER") assigneeId = src.userId;
   else if (rule.assigneeMode === "FIXED") assigneeId = rule.assigneeId;
   else if (rule.assigneeMode === "CASE_RESPONSIBLE" && src.caseId) {
-    const r = await db.caseMember.findFirst({ where: { organizationId: ctx.organizationId, caseId: src.caseId, role: "RESPONSIBLE" }, select: { userId: true } });
+    const r = await tx.caseMember.findFirst({ where: { organizationId: ctx.organizationId, caseId: src.caseId, role: "RESPONSIBLE" }, select: { userId: true } });
     assigneeId = r?.userId ?? src.userId; // sem responsável: quem executou a ação
   } else assigneeId = src.userId;
 
   if (assigneeId) {
-    const active = await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId: assigneeId, status: "ACTIVE" }, select: { id: true, role: { select: { permissions: true } } } });
-    if (!active) assigneeId = null;
+    const active = await tx.membership.findFirst({ where: { organizationId: ctx.organizationId, userId: assigneeId, status: "ACTIVE", user: { disabledAt: null } }, select: { id: true, role: { select: { permissions: true } } } });
+    if (!active || !active.role.permissions.includes("tasks:read") || (rule.trigger === "DOCUMENT_UPLOADED" && !active.role.permissions.includes("documents:read"))) assigneeId = null;
     else if (src.caseId) {
       // processo sigiloso: o responsável precisa ter acesso, senão a tarefa fica sem responsável
-      const c = await db.case.findFirst({ where: { id: src.caseId, organizationId: ctx.organizationId }, select: { confidential: true, members: { where: { userId: assigneeId }, select: { id: true } } } });
+      const c = await tx.case.findFirst({ where: { id: src.caseId, organizationId: ctx.organizationId }, select: { confidential: true, members: { where: { userId: assigneeId }, select: { id: true } } } });
       if (c?.confidential && c.members.length === 0 && !active.role.permissions.includes("organization:manage")) assigneeId = null;
     }
   }
 
   const title = rule.taskTitle.replaceAll("{{gatilho}}", src.label).slice(0, 200);
   const description = rule.taskDescription ? rule.taskDescription.replaceAll("{{gatilho}}", src.label).slice(0, 4000) : null;
-  const task = await db.$transaction(async (tx) => {
-    // Distribuição passa pelas mesmas verificações de acesso/sigilo e versão usadas na caixa.
-    if (notice && rule.trigger === "NOTICE_RECEIVED") {
-      if (rule.noticeAssigneeId) await bulkUpdateNotices(ctx, { action: "ASSIGN_USER", userId: rule.noticeAssigneeId, selection: [{ id: notice.id, updatedAt: notice.updatedAt.toISOString() }] }, tx);
-      if (rule.noticeTags.length) {
-        const current = await tx.courtNotice.findFirstOrThrow({ where: { id: notice.id, organizationId: ctx.organizationId, deletedAt: null }, select: { updatedAt: true } });
-        await bulkUpdateNotices(ctx, { action: "ADD_TAGS", tags: rule.noticeTags, selection: [{ id: notice.id, updatedAt: current.updatedAt.toISOString() }] }, tx);
-      }
+  // Distribuição passa pelas mesmas verificações de acesso/sigilo e versão usadas na caixa.
+  if (notice && rule.trigger === "NOTICE_RECEIVED") {
+    if (rule.noticeAssigneeId) await bulkUpdateNotices(ctx, { action: "ASSIGN_USER", userId: rule.noticeAssigneeId, selection: [{ id: notice.id, updatedAt: notice.updatedAt.toISOString() }] }, tx);
+    if (rule.noticeTags.length) {
+      const current = await tx.courtNotice.findFirstOrThrow({ where: { id: notice.id, organizationId: ctx.organizationId, deletedAt: null }, select: { updatedAt: true } });
+      await bulkUpdateNotices(ctx, { action: "ADD_TAGS", tags: rule.noticeTags, selection: [{ id: notice.id, updatedAt: current.updatedAt.toISOString() }] }, tx);
     }
-
-    const t = await tx.task.create({
-      data: {
-        organizationId: ctx.organizationId,
-        title,
-        description: [description, `Criada automaticamente pela regra "${rule.name}".`].filter(Boolean).join("\n\n"),
-        priority: rule.priority,
-        dueDate: ymdToDate(addDays(src.baseDate, rule.dueDays)),
-        assigneeId,
-        caseId: src.caseId ?? null,
-        clientId: src.clientId ?? null,
-        createdById: src.userId,
-        sourceNoticeId: src.noticeId ?? null,
-      },
-    });
-    if (t.caseId) await logCaseEvent(tx, ctx, t.caseId, { kind: "TASK_CREATED", title: `Tarefa criada por automação: ${t.title}`, description: `Regra: ${rule.name}` });
-    await audit({ action: "workflow.task_created", organizationId: ctx.organizationId, userId: src.userId, resourceType: "task", resourceId: t.id, metadata: { ruleId: rule.id }, meta: ctx.meta }, tx);
-    return t;
-  });
-  if (assigneeId && assigneeId !== src.userId) {
-    await notify({ organizationId: ctx.organizationId, userId: assigneeId, kind: "task.assigned", title: "Nova tarefa automática", body: task.title, link: `/tarefas/${task.id}`, dedupeKey: `task.assigned:${task.id}` });
   }
-  return { taskId: task.id, message: assigneeId ? "Tarefa criada." : "Tarefa criada sem responsável (acesso ou vínculo indisponível)." };
+
+  const task = await tx.task.create({
+    data: {
+      organizationId: ctx.organizationId,
+      title,
+      description: [description, `Criada automaticamente pela regra "${rule.name}".`].filter(Boolean).join("\n\n"),
+      priority: rule.priority,
+      dueDate: ymdToDate(addDays(src.baseDate, rule.dueDays)),
+      assigneeId,
+      caseId: src.caseId ?? null,
+      clientId: src.clientId ?? null,
+      createdById: src.userId,
+      sourceNoticeId: src.noticeId ?? null,
+    },
+  });
+  if (task.caseId) await logCaseEvent(tx, ctx, task.caseId, { kind: "TASK_CREATED", title: `Tarefa criada por automação: ${task.title}`, description: `Regra: ${rule.name}` });
+  await audit({ action: "workflow.task_created", organizationId: ctx.organizationId, userId: src.userId, resourceType: "task", resourceId: task.id, metadata: { ruleId: rule.id }, meta: ctx.meta }, tx);
+  return { taskId: task.id, message: assigneeId ? "Tarefa criada." : "Tarefa criada sem responsável (acesso ou vínculo indisponível).", notification: assigneeId && assigneeId !== src.userId ? { organizationId: ctx.organizationId, userId: assigneeId, kind: "task.assigned", title: "Nova tarefa automática", body: task.title, link: `/tarefas/${task.id}`, dedupeKey: `task.assigned:${task.id}` } : undefined };
 }
 
 // ---------- gestão das regras ----------

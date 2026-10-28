@@ -1,5 +1,21 @@
 # Status de implementação
 
+## Complemento das três etapas em 2026-10-27
+
+Código aplicado localmente às lacunas de confiabilidade, automações e implantação. Os módulos de intimações, processos, prazos, financeiro, CRM/WhatsApp, GED, RUTE, portal, PWA, BI e importação já existiam; sua existência não comprova homologação em produção.
+
+- **Etapa 1:** backup de servidor com trava contra concorrência, temporários privados, publicação do manifesto após os dois arquivos criptografados e falha explícita em cópia externa. Retenção só depois da cópia bem-sucedida quando configurada. Verificação trava o conjunto, recusa manifesto com caminhos/arquivos inesperados e exige histórico em `_legalos_migrations`.
+- **Etapa 2:** conclusão de tarefa e envio de novo documento disparam regras configuráveis. A conclusão funciona no cadastro, na edição, no seletor de situação e nas etapas do quadro. Reabertura não faz a mesma tarefa disparar a mesma regra outra vez. Novas versões de documento e documentos gerados por modelo não disparam o gatilho de envio. A reserva da regra, seus efeitos e o resultado são gravados na mesma transação. Falha pode ser tentada novamente repetindo o gatilho; não há novo agendador de repetição automática nem fila persistente entre a ação de origem e o gatilho. Notificação acontece após a confirmação da transação.
+- **Etapa 3:** tela Implantação do escritório em Configurações, com conferências por etapa e dados do próprio escritório. Cada consulta exige a permissão do módulo; processos sigilosos respeitam a visibilidade. Configurado, Pendente e Conferir com a equipe são estados de configuração, não certificados de prontidão. Guias de implantação e instalação do PWA na ajuda.
+
+**Aplicação:** gerar o cliente Prisma e aplicar a nova migração `20270101000000_workflow_module_events` no procedimento habitual de implantação antes de disponibilizar os novos gatilhos. Regras novas são criadas pelo escritório em Automações; nenhuma automação foi ativada em dados existentes por esta mudança.
+
+**Validação em 2026-10-27:** 78 testes de integração passaram (7 novos cobrindo gatilhos, concorrência, rollback, repetição e isolamento; 71 de regressão dos módulos envolvidos). O teste de navegador de cadastro, implantação, novos gatilhos e ajuda passou. TypeScript, lint e build aprovados. As migrações foram aplicadas em PostgreSQL 16 isolado. Os scripts de backup foram exercitados com PostgreSQL e OpenSSL reais, adaptando os comandos Docker para a infraestrutura local e simulando o destino remoto: restauração e histórico de migrações conferidos; manifesto com caminho inesperado recusado; nenhuma cópia de arquivo em texto puro; falha de cópia externa retornou erro e preservou backups antigos.
+
+**Ainda a validar:** envio de backups ao destino externo real, navegação com perfis reais e uso em aparelhos físicos. RLS no PostgreSQL, homologação de tribunais/Meta/provedores de IA e contas financeiras externas não foram entregues por este complemento. O isolamento existente continua na aplicação e nas restrições de integridade do banco. A publicação aplica a migração somente após o backup do servidor.
+
+**Limite da suíte geral:** o CI da versão anterior (`d72ccbf`) já falhava em testes de navegador que ainda procuram a saudação antiga “Olá”. Os testes específicos deste complemento passaram; isso não significa que toda a suíte geral de navegador esteja aprovada.
+
 **Fase atual:** 8 em partes — 8a (assistente de IA), 8b (OCR e busca no conteúdo) e 8c (consulta DataJud/CNJ) concluídas em 2026-10-17; Fase 9 concluída: 9a (segurança) ✅, 9b (backups e produção) ✅, 9c (relatórios/BI) ✅ e 9d (planos e limites) ✅. **Próxima tarefa:** campos personalizados e, quando houver conta num provedor, cobrança automática; Google Agenda/Gmail/e-mail seguem como pendência da Fase 8.
 
 ## Concluído e verificado

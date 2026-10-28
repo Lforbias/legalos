@@ -2,19 +2,23 @@ import { z } from "zod";
 import { conditionsSchema } from "./conditions";
 import { TASK_PRIORITIES, TASK_PRIORITY_LABEL } from "@/modules/tasks/schemas";
 
-export const WORKFLOW_TRIGGERS = ["CASE_CREATED", "DEADLINE_VALIDATED", "NOTICE_RECEIVED", "LEAD_WON"] as const;
+export const WORKFLOW_TRIGGERS = ["CASE_CREATED", "DEADLINE_VALIDATED", "NOTICE_RECEIVED", "LEAD_WON", "TASK_COMPLETED", "DOCUMENT_UPLOADED"] as const;
 export type WorkflowTriggerKey = (typeof WORKFLOW_TRIGGERS)[number];
 export const TRIGGER_LABEL: Record<WorkflowTriggerKey, string> = {
   CASE_CREATED: "Quando um processo for cadastrado",
   DEADLINE_VALIDATED: "Quando um prazo for validado",
   NOTICE_RECEIVED: "Quando uma intimação for registrada",
   LEAD_WON: "Quando um lead virar cliente",
+  TASK_COMPLETED: "Quando uma tarefa for concluída",
+  DOCUMENT_UPLOADED: "Quando um documento for enviado",
 };
 export const TRIGGER_HINT: Record<WorkflowTriggerKey, string> = {
   CASE_CREATED: "{{gatilho}} = título do processo; prazo contado a partir da data do cadastro.",
   DEADLINE_VALIDATED: "{{gatilho}} = título do prazo; prazo contado a partir da data fatal do prazo (0 = na própria data).",
   NOTICE_RECEIVED: "{{gatilho}} = título da intimação; prazo contado a partir da data de recebimento.",
   LEAD_WON: "{{gatilho}} = nome do cliente; prazo contado a partir de hoje.",
+  TASK_COMPLETED: "{{gatilho}} = título da tarefa concluída; contado a partir da conclusão. Cada tarefa dispara cada regra uma única vez, mesmo se reaberta.",
+  DOCUMENT_UPLOADED: "{{gatilho}} = nome do documento enviado; contado a partir do envio de um novo documento. Novas versões não disparam a regra.",
 };
 export const WORKFLOW_ASSIGNEES = ["TRIGGER_USER", "CASE_RESPONSIBLE", "FIXED"] as const;
 export const ASSIGNEE_LABEL: Record<(typeof WORKFLOW_ASSIGNEES)[number], string> = {

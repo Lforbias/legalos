@@ -8,6 +8,8 @@ import type { Prisma } from "@prisma/client";
 import { DOCUMENT_CATEGORIES } from "@/modules/documents/schemas";
 import { audit } from "./audit.service";
 import { assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service";
+import { todayYmd } from "@/lib/dates/ymd";
+import { runWorkflows } from "./workflow.service";
 
 export const MAX_DOCUMENT_BYTES = 8 * 1024 * 1024; // abaixo do limite de 10 MB de buffer do proxy do Next
 
@@ -132,7 +134,9 @@ export async function uploadDocument(ctx: TenantContext, owner: Owner, file: { n
   await assertOwnerReadable(ctx, owner);
   const { name, mime } = classifyFile(file.name, file.buffer);
   const { category, description } = cleanMeta(meta);
-  return storeNewDocument(ctx, owner, { name, mime, buffer: file.buffer }, { category, description, source: "UPLOAD", templateId: null });
+  const doc = await storeNewDocument(ctx, owner, { name, mime, buffer: file.buffer }, { category, description, source: "UPLOAD", templateId: null });
+  await runWorkflows(ctx, "DOCUMENT_UPLOADED", { type: "document", id: doc.id, userId: ctx.userId, label: doc.name, baseDate: todayYmd(ctx.timezone), caseId: doc.caseId, clientId: doc.clientId });
+  return doc;
 }
 
 /** Grava arquivo + documento + versão 1 de forma atômica (o arquivo é removido se o banco falhar). */

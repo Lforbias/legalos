@@ -1,3 +1,11 @@
+## Implantação das três etapas (2026-10-27)
+
+- Etapa 1: backup de servidor com trava contra concorrência, arquivos temporários privados e publicação do manifesto somente após o conjunto criptografado. Cópia externa falha com código de erro e preserva a retenção anterior; verificação valida os nomes do manifesto e consulta `_legalos_migrations`.
+- Etapa 2: gatilhos `TASK_COMPLETED` e `DOCUMENT_UPLOADED`; conclusão por formulário, situação ou etapa do quadro. Documento novo enviado dispara tarefa; nova versão não dispara. Cada regra roda uma vez por origem. Reserva, efeitos e resultado da regra são atômicos; execução falha pode ser repetida com o mesmo gatilho. Valida escritório da origem e acesso do responsável.
+- Etapa 3: `/configuracoes/implantacao` calcula pendências reais por módulo, respeita permissões e indica conferências humanas; guias de implantação e instalação no celular.
+- Migração nova: `20270101000000_workflow_module_events`, aplicada e conferida em banco isolado. Produção recebe a migração pelo fluxo de publicação com backup prévio.
+- Validação: 78 testes de integração, 1 teste de navegador da implantação, TypeScript, lint e build aprovados. Backup criptografado restaurado em PostgreSQL local; manifesto inválido rejeitado; cópia externa simulada não recebeu texto puro e sua falha preservou a retenção anterior. Homologação com contas externas e aparelhos físicos continua pendente.
+
 ## Produto — valores dos planos (2026-10-26)
 
 - Preços mensais aprovados: Simples R$ 79, Básico R$ 149, Intermediário R$ 349 e Avançado R$ 599.

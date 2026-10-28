@@ -13,6 +13,7 @@ import { findMentions } from "@/modules/tasks/mentions";
 import { TASK_PRIORITY_LABEL } from "@/modules/tasks/schemas";
 import { assertNoticeUsable } from "./notice-guard";
 import { notify } from "./notification.service";
+import { runWorkflows } from "./workflow.service";
 
 type Status = (typeof import("@/modules/tasks/schemas").TASK_STATUSES)[number];
 
@@ -108,6 +109,7 @@ export async function createTask(ctx: TenantContext, raw: TaskInput, opts: { sou
     await audit({ action: "task.create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "task", resourceId: t.id, meta: ctx.meta }, tx);
     return t;
   });
+  if (created.status === "DONE") await runTaskCompletionWorkflows(ctx, created);
   await notifyAssignment(ctx, created, created.assigneeId);
   return created;
 }
@@ -140,6 +142,7 @@ export async function updateTask(ctx: TenantContext, id: string, raw: TaskInput)
     for (const c of changes) await recordTaskEvent(tx, ctx, id, "update", c);
     await audit({ action: "task.update", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "task", resourceId: id, meta: ctx.meta }, tx);
   });
+  if (data.status === "DONE" && current.status !== "DONE") await runTaskCompletionWorkflows(ctx, { id, ...data });
   if (data.assigneeId !== current.assigneeId) await notifyAssignment(ctx, { id, title: data.title }, data.assigneeId);
 }
 
@@ -161,6 +164,11 @@ export async function changeTaskStatus(ctx: TenantContext, id: string, status: S
       tx,
     );
   });
+  if (status === "DONE" && t.status !== "DONE") await runTaskCompletionWorkflows(ctx, t);
+}
+
+export async function runTaskCompletionWorkflows(ctx: TenantContext, task: { id: string; title: string; caseId: string | null; clientId: string | null }) {
+  return runWorkflows(ctx, "TASK_COMPLETED", { type: "task", id: task.id, userId: ctx.userId, label: task.title, baseDate: todayYmd(ctx.timezone), caseId: task.caseId, clientId: task.clientId });
 }
 
 export async function deleteTask(ctx: TenantContext, id: string) {
