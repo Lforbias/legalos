@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { Alert } from "@/components/ui/alert";
@@ -54,7 +55,7 @@ export default async function CourtCredentialsPage() {
   ]);
   const tz = organization.timezone;
   return (
-    <div className="space-y-4">
+    <div className="space-y-4"><Link href="/integracoes/pje" className="text-sm text-primary-text underline">Autenticador OTP do PJe e processos detectados</Link>
       <Alert tone="info">Cada pessoa guarda o próprio acesso a cada sistema de tribunal. O segredo fica cifrado, nunca volta para a tela e só é usado quando você mesmo consulta ou protocola. Sem credencial pessoal, vale a conexão do escritório.</Alert>
       {!available ? <Alert tone="warning">O cofre ainda não foi habilitado neste sistema (falta CERT_ENCRYPTION_KEY). Nada é guardado sem ele.</Alert> : null}
       {available ? (

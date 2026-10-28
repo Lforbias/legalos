@@ -36,13 +36,13 @@ Notificações e IDs de menção só são gerados para membros ativos com acesso
 
 ## Pendências reais — não implementadas nem homologadas
 
-### OTP / MFA do PJe
+### OTP / MFA do PJe — atualização de 28/10/2026
 
-O LegalOS tem MFA para sua própria conta. Isso não é o OTP do PJe/Jus.br. As credenciais de tribunal atuais guardam identificação, senha e/ou certificado cifrado; não há sessão interativa PDPJ, cadastro de segredo TOTP do tribunal ou desafio OTP integrado.
+O LegalOS tem MFA para sua própria conta, separado do autenticador do tribunal. A nova tela **Integrações → PJe** permite importar a chave TOTP real já cadastrada no PJe/Jus.br, confirmar com um código atual dela, guardá-la cifrada e gerar um código temporário após verificar o 2FA do LegalOS. Perfil suportado: SHA1, seis dígitos e 30 segundos.
 
-A tela de credenciais explicita essa limitação. Não foi adicionado um campo de OTP sem conector que o consuma, nem gerador de códigos que aparente autenticação funcional.
+Isso não abre sessão automaticamente no portal e não envia OTP como senha MNI. O usuário digita o código na página oficial. A integração com desafio interativo do portal continua dependente de contrato e acesso autorizados por tribunal; não foi homologada. A chave do autenticador não pode ser derivada do certificado.
 
-Próxima entrega: validar o mecanismo oficial aceito no tribunal e no serviço utilizado. Se houver desafio interativo suportado: operação pendente de autenticação, coleta temporária do código, expiração, cancelamento e retomada única da operação. O código não deve ir para logs, chat da RUTE ou notificações. Certificado e sessão de homologação são necessários para confirmar o acesso real. Não reutilizar o segredo de MFA do LegalOS como se fosse do tribunal.
+Os detalhes, limites e testes da captura pelo navegador estão em [pje-assistido-otp-captura.md](pje-assistido-otp-captura.md).
 
 Fontes oficiais consultadas em 28/10/2026:
 - https://portal.trf6.jus.br/cnj-implementa-duplo-fator-de-autenticacao-na-plataforma-digital-do-poder-judiciario/
@@ -54,7 +54,7 @@ Essas páginas descrevem MFA no acesso ao portal. Elas não confirmam que um con
 
 Existe adaptador de demonstração, explicitamente sem protocolo real. O adaptador MNI real disponível envia documentos para processo com CNJ já conhecido, mediante conexão, permissões e tipos de documento compatíveis. Não distribui ação inicial e não retorna automaticamente um novo CNJ. `findConnection` em `mni-petition.service.ts` exige CNJ válido.
 
-Os fluxos atuais de consulta/importação e captura de avisos não equivalem a um observador geral de novas distribuições feitas diretamente no PJe. Não existe webhook universal do PJe configurado para isso.
+Os fluxos MNI de consulta/importação e captura de avisos não equivalem a um observador geral de novas distribuições. A nova extensão oferece captura assistida: detecta CNJs nas páginas acessadas, com autorização para cada origem, e os envia à fila pessoal de conferência. Não observa páginas invisíveis nem processos com navegador fechado, e não prova que o número corresponde a uma distribuição recente. Não existe webhook universal do PJe configurado.
 
 Para implementar a descoberta:
 1. Definir fonte autorizada por tribunal: serviço oficial, consulta de distribuições por advogado ou fornecedor que entregue esse evento.

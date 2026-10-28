@@ -1,0 +1,13 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>LegalOS PJe</title><link rel="stylesheet" href="popup.css"></head><body>
+<header><strong>LegalOS · PJe</strong><p>Captura assistida de números CNJ.</p></header>
+<p id="status" role="status"></p>
+<form id="connection"><label for="token">Chave de API do LegalOS (somente acesso PJe)</label><input id="token" type="password" autocomplete="off" required><button>Conectar escritório</button></form>
+<p id="office"></p>
+<label class="toggle"><input id="auto" type="checkbox">Enviar números automaticamente para este escritório</label>
+<p id="current"></p><button id="authorize" type="button">Autorizar tribunal desta aba e detectar</button>
+<p id="pending"></p><button id="sync" type="button">Sincronizar fila agora</button>
+<details><summary>Tribunais autorizados</summary><div id="origins"></div></details>
+<p class="note">Só funciona nas páginas acessadas no navegador. Não envia senhas, OTP, cookies, autos ou textos. Números detectados ainda precisam ser conferidos no LegalOS. A chave fica neste perfil do navegador e a captura atua como a pessoa que a criou.</p>
+<a href="https://www.legalossync.tech/integracoes/pje" target="_blank" rel="noreferrer">Abrir fila e autenticador no LegalOS</a>
+<button id="disconnect" class="quiet" type="button">Desconectar e apagar fila local</button>
+<script type="module" src="popup.mjs"></script></body></html>

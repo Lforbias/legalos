@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "minimum_chrome_version": "120",
+  "name": "LegalOS — PJe assistido",
+  "version": "0.1.0",
+  "description": "Detecta números CNJ nas páginas autorizadas do tribunal e os envia à sua fila de conferência no LegalOS.",
+  "permissions": ["activeTab", "scripting", "storage", "alarms"],
+  "host_permissions": ["https://www.legalossync.tech/*"],
+  "optional_host_permissions": ["https://*.jus.br/*"],
+  "background": { "service_worker": "background.mjs", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "LegalOS PJe" }
+}

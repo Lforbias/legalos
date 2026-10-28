@@ -73,7 +73,7 @@ export function CredentialForm({ systems, tribunals, certificates }: { systems: 
         ) : null}
       </div>
       <p className="text-xs text-muted">{sys.notes}</p>
-      {system === "pje-mni" ? <Alert tone="info">O segundo fator do PJe/Jus.br é separado do 2FA do LegalOS. Esta integração MNI ainda não recebe nem gera o OTP do tribunal e não abre uma sessão no portal PJe. Cadastrar um certificado não confirma acesso ao tribunal.</Alert> : null}
+      {system === "pje-mni" ? <Alert tone="info">O segundo fator do PJe/Jus.br é separado do 2FA do LegalOS. O MNI não recebe automaticamente o OTP e não abre sessão no portal PJe. O autenticador pessoal do tribunal pode ser cadastrado em Integrações → PJe. Cadastrar certificado ou autenticador não confirma acesso ao tribunal.</Alert> : null}
       <Button
         loading={pending}
         onClick={() =>

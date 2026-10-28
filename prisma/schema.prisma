@@ -37,6 +37,8 @@ enum AuditResult {
 }
 
 model User {
+  courtOtpAuthenticators CourtOtpAuthenticator[]
+  pjeDiscoveries PjeDiscovery[]
   id                      String    @id @default(uuid()) @db.Uuid
   email                   String    @unique
   name                    String
@@ -111,6 +113,8 @@ model EmailToken {
 }
 
 model Organization {
+  courtOtpAuthenticators CourtOtpAuthenticator[]
+  pjeDiscoveries PjeDiscovery[]
   id                      String                   @id @default(uuid()) @db.Uuid
   name                    String
   slug                    String                   @unique
@@ -471,6 +475,7 @@ model CaseDepartment {
 }
 
 model Case {
+  pjeDiscoveries PjeDiscovery[]
   id             String     @id @default(uuid()) @db.Uuid
   organizationId String     @map("organization_id") @db.Uuid
   number         String?
@@ -3893,4 +3898,36 @@ model ComSettings {
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   @@map("com_settings")
+}
+
+model CourtOtpAuthenticator {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  label String
+  secretEnc String @map("secret_enc")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(3)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([organizationId, userId])
+  @@map("court_otp_authenticators")
+}
+
+model PjeDiscovery {
+  id String @id @default(uuid()) @db.Uuid
+  organizationId String @map("organization_id") @db.Uuid
+  userId String @map("user_id") @db.Uuid
+  number String
+  sourceOrigin String @map("source_origin")
+  status String @default("PENDING")
+  caseId String? @map("case_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  case Case? @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  @@unique([organizationId, userId, number])
+  @@index([organizationId, userId, status])
+  @@map("pje_discoveries")
 }

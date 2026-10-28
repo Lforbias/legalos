@@ -8,6 +8,7 @@ import { resolveTenantContext } from "./tenant.service";
 
 /** Escopos da API pública. Cada escopo exige, além disso, a permissão equivalente de quem criou a chave. */
 export const API_SCOPES = {
+  "pje:discover": { label: "PJe: registrar números observados para conferência (sem criar processos)", permission: "cases:write" },
   "chat:send": { label: "Chat: enviar mensagem aprovada por pessoa", permission: "whatsapp:write" },
   "cases:read": { label: "Ler processos", permission: "cases:read" },
   "clients:read": { label: "Ler clientes", permission: "clients:read" },
@@ -37,6 +38,26 @@ export type ApiKeyInput = { name: string; scopes: string[]; expiresInDays?: numb
 
 export async function createApiKey(ctx: TenantContext, input: ApiKeyInput) {
   assertCan(ctx, "integrations:manage");
+  return issueApiKey(ctx, input);
+}
+
+/** Personal bridge credentials cannot grant data reads, tool execution or OTP access. */
+export async function createPersonalPjeKey(ctx: TenantContext) {
+  assertCan(ctx, "cases:read"); assertCan(ctx, "cases:write");
+  return issueApiKey(ctx, { name: "PJe pessoal — captura assistida", scopes: ["pje:discover"], expiresInDays: 90 });
+}
+export async function listPersonalPjeKeys(ctx: TenantContext) {
+  assertCan(ctx, "cases:read");
+  return db.apiKey.findMany({ where: { organizationId: ctx.organizationId, createdById: ctx.userId, scopes: { equals: ["pje:discover"] }, revokedAt: null }, select: { id: true, prefix: true, expiresAt: true }, orderBy: { createdAt: "desc" }, take: 20 });
+}
+export async function revokePersonalPjeKey(ctx: TenantContext, id: string) {
+  assertCan(ctx, "cases:read");
+  await requireMfa(ctx.userId);
+  const changed = await db.apiKey.updateMany({ where: { id, organizationId: ctx.organizationId, createdById: ctx.userId, scopes: { equals: ["pje:discover"] }, revokedAt: null }, data: { revokedAt: new Date(), revokedById: ctx.userId } });
+  if (changed.count !== 1) throw new NotFoundError("Conexão pessoal não encontrada.");
+  await audit({ action: "apikey.revoke", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "api_key", resourceId: id, meta: ctx.meta });
+}
+async function issueApiKey(ctx: TenantContext, input: ApiKeyInput) {
   await requireMfa(ctx.userId);
   const name = input.name.trim();
   if (name.length < 3 || name.length > 80) throw new ValidationError("Nome inválido.", { name: ["Informe um nome de 3 a 80 caracteres."] });
