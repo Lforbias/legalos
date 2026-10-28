@@ -5,6 +5,9 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Alert } from "@/components/ui/alert";
 import { buttonVariants } from "@/components/ui/button";
 import { PersonalBridgeKeys, OtpSetup, OtpCode, DiscoveryRow, ManualDiscovery } from "@/modules/pje/pje-ui";
+import { PjeConnectCard, type PortalRowView } from "@/modules/portal-access/portal-ui";
+import { formatDateTime } from "@/lib/dates/format";
+import { listMyPortalAccesses, pjeTargetOptions } from "@/server/services/portal-access.service";
 import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
 import { listPersonalPjeKeys } from "@/server/services/apikey.service";
@@ -12,14 +15,29 @@ import { listCourtOtps } from "@/server/services/court-otp.service";
 import { listPjeDiscoveries } from "@/server/services/pje-discovery.service";
 import { listCaseOptions } from "@/server/services/case.service";
 import { vaultAvailable } from "@/server/services/certificate.service";
-export const metadata = { title: "PJe: autenticador e processos detectados" };
+export const metadata = { title: "Conectar o PJe" };
 export default async function PjePage() {
   const { ctx } = await requireTenant();
   if (!can(ctx, "cases:read")) return <AccessDenied />;
-  const [otps, pending, cases, keys] = await Promise.all([listCourtOtps(ctx), listPjeDiscoveries(ctx), listCaseOptions(ctx), listPersonalPjeKeys(ctx)]);
+  const [otps, pending, cases, keys, accesses] = await Promise.all([listCourtOtps(ctx), listPjeDiscoveries(ctx), listCaseOptions(ctx), listPersonalPjeKeys(ctx), listMyPortalAccesses(ctx)]);
+  const rows: PortalRowView[] = accesses.map((a) => ({
+    id: a.id,
+    targetLabel: a.targetLabel,
+    status: a.status,
+    enabled: a.enabled,
+    statusMessage: a.statusMessage,
+    documentHint: a.documentHint,
+    hasOtp: a.hasOtp,
+    lastLogin: a.lastLoginAt ? formatDateTime(a.lastLoginAt, ctx.timezone) : null,
+    technical: a.lastJob && a.lastJob.status !== "QUEUED" && a.lastJob.status !== "RUNNING" ? JSON.stringify(a.lastJob.summary, null, 2).slice(0, 3000) : null,
+  }));
   return <div className="mx-auto max-w-4xl space-y-5">
     <Link href="/integracoes" className="text-sm text-muted hover:underline">Voltar para integrações</Link>
-    <PageHeader title="PJe conectado ao seu trabalho" description="Autenticador pessoal e captura assistida pelo navegador. Você faz o login no tribunal e confere a qual caso cada número pertence." />
+    <PageHeader title="Conectar o PJe" description="Entre com o seu login do PJe uma única vez. O LegalOS confere o acesso e mostra o resultado aqui." />
+    <PjeConnectCard targets={pjeTargetOptions()} rows={rows} />
+    <details className="rounded-xl border border-border p-4">
+    <summary className="cursor-pointer text-sm font-medium">Opções avançadas: extensão do navegador, autenticador e processos detectados</summary>
+    <div className="mt-4 space-y-5">
     <Alert tone="info">A extensão detecta CNJs nas páginas que você acessa em tribunais autorizados. Não observa o tribunal com o navegador fechado, não protocola e não confirma que um processo acabou de ser distribuído. Integração ainda aguardando validação em um acesso real ao PJe.</Alert>
     <Card><CardHeader title="1. Entrar com o código do seu celular" description="Login assistido no PJe / Jus.br, sem copiar a chave do seu autenticador." /><CardBody className="space-y-3 text-sm">
       <p>Abra o login oficial do tribunal no Chrome ou Edge e conclua a primeira etapa com certificado/PJeOffice ou CPF e senha. Quando o portal pedir o segundo fator, abra a extensão LegalOS PJe e clique em Verificar pedido de OTP nesta aba.</p>
@@ -44,5 +62,7 @@ export default async function PjePage() {
       {can(ctx, "cases:write") ? <><ManualDiscovery />{pending.map(row => <DiscoveryRow key={row.id} row={row} cases={cases} canCreate={can(ctx, "clients:read")} />)}</> : <p className="text-sm text-muted">Seu perfil não permite cadastrar ou vincular processos.</p>}
       {!pending.length ? <p className="text-sm text-muted">Nenhum número aguardando conferência.</p> : null}
     </section>
+    </div>
+    </details>
   </div>;
 }

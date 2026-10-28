@@ -52,7 +52,9 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
     <div className="mx-auto max-w-3xl">
       <PageHeader title="Integrações" description="Conectores reais, sempre desligados até haver credenciais e consentimento do escritório." />
       <div className="space-y-4">
-        <Link href="/integracoes/pje" className="inline-block text-sm text-primary-text underline">PJe: autenticador OTP e processos detectados no navegador</Link>
+        <Card>
+          <CardHeader title="Conectar o PJe" description="O caminho simples: seu login do PJe, uma vez, e o LegalOS entra por você." action={<Link href="/integracoes/pje" className="text-sm font-medium text-primary-text underline">Conectar agora</Link>} />
+        </Card>
         <Link href="/integracoes/diagnostico" className="inline-block text-sm text-primary-text underline">Abrir diagnóstico de WhatsApp, tribunais e migração</Link>
         {sp.google === "ok" ? <Alert tone="success">Google conectado. Falta só ligar o Drive neste escritório.</Alert> : null}
         {sp.google === "erro" ? <Alert tone="error">Não foi possível conectar ao Google{sp.msg ? `: ${sp.msg.slice(0, 160)}` : "."}</Alert> : null}
@@ -82,6 +84,9 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             <MonitorForm ufs={UFS} />
           </CardBody>
         </Card>
+        <details className="rounded-xl border border-border p-4">
+          <summary className="cursor-pointer text-sm font-medium">Avançado: conexão oficial MNI (exige autorização do tribunal e liberação de IP)</summary>
+          <div className="mt-4">
         <Card>
           <CardHeader title="Conexões de tribunais — MNI 2.2.2" action={conns.some((c) => c.enabled) ? <Badge tone="info">Habilitada (acesso não confirmado)</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-4 text-sm">
@@ -92,6 +97,8 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             {vault ? <ConnectionForm tribunals={tribunals.map((t) => ({ jtr: t.jtr, label: t.label }))} certificates={usableCerts} /> : null}
           </CardBody>
         </Card>
+          </div>
+        </details>
         <Alert tone="info">Google Agenda, Gmail e envio de e-mail ficam para uma próxima etapa.</Alert>
         <Card>
           <CardHeader title="API do LegalOS — chaves de acesso" action={apiKeys.some((k) => k.status === "ACTIVE") ? <Badge tone="success">Em uso</Badge> : <Badge tone="warning">Sem chaves</Badge>} />

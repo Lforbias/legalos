@@ -39,6 +39,7 @@ enum AuditResult {
 model User {
   courtOtpAuthenticators CourtOtpAuthenticator[]
   pjeDiscoveries PjeDiscovery[]
+  portalAccesses PortalAccess[]
   id                      String    @id @default(uuid()) @db.Uuid
   email                   String    @unique
   name                    String
@@ -115,6 +116,8 @@ model EmailToken {
 model Organization {
   courtOtpAuthenticators CourtOtpAuthenticator[]
   pjeDiscoveries PjeDiscovery[]
+  portalAccesses PortalAccess[]
+  robotJobs RobotJob[]
   id                      String                   @id @default(uuid()) @db.Uuid
   name                    String
   slug                    String                   @unique
@@ -1547,6 +1550,7 @@ model Certificate {
   connections  CourtConnection[]
   authorized   CertificateAuthorizedUser[]
   credentials  CourtCredential[]
+  portalAccesses PortalAccess[]
 
   @@unique([organizationId, fingerprintSha256])
   @@index([organizationId, revokedAt])
@@ -3931,4 +3935,59 @@ model PjeDiscovery {
   @@unique([organizationId, userId, number])
   @@index([organizationId, userId, status])
   @@map("pje_discoveries")
+}
+
+/// Acesso do usuário a um portal de tribunal (PJe etc.) usado pelo robô: um registro por usuário, sistema e tribunal/grau.
+/// O segredo (senha, chave do 2º fator) fica cifrado em `secretEnc`; nunca volta para tela ou API.
+model PortalAccess {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  system         String    @default("pje")
+  target         String
+  label          String
+  authMethod     String    @map("auth_method")
+  certificateId  String?   @map("certificate_id") @db.Uuid
+  secretEnc      String    @map("secret_enc")
+  enabled        Boolean   @default(true)
+  status         String    @default("PENDING")
+  statusMessage  String?   @map("status_message")
+  statusAt       DateTime? @map("status_at") @db.Timestamptz(3)
+  lastLoginAt    DateTime? @map("last_login_at") @db.Timestamptz(3)
+  lastSyncAt     DateTime? @map("last_sync_at") @db.Timestamptz(3)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  certificate  Certificate? @relation(fields: [certificateId], references: [id], onDelete: SetNull)
+  jobs         RobotJob[]
+
+  @@unique([organizationId, userId, system, target])
+  @@index([organizationId, userId])
+  @@map("portal_accesses")
+}
+
+/// Fila de trabalhos do robô de tribunais (o worker pega com SKIP LOCKED). `summary` guarda só contagens e a "assinatura" da tela
+/// (endereço sem parâmetros, títulos e nomes de campos), nunca conteúdo de processos nem segredos.
+model RobotJob {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  accessId       String    @map("access_id") @db.Uuid
+  kind           String
+  status         String    @default("QUEUED")
+  attempts       Int       @default(0)
+  runAfter       DateTime  @default(now()) @map("run_after") @db.Timestamptz(3)
+  startedAt      DateTime? @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(3)
+  message        String?
+  summary        Json      @default("{}")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  access       PortalAccess @relation(fields: [accessId], references: [id], onDelete: Cascade)
+
+  @@index([status, runAfter])
+  @@index([accessId, createdAt(sort: Desc)])
+  @@map("robot_jobs")
 }

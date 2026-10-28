@@ -43,6 +43,20 @@ services:
     depends_on:
       db: { condition: service_healthy }
 
+  # Robô dos portais (PJe etc.): lê a fila no banco e abre o navegador. Só sobe com --profile robot (o deploy faz isso).
+  robot:
+    image: ${ROBOT_IMAGE:-legalos-robot:local}
+    build: { context: ., target: robot }
+    profiles: ["robot"]
+    restart: unless-stopped
+    env_file: .env.production
+    environment:
+      DATABASE_URL: postgresql://legalos:${POSTGRES_PASSWORD}@db:5432/legalos
+    mem_limit: 1200m
+    shm_size: 256m
+    depends_on:
+      db: { condition: service_healthy }
+
 volumes:
   dbdata:
   storage:

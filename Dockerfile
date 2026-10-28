@@ -17,6 +17,18 @@ RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma gene
 FROM build AS migrate
 CMD ["npx", "tsx", "scripts/migrate.ts"]
 
+# Robô dos portais dos tribunais (worker + Chromium). Imagem separada: o app não carrega navegador.
+#   docker compose --profile robot build robot && docker compose --profile robot up -d robot
+FROM deps AS robot
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1 PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+RUN npx playwright-core install --with-deps chromium && rm -rf /var/lib/apt/lists/*
+COPY . .
+RUN DATABASE_URL="postgresql://build:build@localhost:5432/build" npx prisma generate
+RUN groupadd -r robot && useradd -r -g robot -d /app robot && chown -R robot:robot /app && chmod -R a+rX /ms-playwright
+USER robot
+CMD ["npx", "tsx", "scripts/robot-worker.ts"]
+
 FROM node:22-bookworm-slim AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0 STORAGE_DIR=/data/storage
