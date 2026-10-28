@@ -21,10 +21,16 @@ export default async function PjePage() {
     <Link href="/integracoes" className="text-sm text-muted hover:underline">Voltar para integrações</Link>
     <PageHeader title="PJe conectado ao seu trabalho" description="Autenticador pessoal e captura assistida pelo navegador. Você faz o login no tribunal e confere a qual caso cada número pertence." />
     <Alert tone="info">A extensão detecta CNJs nas páginas que você acessa em tribunais autorizados. Não observa o tribunal com o navegador fechado, não protocola e não confirma que um processo acabou de ser distribuído. Integração ainda aguardando validação em um acesso real ao PJe.</Alert>
-    <Card><CardHeader title="1. Autenticador do PJe / Jus.br" description="Seu acesso pessoal. Nem administradores consultam os seus códigos por esta tela." /><CardBody className="space-y-4">
+    <Card><CardHeader title="1. Entrar com o código do seu celular" description="Login assistido no PJe / Jus.br, sem copiar a chave do seu autenticador." /><CardBody className="space-y-3 text-sm">
+      <p>Abra o login oficial do tribunal no Chrome ou Edge e conclua a primeira etapa com certificado/PJeOffice ou CPF e senha. Quando o portal pedir o segundo fator, abra a extensão LegalOS PJe e clique em Verificar pedido de OTP nesta aba.</p>
+      <p>O assistente pede os seis dígitos do seu celular e os envia uma única vez ao formulário oficial reconhecido. O código não passa pelo servidor LegalOS e não é guardado. Se a aba mudar, o pedido expirar ou o tribunal recusar, confira o login e informe um código novo.</p>
+      <p className="text-xs text-muted">Compatibilidade inicial: formulário OTP do SSO PJe/Jus.br. A extensão não conclui a primeira etapa por você, não solicita ciência nem protocola. Enviar o OTP não comprova login aceito e não autoriza a conexão MNI. A consulta automática de movimentos pelo portal é uma etapa separada.</p>
+      <div className="flex flex-wrap gap-2"><a href="https://pje1g.trf1.jus.br/pje/" target="_blank" rel="noreferrer" className={buttonVariants({ variant: "secondary" })}>Abrir login TRF1 · 1º grau</a><a href="/downloads/legalos-pje.zip" download className={buttonVariants({ variant: "secondary" })}>Baixar extensão com OTP assistido</a></div>
+    </CardBody></Card>
+    <Card><CardHeader title="Opcional: gerar o OTP dentro do LegalOS" description="Use apenas se quiser manter uma cópia cifrada da chave do autenticador. Não é necessário para usar o código do celular." /><CardBody className="space-y-4">
       {vaultAvailable() ? <OtpSetup /> : <Alert tone="warning">Habilite o cofre de certificados para guardar o autenticador cifrado.</Alert>}
       {otps.map(item => <OtpCode key={item.id} id={item.id} label={item.label} />)}
-      <p className="text-xs text-muted">O código é digitado por você na página oficial do tribunal. Ele não é enviado ao MNI e não abre uma sessão automaticamente. O teste de cadastro confirma a chave e o código, não o acesso ao tribunal.</p>
+      <p className="text-xs text-muted">O código é usado no login oficial do tribunal, diretamente ou pelo assistente da extensão. Ele não é enviado ao MNI e não abre uma sessão automaticamente. O teste de cadastro confirma a chave e o código, não o acesso ao tribunal.</p>
     </CardBody></Card>
     <Card><CardHeader title="2. Detectar processos no navegador" /><CardBody className="space-y-3 text-sm">
       <p>Use Chrome ou Edge no computador. Baixe e extraia a extensão, abra chrome://extensions (ou edge://extensions), ative o modo de desenvolvedor e escolha Carregar sem compactação, selecionando a pasta extraída.</p>

@@ -1,13 +1,14 @@
 <!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>LegalOS PJe</title><link rel="stylesheet" href="popup.css"></head><body>
 <header><strong>LegalOS · PJe</strong><p>Captura assistida de números CNJ.</p></header>
 <p id="status" role="status"></p>
+<section aria-label="Segundo fator do PJe"><h2>Entrar com o código do celular</h2><p>Na aba oficial do PJe/Jus.br, conclua a primeira etapa com certificado ou senha. Quando aparecer o pedido de código, clique abaixo.</p><button id="otp-inspect" type="button">Verificar pedido de OTP nesta aba</button><p id="otp-status" role="status"></p><form id="otp-form" hidden><label for="otp-code">Código de 6 dígitos do seu celular</label><input id="otp-code" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="off" required><button type="submit">Enviar código ao login oficial</button></form><p class="note">O código é usado uma vez, apenas no formulário oficial reconhecido. Não vai ao servidor LegalOS, não é salvo e não libera o MNI. O assistente não acessa processos nem abre intimações.</p></section>
 <form id="connection"><label for="token">Chave de API do LegalOS (somente acesso PJe)</label><input id="token" type="password" autocomplete="off" required><button>Conectar escritório</button></form>
 <p id="office"></p>
 <label class="toggle"><input id="auto" type="checkbox">Enviar números automaticamente para este escritório</label>
 <p id="current"></p><button id="authorize" type="button">Autorizar tribunal desta aba e detectar</button>
 <p id="pending"></p><button id="sync" type="button">Sincronizar fila agora</button>
 <details><summary>Tribunais autorizados</summary><div id="origins"></div></details>
-<p class="note">Só funciona nas páginas acessadas no navegador. Não envia senhas, OTP, cookies, autos ou textos. Números detectados ainda precisam ser conferidos no LegalOS. A chave fica neste perfil do navegador e a captura atua como a pessoa que a criou.</p>
+<p class="note">Só funciona nas páginas acessadas no navegador. A captura não envia senhas, OTP, cookies, autos ou textos ao LegalOS. Números detectados ainda precisam ser conferidos no LegalOS. A chave fica neste perfil do navegador e a captura atua como a pessoa que a criou.</p>
 <a href="https://www.legalossync.tech/integracoes/pje" target="_blank" rel="noreferrer">Abrir fila e autenticador no LegalOS</a>
 <button id="disconnect" class="quiet" type="button">Desconectar e apagar fila local</button>
 <script type="module" src="popup.mjs"></script></body></html>

@@ -2,6 +2,16 @@
 
 Implementação inicial em 28/10/2026. Tela: `/integracoes/pje`. O fluxo é **assistido pelo titular**, não uma integração universal ao SSO nem monitoramento de todos os processos do advogado.
 
+## Código já existente no celular — extensão 0.2.0
+
+O popup tem um fluxo separado que dispensa importar o segredo do autenticador e dispensa a chave da API de captura. O usuário conclui a primeira etapa do login na página oficial, abre a extensão, escolhe **Verificar pedido de OTP nesta aba** e informa seis dígitos quando existe um desafio reconhecido.
+
+O código é mantido apenas em memória transitória e colocado no formulário do SSO, nunca em armazenamento da extensão ou em uma API do LegalOS. O envio é limitado ao domínio exato `sso.cloud.pje.jus.br`, realm `pje`, caminho `login-actions/authenticate`, formulário Keycloak OTP reconhecido e botão de login esperado. Exige HTTPS, frame principal e POST para a mesma origem. Um ticket aleatório de até 60 segundos prende a tentativa ao formulário e ao `documentId` da aba; uma tentativa consome o ticket, sem repetição automática. Destinos/botões adulterados e navegação concorrente são recusados. Não existem botões para ciência, protocolo ou assinatura.
+
+Depois do envio, o popup instrui conferir a resposta do tribunal: envio não é sucesso de autenticação. Se o portal recusar, uma inspeção nova reconhece a mensagem de código inválido e solicita um novo código. Outros provedores/domínios/realms e layouts não reconhecidos permanecem manuais. A compatibilidade foi testada com DOM simulado; o fluxo real depende de chegar ao desafio com a conta do titular. **Não foi homologado em login real.**
+
+Este fluxo só autentica o navegador. Não cria um robô de consulta de movimentos/avisos nem converte a sessão em autorização MNI. O certificado guardado no servidor não é automaticamente disponibilizado ao PJeOffice do computador. Não exportar o A1 para o navegador por esse recurso.
+
 ## O que funciona na implementação
 
 - Importação da chave real Base32 ou URI `otpauth://totp` do autenticador cadastrado no tribunal. Aceita explicitamente SHA1, seis dígitos, 30 segundos. Perfis diferentes são recusados.

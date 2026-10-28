@@ -1,7 +1,34 @@
 /* global chrome */
 import { courtOrigin } from "./common.mjs";
+import { pjeOtpStep } from "./otp.mjs";
 const el = id => document.getElementById(id);
 let activeTab;
+let otpChallenge;
+function clearOtp() { otpChallenge = null; el("otp-code").value = ""; el("otp-form").hidden = true; }
+el("otp-inspect").onclick = () => run(async () => {
+  clearOtp();
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "ISOLATED", func: pjeOtpStep });
+  const state = result?.result;
+  el("otp-status").textContent = state?.message || "Não foi possível verificar o desafio desta aba.";
+  if (state?.ok && state.ticket && result.documentId) {
+    otpChallenge = { tabId: tab.id, documentId: result.documentId, ticket: state.ticket, expiresAt: state.expiresAt };
+    el("otp-form").hidden = false; el("otp-code").focus();
+  }
+});
+el("otp-form").onsubmit = event => {
+  event.preventDefault(); const challenge = otpChallenge; const code = el("otp-code").value.trim(); clearOtp();
+  void run(async () => {
+    if (!challenge || Date.now() > challenge.expiresAt) throw new Error("Solicitação expirada. Verifique o login novamente.");
+    if (!/^\d{6}$/.test(code)) throw new Error("Informe exatamente 6 dígitos.");
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab.id !== challenge.tabId) throw new Error("A aba mudou. Nenhum código foi enviado.");
+    const [result] = await chrome.scripting.executeScript({ target: { tabId: challenge.tabId, documentIds: [challenge.documentId] }, world: "ISOLATED", func: pjeOtpStep, args: ["submit", code, challenge.ticket] });
+    el("otp-status").textContent = result?.result?.message || "Confira o resultado diretamente no PJe. Não reenvie o mesmo código.";
+  });
+};
+window.addEventListener("pagehide", clearOtp);
+setInterval(() => { if (otpChallenge && Date.now() > otpChallenge.expiresAt) { clearOtp(); el("otp-status").textContent = "Solicitação expirada. Verifique o login novamente."; } }, 1000);
 async function send(message) { const result = await chrome.runtime.sendMessage(message); if (!result?.ok) throw new Error(result?.message || "Extensão indisponível."); return result; }
 async function refresh() {
   const s = await send({ type: "STATE" });
