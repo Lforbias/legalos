@@ -5,7 +5,7 @@ import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
-import { authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction } from "./actions";
+import { restrictCertificateAction, authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction } from "./actions";
 
 export function UploadCertificateForm({ members }: { members: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -151,4 +151,9 @@ export function AuthorizedUsers({ certificateId, authorized, candidates }: { cer
       {error ? <p className="text-danger">{error}</p> : null}
     </div>
   );
+}
+
+export function RestrictCertificateButton({ id }: { id: string }) {
+  const router = useRouter(); const [pending, start] = React.useTransition(); const [error, setError] = React.useState<string>();
+  return <div><Button variant="secondary" loading={pending} onClick={() => { setError(undefined); start(async () => { const res = await restrictCertificateAction(id); if (!res.ok) setError(res.message); else router.refresh(); }); }}>Restringir a somente consulta</Button>{error ? <p role="alert" className="text-xs text-danger">{error}</p> : null}</div>;
 }

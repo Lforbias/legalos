@@ -83,7 +83,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="Conexões de tribunais — MNI 2.2.2" action={conns.some((c) => c.enabled) ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>} />
+          <CardHeader title="Conexões de tribunais — MNI 2.2.2" action={conns.some((c) => c.enabled) ? <Badge tone="info">Habilitada (acesso não confirmado)</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-4 text-sm">
             <p>Conexões de PJe, eproc, e-SAJ e PROJUDI que disponibilizem MNI 2.2.2. MNI 3.0 e webservices proprietários ainda exigem adaptadores específicos. Lista os avisos pendentes sem abrir o teor (abrir geraria ciência e abriria o prazo) e consulta movimentos de um processo. Ainda não foi validado contra um tribunal real: use primeiro um tribunal que tenha ambiente de homologação e confirme com ele o endereço e a forma de autenticação.</p>
             {!vault ? <Alert tone="warning">Falta a chave do cofre (CERT_ENCRYPTION_KEY): cadastro de conexões fica indisponível.</Alert> : null}

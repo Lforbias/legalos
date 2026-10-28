@@ -1,3 +1,4 @@
+import { mniEndpointProblem } from "@/lib/connectors/endpoint";
 import { tjprDailyPassword } from "@/lib/connectors/auth";
 import { connectionSoapAction, connectionSupports, CONNECTION_ENVIRONMENTS, type MniOperation } from "@/lib/connectors/capabilities";
 import { inspectMniContract } from "@/lib/connectors/contract";
@@ -66,8 +67,12 @@ export async function createConnection(ctx: TenantContext, input: ConnectionInpu
   if (!AUTH_MODES.includes(input.authMode)) throw new ValidationError("Modo de autenticação inválido.");
   try {
     const endpoint = assertEndpointUrl(input.endpointUrl);
+    const problem = mniEndpointProblem(input.endpointUrl);
+    if (problem) throw new MniError(problem);
     if (input.wsdlUrl?.trim()) {
       const contract = assertEndpointUrl(input.wsdlUrl.trim());
+      const problem = mniEndpointProblem(input.wsdlUrl.trim());
+      if (problem) throw new MniError(problem);
       if (endpoint.origin !== contract.origin) throw new MniError("O WSDL deve estar na mesma origem HTTPS do serviço do tribunal.");
     }
   } catch (e) {
@@ -104,6 +109,27 @@ export async function setConnectionEnabled(ctx: TenantContext, id: string, enabl
   await audit({ action: enabled ? "mni.connection_enable" : "mni.connection_disable", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: id, meta: ctx.meta });
 }
 
+/** Retarget without deleting credentials; always reset verification and restrict its certificate. */
+export async function updateConnectionTarget(ctx: TenantContext, id: string, input: { endpointUrl: string; wsdlUrl?: string; environment: string; jtr: string }) {
+  assertCan(ctx, "integrations:manage"); await requireMfa(ctx.userId);
+  if (!isKnownJtr(input.jtr) || !(CONNECTION_ENVIRONMENTS as readonly string[]).includes(input.environment)) throw new ValidationError("Confira o tribunal e o ambiente.");
+  const endpointUrl = input.endpointUrl.trim(); const wsdlUrl = input.wsdlUrl?.trim() || null;
+  try {
+    const endpoint = assertEndpointUrl(endpointUrl);
+    const problem = mniEndpointProblem(endpointUrl) ?? (wsdlUrl ? mniEndpointProblem(wsdlUrl) : null);
+    if (problem) throw new MniError(problem);
+    if (wsdlUrl && assertEndpointUrl(wsdlUrl).origin !== endpoint.origin) throw new MniError("O WSDL deve estar na mesma origem do serviço do tribunal.");
+  } catch (error) { throw new ValidationError((error as Error).message); }
+  await db.$transaction(async tx => {
+    const c = await tx.courtConnection.findFirst({ where: { id, organizationId: ctx.organizationId } });
+    if (!c) throw new NotFoundError("Conexão não encontrada.");
+    if (c.authProfile === "TJPR_SCMPP" && input.jtr !== "8.16") throw new ValidationError("O perfil SCMPP só atende o TJPR. Cadastre uma conexão com o perfil correto para outro tribunal.");
+    await tx.courtConnection.update({ where: { id }, data: { endpointUrl, wsdlUrl, environment: input.environment, jtr: input.jtr, enabled: false, wsdlStatus: null, wsdlCheckedAt: null, wsdlOperations: [], wsdlActions: {}, lastStatus: "PENDING", lastMessage: "Destino alterado. Verifique o contrato e a autorização do tribunal antes de ligar a conexão." } });
+    if (c.certificateId) await tx.certificate.updateMany({ where: { id: c.certificateId, organizationId: ctx.organizationId }, data: { consultationOnly: true } });
+    await audit({ action: "court_connection.target_update", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: id, metadata: { environment: input.environment, jtr: input.jtr, consultationOnly: true }, meta: ctx.meta }, tx);
+  });
+}
+
 /** Remove a conexão e a senha cifrada (irreversível). */
 export async function deleteConnection(ctx: TenantContext, id: string) {
   assertCan(ctx, "integrations:manage");
@@ -120,6 +146,8 @@ export async function deleteConnection(ctx: TenantContext, id: string) {
 export async function loadConnection(ctx: TenantContext, id: string, opts: { personal?: boolean; allowDisabled?: boolean } = {}) {
   const c = await db.courtConnection.findFirst({ where: { id, organizationId: ctx.organizationId } });
   if (!c) throw new NotFoundError("Conexão não encontrada.");
+  const problem = mniEndpointProblem(c.endpointUrl) ?? (c.wsdlUrl ? mniEndpointProblem(c.wsdlUrl) : null);
+  if (problem) throw new ValidationError(problem, { endpointUrl: [problem] });
   if (!c.enabled && !opts.allowDisabled) throw new ConflictError("Esta conexão está desligada.");
   const key = requireKey();
   const secret = JSON.parse(openBytes(c.secretEnc, key).toString("utf8")) as { document: string; password: string };

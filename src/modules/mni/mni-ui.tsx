@@ -1,5 +1,6 @@
 "use client";
 
+import { mniEndpointProblem, TRF1_MNI_SOURCE, TRF1_MNI_TARGETS } from "@/lib/connectors/endpoint";
 import { COURT_SYSTEMS } from "@/lib/court-systems";
 import { connectionSupports, ENVIRONMENT_LABEL } from "@/lib/connectors/capabilities";
 import { useRouter } from "next/navigation";
@@ -10,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
 import { PETITION_TYPE_KEYS, PETITION_TYPE_LABEL } from "@/lib/petitioning/types";
-import { inspectContractAction, consultCaseMniAction, createConnectionAction, deleteConnectionAction, setConnectionEnabledAction, setPetitionTypesAction, syncAvisosAction } from "./actions";
+import { updateConnectionTargetAction, inspectContractAction, consultCaseMniAction, createConnectionAction, deleteConnectionAction, setConnectionEnabledAction, setPetitionTypesAction, syncAvisosAction } from "./actions";
 
 export type ConnectionView = { wsdlUrl?: string | null; authProfile?: string; system?: string; environment?: string; wsdlStatus?: string | null; wsdlCheckedAt?: string | null; wsdlOperations?: string[]; id: string; label: string; jtr: string; tribunal: string; endpointUrl: string; authMode: string; certificateLabel: string | null; enabled: boolean; lastSyncAt: string | null; lastStatus: string | null; lastMessage: string | null; petitionTypes: Record<string, string> };
 
@@ -43,6 +44,21 @@ function PetitionTypesEditor({ id, initial }: { id: string; initial: Record<stri
 
 const MODE_LABEL: Record<string, string> = { PASSWORD: "Senha", CERTIFICATE: "Certificado digital", PASSWORD_AND_CERTIFICATE: "Senha + certificado" };
 
+function ConnectionTargetEditor({ connection }: { connection: ConnectionView }) {
+  const router = useRouter(); const [pending, start] = React.useTransition();
+  const [error, setError] = React.useState<string>();
+  const [target, setTarget] = React.useState({ endpointUrl: connection.endpointUrl, wsdlUrl: connection.wsdlUrl ?? "", environment: connection.environment ?? "UNSPECIFIED" });
+  return <details className="mt-3 rounded-lg border border-border p-3"><summary className="cursor-pointer text-sm font-medium">Corrigir destino sem apagar o certificado</summary>
+    <form className="mt-3 space-y-3" onSubmit={event => { event.preventDefault(); setError(undefined); start(async () => { const res = await updateConnectionTargetAction(connection.id, { ...target, jtr: connection.jtr }); if (!res.ok) setError(res.message); else router.refresh(); }); }}>
+      {connection.jtr === "4.01" ? <><Field label="Endereço publicado pelo TRF1" htmlFor={`preset-${connection.id}`}><Select id={`preset-${connection.id}`} defaultValue="" onChange={event => { const selected = TRF1_MNI_TARGETS.find(t => t.key === event.target.value); if (selected) setTarget({ endpointUrl: selected.endpointUrl, wsdlUrl: `${selected.endpointUrl}?wsdl`, environment: selected.environment }); }}><option value="">Selecionar ambiente e grau</option>{TRF1_MNI_TARGETS.map(t => <option key={t.key} value={t.key}>{t.label}</option>)}</Select></Field><p className="text-xs text-muted">O TRF1 exige autorização institucional e liberação do IP do servidor. Certificado sozinho não libera o MNI. <a href={TRF1_MNI_SOURCE} target="_blank" rel="noreferrer" className="underline">Orientação oficial</a>.</p></> : null}
+      <Field label="Endereço do serviço MNI SOAP" htmlFor={`target-${connection.id}`} hint="Não use Swagger, página de login ou link temporário do SSO."><Input id={`target-${connection.id}`} type="url" value={target.endpointUrl} onChange={event => setTarget({ ...target, endpointUrl: event.target.value })} required /></Field>
+      <Field label="Endereço do WSDL" htmlFor={`wsdl-${connection.id}`}><Input id={`wsdl-${connection.id}`} type="url" value={target.wsdlUrl} onChange={event => setTarget({ ...target, wsdlUrl: event.target.value })} /></Field>
+      <Field label="Ambiente" htmlFor={`env-${connection.id}`}><Select id={`env-${connection.id}`} value={target.environment} onChange={event => setTarget({ ...target, environment: event.target.value })}>{Object.entries(ENVIRONMENT_LABEL).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</Select></Field>
+      <p className="text-xs text-muted">Salvar mantém as credenciais, restringe o certificado desta conexão a consultas e deixa a conexão desligada para nova verificação. Não consulta nem altera processos no tribunal.</p>
+      {error ? <Alert tone="error">{error}</Alert> : null}<Button type="submit" loading={pending}>Salvar destino e limitar a consultas</Button>
+    </form></details>;
+}
+
 export function ConnectionList({ items }: { items: ConnectionView[] }) {
   const router = useRouter();
   const [msg, setMsg] = React.useState<{ tone: "success" | "error" | "info"; text: string } | null>(null);
@@ -63,8 +79,10 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
               </div>
               <div className="break-all text-xs text-muted">{c.endpointUrl}</div>
             </div>
-            {c.enabled ? <Badge tone="success">Ativa</Badge> : <Badge tone="warning">Desligada</Badge>}
+            {c.enabled ? <Badge tone={c.wsdlStatus === "COMPATIBLE" && !mniEndpointProblem(c.endpointUrl) ? "info" : "warning"}>{c.wsdlStatus === "COMPATIBLE" && !mniEndpointProblem(c.endpointUrl) ? "Habilitada (acesso não confirmado)" : "Habilitada · não verificada"}</Badge> : <Badge tone="warning">Desligada</Badge>}
           </div>
+          {mniEndpointProblem(c.endpointUrl) ? <Alert tone="error" className="mt-2">{mniEndpointProblem(c.endpointUrl)}</Alert> : null}
+          <ConnectionTargetEditor connection={c} />
           {c.lastSyncAt ? (
             <p className="mt-2 text-xs text-muted">
               Última sincronização: {new Date(c.lastSyncAt).toLocaleString("pt-BR")} — {c.lastStatus === "OK" ? "ok" : "falhou"}
@@ -82,7 +100,7 @@ export function ConnectionList({ items }: { items: ConnectionView[] }) {
             })}>Verificar contrato WSDL</Button>
             <Button
               variant="secondary"
-              disabled={!c.enabled || !connectionSupports({ system: c.system ?? "pje-mni", wsdlStatus: c.wsdlStatus ?? null, wsdlOperations: c.wsdlOperations ?? [], authProfile: c.authProfile }, "consultarAvisosPendentes")}
+              disabled={!c.enabled || Boolean(mniEndpointProblem(c.endpointUrl)) || !connectionSupports({ system: c.system ?? "pje-mni", wsdlStatus: c.wsdlStatus ?? null, wsdlOperations: c.wsdlOperations ?? [], authProfile: c.authProfile }, "consultarAvisosPendentes")}
               loading={pending}
               onClick={() =>
                 run(async () => {

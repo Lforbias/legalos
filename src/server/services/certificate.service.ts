@@ -215,3 +215,11 @@ export async function runCertificateExpiryCheck(organizationId?: string, now = n
   }
   return created;
 }
+
+/** One-way protection for a certificate uploaded before consultation-only was introduced. */
+export async function restrictCertificateToConsultation(ctx: TenantContext, id: string) {
+  assertCan(ctx, "certificates:manage"); await requireMfa(ctx.userId);
+  const changed = await db.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null }, data: { consultationOnly: true } });
+  if (!changed.count) throw new NotFoundError("Certificado não encontrado.");
+  await audit({ action: "certificate.restrict_consultation", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: id, meta: ctx.meta });
+}

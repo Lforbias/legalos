@@ -62,3 +62,13 @@ Uploads não iniciam requisição ao tribunal nem criam/agendam petições. Cons
 A migração preserva certificados anteriores com `consultationOnly = false` para não mudar silenciosamente configurações já concedidas a outros escritórios. A tela os identifica como certificados anteriores sem a trava. O usuário que ainda não cadastrou certificado receberá o modo de consulta em seu novo cadastro. Não há mudança na autorização de conexões por senha que não utilizem este certificado.
 
 Testes cobrem consultas permitidas, recusa de operações desconhecidas/de escrita, ausência de abertura da chave em recusa e bloqueio do transporte no adaptador real. A consulta em tribunal real ainda precisa de validação com as credenciais do titular.
+
+## Ajuste de conexões antigas e TRF1
+
+Em Integrações, “Corrigir destino sem apagar o certificado” permite ajustar serviço/WSDL/ambiente mantendo credenciais. Salvar desliga a conexão, limpa a verificação anterior e impõe somente consulta ao certificado associado. Certificados cadastrados antes da restrição também podem ser protegidos pela ação “Restringir a somente consulta” em Certificados. Não há ação para liberar escrita.
+
+Páginas de Swagger, HTML, PDF e login SSO não são endpoints SOAP. O cadastro e as operações de conexões antigas rejeitam esses alvos antes de abrir a chave ou executar o transporte. Isso diagnostica o endereço inválido da captura de tela; a mensagem genérica com referência `78b8c3d7` não teve seu registro de produção consultado e pode conter outra falha subjacente.
+
+Para TRF1, homologação HML1, 1º grau, o WSDL publicado é `https://pjehml1g.trf1.jus.br/pje/intercomunicacao?wsdl`; o campo de serviço usa a mesma origem/caminho sem `?wsdl`. Os outros destinos disponíveis são retirados da mesma orientação oficial: https://www.trf1.jus.br/trf1/conteudo/NUGTI/MNI_Orienta%C3%A7%C3%B5es.pdf
+
+O documento informa necessidade de autorização da Presidência do TRF1 e liberação de IP público da entidade; certificado pessoal e URL correta não substituem essa autorização. Nenhuma chamada autenticada ao TRF1 foi feita nesta correção e não houve alteração de processo no tribunal. A configuração de produção já cadastrada pelo usuário não foi modificada diretamente nesta sessão: requer salvar o destino pela tela autenticada.

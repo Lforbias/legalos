@@ -10,6 +10,7 @@ import {
   consultCaseMni,
   importAutosMni,
   createConnection,
+  updateConnectionTarget,
   deleteConnection,
   setConnectionEnabled,
   syncAvisos,
@@ -108,5 +109,15 @@ export async function inspectContractAction(id: string) {
     const result = await inspectConnectionContract(ctx, parse(uuidSchema, id));
     revalidatePath("/integracoes");
     return result;
+  });
+}
+
+export async function updateConnectionTargetAction(id: string, input: unknown): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const v = parse(z.object({ endpointUrl: z.string().trim().min(8).max(2000), wsdlUrl: z.string().trim().max(2000).optional(), environment: z.enum(["HOMOLOGATION", "PRODUCTION", "UNSPECIFIED"]), jtr: z.string().max(10) }), input);
+    await updateConnectionTarget(ctx, parse(uuidSchema, id), v);
+    revalidatePath("/integracoes"); revalidatePath("/certificados");
+    return undefined;
   });
 }
