@@ -1521,6 +1521,7 @@ model MfaChallenge {
 }
 
 model Certificate {
+  consultationOnly Boolean @default(true) @map("consultation_only")
   id                String    @id @default(uuid()) @db.Uuid
   organizationId    String    @map("organization_id") @db.Uuid
   ownerUserId       String    @map("owner_user_id") @db.Uuid

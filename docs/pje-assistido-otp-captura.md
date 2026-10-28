@@ -52,3 +52,13 @@ Empacotamento: `npx tsx scripts/package-pje-extension.ts`. Regerar o ZIP a cada 
 - Serviço MNI e papéis autorizados: https://docs.pje.jus.br/servicos-auxiliares/servico-mni-client/
 - Permissões opcionais Chrome: https://developer.chrome.com/docs/extensions/develop/concepts/declare-permissions
 - Scripts e origens autorizadas Chrome: https://developer.chrome.com/docs/extensions/reference/api/scripting
+
+## Certificado somente consulta (28/10/2026)
+
+Todo novo upload define `consultationOnly = true` no servidor, sem opção pública para liberar escrita. O material só pode ser aberto para `mni:wsdl`, `mni:consultarAvisosPendentes`, `mni:consultarProcesso` e `mni:consultarProcesso:autos`. Finalidade desconhecida, assinatura, protocolo e leitura de teor de comunicação que pudesse registrar ciência são recusados antes da decifragem. O adaptador MNI real verifica o mesmo bloqueio em preflight e submit, também cobrindo invocações diretas e execuções agendadas. Administradores não têm exceção.
+
+Uploads não iniciam requisição ao tribunal nem criam/agendam petições. Consultas/importações podem atualizar a cópia dos dados dentro do LegalOS; não concedem autorização para atos processuais externos.
+
+A migração preserva certificados anteriores com `consultationOnly = false` para não mudar silenciosamente configurações já concedidas a outros escritórios. A tela os identifica como certificados anteriores sem a trava. O usuário que ainda não cadastrou certificado receberá o modo de consulta em seu novo cadastro. Não há mudança na autorização de conexões por senha que não utilizem este certificado.
+
+Testes cobrem consultas permitidas, recusa de operações desconhecidas/de escrita, ausência de abertura da chave em recusa e bloqueio do transporte no adaptador real. A consulta em tribunal real ainda precisa de validação com as credenciais do titular.

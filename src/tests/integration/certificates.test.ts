@@ -76,12 +76,12 @@ describe("cofre de certificados A1 (Etapa 0 do motor de tribunais)", () => {
   it("uso: só o titular ou quem administra; registra uso; revogado/vencido/outro escritório recusam", async () => {
     const pfx = makeTestPfx({ password: PASS, serial: "use001" });
     const c = await uploadCertificate(A.ctx, { file: pfx, password: PASS, label: "Uso", ownerUserId: lawyer.ctx.userId });
-    const m = await getCertificateMaterial(lawyer.ctx, c.id, "consulta de intimações");
+    const m = await getCertificateMaterial(lawyer.ctx, c.id, "mni:consultarAvisosPendentes");
     expect(Buffer.compare(m.pfx, pfx)).toBe(0);
     expect(m.passphrase).toBe(PASS);
     await expect(getCertificateMaterial(other.ctx, c.id, "x")).rejects.toBeInstanceOf(NotFoundError);
     await expect(getCertificateMaterial(B.ctx, c.id, "x")).rejects.toBeInstanceOf(NotFoundError);
-    await getCertificateMaterial(A.ctx, c.id, "protocolo", null);
+    await getCertificateMaterial(A.ctx, c.id, "mni:consultarProcesso", null);
     const usage = await listCertificateUsage(A.ctx, c.id);
     expect(usage).toHaveLength(2);
     expect((await db.certificate.findUniqueOrThrow({ where: { id: c.id } })).lastUsedAt).not.toBeNull();

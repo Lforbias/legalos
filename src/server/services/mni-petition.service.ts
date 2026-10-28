@@ -10,7 +10,7 @@ import { PETITION_TYPE_KEYS, type PetitionTypeKey } from "@/lib/petitioning/type
 import { db } from "@/lib/db/client";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { requireMfa } from "./certificate.service";
+import { assertCertificatePurpose, requireMfa } from "./certificate.service";
 import { connectionForCase, assertConnectionOperation, loadConnection, mtlsFor, record, type SoapPost } from "./mni.service";
 
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
@@ -65,6 +65,8 @@ export const mniAdapter: PetitioningAdapter = {
     const ctx = env.ctx as TenantContext;
     await requireMfa(ctx.userId);
     const conn = await findConnection(ctx, input.caseNumber, env.caseId);
+    const actual = await loadConnection(ctx, conn.id, { personal: true });
+    if (actual.c.certificateId) await assertCertificatePurpose(ctx, actual.c.certificateId, "mni:entregarManifestacaoProcessual");
     const types = asTypes(conn.petitionTypes);
     if (!types.PETICAO) throw new ConflictError(`Configure em Integrações o código de tipo de documento da PETIÇÃO para a conexão "${conn.label}" (o tribunal informa os códigos).`);
     for (const a of input.attachments) {
@@ -80,6 +82,7 @@ export const mniAdapter: PetitioningAdapter = {
     const conn = await findConnection(ctx, input.caseNumber, env.caseId);
     const types = asTypes(conn.petitionTypes) as Record<string, string>;
     const { c, secret } = await loadConnection(ctx, conn.id, { personal: true });
+    if (c.certificateId) await assertCertificatePurpose(ctx, c.certificateId, "mni:entregarManifestacaoProcessual");
     assertConnectionOperation(c, "entregarManifestacaoProcessual");
     const cnj = onlyDigits(input.caseNumber ?? "");
     const docs: MniManifestDoc[] = [

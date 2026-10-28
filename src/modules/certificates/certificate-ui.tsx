@@ -47,8 +47,9 @@ export function UploadCertificateForm({ members }: { members: { id: string; name
 
   return (
     <div className="space-y-3">
+      <Alert tone="info">Novos certificados entram em <strong>somente consulta</strong>. Protocolos, assinaturas e usos fora das consultas permitidas ficam bloqueados no servidor, inclusive em agendamentos. Cadastrar o certificado apenas o guarda no cofre; não envia nada ao tribunal.</Alert>
       {error ? <Alert tone="error">{error}</Alert> : null}
-      {ok ? <Alert tone="success">Certificado guardado com segurança.</Alert> : null}
+      {ok ? <Alert tone="success">Certificado guardado em modo somente consulta.</Alert> : null}
       <Field label="Nome para identificar" htmlFor="cert-label" hint='Ex.: "Dra. Talita — A1 2026"'>
         <Input id="cert-label" value={label} onChange={(e) => setLabel(e.target.value)} />
       </Field>

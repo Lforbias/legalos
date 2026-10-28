@@ -32,7 +32,7 @@ export default async function CertificatesPage() {
   const tz = organization.timezone;
   return (
     <div className="mx-auto max-w-4xl">
-      <PageHeader title="Certificados digitais" description="Cofre de certificados A1 dos advogados, base do futuro motor de intimações e protocolos nos tribunais." />
+      <PageHeader title="Certificados digitais" description="Cofre de certificados A1 dos advogados, novos cadastros protegidos pelo modo somente consulta." />
       <div className="space-y-4">
         <Alert tone="info">O arquivo e a senha ficam cifrados (AES-256-GCM), nunca aparecem na tela nem voltam por nenhuma rota, e cada uso é registrado. Certificados A3 (token/cartão) não funcionam em servidor.</Alert>
         {!available ? <Alert tone="warning">O cofre ainda não foi habilitado neste sistema: falta a chave de cifra (variável CERT_ENCRYPTION_KEY). Nada é guardado sem ela.</Alert> : null}
@@ -54,7 +54,7 @@ export default async function CertificatesPage() {
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0 space-y-0.5">
                     <p className="text-sm font-medium">
-                      {c.label} <Badge tone={STATUS[c.status].tone}>{STATUS[c.status].label}</Badge>
+                      {c.label} <Badge tone={STATUS[c.status].tone}>{STATUS[c.status].label}</Badge> <Badge tone={c.consultationOnly ? "info" : "warning"}>{c.consultationOnly ? "Somente consulta" : "Certificado anterior — sem trava de consulta"}</Badge>
                     </p>
                     <p className="text-xs text-muted">
                       Titular: {c.ownerName} · {c.subjectCn}

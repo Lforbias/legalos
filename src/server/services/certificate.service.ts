@@ -31,7 +31,7 @@ export function certStatus(c: { revokedAt: Date | null; notAfter: Date }, now = 
   return "ACTIVE";
 }
 
-const safeSelect = { id: true, label: true, ownerUserId: true, subjectCn: true, documentHint: true, issuerCn: true, serialNumber: true, notBefore: true, notAfter: true, createdAt: true, revokedAt: true, lastUsedAt: true } satisfies Prisma.CertificateSelect;
+const safeSelect = { consultationOnly: true, id: true, label: true, ownerUserId: true, subjectCn: true, documentHint: true, issuerCn: true, serialNumber: true, notBefore: true, notAfter: true, createdAt: true, revokedAt: true, lastUsedAt: true } satisfies Prisma.CertificateSelect;
 
 export type CertificateRow = Prisma.CertificateGetPayload<{ select: typeof safeSelect }> & { ownerName: string; status: CertStatus };
 
@@ -62,6 +62,7 @@ export async function uploadCertificate(ctx: TenantContext, input: { file: Buffe
     const c = await db.certificate.create({
       data: {
         organizationId: ctx.organizationId,
+        consultationOnly: true,
         ownerUserId: input.ownerUserId,
         label,
         subjectCn: info.subjectCn,
@@ -77,7 +78,7 @@ export async function uploadCertificate(ctx: TenantContext, input: { file: Buffe
       },
       select: { id: true },
     });
-    await audit({ action: "certificate.upload", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: c.id, metadata: { fingerprint: info.fingerprintSha256.slice(0, 16), notAfter: info.notAfter.toISOString(), ownerUserId: input.ownerUserId }, meta: ctx.meta });
+    await audit({ action: "certificate.upload", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: c.id, metadata: { consultationOnly: true, fingerprint: info.fingerprintSha256.slice(0, 16), notAfter: info.notAfter.toISOString(), ownerUserId: input.ownerUserId }, meta: ctx.meta });
     return c;
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") throw new ConflictError("Este certificado já está cadastrado neste escritório.");
@@ -141,6 +142,19 @@ export type CertificateMaterial = { pfx: Buffer; passphrase: string; subjectCn: 
  * Permitido ao titular do certificado ou a quem tem `certificates:manage`; recusa revogado/vencido.
  * Nenhuma tela, rota ou API devolve este material.
  */
+const READ_ONLY_PURPOSES = new Set(["mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos"]);
+async function enforceCertificatePurpose(ctx: TenantContext, certificate: { id: string; consultationOnly: boolean }, purpose: string) {
+  if (!certificate.consultationOnly || READ_ONLY_PURPOSES.has(purpose)) return;
+  await audit({ action: "certificate.use_blocked", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificate.id, metadata: { purpose, consultationOnly: true }, meta: ctx.meta });
+  throw new ConflictError("Este certificado é somente para consulta. Protocolo, assinatura, ciência de intimações e outras operações não autorizadas estão bloqueados.");
+}
+/** Called before reserving/submitting a petition, also when invoking the adapter directly. */
+export async function assertCertificatePurpose(ctx: TenantContext, id: string, purpose: string) {
+  await assertCertificateUsable(ctx, id);
+  const certificate = await db.certificate.findFirstOrThrow({ where: { id, organizationId: ctx.organizationId }, select: { id: true, consultationOnly: true } });
+  await enforceCertificatePurpose(ctx, certificate, purpose.trim().slice(0, 120));
+}
+
 export async function getCertificateMaterial(ctx: TenantContext, id: string, purpose: string, caseId?: string | null): Promise<CertificateMaterial> {
   const key = requireKey();
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId } });
@@ -153,6 +167,7 @@ export async function getCertificateMaterial(ctx: TenantContext, id: string, pur
   if (c.notAfter <= new Date()) throw new ConflictError("Este certificado está vencido.");
   const cleanPurpose = purpose.trim().slice(0, 120);
   if (!cleanPurpose) throw new ValidationError("Informe a finalidade do uso.");
+  await enforceCertificatePurpose(ctx, c, cleanPurpose);
   await db.$transaction([
     db.certificateUsage.create({ data: { organizationId: ctx.organizationId, certificateId: id, userId: ctx.userId, purpose: cleanPurpose, caseId: caseId ?? null } }),
     db.certificate.update({ where: { id }, data: { lastUsedAt: new Date() } }),
