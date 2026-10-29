@@ -203,10 +203,8 @@ function PortalAccessRow({ r }: { r: PortalRowView }) {
 export function PjeConnectCard({ targets, rows }: { targets: { key: string; label: string }[]; rows: PortalRowView[] }) {
   return (
     <Card>
-      <CardHeader title="Conectar o PJe" description="Informe o seu login do PJe uma vez. O LegalOS entra por você, confere o acesso e mostra aqui o resultado." />
+      <CardHeader title="PJe → LegalOS Box" description="Entre com certificado/PJeOffice no tribunal e importe os metadados da lista pela extensão, após conferir a prévia." />
       <CardBody className="space-y-4">
-        <PortalAccessList rows={rows} />
-        <PjeConnectForm targets={targets} hasAccess={rows.length > 0} />
         <div className="rounded-xl border border-dashed border-border p-3 text-sm">
           <p className="font-medium">Certificado digital e captura assistida — TRF3, 1º grau</p>
           <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm">
@@ -219,6 +217,10 @@ export function PjeConnectCard({ targets, rows }: { targets: { key: string; labe
           </ol>
           <p className="mt-3 text-xs text-muted">Importa apenas os metadados visíveis, como referência e data de comunicação. Não importa o teor completo, não registra ciência, não calcula prazo e não lê com o navegador fechado. O certificado do cofre não é transferido para o navegador. Login e captura são etapas separadas. eproc e outros layouts aguardam validação própria.</p>
         </div>
+        <details className="rounded-xl border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium">Teste opcional de login por CPF e senha — não importa expedientes</summary>
+          <div className="mt-4 space-y-4"><PortalAccessList rows={rows} /><PjeConnectForm targets={targets} hasAccess={rows.length > 0} /></div>
+        </details>
       </CardBody>
     </Card>
   );
