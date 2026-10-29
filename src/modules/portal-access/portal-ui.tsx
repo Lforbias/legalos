@@ -208,8 +208,16 @@ export function PjeConnectCard({ targets, rows }: { targets: { key: string; labe
         <PortalAccessList rows={rows} />
         <PjeConnectForm targets={targets} hasAccess={rows.length > 0} />
         <div className="rounded-xl border border-dashed border-border p-3 text-sm">
-          <p className="font-medium">Entrar com certificado digital <Badge tone="warning">em validação</Badge></p>
-          <p className="mt-1 text-xs text-muted">A maioria dos advogados entra no PJe com certificado. Estamos validando essa forma de entrada com um acesso real antes de liberar. Enquanto isso, se o seu login também funciona com CPF e senha, use o formulário acima.</p>
+          <p className="font-medium">Certificado digital e captura assistida — TRF3, 1º grau</p>
+          <ol className="mt-2 list-decimal space-y-2 pl-5 text-sm">
+            <li>Atualize a extensão LegalOS PJe para a versão 0.3.0. <a className="underline" href="/downloads/legalos-pje.zip" download>Baixar extensão</a>.</li>
+            <li><a className="underline" href="https://pje1g.trf3.jus.br/pje/login.seam" target="_blank" rel="noreferrer">Abra o PJe/TRF3</a> no Chrome e entre com seu certificado pelo PJeOffice. Informe o OTP diretamente no tribunal.</li>
+            <li>No painel do representante, expanda o agrupamento e a jurisdição. Clique na Caixa de entrada para exibir as linhas; não abra o teor dos expedientes.</li>
+            <li>Em <a className="underline" href="/integracoes#api">Integrações → API</a>, crie uma chave só com o acesso “Box: importar metadados conferidos da lista PJe/TRF3”. Cole a chave diretamente na seção “PJe → Caixa de entrada do Box” da extensão.</li>
+            <li>Confira o escritório de destino. Clique em “Ler lista visível para conferir”, revise os números e confirme a importação. Abra a Caixa de entrada do LegalOS e pesquise pelo CNJ.</li>
+            <li>Repita nas demais caixas e páginas. Reimportar a mesma observação não cria cópias.</li>
+          </ol>
+          <p className="mt-3 text-xs text-muted">Importa apenas os metadados visíveis, como referência e data de comunicação. Não importa o teor completo, não registra ciência, não calcula prazo e não lê com o navegador fechado. O certificado do cofre não é transferido para o navegador. Login e captura são etapas separadas. eproc e outros layouts aguardam validação própria.</p>
         </div>
       </CardBody>
     </Card>

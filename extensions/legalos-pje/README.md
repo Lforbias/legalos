@@ -1,4 +1,14 @@
-# LegalOS PJe — captura assistida 0.1.0
+# LegalOS PJe — captura assistida 0.3.0
+
+## Novo: importar metadados da lista TRF3/1º grau no Box
+
+O roteiro completo está em `docs/pje-trf3-captura-assistida.md` no projeto. A seção **PJe → Caixa de entrada do Box** usa uma chave separada, escopo `portal:import`, criada em Integrações → API. Não reutiliza nem amplia o escopo da chave antiga de CNJs. Depois do login pessoal com certificado/PJeOffice e OTP, exiba a Caixa de entrada de uma jurisdição, leia a prévia na extensão e confirme o envio para o escritório indicado.
+
+São enviados somente CNJ, referência/tipo e data de comunicação visíveis. Não se envia teor, nomes das partes, credenciais, certificado ou cookies. Não registra ciência e não calcula prazo. A mesma observação é deduplicada no servidor. São capturadas somente as linhas da página visível; outras caixas e páginas exigem uma nova conferência. Layout desconhecido para; outros tribunais e eproc ainda não são suportados por este extrator.
+
+Desconectar importação remove sua chave local. Revogue também a chave em Integrações para encerrar o acesso. A automação de números CNJ abaixo é independente e não importa expedientes.
+
+## Detecção de números CNJ (função anterior)
 
 Instalação no Chrome/Edge: extraia o ZIP, abra chrome://extensions ou edge://extensions, ative o modo de desenvolvedor, clique em Carregar sem compactação e selecione esta pasta.
 

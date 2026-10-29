@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "minimum_chrome_version": "120",
   "name": "LegalOS — PJe assistido",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Auxilia o segundo fator no login oficial PJe/Jus.br e detecta números CNJ nas páginas autorizadas para conferência no LegalOS.",
   "permissions": ["activeTab", "scripting", "storage", "alarms"],
   "host_permissions": ["https://www.legalossync.tech/*"],

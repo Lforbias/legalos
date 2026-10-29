@@ -8,6 +8,7 @@ import { resolveTenantContext } from "./tenant.service";
 
 /** Escopos da API pública. Cada escopo exige, além disso, a permissão equivalente de quem criou a chave. */
 export const API_SCOPES = {
+  "portal:import": { label: "Box: importar metadados conferidos da lista PJe/TRF3 (sem ler dados)", permission: "inbox:write" },
   "pje:discover": { label: "PJe: registrar números observados para conferência (sem criar processos)", permission: "cases:write" },
   "chat:send": { label: "Chat: enviar mensagem aprovada por pessoa", permission: "whatsapp:write" },
   "cases:read": { label: "Ler processos", permission: "cases:read" },

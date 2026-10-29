@@ -43,6 +43,20 @@ async function handle(message, sender) {
     return { ok: true };
   }
   if (!sender.url?.startsWith(chrome.runtime.getURL("")) || sender.tab) throw new Error("Comando permitido somente no painel da extensão.");
+  if (message.type === "NOTICE_CONNECT" || message.type === "NOTICE_IMPORT") {
+    const saved = await chrome.storage.local.get("noticeConfig");
+    const token = message.type === "NOTICE_CONNECT" ? message.token : saved.noticeConfig?.token;
+    if (typeof token !== "string" || !/^lgos_[0-9a-f]{8}_[A-Za-z0-9_-]{43}$/.test(token)) throw new Error("Conecte uma chave com o acesso Box: importar metadados.");
+    const importing = message.type === "NOTICE_IMPORT";
+    if (importing && message.binding !== saved.noticeConfig?.binding) throw new Error("A conexão de importação mudou. Confira a lista novamente.");
+    const response = await fetch(`${API_ORIGIN}/api/v1/portal/notices`, { method: importing ? "POST" : "GET", credentials: "omit", redirect: "error", cache: "no-store", signal: AbortSignal.timeout(30000), headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }, ...(importing ? { body: JSON.stringify(message.batch) } : {}) });
+    if (!response.ok) throw new Error(response.status === 401 || response.status === 403 ? "Chave sem acesso ou expirada. Use o escopo Box: importar metadados; a chave antiga de números CNJ não serve." : "Importação não confirmada. Confira a caixa de entrada e repita a mesma seleção; os registros são deduplicados.");
+    const data = await response.json();
+    if (!importing) await chrome.storage.local.set({ noticeConfig: { token, office: data.organizationName, binding: crypto.randomUUID() } });
+    return { ok: true, ...data };
+  }
+  if (message.type === "NOTICE_STATE") { const { noticeConfig } = await chrome.storage.local.get("noticeConfig"); return { ok: true, office: noticeConfig?.office || null, binding: noticeConfig?.binding || null }; }
+  if (message.type === "NOTICE_DISCONNECT") { await chrome.storage.local.remove("noticeConfig"); return { ok: true }; }
   if (message.type === "STATE") {
     const { config, origins = [], queue = [], lastError = "", lastSync } = await chrome.storage.local.get(["config", "origins", "queue", "lastError", "lastSync"]);
     return { ok: true, connected: Boolean(config?.token), office: config?.office, auto: Boolean(config?.auto), origins, pending: queue.length, lastError, lastSync };

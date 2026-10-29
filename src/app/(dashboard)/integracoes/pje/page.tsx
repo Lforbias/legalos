@@ -33,7 +33,7 @@ export default async function PjePage() {
   }));
   return <div className="mx-auto max-w-4xl space-y-5">
     <Link href="/integracoes" className="text-sm text-muted hover:underline">Voltar para integrações</Link>
-    <PageHeader title="Conectar o PJe" description="Entre com o seu login do PJe uma única vez. O LegalOS confere o acesso e mostra o resultado aqui." />
+    <PageHeader title="Conectar o PJe" description="Certificado/PJeOffice no navegador e captura assistida para o Box. O teste de login por senha é um fluxo separado e não importa expedientes." />
     <PjeConnectCard targets={pjeTargetOptions()} rows={rows} />
     <details className="rounded-xl border border-border p-4">
     <summary className="cursor-pointer text-sm font-medium">Opções avançadas: extensão do navegador, autenticador e processos detectados</summary>
