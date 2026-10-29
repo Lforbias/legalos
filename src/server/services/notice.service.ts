@@ -152,7 +152,8 @@ export async function matchCaseByCnj(ctx: TenantContext, cnj: string | null): Pr
 export type CaptureMeta = {
   originKind: OriginKind;
   sourceSystem: string;
-  officialId: string;
+  /** Null for assisted list observations without a verified official expedition ID. */
+  officialId: string | null;
   courtCode: string | null;
   professionalId?: string | null;
   capturedAt: Date;

@@ -1,0 +1,1 @@
+export function inspectTrf3Notices(): { ok: boolean; message: string; items: { caseNumber: string; reference: string; title: string; communicatedAt: string }[]; sourceOrigin?: string; sourcePath?: string; skipped?: number };

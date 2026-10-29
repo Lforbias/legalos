@@ -68,6 +68,18 @@ describe("PJe assistido: autenticador e extensão", () => {
     failPost = false;
     expect(await send({ type: "SYNC" })).toMatchObject({ ok: true });
     expect(state.queue).toHaveLength(0);
+    // Importing metadata is a separate, explicit permission and never a content-script command.
+    expect(await send({ type: "NOTICE_CONNECT", token: `lgos_12345678_${"A".repeat(43)}` }, page)).toMatchObject({ ok: false });
+    expect(await send({ type: "NOTICE_IMPORT", batch: {} }, page)).toMatchObject({ ok: false });
+    expect(await send({ type: "NOTICE_CONNECT", token: `lgos_12345678_${"A".repeat(43)}` })).toMatchObject({ ok: true });
+    const noticeState = await send({ type: "NOTICE_STATE" }) as { binding: string };
+    expect(noticeState).not.toHaveProperty("token");
+    const countBefore = fetchMock.mock.calls.length;
+    expect(await send({ type: "NOTICE_IMPORT", binding: "old-connection", batch: {} })).toMatchObject({ ok: false });
+    expect(fetchMock.mock.calls).toHaveLength(countBefore);
+    expect(await send({ type: "NOTICE_IMPORT", binding: noticeState.binding, batch: {} })).toMatchObject({ ok: true });
+    await send({ type: "NOTICE_CONNECT", token: `lgos_87654321_${"B".repeat(43)}` });
+    expect(await send({ type: "NOTICE_IMPORT", binding: noticeState.binding, batch: {} })).toMatchObject({ ok: false });
     expect(JSON.parse(postBodies[0]!)).toEqual({ sourceOrigin: "https://pje.tjba.jus.br", numbers: [cnj] });
     await send({ type: "CAPTURE", numbers: [cnj] }, page);
     await send({ type: "AUTO", enabled: true });

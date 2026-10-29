@@ -1,9 +1,39 @@
 /* global chrome */
 import { courtOrigin } from "./common.mjs";
 import { pjeOtpStep } from "./otp.mjs";
+import { inspectTrf3Notices } from "./notices.mjs";
 const el = id => document.getElementById(id);
 let activeTab;
 let otpChallenge;
+let noticePreview;
+function clearNotices() { noticePreview = null; el("notice-preview").replaceChildren(); el("notice-import").hidden = true; }
+async function noticeState() { const state = await send({ type: "NOTICE_STATE" }); el("notice-office").textContent = state.office ? `Importar para: ${state.office}` : "Importação desconectada."; }
+el("notice-connection").onsubmit = event => { event.preventDefault(); const token = el("notice-token").value.trim(); el("notice-token").value = ""; clearNotices(); void run(async () => { await send({ type: "NOTICE_CONNECT", token }); await noticeState(); }); };
+el("notice-inspect").onclick = () => run(async () => {
+  clearNotices();
+  const state = await send({ type: "NOTICE_STATE" });
+  if (!state.office) throw new Error("Conecte primeiro a importação para conferir o escritório de destino.");
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const [result] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, world: "ISOLATED", func: inspectTrf3Notices });
+  const found = result?.result; el("notice-status").textContent = found?.message || "Não foi possível ler a lista.";
+  if (!found?.ok) return;
+  noticePreview = { batch: { sourceOrigin: found.sourceOrigin, sourcePath: found.sourcePath, items: found.items, confirmed: true }, tabId: tab.id, documentId: result.documentId, office: state.office, binding: state.binding, expires: Date.now() + 120000 };
+  for (const item of found.items) { const li = document.createElement("li"); li.textContent = `${item.caseNumber} · ${item.title} (${item.reference}) · ${item.communicatedAt}`; el("notice-preview").append(li); }
+  el("notice-import").hidden = false;
+});
+el("notice-import").onclick = () => run(async () => {
+  const preview = noticePreview; clearNotices();
+  if (!preview || Date.now() > preview.expires) throw new Error("Conferência expirada. Leia novamente a lista.");
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const state = await send({ type: "NOTICE_STATE" });
+  if (tab.id !== preview.tabId || state.binding !== preview.binding) throw new Error("A aba ou a conexão mudou. Confira novamente.");
+  const [current] = await chrome.scripting.executeScript({ target: { tabId: tab.id, documentIds: [preview.documentId] }, world: "ISOLATED", func: inspectTrf3Notices });
+  if (!current?.result?.ok || JSON.stringify(current.result.items) !== JSON.stringify(preview.batch.items)) throw new Error("A lista mudou. Confira novamente antes de importar.");
+  const result = await send({ type: "NOTICE_IMPORT", binding: preview.binding, batch: preview.batch });
+  el("notice-status").textContent = `${result.created} novo(s), ${result.known} já conhecido(s). Abra a Caixa de entrada do LegalOS para conferir.`;
+});
+el("notice-disconnect").onclick = () => run(async () => { clearNotices(); await send({ type: "NOTICE_DISCONNECT" }); await noticeState(); });
+void noticeState().catch(() => {});
 function clearOtp() { otpChallenge = null; el("otp-code").value = ""; el("otp-form").hidden = true; }
 el("otp-inspect").onclick = () => run(async () => {
   clearOtp();
