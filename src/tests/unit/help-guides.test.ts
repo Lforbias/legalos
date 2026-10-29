@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { HELP_GUIDES } from "@/modules/help/guides";
-import { NAV_ITEMS } from "@/config/navigation";
+import { NAV_ITEMS, navItemInBoxVersion } from "@/config/navigation";
 import { SETTINGS_ITEMS } from "@/config/settings";
 
 describe("Cobertura da central de ajuda", () => {
@@ -17,6 +17,6 @@ describe("Cobertura da central de ajuda", () => {
       expect(groups.some(group => fs.existsSync(path.join(process.cwd(), "src/app", group, pathname, "page.tsx"))), link.href).toBe(true);
     }
     for (const setting of SETTINGS_ITEMS) expect(shortcuts.some(l => l.href === setting.href), setting.label).toBe(true);
-    for (const item of NAV_ITEMS.filter(n => !["help", "prototypes", "portal"].includes(n.key))) expect(shortcuts.some(l => l.key === item.key), item.label).toBe(true);
+    for (const item of NAV_ITEMS.filter(n => navItemInBoxVersion(n, false) && !["help", "prototypes", "portal"].includes(n.key))) expect(shortcuts.some(l => l.key === item.key), item.label).toBe(true);
   });
 });

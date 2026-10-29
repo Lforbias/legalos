@@ -35,7 +35,7 @@ export default function DesktopProduct() {
       <div className="mx-auto max-w-7xl px-4 py-24">
         <SectionTitle eyebrow="Dentro da pasta" title="Vários processos. Uma visão do cliente." />
         <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">{AREAS.map(([title, text]) => <article key={title}><h2 className="font-medium">{title}</h2><p className="mt-3 text-sm leading-relaxed text-muted">{text}</p></article>)}</div>
-        <p className="mt-12 max-w-3xl text-sm leading-relaxed text-muted">O Desktop consulta os registros existentes de Func, Box e Chat. Cada seção respeita as permissões, o sigilo dos processos e os vínculos cadastrados. A atividade recente é uma seleção dos registros disponíveis; não substitui a auditoria completa.</p>
+        <p className="mt-12 max-w-3xl text-sm leading-relaxed text-muted">O Desktop consulta os registros existentes de Func e Chat. Cada seção respeita as permissões, o sigilo dos processos e os vínculos cadastrados. A atividade recente é uma seleção dos registros disponíveis; não substitui a auditoria completa.</p>
       </div>
     </section>
     <section className="mx-auto max-w-4xl px-4 py-24 text-center">

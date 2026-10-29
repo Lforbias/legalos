@@ -1,5 +1,6 @@
 import type { PermissionKey } from "@/lib/permissions/catalog";
 import { ForbiddenError } from "@/lib/permissions/check";
+import { BOX_AVAILABLE, isBoxPermission } from "@/lib/box-retirement";
 
 /**
  * Contexto de tenant. É construído SEMPRE no servidor, a partir da sessão (cookie httpOnly) e da
@@ -26,6 +27,7 @@ export type TenantContext = {
 };
 
 export function can(ctx: TenantContext, permission: PermissionKey): boolean {
+  if (!BOX_AVAILABLE && isBoxPermission(permission)) return false;
   return ctx.permissions.has(permission);
 }
 

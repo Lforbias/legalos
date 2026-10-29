@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError } from "@/lib/permissions/check";
@@ -14,6 +15,7 @@ const own = (ctx: TenantContext) => ({ organizationId: ctx.organizationId, userI
 
 /** Browser observations are untrusted candidates, never proof of distribution or authority to link. */
 export async function receivePjeDiscoveries(ctx: TenantContext, raw: unknown) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:write");
   const input = discoveryBatchSchema.parse(raw);
   const numbers = [...new Set(input.numbers.map(formatCnj))];
@@ -32,10 +34,12 @@ export async function receivePjeDiscoveries(ctx: TenantContext, raw: unknown) {
   return { received: numbers.length };
 }
 export async function listPjeDiscoveries(ctx: TenantContext) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   return db.pjeDiscovery.findMany({ where: { ...own(ctx), status: "PENDING" }, orderBy: { createdAt: "desc" }, take: 100, select: { id: true, number: true, sourceOrigin: true, createdAt: true } });
 }
 export async function ignorePjeDiscovery(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:write");
   const row = await db.pjeDiscovery.findFirst({ where: { id, ...own(ctx) }, select: { number: true } });
   if (!row) throw new NotFoundError("Registro não encontrado.");
@@ -48,6 +52,7 @@ export async function ignorePjeDiscovery(ctx: TenantContext, id: string) {
 }
 export const linkDiscoverySchema = z.object({ id: z.uuid(), caseId: z.union([z.uuid(), z.literal("")]).optional(), clientId: z.union([z.uuid(), z.literal("")]).optional(), title: z.string().trim().max(200).optional(), area: z.string().trim().max(60).optional() });
 export async function linkPjeDiscovery(ctx: TenantContext, raw: unknown) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:write"); assertCan(ctx, "cases:read");
   const input = linkDiscoverySchema.parse(raw);
   const initial = await db.pjeDiscovery.findFirst({ where: { id: input.id, ...own(ctx) } });

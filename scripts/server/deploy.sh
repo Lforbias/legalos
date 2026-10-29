@@ -109,12 +109,9 @@ STAGE="subir o app"
 compose up -d $BUILD_FLAG app || rollback
 STAGE="esperar /api/ready (90 s)"; wait_ready || rollback
 
-# robô dos portais (Chromium): constrói neste servidor e sobe ao lado do app. Se falhar, o app segue no ar (nunca causa volta de versão).
-# Para não usar o robô neste servidor: ROBOT_ENABLED=0 no .env.production.
-if [ "$(env_get ROBOT_ENABLED)" != "0" ]; then
-  log "robô dos portais: construindo e subindo"
-  ( compose --profile robot build robot && compose --profile robot up -d robot ) || log "AVISO: o robô dos portais não subiu (o app segue no ar). Veja: docker compose --profile robot logs robot"
-fi
+# Box retirado: não construir nem iniciar o robô antigo; parar instâncias existentes.
+log "Box retirado: parando o robô dos portais"
+compose --profile robot stop robot || log "AVISO: confira manualmente se o robô dos portais parou"
 
 if [ "$FAST" = 1 ]; then printf 'APP_IMAGE=%s MIGRATE_IMAGE=%s\n' "$APP_IMAGE" "$MIGRATE_IMAGE" > "$APP_DIR/.deployed-image"; fi
 echo "$SHA" > "$APP_DIR/.deployed-sha"

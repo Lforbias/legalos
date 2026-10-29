@@ -8,10 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
 import { createApiKeyAction, revokeApiKeyAction } from "./actions";
 
-export type ApiKeyView = { id: string; name: string; prefix: string; scopes: string[]; status: "ACTIVE" | "EXPIRED" | "REVOKED"; expiresAt: string | null; lastUsedAt: string | null; createdAt: string };
+export type ApiKeyView = { id: string; name: string; prefix: string; scopes: string[]; status: "ACTIVE" | "EXPIRED" | "REVOKED" | "SUSPENDED"; expiresAt: string | null; lastUsedAt: string | null; createdAt: string };
 export type ScopeOption = { key: string; label: string; allowed: boolean };
 
-const STATUS = { ACTIVE: ["success", "Ativa"], EXPIRED: ["warning", "Expirada"], REVOKED: ["warning", "Revogada"] } as const;
+const STATUS = { ACTIVE: ["success", "Ativa"], EXPIRED: ["warning", "Expirada"], REVOKED: ["warning", "Revogada"], SUSPENDED: ["warning", "Sem acessos disponíveis"] } as const;
 
 export function ApiKeyList({ items, scopeLabels }: { items: ApiKeyView[]; scopeLabels: Record<string, string> }) {
   const router = useRouter();

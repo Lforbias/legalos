@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { connectionSupports } from "@/lib/connectors/capabilities";
 import { db } from "@/lib/db/client";
 import { readinessOf, type Capability } from "@/lib/connectors/registry";
@@ -12,6 +13,7 @@ import { audit } from "./audit.service";
  * e o comportamento anterior (conexão PJe/MNI cadastrada) continua valendo.
  */
 export async function listSystemMap(ctx: TenantContext) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const [maps, conns] = await Promise.all([
     db.courtSystemMap.findMany({ where: { organizationId: ctx.organizationId } }),
@@ -26,6 +28,7 @@ export async function listSystemMap(ctx: TenantContext) {
 }
 
 export async function setCourtSystem(ctx: TenantContext, jtr: string, system: string | null) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   if (!isKnownJtr(jtr)) throw new ValidationError("Tribunal inválido.", { jtr: ["Selecione um tribunal da lista."] });
   if (system === null || system === "") {
@@ -39,11 +42,13 @@ export async function setCourtSystem(ctx: TenantContext, jtr: string, system: st
 
 /** Sistema mapeado para o tribunal (ou null se não definido). */
 export async function systemForJtr(organizationId: string, jtr: string): Promise<string | null> {
+  assertBoxAvailable();
   return (await db.courtSystemMap.findUnique({ where: { organizationId_jtr: { organizationId, jtr } }, select: { system: true } }))?.system ?? null;
 }
 
 /** Recusa honestamente a ação quando o tribunal está mapeado para um sistema sem conector (ou sem a capacidade pedida). Sem mapa: não bloqueia. */
 export async function assertConnectorFor(organizationId: string, jtr: string | null, capability: Capability): Promise<void> {
+  assertBoxAvailable();
   if (!jtr) return;
   const system = await systemForJtr(organizationId, jtr);
   if (!system) return;
@@ -60,6 +65,7 @@ export async function assertConnectorFor(organizationId: string, jtr: string | n
 
 /** Relatório de prontidão do escritório: por sistema, quantos tribunais e o que falta. */
 export async function getReadinessReport(ctx: TenantContext) {
+  assertBoxAvailable();
   const rows = await listSystemMap(ctx);
   const mapped = rows.filter((r) => r.system);
   const bySystem = COURT_SYSTEMS.map((s) => {

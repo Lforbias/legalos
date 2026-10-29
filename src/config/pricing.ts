@@ -38,13 +38,14 @@ export function publishedPlanAverage(plans: readonly { value: number | null }[])
 
 export const LEGALOS_PLANS = [
   { id: "simples", name: "Simples", price: 79, users: 2, processes: 150, whatsappNumbers: null, subtitle: "O primeiro passo para organizar a rotina.", audience: "Para quem está começando e quer concentrar o essencial.", focus: ["Cadastro e organização dos clientes", "Casos, tarefas e agenda", "Documentos da rotina"], featured: false },
-  { id: "basico", name: "Básico", price: 149, users: 5, processes: 500, whatsappNumbers: null, subtitle: "Mais estrutura para o dia a dia.", audience: "Para o profissional que quer acompanhar o escritório com mais clareza.", focus: ["Operação jurídica no Func", "Acompanhamento de prazos e intimações", "Organização financeira"], featured: false },
-  { id: "intermediario", name: "Intermediário", price: 349, users: 10, processes: 1000, whatsappNumbers: 1, subtitle: "Equipe, atendimento e operação conectados.", audience: "Para escritórios que precisam coordenar pessoas e diferentes rotinas.", focus: ["Conexão entre Func, Box e Chat", "Fluxos de trabalho e colaboração", "Visão do cliente no Desktop"], featured: true },
+  { id: "basico", name: "Básico", price: 149, users: 5, processes: 500, whatsappNumbers: null, subtitle: "Mais estrutura para o dia a dia.", audience: "Para o profissional que quer acompanhar o escritório com mais clareza.", focus: ["Operação jurídica no Func", "Acompanhamento de tarefas e prazos", "Organização financeira"], featured: false },
+  { id: "intermediario", name: "Intermediário", price: 349, users: 10, processes: 1000, whatsappNumbers: 1, subtitle: "Equipe, atendimento e operação conectados.", audience: "Para escritórios que precisam coordenar pessoas e diferentes rotinas.", focus: ["Conexão entre Func e Chat", "Fluxos de trabalho e colaboração", "Visão do cliente no Desktop"], featured: true },
   { id: "avancado", name: "Avançado", price: 599, users: 20, processes: 2000, whatsappNumbers: 2, subtitle: "Uma operação com mais possibilidades.", audience: "Para equipes que buscam automações, inteligência e integrações.", focus: ["RUTE e governança da inteligência artificial", "API REST, MCP e webhooks", "Automações e acompanhamento gerencial"], featured: false },
 ] as const;
 
-export type ComparisonCell = "yes" | "plan" | "unknown" | "conditional" | "validation";
+export type ComparisonCell = "yes" | "no" | "plan" | "unknown" | "conditional" | "validation";
 export const COMPARISON_LABELS: Record<ComparisonCell, string> = {
+  no: "Indisponível",
   yes: "Disponível", plan: "Conforme plano", unknown: "Não confirmado", conditional: "Requer configuração", validation: "Em validação",
 };
 // A missing statement on a public page is never evidence that the competitor lacks a feature.
@@ -52,9 +53,9 @@ export const COMPARISON_ROWS: { label: string; legalos: ComparisonCell; legalmai
   { label: "Cadastro de clientes", legalos: "yes", legalmail: "unknown", advbox: "yes", astrea: "yes", chatguru: "yes" },
   { label: "Gestão de processos jurídicos", legalos: "yes", legalmail: "yes", advbox: "yes", astrea: "yes", chatguru: "unknown" },
   { label: "Tarefas e agenda jurídica", legalos: "yes", legalmail: "unknown", advbox: "yes", astrea: "yes", chatguru: "unknown" },
-  { label: "Captura de publicações / intimações", legalos: "conditional", legalmail: "yes", advbox: "plan", astrea: "plan", chatguru: "unknown" },
-  { label: "Acesso aos autos do tribunal", legalos: "validation", legalmail: "yes", advbox: "unknown", astrea: "unknown", chatguru: "unknown", note: "LegalOS: repositório e visualização disponíveis; captura por tribunal depende de integração e homologação real." },
-  { label: "Protocolo eletrônico no tribunal", legalos: "validation", legalmail: "yes", advbox: "unknown", astrea: "unknown", chatguru: "unknown", note: "LegalOS: fluxo interno de petições disponível; protocolo externo não foi homologado para todos os tribunais." },
+  { label: "Captura de publicações / intimações", legalos: "no", legalmail: "yes", advbox: "plan", astrea: "plan", chatguru: "unknown" },
+  { label: "Acesso aos autos do tribunal", legalos: "no", legalmail: "yes", advbox: "unknown", astrea: "unknown", chatguru: "unknown", note: "LegalOS: recurso retirado temporariamente." },
+  { label: "Protocolo eletrônico no tribunal", legalos: "no", legalmail: "yes", advbox: "unknown", astrea: "unknown", chatguru: "unknown", note: "LegalOS: recurso retirado temporariamente." },
   { label: "Modelos de documentos jurídicos", legalos: "yes", legalmail: "yes", advbox: "yes", astrea: "yes", chatguru: "unknown" },
   { label: "Gestão financeira do escritório", legalos: "yes", legalmail: "unknown", advbox: "plan", astrea: "plan", chatguru: "unknown" },
   { label: "CRM e funil comercial", legalos: "yes", legalmail: "unknown", advbox: "yes", astrea: "unknown", chatguru: "yes" },

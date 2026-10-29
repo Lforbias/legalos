@@ -1,4 +1,5 @@
 import { db, type Tx } from "@/lib/db/client";
+import { BOX_AVAILABLE, isBoxPath } from "@/lib/box-retirement";
 import { dateToYmd, diffDays, formatYmd, todayYmd } from "@/lib/dates/ymd";
 import { NotFoundError } from "@/lib/permissions/check";
 import { can, type TenantContext } from "@/server/context";
@@ -18,7 +19,7 @@ export type NotifyInput = {
 
 /** Cria avisos (idempotente por `dedupeKey`). O destinatário precisa pertencer ao escritório. */
 export async function notify(items: NotifyInput | NotifyInput[], client: Tx | typeof db = db): Promise<number> {
-  const list = (Array.isArray(items) ? items : [items]).filter((i) => !i.link || (i.link.startsWith("/") && !i.link.startsWith("//")));
+  const list = (Array.isArray(items) ? items : [items]).filter((i) => (!i.link || (i.link.startsWith("/") && !i.link.startsWith("//"))) && (BOX_AVAILABLE || !i.link || !isBoxPath(i.link)));
   if (!list.length) return 0;
   const res = await client.notification.createMany({
     data: list.map((i) => ({
@@ -37,14 +38,19 @@ export async function notify(items: NotifyInput | NotifyInput[], client: Tx | ty
 
 export async function listNotifications(ctx: TenantContext, opts: { unreadOnly?: boolean; take?: number } = {}) {
   return db.notification.findMany({
-    where: { userId: ctx.userId, organizationId: ctx.organizationId, ...(opts.unreadOnly ? { readAt: null } : {}) },
+    where: { userId: ctx.userId, organizationId: ctx.organizationId, ...activeNotificationLinks(), ...(opts.unreadOnly ? { readAt: null } : {}) },
     orderBy: [{ createdAt: "desc" }, { id: "asc" }],
     take: Math.min(opts.take ?? 50, 200),
   });
 }
 
 export async function unreadCount(ctx: TenantContext): Promise<number> {
-  return db.notification.count({ where: { userId: ctx.userId, organizationId: ctx.organizationId, readAt: null } });
+  return db.notification.count({ where: { userId: ctx.userId, organizationId: ctx.organizationId, readAt: null, ...activeNotificationLinks() } });
+}
+
+function activeNotificationLinks() {
+  if (BOX_AVAILABLE) return {};
+  return { OR: [{ link: null }, { AND: ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/monitoramento", "/integracoes/pje"].map(prefix => ({ NOT: { link: { startsWith: prefix } } })) }] };
 }
 
 export async function markRead(ctx: TenantContext, id: string) {

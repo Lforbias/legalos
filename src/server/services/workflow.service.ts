@@ -1,3 +1,4 @@
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import { matchesConditions, EMPTY_CONDITIONS } from "@/modules/workflows/conditions";
 import { bulkUpdateNotices } from "./notice-bulk.service";
 import { normalizeTags } from "./inbox-flow.service";
@@ -32,6 +33,7 @@ export type WorkflowSource = {
  * (sem exigir `tasks:write` de quem disparou) e registrada em `workflow_runs` (criada, ignorada ou falha).
  */
 export async function runWorkflows(ctx: TenantContext, trigger: WorkflowTriggerKey, src: WorkflowSource): Promise<number> {
+  if (!BOX_AVAILABLE && trigger === "NOTICE_RECEIVED") return 0;
   let created = 0;
   try {
     if (src.userId !== ctx.userId) throw new ValidationError("Origem da automação inválida.");
@@ -127,7 +129,7 @@ async function executeRule(ctx: TenantContext, rule: Awaited<ReturnType<typeof d
 
 export async function listRules(ctx: TenantContext) {
   assertCan(ctx, "workflows:manage");
-  return db.workflowRule.findMany({ where: { organizationId: ctx.organizationId, deletedAt: null }, orderBy: [{ trigger: "asc" }, { name: "asc" }], take: 200 });
+  return db.workflowRule.findMany({ where: { organizationId: ctx.organizationId, deletedAt: null, ...(!BOX_AVAILABLE ? { trigger: { not: "NOTICE_RECEIVED" as const } } : {}) }, orderBy: [{ trigger: "asc" }, { name: "asc" }], take: 200 });
 }
 
 export async function getRule(ctx: TenantContext, id: string) {

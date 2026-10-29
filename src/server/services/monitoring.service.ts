@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { db } from "@/lib/db/client";
 import { boxV2Enabled } from "@/lib/features";
 import { assertCan, type TenantContext } from "@/server/context";
@@ -34,6 +35,7 @@ async function loadSources(organizationId?: string) {
 
 /** Painel de saúde do monitoramento de intimações (DJEN + PJe/MNI) do escritório. */
 export async function getMonitoringOverview(ctx: TenantContext, now = new Date()) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const sources = (await loadSources(ctx.organizationId)).map(({ row }) => ({
     kind: row.kind, id: row.id, label: row.label, detail: row.detail, enabled: row.enabled,
@@ -46,6 +48,7 @@ export async function getMonitoringOverview(ctx: TenantContext, now = new Date()
 
 /** Avisa quem administra integrações quando uma fonte falha ou para. Idempotente por fonte + última execução. */
 export async function runMonitoringCheck(organizationId?: string, now = new Date()): Promise<{ checked: number; alerts: number }> {
+  assertBoxAvailable();
   // Pelo agendador (sem escritório), o aviso legado só vale para quem ainda usa a tela antiga: com o Box 2.0 ligado, a verificação de saúde nova cobre as mesmas fontes.
   const all = (await loadSources(organizationId)).filter((a) => organizationId || !boxV2Enabled(a.organizationId));
   const bad = all.map((a) => ({ ...a, health: classifySource(a.row, now) })).filter((a) => a.health === "ERROR" || a.health === "STALE");

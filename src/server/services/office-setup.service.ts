@@ -35,7 +35,7 @@ export async function getOfficeSetup(ctx: TenantContext): Promise<SetupStep[]> {
     const count = await db.deadline.count({ where: { ...org, status: "DRAFT", case: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } } });
     return { id: "deadlines", stage: 1, title: "Conferência dos prazos", description: count ? `${count} prazos visíveis aguardam validação humana. Confira datas e responsáveis.` : "Confira a rotina de cadastro, revisão e cumprimento dos prazos com a controladoria.", href: "/prazos", status: count ? "PENDING" : "REVIEW" };
   });
-  await add("integrations:manage", async () => {
+  await add("inbox:read", async () => {
     const [djen, mni] = await Promise.all([db.djenMonitor.count({ where: { ...org, enabled: true } }), db.courtConnection.count({ where: { ...org, enabled: true } })]);
     return { id: "notices", stage: 1, title: "Captura e monitoramento", description: `${djen} monitores DJEN e ${mni} conexões de tribunal habilitados. Confira a última execução e compare o resultado com a fonte oficial.`, href: "/integracoes/diagnostico", status: djen + mni ? "REVIEW" : "PENDING" };
   });

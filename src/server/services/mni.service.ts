@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { mniEndpointProblem } from "@/lib/connectors/endpoint";
 import { tjprDailyPassword } from "@/lib/connectors/auth";
 import { connectionSoapAction, connectionSupports, CONNECTION_ENVIRONMENTS, type MniOperation } from "@/lib/connectors/capabilities";
@@ -48,6 +49,7 @@ const digitsToCnj = (d: string): string | null => {
 export type ConnectionRow = { wsdlUrl: string | null; authProfile: string; system: string; environment: string; wsdlStatus: string | null; wsdlCheckedAt: Date | null; wsdlOperations: string[]; id: string; label: string; jtr: string; endpointUrl: string; authMode: string; certificateId: string | null; certificateLabel: string | null; enabled: boolean; lastSyncAt: Date | null; lastStatus: string | null; lastMessage: string | null; petitionTypes: Record<string, string> };
 
 export async function listConnections(ctx: TenantContext): Promise<ConnectionRow[]> {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const rows = await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId }, include: { certificate: { select: { label: true } } }, orderBy: { createdAt: "asc" } });
   return rows.map((r) => ({ wsdlUrl: r.wsdlUrl, authProfile: r.authProfile, system: r.system, environment: r.environment, wsdlStatus: r.wsdlStatus, wsdlCheckedAt: r.wsdlCheckedAt, wsdlOperations: r.wsdlOperations, id: r.id, label: r.label, jtr: r.jtr, endpointUrl: r.endpointUrl, authMode: r.authMode, certificateId: r.certificateId, certificateLabel: r.certificate?.label ?? null, enabled: r.enabled, lastSyncAt: r.lastSyncAt, lastStatus: r.lastStatus, lastMessage: r.lastMessage, petitionTypes: (r.petitionTypes && typeof r.petitionTypes === "object" && !Array.isArray(r.petitionTypes) ? (r.petitionTypes as Record<string, string>) : {}) }));
@@ -56,6 +58,7 @@ export async function listConnections(ctx: TenantContext): Promise<ConnectionRow
 export type ConnectionInput = { enabled?: boolean; wsdlUrl?: string; authProfile?: string; system?: string; environment?: string; label: string; jtr: string; endpointUrl: string; authMode: AuthMode; certificateId?: string | null; document: string; password?: string };
 
 export async function createConnection(ctx: TenantContext, input: ConnectionInput) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const key = requireKey();
   await requireMfa(ctx.userId);
@@ -102,6 +105,7 @@ export async function createConnection(ctx: TenantContext, input: ConnectionInpu
 }
 
 export async function setConnectionEnabled(ctx: TenantContext, id: string, enabled: boolean) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   if (enabled) {
     const c = await db.courtConnection.findFirst({ where: { id, organizationId: ctx.organizationId } });
@@ -115,6 +119,7 @@ export async function setConnectionEnabled(ctx: TenantContext, id: string, enabl
 
 /** Retarget without deleting credentials; always reset verification and restrict its certificate. */
 export async function updateConnectionTarget(ctx: TenantContext, id: string, input: { endpointUrl: string; wsdlUrl?: string; environment: string; jtr: string }) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage"); await requireMfa(ctx.userId);
   if (!isKnownJtr(input.jtr) || !(CONNECTION_ENVIRONMENTS as readonly string[]).includes(input.environment)) throw new ValidationError("Confira o tribunal e o ambiente.");
   const endpointUrl = input.endpointUrl.trim(); const wsdlUrl = input.wsdlUrl?.trim() || null;
@@ -136,6 +141,7 @@ export async function updateConnectionTarget(ctx: TenantContext, id: string, inp
 
 /** Remove a conexão e a senha cifrada (irreversível). */
 export async function deleteConnection(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   await requireMfa(ctx.userId);
   const r = await db.courtConnection.deleteMany({ where: { id, organizationId: ctx.organizationId } });
@@ -148,6 +154,7 @@ export async function deleteConnection(ctx: TenantContext, id: string) {
  * (3.0-F6b); sem ela, ou em rotinas automáticas, vale a credencial da conexão do escritório.
  */
 export async function loadConnection(ctx: TenantContext, id: string, opts: { personal?: boolean; allowDisabled?: boolean } = {}) {
+  assertBoxAvailable();
   const c = await db.courtConnection.findFirst({ where: { id, organizationId: ctx.organizationId } });
   if (!c) throw new NotFoundError("Conexão não encontrada.");
   const problem = mniEndpointProblem(c.endpointUrl) ?? (c.wsdlUrl ? mniEndpointProblem(c.wsdlUrl) : null);
@@ -164,12 +171,14 @@ export async function loadConnection(ctx: TenantContext, id: string, opts: { per
 }
 
 export async function mtlsFor(ctx: TenantContext, certificateId: string | null, purpose: string, caseId?: string): Promise<Mtls | undefined> {
+  assertBoxAvailable();
   if (!certificateId) return undefined;
   const m = await getCertificateMaterial(ctx, certificateId, purpose, caseId ?? null);
   return { pfx: pfxForTls(m.pfx, m.passphrase), passphrase: m.passphrase };
 }
 
 export async function record(connectionId: string, ok: boolean, message: string) {
+  assertBoxAvailable();
   await db.courtConnection.update({ where: { id: connectionId }, data: { lastSyncAt: new Date(), lastStatus: ok ? "OK" : "ERROR", lastMessage: message.slice(0, 300) } });
 }
 
@@ -207,6 +216,7 @@ export type SyncAvisosResult = { found: number; imported: number; alreadyKnown: 
  * contagem do prazo. O teor deve ser aberto conscientemente pelo advogado.
  */
 export async function syncAvisos(ctx: TenantContext, connectionId: string, post: SoapPost = postSoap): Promise<SyncAvisosResult> {
+  assertBoxAvailable();
   assertCan(ctx, "inbox:write");
   const { c, secret } = await loadConnection(ctx, connectionId);
   assertConnectionOperation(c, "consultarAvisosPendentes");
@@ -265,6 +275,7 @@ export async function syncAvisos(ctx: TenantContext, connectionId: string, post:
 
 /** Conexão ativa que atende o tribunal do número CNJ do processo (ou null). */
 export async function connectionForCase(ctx: TenantContext, caseId: string, operation: MniOperation = "consultarProcesso") {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   await assertCaseVisible(ctx, caseId);
   const c = await db.case.findFirst({ where: { id: caseId, organizationId: ctx.organizationId }, select: { number: true, courtSystem: true } });
@@ -282,6 +293,7 @@ export type ConsultCaseResult = { total: number; imported: number; classe: strin
 
 /** Consulta o processo no tribunal (MNI) e importa os movimentos novos na linha do tempo. Processos sigilosos não são consultados. */
 export async function consultCaseMni(ctx: TenantContext, caseId: string, post: SoapPost = postSoap): Promise<ConsultCaseResult> {
+  assertBoxAvailable();
   assertCan(ctx, "cases:write");
   await assertCaseVisible(ctx, caseId);
   const c = await db.case.findFirstOrThrow({ where: { id: caseId, organizationId: ctx.organizationId }, select: { number: true, confidential: true } });
@@ -342,6 +354,7 @@ function categoryOf(d: MniDocumento): string {
  * Consulta de autos NÃO gera ciência de comunicações; mesmo assim, o uso do certificado fica registrado.
  */
 export async function importAutosMni(ctx: TenantContext, caseId: string, post: SoapPost = postSoap, excludedIds: string[] = [], onExcluded?: (id: string) => void, limit = AUTOS_MAX_PER_RUN): Promise<ImportAutosResult> {
+  assertBoxAvailable();
   assertCan(ctx, "cases:write");
   assertCan(ctx, "documents:write");
   await assertCaseVisible(ctx, caseId);
@@ -424,6 +437,7 @@ export async function importAutosMni(ctx: TenantContext, caseId: string, post: S
  * de quem a criou. O certificado continua sendo lido pelo cofre (com registro de uso). Só LISTA avisos; nunca abre o teor.
  */
 export async function runMniAll(opts: { post?: SoapPost } = {}) {
+  assertBoxAvailable();
   const conns = await db.courtConnection.findMany({
     where: { enabled: true, createdById: { not: null }, organization: { deletedAt: null, suspendedAt: null } },
     select: { id: true, organizationId: true, createdById: true, authProfile: true, system: true, wsdlStatus: true, wsdlOperations: true },
@@ -452,6 +466,7 @@ export async function runMniAll(opts: { post?: SoapPost } = {}) {
 
 /** Verifica o contrato publicado; não confunde essa verificação com autenticação/homologação. */
 export async function inspectConnectionContract(ctx: TenantContext, id: string, fetcher: typeof fetchWsdl = fetchWsdl) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   await requireMfa(ctx.userId);
   const { c } = await loadConnection(ctx, id, { allowDisabled: true });

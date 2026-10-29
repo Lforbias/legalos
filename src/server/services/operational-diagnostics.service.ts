@@ -1,3 +1,4 @@
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import {db} from "@/lib/db/client";
 import {assertCan,can,type TenantContext} from "@/server/context";
 import {caseVisibility} from "./case.service";
@@ -11,8 +12,8 @@ export async function operationalDiagnostics(ctx:TenantContext){
  const org={organizationId:ctx.organizationId};
  const [accounts,connections,monitors]=await Promise.all([
   can(ctx,"whatsapp:manage")?db.whatsappAccount.findMany({where:org,select:{id:true,label:true,provider:true,enabled:true,qrState:true,lastCheckAt:true,lastStatus:true}}):Promise.resolve([]),
-  db.courtConnection.findMany({where:org,select:{id:true,label:true,system:true,environment:true,authProfile:true,enabled:true,wsdlStatus:true,wsdlCheckedAt:true,wsdlOperations:true,lastStatus:true,lastSyncAt:true,certificate:{select:{notAfter:true,revokedAt:true}}}}),
-  db.djenMonitor.findMany({where:org,select:{label:true,enabled:true,lastSyncAt:true,lastStatus:true}}),
+  BOX_AVAILABLE ? db.courtConnection.findMany({where:org,select:{id:true,label:true,system:true,environment:true,authProfile:true,enabled:true,wsdlStatus:true,wsdlCheckedAt:true,wsdlOperations:true,lastStatus:true,lastSyncAt:true,certificate:{select:{notAfter:true,revokedAt:true}}}}):Promise.resolve([]),
+  BOX_AVAILABLE ? db.djenMonitor.findMany({where:org,select:{label:true,enabled:true,lastSyncAt:true,lastStatus:true}}):Promise.resolve([]),
  ]);
  const whatsapp=[];
  for(const a of accounts){

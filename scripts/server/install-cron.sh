@@ -2,7 +2,7 @@
 # Instala os agendamentos do LegalOS em /etc/cron.d/legalos (como root). Pode rodar de novo sem problema.
 #   a cada minuto  → entrega de webhooks
 #   a cada 5 min   → fila de e-mails e SLA de resposta do Chat
-#   a cada 30 min  → captura do DJEN e sincronização do MNI
+#   Box retirado: sem captura judicial, peticionamento, autos ou robôs
 #   03:00 (diário) → backup criptografado
 #   domingo 04:00  → verificação (restauração de teste) do último backup
 set -euo pipefail
@@ -16,18 +16,12 @@ cat > /etc/cron.d/legalos <<CRON
 SHELL=/bin/bash
 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 * * * * *    root $S/cron-call.sh webhooks
-*/30 * * * * root $S/cron-call.sh djen
-*/30 * * * * root $S/cron-call.sh mni
 */5 * * * *  root $S/cron-call.sh mail
 17 * * * *   root $S/cron-call.sh billing
 7 * * * *    root $S/cron-call.sh whatsapp-billing
 */5 * * * *  root $S/cron-call.sh chat-sla
 * * * * *  root $S/cron-call.sh chat-extras
 */15 * * * * root $S/cron-call.sh push-due
-* * * * *    root $S/cron-call.sh petition-queue
-* * * * *    root $S/cron-call.sh autos-queue
-*/5 * * * * root $S/cron-call.sh monitoring
-*/15 * * * * root $S/cron-call.sh robots
 0 3 * * *    root $S/backup-docker.sh >> /var/log/legalos-backup.log 2>&1
 0 4 * * 0    root $S/verify-backup-docker.sh >> /var/log/legalos-backup.log 2>&1
 CRON

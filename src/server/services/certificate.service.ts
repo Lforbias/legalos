@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { createSecureContext } from "node:tls";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
@@ -21,6 +22,7 @@ function requireKey(): Buffer {
 }
 
 export async function requireMfa(userId: string) {
+  assertBoxAvailable();
   const m = await db.userMfa.findUnique({ where: { userId }, select: { enabledAt: true } });
   if (!m?.enabledAt) throw new ConflictError("Ative a verificação em duas etapas em Minha conta para gerenciar certificados digitais.");
 }
@@ -39,12 +41,14 @@ export type CertificateRow = Prisma.CertificateGetPayload<{ select: typeof safeS
 
 /** Lista SEM nenhum material secreto (arquivo e senha nunca saem do banco por aqui). */
 export async function listCertificates(ctx: TenantContext): Promise<CertificateRow[]> {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   const rows = await db.certificate.findMany({ where: { organizationId: ctx.organizationId }, select: { ...safeSelect, owner: { select: { name: true } } }, orderBy: [{ revokedAt: { sort: "asc", nulls: "first" } }, { notAfter: "asc" }] });
   return rows.map(({ owner, ...r }) => ({ ...r, ownerName: owner.name, status: certStatus(r) }));
 }
 
 export async function uploadCertificate(ctx: TenantContext, input: { file: Buffer; password: string; label: string; ownerUserId: string }) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   const key = requireKey();
   await requireMfa(ctx.userId);
@@ -90,6 +94,7 @@ export async function uploadCertificate(ctx: TenantContext, input: { file: Buffe
 
 /** Revoga e APAGA o material cifrado (irreversível: para voltar a usar, envie o certificado de novo). */
 export async function revokeCertificate(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   await requireMfa(ctx.userId);
   const res = await db.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null }, data: { revokedAt: new Date(), revokedById: ctx.userId, pfxEnc: "", passEnc: "" } });
@@ -98,6 +103,7 @@ export async function revokeCertificate(ctx: TenantContext, id: string) {
 }
 
 export async function listCertificateUsage(ctx: TenantContext, id: string, take = 50) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { id: true } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
@@ -106,6 +112,7 @@ export async function listCertificateUsage(ctx: TenantContext, id: string, take 
 
 /* ---------- usuários autorizados (3.0-F9) ---------- */
 export async function listAuthorizedUsers(ctx: TenantContext, certificateId: string) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   const c = await db.certificate.findFirst({ where: { id: certificateId, organizationId: ctx.organizationId }, select: { id: true } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
@@ -115,6 +122,7 @@ export async function listAuthorizedUsers(ctx: TenantContext, certificateId: str
 }
 
 export async function authorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   await requireMfa(ctx.userId);
   const c = await db.certificate.findFirst({ where: { id: certificateId, organizationId: ctx.organizationId, revokedAt: null }, select: { id: true, ownerUserId: true } });
@@ -131,6 +139,7 @@ export async function authorizeCertificateUser(ctx: TenantContext, certificateId
 }
 
 export async function unauthorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   const res = await db.certificateAuthorizedUser.deleteMany({ where: { certificateId, userId, organizationId: ctx.organizationId } });
   if (res.count !== 1) throw new NotFoundError("Autorização não encontrada.");
@@ -154,12 +163,14 @@ async function enforceCertificatePurpose(ctx: TenantContext, certificate: { id: 
 }
 /** Called before reserving/submitting a petition, also when invoking the adapter directly. */
 export async function assertCertificatePurpose(ctx: TenantContext, id: string, purpose: string) {
+  assertBoxAvailable();
   await assertCertificateUsable(ctx, id);
   const certificate = await db.certificate.findFirstOrThrow({ where: { id, organizationId: ctx.organizationId }, select: { id: true, consultationOnly: true, ownerUserId: true } });
   await enforceCertificatePurpose(ctx, certificate, purpose.trim().slice(0, 120));
 }
 
 export async function getCertificateMaterial(ctx: TenantContext, id: string, purpose: string, caseId?: string | null): Promise<CertificateMaterial> {
+  assertBoxAvailable();
   const key = requireKey();
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
@@ -182,6 +193,7 @@ export async function getCertificateMaterial(ctx: TenantContext, id: string, pur
 
 /** Certificados que ESTA pessoa pode usar agora (titular, autorizada ou administradora do cofre). Só id e nome. */
 export async function listUsableCertificates(ctx: TenantContext): Promise<{ id: string; label: string }[]> {
+  assertBoxAvailable();
   const now = new Date();
   const manage = can(ctx, "certificates:manage");
   const authIds = manage ? [] : (await db.certificateAuthorizedUser.findMany({ where: { userId: ctx.userId, organizationId: ctx.organizationId }, select: { certificateId: true } })).map((a) => a.certificateId);
@@ -194,6 +206,7 @@ export async function listUsableCertificates(ctx: TenantContext): Promise<{ id: 
 
 /** Confere (sem registrar uso nem abrir o segredo) se este usuário pode usar o certificado agora: titular, administrador do cofre ou autorizado; vigente e não revogado. */
 export async function assertCertificateUsable(ctx: TenantContext, id: string): Promise<void> {
+  assertBoxAvailable();
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { ownerUserId: true, revokedAt: true, notAfter: true } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
   if (c.ownerUserId !== ctx.userId && !can(ctx, "certificates:manage")) {
@@ -206,6 +219,7 @@ export async function assertCertificateUsable(ctx: TenantContext, id: string): P
 
 /** Avisa titular e administradores do cofre quando faltam 30 e 7 dias (ou já venceu). Idempotente. */
 export async function runCertificateExpiryCheck(organizationId?: string, now = new Date()): Promise<number> {
+  assertBoxAvailable();
   const horizon = new Date(now.getTime() + EXPIRY_WARN_DAYS[0] * DAY);
   const certs = await db.certificate.findMany({ where: { revokedAt: null, notAfter: { lte: horizon }, ...(organizationId ? { organizationId } : {}) }, select: { id: true, label: true, organizationId: true, ownerUserId: true, notAfter: true } });
   let created = 0;
@@ -225,6 +239,7 @@ export async function runCertificateExpiryCheck(organizationId?: string, now = n
  * É a trava de segurança: quem administra o cofre pode acionar a qualquer momento; liberar de novo exige o ato explícito abaixo.
  */
 export async function restrictCertificateToConsultation(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage"); await requireMfa(ctx.userId);
   const changed = await db.$transaction(async (tx) => {
     const r = await tx.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null }, data: { consultationOnly: true, signingEnabledAt: null, signingEnabledById: null } });
@@ -241,6 +256,7 @@ export async function restrictCertificateToConsultation(ctx: TenantContext, id: 
  * Liberar não envia nada ao tribunal: cada protocolo ainda passa pela aprovação, pela confirmação do número do processo e pela homologação do conector.
  */
 export async function enableCertificateSigning(ctx: TenantContext, id: string, confirmLabel: string) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   assertCan(ctx, "certificates:sign");
   await requireMfa(ctx.userId);
@@ -257,6 +273,7 @@ export async function enableCertificateSigning(ctx: TenantContext, id: string, c
 
 /** Dá ou retira de uma pessoa JÁ autorizada o poder de assinar/protocolar com o certificado (a consulta não muda). */
 export async function setCertificateSigner(ctx: TenantContext, certificateId: string, userId: string, canSign: boolean) {
+  assertBoxAvailable();
   assertCan(ctx, "certificates:manage");
   assertCan(ctx, "certificates:sign");
   await requireMfa(ctx.userId);
@@ -274,6 +291,7 @@ export async function setCertificateSigner(ctx: TenantContext, certificateId: st
 
 /** Local crypto validation only: no network, no login, no protocol and no change to the stored certificate. */
 export async function testCertificateTls(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   const material = await getCertificateMaterial(ctx, id, "local:tls-check");
   try { createSecureContext({ pfx: pfxForTls(material.pfx, material.passphrase), passphrase: material.passphrase }); }
   catch { throw new ValidationError("O certificado não pôde ser preparado para TLS. Confira o arquivo e a senha ou refaça a exportação A1."); }

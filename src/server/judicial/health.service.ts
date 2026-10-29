@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { db } from "@/lib/db/client";
 import { certificateAlerts, HEALTH_ALERT_CODES, jobAlert, SEVERITY_ORDER, sourceAlerts, sourceHeadline, worstSeverity, type AlertCandidate, type AlertSeverity, type SourceAlertInput } from "@/lib/judicial/alerts";
 import { detectSilence, evaluateFreshness, evaluateJobFreshness, isRunInterrupted, SOURCE_POLICIES, type FreshnessLevel, type SourceKind } from "@/lib/judicial/health-policy";
@@ -53,6 +54,7 @@ function leadingFailures(statuses: readonly string[]): number {
 }
 
 export async function getSourceHealth(organizationId: string, now = new Date()): Promise<SourceHealthRow[]> {
+  assertBoxAvailable();
   const [monitors, connections, accesses] = await Promise.all([
     db.djenMonitor.findMany({ where: { organizationId }, orderBy: { createdAt: "asc" } }),
     db.courtConnection.findMany({ where: { organizationId }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, jtr: true, system: true, enabled: true, createdAt: true, lastSyncAt: true, lastStatus: true, lastMessage: true } }),
@@ -115,6 +117,7 @@ export type JobHealthRow = { key: JobKey; label: string; everyMin: number; level
 
 /** Rotinas agendadas: a "última boa" é o início da última execução que terminou OK. */
 export async function getJobHealth(keys: readonly JobKey[], now = new Date()): Promise<JobHealthRow[]> {
+  assertBoxAvailable();
   const out: JobHealthRow[] = [];
   for (const key of keys) {
     const [ok, last] = await Promise.all([
@@ -131,6 +134,7 @@ export type OrgHealth = { sources: SourceHealthRow[]; jobs: JobHealthRow[]; cand
 
 /** Calcula (sem gravar) tudo que está errado agora para um escritório. */
 export async function computeOrgHealth(organizationId: string, opts: { now?: Date; includeJobs?: boolean } = {}): Promise<OrgHealth> {
+  assertBoxAvailable();
   const now = opts.now ?? new Date();
   const sources = await getSourceHealth(organizationId, now);
   const certs = await db.certificate.findMany({ where: { organizationId, revokedAt: null }, select: { id: true, label: true, notAfter: true, revokedAt: true } });
@@ -151,6 +155,7 @@ export type ReconcileResult = { opened: number; escalated: number; resolved: num
 
 /** Grava os alertas atuais, reabre os que voltaram, resolve os que sumiram e avisa os administradores (sem repetir). */
 export async function reconcileAlerts(organizationId: string, candidates: readonly AlertCandidate[], now = new Date()): Promise<ReconcileResult> {
+  assertBoxAvailable();
   const res: ReconcileResult = { opened: 0, escalated: 0, resolved: 0, notified: 0 };
   const admins = (await db.membership.findMany({ where: { organizationId, status: "ACTIVE", role: { permissions: { has: "integrations:manage" } } }, select: { userId: true } })).map((r) => r.userId);
   const existing = await db.healthAlert.findMany({ where: { organizationId, code: { in: [...HEALTH_ALERT_CODES] } } });
@@ -197,6 +202,7 @@ export async function reconcileAlerts(organizationId: string, candidates: readon
 
 /** Verificação periódica (agendador a cada 5 min). Sem `organizationId`, percorre todos os escritórios ativos que têm alguma fonte. */
 export async function runHealthCheck(organizationId?: string, opts: { now?: Date; includeJobs?: boolean } = {}) {
+  assertBoxAvailable();
   const now = opts.now ?? new Date();
   // Sem `organizationId` (agendador), só os escritórios com o Box 2.0 ligado entram: com a chave desligada, ninguém recebe aviso novo.
   const candidates = organizationId
@@ -219,6 +225,7 @@ export async function runHealthCheck(organizationId?: string, opts: { now?: Date
 }
 
 export async function listAlerts(ctx: TenantContext, opts: { includeResolved?: boolean } = {}) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   return db.healthAlert.findMany({
     where: { organizationId: ctx.organizationId, ...(opts.includeResolved ? {} : { state: { in: ["OPEN", "ACKNOWLEDGED"] } }) },
@@ -230,6 +237,7 @@ export async function listAlerts(ctx: TenantContext, opts: { includeResolved?: b
 
 /** Execuções recentes das fontes (técnico: só administradores). */
 export async function listRecentRuns(ctx: TenantContext, take = 15) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   return db.syncRun.findMany({
     where: { organizationId: ctx.organizationId },
@@ -240,6 +248,7 @@ export async function listRecentRuns(ctx: TenantContext, take = 15) {
 }
 
 export async function acknowledgeAlert(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const r = await db.healthAlert.updateMany({ where: { id, organizationId: ctx.organizationId, state: "OPEN" }, data: { state: "ACKNOWLEDGED", acknowledgedAt: new Date(), acknowledgedById: ctx.userId } });
   if (r.count !== 1) throw new NotFoundError("Alerta não encontrado ou já tratado.");

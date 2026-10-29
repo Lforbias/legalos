@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { db } from "@/lib/db/client";
 import { addDays, todayYmd, ymdToDate, dateToYmd } from "@/lib/dates/ymd";
 import { DJEN_PAGE_SIZE, defaultHttp, djenBase, type DjenHttp } from "@/lib/djen/client";
@@ -43,11 +44,13 @@ const FIRST_SYNC_DAYS = 7;
 const MAX_DAYS = 30;
 
 export async function listMonitors(ctx: TenantContext): Promise<MonitorRow[]> {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   return db.djenMonitor.findMany({ where: { organizationId: ctx.organizationId }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, oabNumber: true, oabUf: true, enabled: true, lastSyncAt: true, lastStatus: true, lastMessage: true, defaultAssigneeId: true, defaultTeamId: true, professionalId: true, lastSuccessAt: true, lastCaptureAt: true, firstVerifiedAt: true } });
 }
 
 export async function createMonitor(ctx: TenantContext, input: { label: string; oabNumber: string; oabUf: string }) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const label = input.label.trim();
   if (label.length < 2 || label.length > 80) throw new ValidationError("Dê um nome ao monitoramento (2 a 80 caracteres).", { label: ["Nome inválido."] });
@@ -68,6 +71,7 @@ export async function createMonitor(ctx: TenantContext, input: { label: string; 
 
 /** Define quem recebe as publicações novas deste monitoramento: um membro, uma equipe, ou ninguém (vão para a Entrada). */
 export async function setMonitorRecipients(ctx: TenantContext, id: string, input: { userId?: string | null; teamId?: string | null }) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const userId = input.userId || null;
   const teamId = input.teamId || null;
@@ -86,6 +90,7 @@ export async function setMonitorRecipients(ctx: TenantContext, id: string, input
 }
 
 export async function setMonitorEnabled(ctx: TenantContext, id: string, enabled: boolean) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const r = await db.djenMonitor.updateMany({ where: { id, organizationId: ctx.organizationId }, data: { enabled } });
   if (r.count !== 1) throw new NotFoundError("Monitoramento não encontrado.");
@@ -93,6 +98,7 @@ export async function setMonitorEnabled(ctx: TenantContext, id: string, enabled:
 }
 
 export async function deleteMonitor(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   await requireMfa(ctx.userId);
   const r = await db.djenMonitor.deleteMany({ where: { id, organizationId: ctx.organizationId } });
@@ -139,6 +145,7 @@ export type SyncOptions = { days?: number; http?: DjenHttp; pauseMs?: number; tr
  *  - cada resultado vira evidência (inclusive falhas); respostas de transporte injetado nunca contam como prova real.
  */
 export async function syncDjen(ctx: TenantContext, monitorId: string, opts: SyncOptions = {}): Promise<DjenSyncResult> {
+  assertBoxAvailable();
   assertCan(ctx, "inbox:write");
   const m = await db.djenMonitor.findFirst({ where: { id: monitorId, organizationId: ctx.organizationId } });
   if (!m) throw new NotFoundError("Monitoramento não encontrado.");
@@ -277,6 +284,7 @@ export async function syncDjen(ctx: TenantContext, monitorId: string, opts: Sync
 
 /** Execução automática (chamada pelo agendador externo): sincroniza todos os monitoramentos ligados, cada um com o contexto de quem o criou. */
 export async function runDjenAll(opts: { http?: DjenHttp; pauseMs?: number } = {}) {
+  assertBoxAvailable();
   await recoverInterruptedRuns(); // execuções que pararam de dar sinal de vida não podem travar a fonte
   const monitors = await db.djenMonitor.findMany({ where: { enabled: true, organization: { deletedAt: null, suspendedAt: null } }, select: { id: true, organizationId: true, createdById: true }, orderBy: { lastSyncAt: { sort: "asc", nulls: "first" } } });
   const out = { total: monitors.length, ok: 0, failed: 0, busy: 0, partial: 0, imported: 0 };

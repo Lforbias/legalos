@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
@@ -49,6 +50,7 @@ async function loadPetition(ctx: TenantContext, id: string) {
 }
 
 export async function listPetitions(ctx: TenantContext, f: { status?: string; caseId?: string } = {}) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:read");
   const where: Prisma.PetitionFilingWhereInput = {
     organizationId: ctx.organizationId,
@@ -70,6 +72,7 @@ export async function listPetitions(ctx: TenantContext, f: { status?: string; ca
 }
 
 export async function getPetition(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:read");
   const p = await loadPetition(ctx, id);
   const attachments = (await loadAttachments(ctx, p.id)).map((a) => ({ ...a, stale: a.document.deletedAt !== null || a.document.currentVersion !== a.documentVersion }));
@@ -105,6 +108,7 @@ function checkClass(v: string): AttachmentClass {
 
 /** Só em rascunho. O documento precisa ser do mesmo processo, diferente do documento principal, e não pode se repetir. */
 export async function addAttachment(ctx: TenantContext, petitionId: string, input: { documentId: string; classification: string }) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   assertCan(ctx, "documents:read");
   const classification = checkClass(input.classification);
@@ -127,6 +131,7 @@ export async function addAttachment(ctx: TenantContext, petitionId: string, inpu
 }
 
 export async function removeAttachment(ctx: TenantContext, petitionId: string, attachmentId: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   const p = await loadPetition(ctx, petitionId);
   if (p.status !== "DRAFT") throw new ConflictError("Só é possível alterar os anexos de petições em rascunho.");
@@ -136,6 +141,7 @@ export async function removeAttachment(ctx: TenantContext, petitionId: string, a
 }
 
 export async function setAttachmentClassification(ctx: TenantContext, petitionId: string, attachmentId: string, classification: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   const cls = checkClass(classification);
   const p = await loadPetition(ctx, petitionId);
@@ -147,6 +153,7 @@ export async function setAttachmentClassification(ctx: TenantContext, petitionId
 
 /** Troca a posição do anexo com o vizinho (a ordem dos anexos vale no envio). */
 export async function moveAttachment(ctx: TenantContext, petitionId: string, attachmentId: string, direction: "up" | "down") {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   const p = await loadPetition(ctx, petitionId);
   if (p.status !== "DRAFT") throw new ConflictError("Só é possível alterar os anexos de petições em rascunho.");
@@ -163,6 +170,7 @@ export async function moveAttachment(ctx: TenantContext, petitionId: string, att
 }
 
 export async function createPetition(ctx: TenantContext, raw: PetitionInput) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   assertCan(ctx, "documents:read");
   const title = raw.title.trim();
@@ -185,6 +193,7 @@ export async function createPetition(ctx: TenantContext, raw: PetitionInput) {
 
 /** Só em rascunho. Troca o documento (do mesmo processo) e/ou os dados descritivos. */
 export async function updatePetition(ctx: TenantContext, id: string, raw: PetitionInput) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   const p = await loadPetition(ctx, id);
   if (p.status !== "DRAFT") throw new ConflictError("Só é possível editar petições em rascunho.");
@@ -223,6 +232,7 @@ function assertDocumentUsable(p: Awaited<ReturnType<typeof loadPetition>>) {
 }
 
 export async function requestReview(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   const p = await loadPetition(ctx, id);
   assertDocumentUsable(p);
@@ -248,6 +258,7 @@ export async function requestReview(ctx: TenantContext, id: string) {
 }
 
 export async function approvePetition(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:approve");
   const p = await loadPetition(ctx, id);
   assertDocumentUsable(p);
@@ -257,6 +268,7 @@ export async function approvePetition(ctx: TenantContext, id: string) {
 }
 
 export async function returnPetition(ctx: TenantContext, id: string, note: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:approve");
   const n = note.trim();
   if (n.length < 3) throw new ValidationError("Informe o motivo.", { note: ["Explique o que precisa ser ajustado."] });
@@ -267,6 +279,7 @@ export async function returnPetition(ctx: TenantContext, id: string, note: strin
 }
 
 export async function cancelPetition(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   const p = await loadPetition(ctx, id);
   if (p.status === "FAILED" && isLegacyUncertain(p.error)) throw new ConflictError("Não há certeza de que o tribunal não recebeu esta petição. Confira no tribunal e registre o resultado antes de cancelar.");
@@ -313,6 +326,7 @@ async function markInterrupted(organizationId: string, petitionId: string, userI
 
 /** Rotina do agendador: envios "presos" viram estado desconhecido (nunca reenvio automático). */
 export async function recoverStuckSubmissions(now = new Date()): Promise<number> {
+  assertBoxAvailable();
   const stuck = await db.petitionFiling.findMany({ where: { status: "SUBMITTING", deletedAt: null, updatedAt: { lt: new Date(now.getTime() - STUCK_SUBMITTING_MS) } }, take: 50, select: { id: true, organizationId: true, caseId: true, title: true, submittedById: true } });
   let n = 0;
   for (const p of stuck) if (await markInterrupted(p.organizationId, p.id, p.submittedById, p.caseId, p.title, now)) n++;
@@ -337,6 +351,7 @@ async function recordFilingEvidence(ctx: TenantContext, target: FilingTarget, ou
  * Protocolo real em conector sem homologação neste tribunal é recusado ANTES de reservar o envio.
  */
 export async function submitPetition(ctx: TenantContext, id: string, opts: { confirmCase?: string; post?: unknown } = {}) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:approve");
   let p = await loadPetition(ctx, id);
   if (p.status === "SUBMITTING" && p.updatedAt.getTime() < Date.now() - STUCK_SUBMITTING_MS) {
@@ -483,6 +498,7 @@ const PROTOCOL_RE = /^[A-Za-z0-9][A-Za-z0-9 ._/-]{2,59}$/;
  *  - NOT_FILED: conferido no tribunal que NADA foi protocolado. Só então a petição volta a poder ser enviada.
  */
 export async function reconcilePetition(ctx: TenantContext, id: string, input: ReconcileInput) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:approve");
   const p = await loadPetition(ctx, id);
   const legacyDoubt = p.status === "FAILED" && isLegacyUncertain(p.error);

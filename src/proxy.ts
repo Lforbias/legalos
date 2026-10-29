@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
+import { BOX_AVAILABLE, BOX_UNAVAILABLE_MESSAGE, isBoxPath } from "@/lib/box-retirement";
 
 // /api/cron e /api/v1 não usam cookie de sessão: autenticam por conta própria (segredo do agendador / chave de API).
 const PUBLIC_PREFIXES = ["/blog", "/ferramentas", "/comunidade", "/acesso", "/minha-conta", "/transparencia", "/sair-das-novidades", "/api/audience", "/sitemap.xml", "/robots.txt", "/brand", "/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook"];
@@ -41,6 +42,14 @@ export function proxy(request: NextRequest) {
   headers.set("content-security-policy", csp);
 
   const { pathname, search } = request.nextUrl;
+  if (!BOX_AVAILABLE && isBoxPath(pathname)) {
+    const res = pathname.startsWith("/api/")
+      ? NextResponse.json({ error: { code: "box_removed", message: BOX_UNAVAILABLE_MESSAGE } }, { status: 410 })
+      : new NextResponse(BOX_UNAVAILABLE_MESSAGE, { status: 404 });
+    res.headers.set("Cache-Control", "no-store");
+    res.headers.set("Content-Security-Policy", csp);
+    return res;
+  }
   // A raiz apresenta o produto para visitantes e usuários autenticados.
   if (pathname === "/") {
     const url = request.nextUrl.clone();

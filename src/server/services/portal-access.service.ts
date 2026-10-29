@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -61,6 +62,7 @@ export function pjeTargetOptions() {
 }
 
 export async function listMyPortalAccesses(ctx: TenantContext): Promise<PortalAccessRow[]> {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   const rows = await db.portalAccess.findMany({
     where: { organizationId: ctx.organizationId, userId: ctx.userId },
@@ -104,6 +106,7 @@ async function enqueue(organizationId: string, accessId: string, kind: "LOGIN_TE
 
 /** Cadastra (ou atualiza) o acesso aos tribunais escolhidos e enfileira o teste de login do primeiro. */
 export async function connectPje(ctx: TenantContext, raw: unknown) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   const input = connectPjeSchema.parse(raw);
   const key = requireKey();
@@ -140,6 +143,7 @@ async function ownAccess(ctx: TenantContext, id: string) {
 
 /** Enfileira um novo teste de login (no máximo um por minuto por acesso). */
 export async function testPortalAccess(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
@@ -156,6 +160,7 @@ export async function testPortalAccess(ctx: TenantContext, id: string) {
 }
 
 export async function setPortalAccessEnabled(ctx: TenantContext, id: string, enabled: boolean) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId }, select: { id: true } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
@@ -165,6 +170,7 @@ export async function setPortalAccessEnabled(ctx: TenantContext, id: string, ena
 
 /** O dono remove o próprio acesso; quem administra integrações remove o de qualquer pessoa (nunca lê o segredo). */
 export async function deletePortalAccess(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   await ownAccess(ctx, id);
   await db.portalAccess.delete({ where: { id } });
   await audit({ action: "portal_access.delete", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
@@ -175,6 +181,7 @@ export async function deletePortalAccess(ctx: TenantContext, id: string) {
  * leitura das intimações ser conferida contra a tela real: cada leitura é um login no PJe e não deve ser repetido à toa.
  */
 export async function enqueueDueSyncs(opts: { now?: Date; everyMinutes?: number } = {}) {
+  assertBoxAvailable();
   const out = { enabled: process.env.ROBOT_SYNC_ENABLED === "1", queued: 0 };
   if (!out.enabled) return out;
   const now = opts.now ?? new Date();
