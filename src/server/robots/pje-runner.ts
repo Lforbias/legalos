@@ -1,4 +1,5 @@
 import type { Page } from "playwright-core";
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { loginPje, type LoginOutcome } from "@/lib/robots/pje/login";
@@ -58,6 +59,7 @@ function nameWords(name: string): string[] {
 }
 
 export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: string }> {
+  if (!BOX_AVAILABLE) return { status: "SKIPPED" };
   const now = deps.now ?? (() => new Date());
   const job = await db.robotJob.findUnique({
     where: { id: jobId },
@@ -167,6 +169,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
 
 /** Processa a fila até esvaziar (ou até `maxJobs`). Devolve quantos trabalhos rodou. */
 export async function drainQueue(deps: RobotDeps, maxJobs = 10): Promise<number> {
+  if (!BOX_AVAILABLE) return 0;
   await recoverStuckJobs((deps.now ?? (() => new Date()))());
   let n = 0;
   while (n < maxJobs) {

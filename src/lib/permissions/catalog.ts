@@ -1,3 +1,4 @@
+import { BOX_AVAILABLE, isBoxPermission } from "@/lib/box-retirement";
 /**
  * Catálogo de permissões granulares. Formato: "<recurso>:<ação>".
  * As permissões dos módulos futuros já existem aqui para que perfis personalizados e a navegação
@@ -111,3 +112,5 @@ export function isPermissionKey(value: string): value is PermissionKey {
 export const PERMISSION_LABELS: Record<string, string> = Object.fromEntries(
   PERMISSION_GROUPS.flatMap((g) => g.permissions.map((p) => [p.key, p.label])),
 );
+
+export const VISIBLE_PERMISSION_GROUPS = PERMISSION_GROUPS.map(g => ({ ...g, permissions: g.permissions.filter(p => BOX_AVAILABLE || !isBoxPermission(p.key)) })).filter(g => g.permissions.length > 0);

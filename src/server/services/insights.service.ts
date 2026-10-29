@@ -1,3 +1,4 @@
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { addDays, dateToYmd, todayYmd, ymdToDate } from "@/lib/dates/ymd";
@@ -237,7 +238,7 @@ async function integrationItems(ctx: TenantContext): Promise<AlertItem[]> {
   const org = ctx.organizationId;
   const out: AlertItem[] = [];
   const now = Date.now();
-  if (can(ctx, "integrations:manage") || can(ctx, "inbox:read")) {
+  if (BOX_AVAILABLE && (can(ctx, "integrations:manage") || can(ctx, "inbox:read"))) {
     const mons = await db.djenMonitor.findMany({ where: { organizationId: org, enabled: true }, select: { id: true, label: true, lastStatus: true, lastSyncAt: true, lastMessage: true } });
     for (const m of mons) {
       const stale = !m.lastSyncAt || now - m.lastSyncAt.getTime() > 36 * 3_600_000;

@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -21,12 +22,14 @@ export const MAX_AHEAD_DAYS = 30;
 const MAX_PER_RUN = 20;
 
 export async function getScheduleSwitch(ctx: TenantContext) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:read");
   const o = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { petitionScheduleEnabled: true } });
   return Boolean(o?.petitionScheduleEnabled);
 }
 
 export async function setScheduleSwitch(ctx: TenantContext, on: boolean) {
+  assertBoxAvailable();
   assertCan(ctx, "organization:manage");
   await db.organization.update({ where: { id: ctx.organizationId }, data: { petitionScheduleEnabled: on } });
   if (!on) {
@@ -37,6 +40,7 @@ export async function setScheduleSwitch(ctx: TenantContext, on: boolean) {
 }
 
 export async function schedulePetition(ctx: TenantContext, id: string, input: { at: Date; confirmCase?: string }, now = new Date()) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:approve");
   if (!(await getScheduleSwitch(ctx))) throw new ConflictError("O agendamento de protocolos está desligado neste escritório. Um administrador pode ligá-lo na fila de protocolos.");
   const p = await db.petitionFiling.findFirst({
@@ -58,6 +62,7 @@ export async function schedulePetition(ctx: TenantContext, id: string, input: { 
 }
 
 export async function unschedulePetition(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:write");
   const res = await db.petitionFiling.updateMany({ where: { id, organizationId: ctx.organizationId, deletedAt: null, status: "APPROVED", scheduledFor: { not: null } }, data: { scheduledFor: null, scheduleNote: "Agendamento cancelado por uma pessoa." } });
   if (res.count === 0) throw new ConflictError("Esta petição não está agendada (ou já foi enviada).");
@@ -67,6 +72,7 @@ export async function unschedulePetition(ctx: TenantContext, id: string) {
 const QUEUE_STATUSES = ["APPROVED", "SUBMITTING", "SUBMITTED", "FAILED", "AWAITING_CONFIRMATION", "FILED_CONFIRMED", "UNKNOWN"] as const;
 
 export async function listQueue(ctx: TenantContext, f: { view?: "fila" | "agendadas" | "protocoladas" | "falhas" | "conferir" } = {}) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:read");
   const view = f.view ?? "fila";
   const status = view === "protocoladas" ? ["SUBMITTED", "FILED_CONFIRMED"] : view === "falhas" ? ["FAILED"] : view === "conferir" ? ["UNKNOWN", "AWAITING_CONFIRMATION"] : view === "agendadas" ? ["APPROVED"] : ["APPROVED", "SUBMITTING"];
@@ -87,6 +93,7 @@ export async function listQueue(ctx: TenantContext, f: { view?: "fila" | "agenda
 }
 
 export async function getReceipt(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   assertCan(ctx, "petitions:read");
   const p = await db.petitionFiling.findFirst({
     where: { id, organizationId: ctx.organizationId, deletedAt: null, status: { in: ["SUBMITTED", "FILED_CONFIRMED", "AWAITING_CONFIRMATION"] }, case: { is: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } } },
@@ -103,6 +110,7 @@ async function cancelSchedule(id: string, note: string, userId: string | null, o
 
 /** Rotina do agendador (a cada minuto): executa os agendamentos vencidos, no máximo 20 por vez. */
 export async function runDueSchedules(now = new Date()) {
+  assertBoxAvailable();
   // Antes de tudo: envio "preso" vira estado desconhecido (nunca é reenviado automaticamente).
   await recoverStuckSubmissions(now).catch((e) => logger.warn("petition.recover_failed", { error: e instanceof Error ? e.message : String(e) }));
   const due = await db.petitionFiling.findMany({

@@ -25,7 +25,7 @@ export default async function AutomationsPage() {
     <div className="mx-auto max-w-5xl">
       <PageHeader
         title="Automações"
-        description="Regras com condições E/OU: crie tarefas, distribua e etiquete intimações. Cada regra roda uma vez por item e fica registrada."
+        description="Regras com condições E/OU para criar tarefas. Cada regra roda uma vez por item e fica registrada."
         actions={<Link href="/automacoes/nova" className={bv({})}><Plus className="h-4 w-4" aria-hidden /> Nova regra</Link>}
       />
       <Card>

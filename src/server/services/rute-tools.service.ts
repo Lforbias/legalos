@@ -1,4 +1,5 @@
 import { CASE_NATURES } from "@/modules/cases/schemas";
+import { BOX_AVAILABLE, isBoxTool } from "@/lib/box-retirement";
 import { CHAT_TOOLS } from "./rute-chat-tools";
 import { ACTION_TOOLS } from "./rute-action-tools";
 import { DOMAIN_TOOLS } from "./rute-domain-tools";
@@ -342,7 +343,7 @@ for (const tool of TOOLS) {
 
 export function toolList(ctx: TenantContext, scopes: ReadonlySet<ToolScope>) {
   if (!can(ctx, "ai:use")) return [];
-  return TOOLS.filter((t) => scopes.has(t.scope) && can(ctx, t.permission));
+  return TOOLS.filter((t) => (BOX_AVAILABLE || !isBoxTool(t.name)) && scopes.has(t.scope) && can(ctx, t.permission));
 }
 
 export function toolCatalog(ctx: TenantContext, scopes: ReadonlySet<ToolScope>) {
@@ -368,7 +369,7 @@ export async function callTool(ctx: TenantContext, scopes: ReadonlySet<ToolScope
   try {
     await assertRuteOn(ctx.organizationId, origin.via === "ASSISTANT" ? "assistant" : "mcp");
     assertCan(ctx, "ai:use");
-    if (!def) throw new NotFoundError(`Ferramenta desconhecida: ${name}.`);
+    if (!def || (!BOX_AVAILABLE && isBoxTool(name))) throw new NotFoundError(`Ferramenta indisponível: ${name}.`);
     if (!scopes.has(def.scope)) throw new ForbiddenError("Esta conexão não tem permissão para essa ferramenta.");
     assertCan(ctx, def.permission);
     if (rawArgs !== undefined && rawArgs !== null && (typeof rawArgs !== "object" || Array.isArray(rawArgs))) throw new ValidationError("Argumentos devem ser um objeto JSON.");

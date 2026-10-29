@@ -1,9 +1,10 @@
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 /**
  * Conteúdo da página pública /produto. REGRA: só o que existe e foi verificado; nada de cliente, depoimento, preço ou número inventado.
  * Os números abaixo foram conferidos no código e nos testes em 2026-10-22 (atualizar a cada entrega, junto com src/lib/updates.ts).
  */
 export const FACTS = {
-  spaces: 3,
+  spaces: 2,
   permissions: 41,
   tables: 129,
   tests: 830,
@@ -12,12 +13,12 @@ export const FACTS = {
 
 export type ModuleShot = { id: string; label: string; image: string; alt: string; title: string; text: string; points: string[] };
 
-export const MODULES: ModuleShot[] = [
+const ALL_MODULES: ModuleShot[] = [
   {
     id: "processos", label: "Processos", image: "/produto/processo.webp", alt: "Tela de um processo no LegalOS com dados, vínculos e conversa de WhatsApp",
     title: "Cada processo, com tudo o que importa num lugar só",
-    text: "Dados, partes, linha do tempo, prazos, tarefas, intimações, documentos e petições, ligados ao cliente e à conversa de WhatsApp daquele caso.",
-    points: ["Número CNJ validado pelo dígito verificador", "Consulta de andamentos pelo DataJud do CNJ", "Compartilhamento opcional com o portal do cliente, só do que você marcar", "Processos sigilosos visíveis apenas a quem tem acesso"],
+    text: "Dados, partes, linha do tempo, prazos, tarefas e documentos, ligados ao cliente e à conversa de WhatsApp daquele caso.",
+    points: ["Número CNJ validado pelo dígito verificador", "Registro de andamentos do processo", "Compartilhamento opcional com o portal do cliente, só do que você marcar", "Processos sigilosos visíveis apenas a quem tem acesso"],
   },
   {
     id: "caixa", label: "Intimações", image: "/produto/caixa.webp", alt: "Caixa de entrada jurídica com intimações novas e contadores do dia",
@@ -46,8 +47,8 @@ export const MODULES: ModuleShot[] = [
   {
     id: "painel", label: "Visão geral", image: "/produto/painel.webp", alt: "Painel inicial com indicadores do escritório",
     title: "O escritório inteiro num só olhar",
-    text: "Painel com membros, clientes, processos, prazos em aberto e vencidos, tarefas pessoais, intimações novas e atividade do escritório.",
-    points: ["Indicadores calculados dos dados reais", "Três espaços de trabalho com identidade própria: Func, Box e Chat", "Tema escuro e claro", "Instalável no celular como aplicativo (PWA)"],
+    text: "Painel com membros, clientes, processos, prazos em aberto e vencidos, tarefas pessoais e atividade do escritório.",
+    points: ["Indicadores calculados dos dados reais", "Func e Chat com identidade própria", "Tema escuro e claro", "Instalável no celular como aplicativo (PWA)"],
   },
   {
     id: "relatorios", label: "Relatórios", image: "/produto/relatorios.webp", alt: "Relatórios e indicadores do escritório",
@@ -105,7 +106,7 @@ export const MODULES: ModuleShot[] = [
   },
 ];
 
-export const SPACES = [
+const ALL_SPACES = [
   { name: "LegalOS Func", tone: "#7C8CFF", text: "A gestão do escritório: clientes, processos, tarefas, prazos, agenda, documentos, financeiro, CRM e relatórios.", items: ["Clientes e processos", "Tarefas, prazos e agenda", "Financeiro e relatórios", "Portal do cliente"] },
   { name: "LegalOS Box", tone: "#0f8f83", text: "A caixa de intimações e o peticionamento: captura, distribuição, certificados digitais e integrações com tribunais.", items: ["Caixa de entrada jurídica", "DJEN e DataJud", "Cofre de certificados A1", "Petições e conector PJe/MNI"] },
   { name: "LegalOS Chat", tone: "#e0a800", text: "WhatsApp ligado à rotina jurídica e caixa de e-mail compartilhada, com configuração por escritório.", items: ["Filas, etiquetas, macros e listas salvas", "Copiloto com revisão humana", "Campanhas com aprovação e agendamento", "E-mail IMAP/SMTP e respostas em texto"] },
@@ -136,17 +137,17 @@ export const SECURITY = [
   { title: "Permissões granulares", text: `${FACTS.permissions} permissões combináveis em perfis (proprietário, administrador, advogado, financeiro, assistente e mais), com o mínimo de acesso por padrão.` },
   { title: "Verificação em duas etapas (2FA)", text: "Código do aplicativo autenticador e códigos de recuperação. Exigida de administradores da plataforma e em integrações sensíveis, como webhooks." },
   { title: "Trilha de auditoria", text: "Quem fez o quê, quando e de onde. Falhas e acessos negados também ficam registrados." },
-  { title: "Cofre cifrado", text: "Certificados digitais A1 e chaves de integração guardados cifrados; nenhuma chave aparece na tela depois de salva." },
+  { title: "Cofre cifrado", text: "Chaves de integração guardadas cifradas; nenhuma chave aparece na tela depois de salva." },
   { title: "Backups cifrados", text: "Cópia diária do banco e dos documentos, cifrada, com rotina de verificação e restauração documentadas." },
 ] as const;
 
 export const HONESTY = [
   { title: "Nada é falso", text: "Se uma integração não está configurada, o sistema avisa. Ele não simula resposta, não inventa dado e não finge que enviou." },
-  { title: "Nada sai sem autorização", text: "Mensagens a clientes, cobranças e protocolos dependem de decisão humana. Toda automação tem seu botão de ligar e desligar." },
+  { title: "Nada sai sem autorização", text: "Mensagens a clientes e cobranças dependem de decisão humana. Toda automação tem seu botão de ligar e desligar." },
   { title: "IA só com chave real e supervisão", text: "Os recursos de IA ficam desligados até o escritório configurar a chave do provedor. Mascaram CPF e CNPJ e só sugerem: uma pessoa decide." },
 ] as const;
 
-export const INTEGRATIONS: { name: string; note?: string }[] = [
+const ALL_INTEGRATIONS: { name: string; note?: string }[] = [
   { name: "DJEN" }, { name: "DataJud (CNJ)" }, { name: "WhatsApp Meta e QR-Code" }, { name: "Asaas" },
   { name: "PJe / MNI", note: "conector pronto, em validação" }, { name: "SMTP (e-mail)" }, { name: "API pública v1" }, { name: "Webhooks assinados" },
 ];
@@ -163,3 +164,8 @@ export const PWA = {
     { title: "Sempre na versão atual", text: "Atualiza sozinho quando o escritório publica uma versão nova, sem baixar nada." },
   ],
 } as const;
+
+export const MODULES = ALL_MODULES.filter(m => BOX_AVAILABLE || m.id !== "caixa");
+export const SPACES = ALL_SPACES.filter(s => BOX_AVAILABLE || s.name !== "LegalOS Box");
+
+export const INTEGRATIONS = ALL_INTEGRATIONS.filter(i => BOX_AVAILABLE || !["DJEN", "PJe / MNI", "DataJud (CNJ)"].includes(i.name));

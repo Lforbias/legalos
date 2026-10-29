@@ -7,26 +7,26 @@ import { Reveal } from "../showcase-client";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Roadmap", description: "Tudo o que o LegalOS já entrega e tudo o que está sendo construído, versão por versão." };
 
+const activePhase = (p: Phase) => !/Box|LegalMail|intima|certificad|tribun|DJEN|MNI|peticionamento/i.test(p.title);
+
 type Block = { version: string; name: string; phases: Phase[] };
 
 const DELIVERED: Block[] = [
   { version: "6.0", name: "RUTE, a IA do LegalOS", phases: PHASES_6 },
   { version: "5.0", name: "Cálculos, portal do cliente, cobrança e copiloto", phases: PHASES_5 },
-  { version: "4.0", name: "LegalOS Chat completo", phases: PHASES_4.filter((p) => p.status === "feita") },
-  { version: "3.0", name: "Box: petições, tribunais e documentos", phases: PHASES_3.filter((p) => p.status === "feita") },
-  { version: "2.0", name: "Gestão do escritório, financeiro, migração e IA", phases: PHASES_2.filter((p) => p.status === "feita") },
+  { version: "4.0", name: "LegalOS Chat completo", phases: PHASES_4.filter((p) => p.status === "feita" && activePhase(p)) },
+  { version: "2.0", name: "Gestão do escritório, financeiro, migração e IA", phases: PHASES_2.filter((p) => p.status === "feita" && activePhase(p)) },
 ];
 
 const BASE = [
   "Clientes, processos, tarefas, prazos, agenda, documentos e CRM",
-  "Intimações pelo DJEN, consulta no DataJud e conector PJe/MNI",
   "WhatsApp (API oficial ou QR-Code), fila de atendimento e robô",
   "Financeiro, relatórios, equipe e portal do cliente",
   "Multi-escritório com permissões por perfil, auditoria e verificação em duas etapas",
   "API pública, webhooks e aplicativo instalável no celular (PWA)",
 ];
 
-const PENDING = PHASES_3.concat(PHASES_4).filter((p) => p.status !== "feita");
+const PENDING = PHASES_3.concat(PHASES_4).filter((p) => p.status !== "feita" && activePhase(p));
 
 const BUILDING: { title: string; text: string; items: string[] }[] = [
   {

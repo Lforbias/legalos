@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import { conditionsSchema } from "./conditions";
 import { TASK_PRIORITIES, TASK_PRIORITY_LABEL } from "@/modules/tasks/schemas";
 
@@ -43,6 +44,7 @@ export const ruleSchema = z
     noticeTags: z.string().trim().max(300).optional(),
   })
   .superRefine((v, ctx) => {
+    if (!BOX_AVAILABLE && v.trigger === "NOTICE_RECEIVED") ctx.addIssue({ code: "custom", path: ["trigger"], message: "O Box foi retirado; este gatilho está indisponível." });
     if (v.trigger !== "NOTICE_RECEIVED" && (v.noticeAssigneeId || v.noticeTags)) ctx.addIssue({ code: "custom", path: ["trigger"], message: "Distribuição e etiquetas só se aplicam a intimações." });
     if (v.assigneeMode === "FIXED" && !v.assigneeId) ctx.addIssue({ code: "custom", path: ["assigneeId"], message: "Escolha o membro." });
     if (v.assigneeMode === "CASE_RESPONSIBLE" && v.trigger === "LEAD_WON") ctx.addIssue({ code: "custom", path: ["assigneeMode"], message: "Lead ganho não tem processo." });

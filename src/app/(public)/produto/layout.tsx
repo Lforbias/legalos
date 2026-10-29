@@ -6,9 +6,9 @@ import { contact } from "./_parts";
 
 export const metadata: Metadata = {
   title: { default: "LegalOS — gestão jurídica integrada", template: "%s · LegalOS" },
-  description: "Processos, intimações, prazos, financeiro e atendimento por WhatsApp num só sistema, feito para escritórios de advocacia.",
+  description: "Processos, tarefas, prazos, financeiro e atendimento por WhatsApp num só sistema, feito para escritórios de advocacia.",
   robots: { index: true, follow: true },
-  openGraph: { title: "LegalOS — gestão jurídica integrada", description: "Tudo do escritório num só sistema: processos, intimações, prazos, financeiro e WhatsApp.", type: "website", locale: "pt_BR" },
+  openGraph: { title: "LegalOS — gestão jurídica integrada", description: "Tudo do escritório num só sistema: processos, tarefas, prazos, financeiro e WhatsApp.", type: "website", locale: "pt_BR" },
 };
 
 const NAV = [
@@ -53,7 +53,7 @@ export default function ProdutoLayout({ children }: { children: React.ReactNode 
         <div className="mx-auto grid max-w-7xl gap-10 px-4 py-14 md:grid-cols-[2fr_1fr_1fr]">
           <div>
             <Brand />
-            <p className="mt-4 max-w-sm text-sm text-muted">Gestão jurídica integrada: processos, intimações, prazos, financeiro e atendimento por WhatsApp, num só lugar.</p>
+            <p className="mt-4 max-w-sm text-sm text-muted">Gestão jurídica integrada: processos, tarefas, prazos, financeiro e atendimento por WhatsApp, num só lugar.</p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-muted">Explorar</p>

@@ -1,3 +1,4 @@
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import { CASE_NATURE_LABEL } from "@/modules/cases/schemas";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -103,7 +104,7 @@ export default async function CaseDetailPage({
   const canWrite = can(ctx, "cases:write");
   const dj = canWrite && c.number && !c.confidential ? await datajudStatus(ctx) : null;
   const showDatajud = Boolean(dj?.keyConfigured && dj.orgEnabled);
-  const mni = canWrite && c.number && !c.confidential ? await connectionForCase(ctx, c.id).catch(() => null) : null;
+  const mni = BOX_AVAILABLE && canWrite && c.number && !c.confidential ? await connectionForCase(ctx, c.id).catch(() => null) : null;
   const canDocs = can(ctx, "documents:read");
   const canDeadlines = can(ctx, "deadlines:read");
   const canTasks = can(ctx, "tasks:read");
@@ -156,7 +157,7 @@ export default async function CaseDetailPage({
         description={c.number ? `Nº ${formatCnj(c.number)}` : c.legacyNumber ? `Nº ${c.legacyNumber}` : (CASE_NATURE_LABEL[c.nature as keyof typeof CASE_NATURE_LABEL] ?? "Caso")}
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            {canDocs ? <Link href={`/processos/${c.id}/autos`} className={buttonVariants({ variant: "secondary" })}>Autos digitais</Link> : null}
+            {BOX_AVAILABLE && canDocs ? <Link href={`/processos/${c.id}/autos`} className={buttonVariants({ variant: "secondary" })}>Autos digitais</Link> : null}
             {c.confidential ? (
               <Badge tone="warning">
                 <Lock className="mr-1 h-3 w-3" aria-hidden /> Sigiloso

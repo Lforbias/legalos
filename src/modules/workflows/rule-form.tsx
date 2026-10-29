@@ -1,4 +1,5 @@
 "use client";
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 
 import { CONDITION_FIELDS, EMPTY_CONDITIONS } from "./conditions";
 import { useRouter } from "next/navigation";
@@ -47,7 +48,7 @@ export function RuleForm({ ruleId, initial, members }: { ruleId?: string; initia
                 form.setValue("trigger", next, { shouldDirty: true });
                 if (next !== "NOTICE_RECEIVED") { form.setValue("noticeAssigneeId", ""); form.setValue("noticeTags", ""); }
               }}>
-                {WORKFLOW_TRIGGERS.map((t) => (
+                {WORKFLOW_TRIGGERS.filter(t => BOX_AVAILABLE || t !== "NOTICE_RECEIVED").map((t) => (
                   <option key={t} value={t}>{TRIGGER_LABEL[t]}</option>
                 ))}
               </Select>

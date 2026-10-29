@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { BOX_AVAILABLE, isBoxPermission } from "@/lib/box-retirement";
 import { db } from "@/lib/db/client";
 import type { PermissionKey } from "@/lib/permissions/catalog";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -64,6 +65,7 @@ async function issueApiKey(ctx: TenantContext, input: ApiKeyInput) {
   const scopes = [...new Set(input.scopes)];
   if (scopes.length === 0 || scopes.some((s) => !Object.hasOwn(API_SCOPES, s))) throw new ValidationError("Escolha ao menos um acesso válido.", { scopes: ["Escolha ao menos um acesso."] });
   for (const s of scopes) {
+    if (!BOX_AVAILABLE && (s.startsWith("pje:") || isBoxPermission(API_SCOPES[s as ApiScope].permission))) throw new ConflictError("O Box foi retirado; estes acessos estão indisponíveis.");
     if (!can(ctx, API_SCOPES[s as ApiScope].permission)) throw new ValidationError("Você não tem permissão para conceder um dos acessos escolhidos.", { scopes: [`Seu perfil não permite: ${API_SCOPES[s as ApiScope].label}.`] });
   }
   const days = input.expiresInDays ?? null;
@@ -93,7 +95,7 @@ export async function listApiKeys(ctx: TenantContext) {
     select: { id: true, name: true, prefix: true, scopes: true, expiresAt: true, lastUsedAt: true, revokedAt: true, createdAt: true },
   });
   const now = new Date();
-  return rows.map((r) => ({ ...r, status: r.revokedAt ? ("REVOKED" as const) : r.expiresAt && r.expiresAt <= now ? ("EXPIRED" as const) : ("ACTIVE" as const) }));
+  return rows.map((r) => ({ ...r, status: r.revokedAt ? ("REVOKED" as const) : r.expiresAt && r.expiresAt <= now ? ("EXPIRED" as const) : !BOX_AVAILABLE && r.scopes.every(s => s.startsWith("pje:") || (API_SCOPES[s as ApiScope] && isBoxPermission(API_SCOPES[s as ApiScope].permission))) ? ("SUSPENDED" as const) : ("ACTIVE" as const) }));
 }
 
 export async function revokeApiKey(ctx: TenantContext, id: string) {
@@ -125,7 +127,7 @@ export async function authenticateApiKey(token: string, meta: RequestMeta = {}):
   const scopes = new Set<ApiScope>();
   for (const s of key.scopes) {
     const def = API_SCOPES[s as ApiScope];
-    if (def && can(ctx, def.permission)) scopes.add(s as ApiScope);
+    if (def && (BOX_AVAILABLE || (!s.startsWith("pje:") && !isBoxPermission(def.permission))) && can(ctx, def.permission)) scopes.add(s as ApiScope);
   }
   if (!key.lastUsedAt || Date.now() - key.lastUsedAt.getTime() > 5 * 60_000) {
     await db.apiKey.update({ where: { id: key.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);

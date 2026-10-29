@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError } from "@/lib/permissions/check";
@@ -16,10 +17,12 @@ async function access(ctx: TenantContext, caseId: string, write = false) {
   await assertCaseVisible(ctx, caseId);
 }
 export async function latestAutosJob(ctx: TenantContext, caseId: string) {
+  assertBoxAvailable();
   await access(ctx, caseId);
   return db.autosDownloadJob.findFirst({ where: { organizationId: ctx.organizationId, caseId }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { id: true, status: true, listed: true, imported: true, remaining: true, skipped: true, attempts: true, error: true, updatedAt: true, nextRunAt: true } });
 }
 export async function enqueueAutos(ctx: TenantContext, caseId: string) {
+  assertBoxAvailable();
   await access(ctx, caseId, true);
   const c = await db.case.findFirstOrThrow({ where: { id: caseId, organizationId: ctx.organizationId } });
   if (c.confidential || !c.number) throw new ConflictError("A fila exige processo não sigiloso com número CNJ.");
@@ -40,6 +43,7 @@ export async function enqueueAutos(ctx: TenantContext, caseId: string) {
   }
 }
 export async function retryAutos(ctx: TenantContext, caseId: string, id: string) {
+  assertBoxAvailable();
   await access(ctx, caseId, true);
   const job = await db.autosDownloadJob.findFirst({ where: { id, caseId, organizationId: ctx.organizationId } });
   if (!job) throw new NotFoundError("Download não encontrado.");
@@ -52,6 +56,7 @@ export async function retryAutos(ctx: TenantContext, caseId: string, id: string)
 }
 /** Uma passagem de até 10 arquivos por chamada. Lease e token impedem dois workers de concluir o mesmo lote. */
 export async function runAutosQueue(opts: { importer?: typeof importAutosMni; now?: Date } = {}) {
+  assertBoxAvailable();
   const now = opts.now ?? new Date();
   const candidates = await db.autosDownloadJob.findMany({ where: { OR: [{ status: { in: ["QUEUED", "RETRY"] }, nextRunAt: { lte: now } }, { status: "RUNNING", leaseUntil: { lt: now } }] }, orderBy: { nextRunAt: "asc" }, take: 1 });
   let completed = 0, failed = 0, processed = 0;

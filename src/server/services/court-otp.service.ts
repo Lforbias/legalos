@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -17,10 +18,12 @@ async function authorize(ctx: TenantContext, code: string) {
   if (!await verifySecondFactor(ctx.userId, code)) throw new ValidationError("Informe o código atual do 2FA do LegalOS. Cada código só pode ser usado uma vez.");
 }
 export async function listCourtOtps(ctx: TenantContext) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   return db.courtOtpAuthenticator.findMany({ where: { organizationId: ctx.organizationId, userId: ctx.userId, revokedAt: null }, select: { id: true, label: true, createdAt: true }, orderBy: { createdAt: "desc" } });
 }
 export async function saveCourtOtp(ctx: TenantContext, raw: unknown) {
+  assertBoxAvailable();
   const input = z.object({ label: z.string().trim().min(3).max(80), secret: z.string().max(2048), confirmationCode: z.string().regex(/^\d{6}$/), authorizationCode: z.string().min(6).max(30) }).parse(raw);
   const k = key();
   await authorize(ctx, input.authorizationCode);
@@ -35,6 +38,7 @@ export async function saveCourtOtp(ctx: TenantContext, raw: unknown) {
   });
 }
 export async function revealCourtOtp(ctx: TenantContext, id: string, authorizationCode: string) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   const row = await db.courtOtpAuthenticator.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, revokedAt: null } });
   if (!row) throw new NotFoundError("Autenticador não encontrado.");
@@ -45,6 +49,7 @@ export async function revealCourtOtp(ctx: TenantContext, id: string, authorizati
   return { code, expiresAt: new Date((totpStep(now) + 1) * 30_000).toISOString() };
 }
 export async function revokeCourtOtp(ctx: TenantContext, id: string, authorizationCode: string) {
+  assertBoxAvailable();
   await authorize(ctx, authorizationCode);
   const changed = await db.courtOtpAuthenticator.updateMany({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, revokedAt: null }, data: { secretEnc: "", revokedAt: new Date() } });
   if (changed.count !== 1) throw new NotFoundError("Autenticador não encontrado.");

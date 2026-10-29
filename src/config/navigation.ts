@@ -31,6 +31,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import type { PermissionKey } from "@/lib/permissions/catalog";
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 
 /** Os três "lugares" do LegalOS. Func = gestão do escritório (estilo Astrea/Advbox); Box = caixa de intimações, capturas e peticionamento (estilo LegalMail); Chat = atendimento por WhatsApp (estilo ChatGuru). */
 export type Space = "func" | "box" | "chat";
@@ -42,7 +43,7 @@ export const SPACES: Record<Space, { name: string; short: string; home: string; 
 };
 
 /** Caminhos que pertencem ao Box e ao Chat; todo o resto pertence ao Func. */
-const BOX_PREFIXES = ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/integracoes", "/monitoramento"];
+const BOX_PREFIXES = ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/monitoramento", "/integracoes/pje"];
 const CHAT_PREFIXES = ["/atendimento"];
 const under = (pathname: string, prefixes: string[]) => prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
@@ -103,7 +104,7 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "ai", space: "func", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use", phase: 8, implemented: true, summary: "Perguntas sobre o processo com fontes citadas, opt-in por escritório e limite mensal de consumo." },
   { key: "certificates", space: "box", label: "Certificados digitais", href: "/certificados", icon: KeyRound, permission: "certificates:manage", phase: 10, implemented: true, summary: "Cofre de certificados A1 cifrados, com registro de uso e alerta de vencimento (base do motor de tribunais).", box: "legacy" },
   { key: "pje-connect", space: "box", label: "Conectar PJe", href: "/integracoes/pje", icon: KeyRound, permission: "cases:read", phase: 14, implemented: true, summary: "Informe o seu login do PJe uma vez: o LegalOS entra, confere o acesso e mostra o resultado.", box: "legacy" },
-  { key: "integrations", space: "box", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "Consulta DataJud/CNJ (opt-in); e-mail e calendários em etapa futura.", box: "legacy" },
+  { key: "integrations", space: "func", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "API, Google e integrações compartilhadas." },
   { key: "monitoring", space: "box", label: "Monitoramento", href: "/monitoramento", icon: Activity, permission: "integrations:manage", phase: 10, implemented: true, summary: "Saúde da captura de intimações (DJEN e PJe/MNI): última execução, erros e fontes paradas.", box: "legacy" },
   { key: "prototypes", space: "both", label: "Protótipos", href: "/prototipos", icon: FlaskConical, phase: 0, implemented: true, summary: "Telas só visuais das próximas versões (visível só com LEGALOS_PROTOTYPES=1)." },
   { key: "help", space: "both", label: "Ajuda", href: "/ajuda", icon: CircleHelp, phase: 1, implemented: true, summary: "Primeiros passos, guias de uso e caminhos da plataforma." },
@@ -111,7 +112,7 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /** O item vale para a versão do Box em uso? (item sem marca vale sempre). */
-export const navItemInBoxVersion = (n: Pick<NavItem, "box">, boxV2: boolean) => !n.box || (n.box === "v2") === boxV2;
+export const navItemInBoxVersion = (n: Pick<NavItem, "box"> & { space?: string }, boxV2: boolean) => (BOX_AVAILABLE || (n.space !== "box" && !n.box)) && (!n.box || (n.box === "v2") === boxV2);
 
 export function getNavItem(key: string) {
   return NAV_ITEMS.find((n) => n.key === key);

@@ -1,4 +1,5 @@
 "use client";
+import { BOX_AVAILABLE, isBoxPermission } from "@/lib/box-retirement";
 
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Input, Textarea } from "@/components/ui/form";
-import { ALL_PERMISSIONS, PERMISSION_GROUPS, PERMISSION_LABELS } from "@/lib/permissions/catalog";
+import { ALL_PERMISSIONS, VISIBLE_PERMISSION_GROUPS, PERMISSION_LABELS } from "@/lib/permissions/catalog";
 import { createRoleAction, deleteRoleAction, updateRoleAction } from "./actions";
 
 type Role = { id: string; key: string; name: string; description: string | null; permissions: string[]; isSystem: boolean; memberCount: number };
@@ -53,7 +54,7 @@ export function RolesManager({ roles, actorPermissions, actorIsOwner, canManage 
               <details className="text-xs">
                 <summary className="cursor-pointer text-primary-text">Ver permissões</summary>
                 <ul className="mt-2 columns-1 gap-4 text-muted sm:columns-2">
-                  {ALL_PERMISSIONS.filter((k) => r.permissions.includes(k)).map((k) => (
+                  {ALL_PERMISSIONS.filter((k) => (BOX_AVAILABLE || !isBoxPermission(k)) && r.permissions.includes(k)).map((k) => (
                     <li key={k} className="break-inside-avoid py-0.5">
                       {PERMISSION_LABELS[k]}
                     </li>
@@ -150,7 +151,7 @@ function RoleEditor({
             </Field>
           </div>
           <div className="grid gap-4 md:grid-cols-2">
-            {PERMISSION_GROUPS.map((g) => (
+            {VISIBLE_PERMISSION_GROUPS.map((g) => (
               <fieldset key={g.key} className="rounded-md border border-border p-3">
                 <legend className="px-1 text-xs font-semibold text-muted">{g.label}</legend>
                 <div className="space-y-1.5">

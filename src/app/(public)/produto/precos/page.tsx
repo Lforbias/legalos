@@ -33,7 +33,7 @@ export default function PricingPage() {
         </div>
         <div className="mt-16 grid gap-5 border-t border-white/15 pt-7 sm:grid-cols-3">
           <div><p className="text-3xl font-medium">{featureCount}</p><p className="mt-1 text-sm text-white/55">recursos e operações catalogados</p></div>
-          <div><p className="text-3xl font-medium">Um ecossistema</p><p className="mt-1 text-sm text-white/55">Func · Box · Chat · RUTE · Desktop</p></div>
+          <div><p className="text-3xl font-medium">Um ecossistema</p><p className="mt-1 text-sm text-white/55">Func · Chat · RUTE · Desktop</p></div>
           <div><p className="text-3xl font-medium">4 planos</p><p className="mt-1 text-sm text-white/55">a partir de R$ 79 por mês</p></div>
         </div>
       </div>

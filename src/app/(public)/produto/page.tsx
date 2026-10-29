@@ -1,4 +1,4 @@
-import { ArrowRight, BellRing, CalendarClock, Inbox, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
+import { ArrowRight, BellRing, CalendarClock, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { COMING_SOON, FACTS, RUTE_INFO, HONESTY, INTEGRATIONS, MODULES, PWA, SPACES } from "@/config/showcase";
 import { PHASES_2 } from "@/lib/updates";
@@ -10,15 +10,15 @@ import { DesktopShowcase } from "./desktop-showcase";
 export const dynamic = "force-dynamic";
 
 const STATS = [
-  { n: String(FACTS.spaces), label: "espaços integrados", sub: "Func, Box e Chat" },
+  { n: String(FACTS.spaces), label: "espaços integrados", sub: "Func e Chat" },
   { n: String(FACTS.permissions), label: "permissões granulares", sub: "mínimo de acesso por padrão" },
   { n: `${FACTS.tests}+`, label: "testes automatizados", sub: `mais ${FACTS.e2e} testes de ponta a ponta` },
   { n: `${FACTS.tables}`, label: "estruturas de dados", sub: "tudo isolado por escritório" },
 ];
 
 const DAY = [
-  { t: "08:02", icon: Inbox, title: "Chega uma intimação", text: "Capturada do DJEN pela OAB e colocada na caixa do escritório." },
-  { t: "08:03", icon: Sparkles, title: "Vai para quem trata", text: "Distribuída ao advogado do caso. A IA, se estiver ligada, sugere a providência." },
+  { t: "08:02", icon: CalendarClock, title: "Organize o dia", text: "Confira os compromissos e as tarefas do escritório." },
+  { t: "08:03", icon: Sparkles, title: "Vai para quem trata", text: "A tarefa é atribuída à pessoa responsável pelo caso." },
   { t: "08:10", icon: CalendarClock, title: "Vira prazo", text: "O prazo é calculado, fica como rascunho e só vale depois de conferido por uma pessoa." },
   { t: "09:30", icon: MessageCircle, title: "O cliente pergunta", text: "A conversa de WhatsApp já mostra o processo, as tarefas e o financeiro daquele cliente." },
   { t: "17:00", icon: BellRing, title: "Nada se perde", text: "Prazos e tarefas do dia aparecem para cada pessoa, com aviso dentro do sistema." },
@@ -42,7 +42,7 @@ export default function ProdutoHome() {
               O escritório inteiro.<br /><span style={{ background: "linear-gradient(110deg, #fff 15%, #ffe168 85%)", backgroundClip: "text", color: "transparent" }}>Num só sistema.</span>
             </h1>
             <p className="mx-auto mt-6 max-w-2xl text-lg text-white/70 md:text-xl">
-              Processos, intimações, prazos, financeiro e WhatsApp conversando entre si. Menos aba aberta, menos prazo na cabeça, mais tempo para advogar.
+              Processos, tarefas, prazos, financeiro e WhatsApp conversando entre si. Menos aba aberta, menos prazo na cabeça, mais tempo para advogar.
             </p>
             <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <CtaLink variant="solid" />
@@ -76,7 +76,7 @@ export default function ProdutoHome() {
             Planilha aqui. <span className="text-muted">WhatsApp ali.</span> Prazo <span className="text-muted">na cabeça.</span>
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg text-muted">
-            O escritório funciona quando tudo conversa. No LegalOS, a intimação vira prazo, o prazo vira tarefa, a tarefa aparece na conversa do cliente e o honorário fica no processo.
+            O escritório funciona quando tudo conversa. No LegalOS, o processo reúne os prazos, a tarefa aparece na conversa do cliente e o honorário fica no processo.
           </p>
         </Reveal>
       </section>

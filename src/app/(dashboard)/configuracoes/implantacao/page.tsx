@@ -7,7 +7,7 @@ import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Implantação do escritório" };
 const stages = [
-  { id: 1, title: "Etapa 1 — Operação processual", description: "Carteira, prazos, captura de intimações e acesso da equipe." },
+  { id: 1, title: "Etapa 1 — Operação processual", description: "Carteira, prazos, tarefas e acesso da equipe." },
   { id: 2, title: "Etapa 2 — Módulos conectados", description: "Financeiro, relacionamento, documentos, automações e RUTE." },
   { id: 3, title: "Etapa 3 — Adoção e acompanhamento", description: "Portal, migração, relatórios, celular e treinamento." },
 ] as const;

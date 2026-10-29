@@ -3,7 +3,7 @@
  * Availability remains subject to permissions, configuration and future commercial packaging.
  */
 export type PricingFeatureGroup = { name: string; condition: string | null; features: { id: string; label: string; evidence: string }[] };
-export const PRICING_FEATURES: PricingFeatureGroup[] = [
+const ALL_PRICING_FEATURES: PricingFeatureGroup[] = [
   {
     "name": "Clientes",
     "condition": null,
@@ -1733,3 +1733,6 @@ export const PRICING_FEATURES: PricingFeatureGroup[] = [
     ]
   }
 ];
+
+const removedBoxEvidence = /(?:notice|inbox-flow|djen|datajud|mni|certificate|petition|monitoring|portal-access|pje-discovery|court-otp|autos-queue)\.service/;
+export const PRICING_FEATURES = ALL_PRICING_FEATURES.map(g => ({ ...g, features: g.features.filter(f => !removedBoxEvidence.test(f.evidence)) })).filter(g => g.features.length > 0);

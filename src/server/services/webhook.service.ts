@@ -1,4 +1,5 @@
 import { randomBytes, randomUUID } from "node:crypto";
+import { BOX_AVAILABLE, isBoxEvent } from "@/lib/box-retirement";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -53,6 +54,7 @@ export async function createWebhook(ctx: TenantContext, input: WebhookInput) {
     throw new ValidationError("Endereço inválido.", { url: [e instanceof WebhookUrlError ? e.message : "Endereço inválido."] });
   }
   const events = [...new Set(input.events)];
+  if (!BOX_AVAILABLE && events.some(isBoxEvent)) throw new ConflictError("Eventos do Box estão indisponíveis.");
   if (events.length === 0 || events.some((e) => !(e in WEBHOOK_EVENTS))) throw new ValidationError("Escolha ao menos um evento válido.", { events: ["Escolha ao menos um evento."] });
   const count = await db.webhookEndpoint.count({ where: { organizationId: ctx.organizationId, deletedAt: null } });
   if (count >= MAX_ENDPOINTS) throw new ConflictError(`Limite de ${MAX_ENDPOINTS} webhooks. Remova algum antes de criar outro.`);
@@ -122,6 +124,7 @@ type Envelope = { id: string; type: string; createdAt: string; data: Record<stri
 
 /** Enfileira o evento para cada webhook ativo que o assinou. Nunca derruba a operação de origem. Carga mínima: só identificadores. */
 export async function emitWebhookEvent(organizationId: string, type: WebhookEvent, data: Record<string, unknown>): Promise<number> {
+  if (!BOX_AVAILABLE && isBoxEvent(type)) return 0;
   try {
     const endpoints = await db.webhookEndpoint.findMany({ where: { organizationId, deletedAt: null, enabled: true, events: { has: type } }, select: { id: true } });
     if (!endpoints.length) return 0;
@@ -141,6 +144,7 @@ export async function emitWebhookEvent(organizationId: string, type: WebhookEven
 type DeliveryRow = { id: string; organizationId: string; endpointId: string; payload: unknown; attempts: number; eventType: string; eventId: string };
 
 async function attempt(d: DeliveryRow): Promise<"SUCCEEDED" | "PENDING" | "FAILED"> {
+  if (!BOX_AVAILABLE && isBoxEvent(d.eventType)) return "PENDING";
   const ep = await db.webhookEndpoint.findFirst({ where: { id: d.endpointId, organizationId: d.organizationId, deletedAt: null }, select: { url: true, secretEnc: true, enabled: true } });
   if (!ep || !ep.enabled) {
     await db.webhookDelivery.update({ where: { id: d.id }, data: { status: "FAILED", lastError: "Webhook removido ou desligado." } });
@@ -202,6 +206,7 @@ export async function runWebhookDeliveries(limit = 50): Promise<WebhookRunResult
     WHERE id IN (
       SELECT id FROM webhook_deliveries
       WHERE status = 'PENDING' AND next_attempt_at <= now()
+        AND (${BOX_AVAILABLE} OR event_type NOT IN ('notice.created', 'petition.submitted', 'petition.failed'))
         AND organization_id NOT IN (SELECT id FROM organizations WHERE suspended_at IS NOT NULL OR deleted_at IS NOT NULL)
       ORDER BY next_attempt_at LIMIT ${limit} FOR UPDATE SKIP LOCKED)
     RETURNING id, organization_id AS "organizationId", endpoint_id AS "endpointId", payload, attempts, event_type AS "eventType", event_id AS "eventId"`;

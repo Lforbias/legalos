@@ -1,3 +1,4 @@
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccessDenied } from "@/components/layout/access-denied";
@@ -18,11 +19,11 @@ export default async function ImportPage() {
   const { ctx, organization } = await requireTenant();
   if (!can(ctx, "cases:write")) return <AccessDenied />;
   const dj = await datajudStatus(ctx);
-  const mniCount = await db.courtConnection.count({ where: { organizationId: ctx.organizationId, enabled: true } });
+  const mniCount = BOX_AVAILABLE ? await db.courtConnection.count({ where: { organizationId: ctx.organizationId, enabled: true } }) : 0;
   const batches = await listImportBatches(ctx);
   return (
     <div className="mx-auto max-w-3xl space-y-4">
-      <PageHeader title="Importar processos" description="Cadastre vários processos de uma vez pelo número CNJ e, se quiser, traga andamentos e autos." actions={<Link href="/processos" className={buttonVariants({ variant: "secondary" })}>Voltar aos processos</Link>} />
+      <PageHeader title="Importar processos" description="Cadastre vários processos de uma vez pelo número CNJ." actions={<Link href="/processos" className={buttonVariants({ variant: "secondary" })}>Voltar aos processos</Link>} />
       <ImportForm datajudReady={dj.keyConfigured && dj.orgEnabled} mniReady={mniCount > 0} canDocs={can(ctx, "documents:write")} />
       {batches.length ? (
         <Card>

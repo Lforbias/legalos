@@ -1,4 +1,5 @@
 "use client";
+import { BOX_AVAILABLE } from "@/lib/box-retirement";
 
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -61,6 +62,7 @@ export function ImportForm({ datajudReady, mniReady, canDocs }: { datajudReady: 
               </Select>
             </Field>
           </div>
+          {BOX_AVAILABLE ? <>
           <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" className="mt-1" checked={v.datajud} disabled={!datajudReady} onChange={(e) => setV({ ...v, datajud: e.target.checked })} />
             <span>Buscar os andamentos públicos no DataJud{datajudReady ? "" : " (indisponível: desligado ou sem chave neste escritório)"}. O número do processo é enviado ao CNJ.</span>
@@ -73,6 +75,7 @@ export function ImportForm({ datajudReady, mniReady, canDocs }: { datajudReady: 
             <input type="checkbox" className="mt-1" checked={v.updateExisting} onChange={(e) => setV({ ...v, updateExisting: e.target.checked })} />
             <span>Também atualizar (andamentos/autos) os processos que já estão cadastrados.</span>
           </label>
+          </> : null}
         </CardBody>
       </Card>
       <Button type="submit" loading={pending} disabled={v.numbers.trim().length < 10}>Importar processos</Button>

@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { connectionSoapAction } from "@/lib/connectors/capabilities";
 import { connectorKeyForMniSystem } from "@/lib/judicial/catalog";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -19,6 +20,7 @@ const CODE = /^[A-Za-z0-9._-]{1,20}$/;
 
 /** Define os códigos de tipo de documento do tribunal para o protocolo. Só quem administra integrações; exige 2FA. */
 export async function setPetitionTypes(ctx: TenantContext, connectionId: string, raw: Record<string, string>) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   await requireMfa(ctx.userId);
   const clean: Record<string, string> = {};

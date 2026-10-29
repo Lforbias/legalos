@@ -1,10 +1,15 @@
+import { PROTOS_2 } from "@/modules/prototypes/phases-2";
+import { PROTOS_3 } from "@/modules/prototypes/phases-3";
+import { PROTOS_4 } from "@/modules/prototypes/phases-4";
 import { describe, expect, it } from "vitest";
 import { PHASES_2, PHASES_3, PHASES_4 } from "@/lib/updates";
 import { PROTOTYPES, getPrototype, prototypesEnabled } from "@/modules/prototypes/registry";
 
 describe("protótipos de tela", () => {
   it("há um protótipo para cada fase ainda por fazer das versões 2.0, 3.0 e 4.0", () => {
-    const pending = [...PHASES_2, ...PHASES_3, ...PHASES_4].filter((p) => p.status !== "feita").map((p) => p.id);
+    const retired = new Set([...PROTOS_2, ...PROTOS_3, ...PROTOS_4].filter(p => p.space === "Box").map(p => p.id));
+    expect(PROTOTYPES.some(p => p.space === "Box")).toBe(false);
+    const pending = [...PHASES_2, ...PHASES_3, ...PHASES_4].filter((p) => p.status !== "feita" && !retired.has(p.id)).map((p) => p.id);
     const have = new Set(PROTOTYPES.map((p) => p.id));
     expect(pending.filter((id) => !have.has(id))).toEqual([]);
   });

@@ -1,3 +1,4 @@
+import { assertBoxAvailable } from "@/server/box-guard";
 import { connectionSupports } from "@/lib/connectors/capabilities";
 import { db } from "@/lib/db/client";
 import { checkRequirements, COURT_SYSTEMS, getCourtSystem, type AuthMode } from "@/lib/court-systems";
@@ -43,12 +44,14 @@ async function rows(ctx: TenantContext, where: { userId?: string }): Promise<Cre
 }
 
 export async function listMyCredentials(ctx: TenantContext) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   return rows(ctx, { userId: ctx.userId });
 }
 
 /** Para quem administra integrações: quem tem credencial de quê (sem segredo). */
 export async function listOrgCredentials(ctx: TenantContext) {
+  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   return rows(ctx, {});
 }
@@ -56,6 +59,7 @@ export async function listOrgCredentials(ctx: TenantContext) {
 export type SaveCredentialInput = { system: string; courtCode?: string | null; authMode: string; document: string; password?: string | null; certificateId?: string | null };
 
 export async function saveMyCredential(ctx: TenantContext, input: SaveCredentialInput) {
+  assertBoxAvailable();
   assertCan(ctx, "cases:read");
   const key = requireKey();
   await requireMfa(ctx.userId);
@@ -82,6 +86,7 @@ export async function saveMyCredential(ctx: TenantContext, input: SaveCredential
 
 /** O dono remove a própria; quem administra integrações remove a de qualquer pessoa do escritório. */
 export async function deleteCredential(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   await requireMfa(ctx.userId);
   const admin = can(ctx, "integrations:manage");
   const r = await db.courtCredential.deleteMany({ where: { id, organizationId: ctx.organizationId, ...(admin ? {} : { userId: ctx.userId }) } });
@@ -94,6 +99,7 @@ export async function deleteCredential(ctx: TenantContext, id: string) {
  * NÃO acessa o tribunal (isso depende do conector e de acesso real): diz "completa e pronta" ou o que falta.
  */
 export async function verifyMyCredential(ctx: TenantContext, id: string) {
+  assertBoxAvailable();
   const c = await db.courtCredential.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId } });
   if (!c) throw new NotFoundError("Credencial não encontrada.");
   const key = requireKey();
@@ -114,6 +120,7 @@ export async function verifyMyCredential(ctx: TenantContext, id: string) {
  * Devolve null se a pessoa não tiver. Nunca é exposta por tela ou rota.
  */
 export async function resolveMyCredential(ctx: TenantContext, system: string, courtCode: string) {
+  assertBoxAvailable();
   const list = await db.courtCredential.findMany({ where: { organizationId: ctx.organizationId, userId: ctx.userId, system, courtCode: { in: [courtCode, ""] } } });
   const c = list.find((x) => x.courtCode === courtCode) ?? list.find((x) => x.courtCode === "");
   if (!c) return null;
