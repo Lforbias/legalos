@@ -285,8 +285,8 @@ export async function getDocumentForDownload(ctx: TenantContext, id: string, ver
 export async function deleteDocument(ctx: TenantContext, id: string) {
   assertCan(ctx, "documents:write");
   const doc = await loadDocumentChecked(ctx, id);
-  const active = await db.petitionFiling.count({ where: { documentId: id, organizationId: ctx.organizationId, deletedAt: null, status: { in: ["IN_REVIEW", "APPROVED", "SUBMITTING", "SUBMITTED"] } } });
-  const activeAsAttachment = await db.petitionAttachment.count({ where: { documentId: id, organizationId: ctx.organizationId, petition: { is: { deletedAt: null, status: { in: ["IN_REVIEW", "APPROVED", "SUBMITTING", "SUBMITTED"] } } } } });
+  const active = await db.petitionFiling.count({ where: { documentId: id, organizationId: ctx.organizationId, deletedAt: null, status: { in: ["IN_REVIEW", "APPROVED", "SUBMITTING", "SUBMITTED", "AWAITING_CONFIRMATION", "FILED_CONFIRMED", "UNKNOWN"] } } });
+  const activeAsAttachment = await db.petitionAttachment.count({ where: { documentId: id, organizationId: ctx.organizationId, petition: { is: { deletedAt: null, status: { in: ["IN_REVIEW", "APPROVED", "SUBMITTING", "SUBMITTED", "AWAITING_CONFIRMATION", "FILED_CONFIRMED", "UNKNOWN"] } } } } });
   if (active + activeAsAttachment > 0) throw new ConflictError("O documento está vinculado a uma petição em andamento ou protocolada e não pode ser excluído.");
   await db.$transaction(async (tx) => {
     const res = await tx.document.updateMany({ where: { id, organizationId: ctx.organizationId, deletedAt: null }, data: { deletedAt: new Date() } });

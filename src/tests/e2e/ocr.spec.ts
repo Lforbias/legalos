@@ -14,11 +14,11 @@ test("OCR: envia imagem, extrai o texto, busca pelo conteúdo e isola entre escr
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ocr ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso OCR ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso OCR ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso OCR ${id}` })).toBeVisible();
   await page.goto(`${page.url()}?aba=documentos`);
   await page.locator("#document-file").setInputFiles({ name: "intimacao.png", mimeType: "image/png", buffer: fs.readFileSync(path.join(process.cwd(), "src/tests/fixtures/scan.png")) });
@@ -52,7 +52,7 @@ test("OCR: envia imagem, extrai o texto, busca pelo conteúdo e isola entre escr
   await p2.getByRole("button", { name: "Criar conta" }).click();
   await p2.getByLabel("Nome do escritório").fill(`Banca o2 ${id2}`);
   await p2.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(p2.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(p2.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await p2.goto("/documentos?conteudo=hearing");
   await expect(p2.getByText(/Nada encontrado/)).toBeVisible();
   await other.close();

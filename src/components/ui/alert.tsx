@@ -8,10 +8,10 @@ const tones = {
   info: { cls: "bg-info-bg text-primary-text border-primary/30", Icon: Info },
 } as const;
 
-export function Alert({ tone = "info", children, className }: { tone?: keyof typeof tones; children: React.ReactNode; className?: string }) {
+export function Alert({ tone = "info", children, className, "data-testid": testId }: { tone?: keyof typeof tones; children: React.ReactNode; className?: string; "data-testid"?: string }) {
   const { cls, Icon } = tones[tone];
   return (
-    <div role={tone === "error" ? "alert" : "status"} className={cn("flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-6", cls, className)}>
+    <div role={tone === "error" ? "alert" : "status"} data-testid={testId} className={cn("flex items-start gap-2.5 rounded-xl border px-4 py-3 text-sm leading-6", cls, className)}>
       <Icon className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
       <div className="min-w-0">{children}</div>
     </div>

@@ -12,11 +12,11 @@ test("IA sem chave configurada: avisa com clareza, não simula resposta e está 
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ia ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso IA ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso IA ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso IA ${id}` })).toBeVisible();
   await page.getByRole("link", { name: "Perguntar à IA" }).click();
   await expect(page.getByRole("heading", { name: "Assistente de IA" })).toBeVisible();

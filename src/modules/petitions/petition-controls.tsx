@@ -48,6 +48,14 @@ function ReturnForm({ id }: { id: string }) {
   );
 }
 
+/** O que dizer depois de um envio. Teste nunca é chamado de protocolo; sem recibo oficial, não se afirma que foi protocolada. */
+function describeResult(r: { protocol: string | null; isDemo: boolean; status: string; environment: string; officiallyFiled: boolean }): string {
+  if (r.officiallyFiled) return `Petição protocolada com confirmação oficial. Protocolo: ${r.protocol}.`;
+  if (r.status === "AWAITING_CONFIRMATION") return `O tribunal respondeu${r.protocol ? ` (protocolo informado: ${r.protocol})` : ""}, mas sem o recibo oficial. Confira no tribunal e registre o recibo abaixo.`;
+  if (r.isDemo) return `Envio de DEMONSTRAÇÃO concluído${r.protocol ? ` (protocolo de teste: ${r.protocol})` : ""}. Nenhum tribunal recebeu esta petição.`;
+  return `Envio de TESTE concluído${r.protocol ? ` (protocolo de teste: ${r.protocol})` : ""}. Nenhum tribunal real recebeu esta petição.`;
+}
+
 export function PetitionControls({
   id,
   status,
@@ -56,9 +64,14 @@ export function PetitionControls({
   canApprove,
   real = false,
   caseNumber = null,
+  canResend = true,
+  resendBlockedReason = null,
 }: {
   real?: boolean;
   caseNumber?: string | null;
+  /** Falso quando não há certeza de que o tribunal não recebeu a petição: só a conferência por uma pessoa libera. */
+  canResend?: boolean;
+  resendBlockedReason?: string | null;
   id: string;
   status: string;
   stale: boolean;
@@ -78,22 +91,25 @@ export function PetitionControls({
       <div className="flex flex-wrap items-start gap-3">
         {status === "DRAFT" && canWrite ? <StepButton label="Enviar para revisão" action={() => requestReviewAction(id)} /> : null}
         {status === "IN_REVIEW" && canApprove ? <StepButton label="Aprovar" action={() => approvePetitionAction(id)} /> : null}
-        {["APPROVED", "FAILED"].includes(status) && canApprove && !stale ? (
+        {["APPROVED", "FAILED"].includes(status) && canApprove && !stale && canResend ? (
           <div className="space-y-2">
             {real ? (
               <Field label="Para protocolar no tribunal, digite o número do processo" htmlFor={`confirm-${id}`} hint={`Ato irreversível. Número: ${caseNumber ?? "sem número"}`}>
                 <Input id={`confirm-${id}`} value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" data-testid="petition-confirm" />
               </Field>
             ) : null}
-          <StepButton
-            label={real ? "Protocolar no tribunal" : status === "FAILED" ? "Tentar enviar de novo" : "Enviar (demonstração)"}
-            action={async () => {
-              const res = await submitPetitionAction(id, real ? confirm : undefined);
-              if (res.ok && res.data) setResult(res.data.isDemo ? `Envio SIMULADO concluído. Protocolo de demonstração: ${res.data.protocol}. Nenhum tribunal recebeu esta petição.` : `Petição protocolada: ${res.data.protocol}.`);
-              return res;
-            }}
-          />
+            <StepButton
+              label={real ? "Protocolar no tribunal" : status === "FAILED" ? "Tentar enviar de novo" : "Enviar (demonstração)"}
+              action={async () => {
+                const res = await submitPetitionAction(id, real ? confirm : undefined);
+                if (res.ok && res.data) setResult(describeResult(res.data));
+                return res;
+              }}
+            />
           </div>
+        ) : null}
+        {["APPROVED", "FAILED"].includes(status) && canApprove && !canResend && resendBlockedReason ? (
+          <Alert tone="warning" className="max-w-md" data-testid="petition-resend-blocked">{resendBlockedReason}</Alert>
         ) : null}
         {open && canWrite ? (
           <ConfirmAction label="Cancelar petição" confirmLabel="Cancelar petição" description="A petição fica cancelada e não pode mais ser enviada." action={() => cancelPetitionAction(id)} onDone={() => router.refresh()} />

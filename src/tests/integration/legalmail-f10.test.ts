@@ -39,7 +39,7 @@ describe("3.0-F10 — créditos e custos", () => {
     pc = { userId: admin.id, meta: META };
     outsider = { userId: lawyer.ctx.userId, meta: META };
     caseId = (await createCase(A.ctx, { ...base, number: CNJ, title: "Com número" })).id;
-    registerPetitioningAdapter({ key: "f10-real", label: "Real (teste)", isDemo: false, async submit() { submits++; return { protocol: `P-${submits}`, receipt: "ok" }; } } satisfies PetitioningAdapter);
+    registerPetitioningAdapter({ key: "f10-real", label: "Real (teste)", isDemo: false, async describeTarget() { return { connectorKey: "f10-real", courtCode: "TST", environment: "SIMULATED" as const }; }, async submit() { submits++; return { protocol: `P-${submits}`, receipt: "ok" }; } } satisfies PetitioningAdapter);
   });
   afterAll(() => {
     if (oldAdapter === undefined) delete process.env.PETITIONING_ADAPTER; else process.env.PETITIONING_ADAPTER = oldAdapter;

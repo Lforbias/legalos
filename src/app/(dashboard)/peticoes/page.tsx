@@ -10,7 +10,8 @@ import { Card } from "@/components/ui/card";
 import { Select } from "@/components/ui/form";
 import { formatDateTime } from "@/lib/dates/format";
 import { getPetitioningAdapter } from "@/lib/petitioning/adapter";
-import { PETITION_STATUS_LABEL, PETITION_STATUS_TONE, type PetitionStatusKey } from "@/modules/petitions/schemas";
+import { petitionStateInfo } from "@/lib/judicial/petition-state";
+import { PETITION_STATUS_LABEL } from "@/modules/petitions/schemas";
 import { can } from "@/server/context";
 import { listPetitions, PETITION_STATUSES } from "@/server/services/petition.service";
 import { requireTenant } from "@/server/session";
@@ -77,8 +78,7 @@ export default async function PetitionsPage({ searchParams }: { searchParams: Pr
                   </td>
                   <td className="px-3 py-2"><Link href={`/processos/${p.case.id}`} className="hover:underline">{p.case.title}</Link></td>
                   <td className="px-3 py-2">
-                    <Badge tone={PETITION_STATUS_TONE[p.status as PetitionStatusKey]}>{PETITION_STATUS_LABEL[p.status as PetitionStatusKey]}</Badge>
-                    {p.isDemo && p.status === "SUBMITTED" ? <Badge tone="warning" className="ml-1">demonstração</Badge> : null}
+                    {(() => { const i = petitionStateInfo(p.status, p.filingEnvironment, p.isDemo); return <Badge tone={i.tone}>{i.label}</Badge>; })()}
                   </td>
                   <td className="px-3 py-2 text-xs text-muted">{formatDateTime(p.updatedAt, organization.timezone)}</td>
                 </tr>

@@ -5,7 +5,7 @@ import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
-import { testCertificateTlsAction, restrictCertificateAction, authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction } from "./actions";
+import { testCertificateTlsAction, restrictCertificateAction, authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction, enableCertificateSigningAction, setCertificateSignerAction } from "./actions";
 
 export function UploadCertificateForm({ members }: { members: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -47,7 +47,7 @@ export function UploadCertificateForm({ members }: { members: { id: string; name
 
   return (
     <div className="space-y-3">
-      <Alert tone="info">Novos certificados entram em <strong>somente consulta</strong>. Protocolos, assinaturas e usos fora das consultas permitidas ficam bloqueados no servidor, inclusive em agendamentos. Cadastrar o certificado apenas o guarda no cofre; não envia nada ao tribunal.</Alert>
+      <Alert tone="info">Novos certificados entram em <strong>somente consulta</strong>. Assinar e protocolar é um poder separado: só passa a valer depois que alguém com essa permissão <strong>libera o certificado</strong> (com verificação em duas etapas e confirmação). Cadastrar o certificado apenas o guarda no cofre; não envia nada ao tribunal.</Alert>
       {error ? <Alert tone="error">{error}</Alert> : null}
       {ok ? <Alert tone="success">Certificado guardado em modo somente consulta.</Alert> : null}
       <Field label="Nome para identificar" htmlFor="cert-label" hint='Ex.: "Dra. Talita — A1 2026"'>
@@ -101,7 +101,7 @@ export function RevokeCertificateButton({ id }: { id: string }) {
   );
 }
 
-export function AuthorizedUsers({ certificateId, authorized, candidates }: { certificateId: string; authorized: { userId: string; name: string }[]; candidates: { id: string; name: string }[] }) {
+export function AuthorizedUsers({ certificateId, authorized, candidates, signingReleased = false, canManageSigning = false }: { certificateId: string; authorized: { userId: string; name: string; canSign?: boolean }[]; candidates: { id: string; name: string }[]; signingReleased?: boolean; canManageSigning?: boolean }) {
   const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const [pending, start] = React.useTransition();
@@ -120,12 +120,17 @@ export function AuthorizedUsers({ certificateId, authorized, candidates }: { cer
     });
   return (
     <div className="mt-2 space-y-1.5 text-xs">
-      <p className="text-muted">Também podem usar este certificado: {authorized.length ? "" : "ninguém além do titular."}</p>
+      <p className="text-muted">Também podem <strong>consultar</strong> com este certificado: {authorized.length ? "" : "ninguém além do titular."}</p>
       {authorized.length ? (
         <ul className="flex flex-wrap gap-1.5">
           {authorized.map((a) => (
             <li key={a.userId} className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-0.5">
               {a.name}
+              {signingReleased && canManageSigning ? (
+                <button type="button" aria-label={a.canSign ? `Retirar de ${a.name} o poder de assinar` : `Dar a ${a.name} o poder de assinar`} disabled={pending} className="text-primary-text hover:underline" onClick={() => run(() => setCertificateSignerAction(certificateId, a.userId, !a.canSign))}>
+                  {a.canSign ? "pode assinar · retirar" : "só consulta · permitir assinar"}
+                </button>
+              ) : a.canSign ? <span className="text-muted">pode assinar</span> : null}
               <button type="button" aria-label={`Remover ${a.name}`} disabled={pending} className="text-danger hover:underline" onClick={() => run(() => unauthorizeCertificateUserAction(certificateId, a.userId))}>
                 remover
               </button>
@@ -153,9 +158,29 @@ export function AuthorizedUsers({ certificateId, authorized, candidates }: { cer
   );
 }
 
+export function ReleaseSigningButton({ id, label }: { id: string; label: string }) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [typed, setTyped] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
+  const [pending, start] = React.useTransition();
+  if (!open) return <Button variant="secondary" onClick={() => setOpen(true)}>Liberar para assinatura e protocolo…</Button>;
+  return (
+    <div className="max-w-sm space-y-2 rounded-lg border border-border p-3 text-xs">
+      <p>Liberar permite assinar e protocolar petições com este certificado, por quem for autorizado a assinar. Cada protocolo ainda exige aprovação e a confirmação do número do processo. Ciência de intimações continua bloqueada. Para confirmar, digite o nome do certificado: <strong>{label}</strong></p>
+      <Input aria-label="Nome do certificado" value={typed} onChange={(e) => setTyped(e.target.value)} />
+      {error ? <p role="alert" className="text-danger">{error}</p> : null}
+      <div className="flex gap-2">
+        <Button size="sm" loading={pending} disabled={typed.trim() !== label} onClick={() => start(async () => { const r = await enableCertificateSigningAction(id, typed); if (!r.ok) setError(r.message ?? "Não foi possível liberar."); else { setOpen(false); router.refresh(); } })}>Liberar</Button>
+        <Button size="sm" variant="secondary" onClick={() => { setOpen(false); setTyped(""); setError(null); }}>Cancelar</Button>
+      </div>
+    </div>
+  );
+}
+
 export function RestrictCertificateButton({ id }: { id: string }) {
   const router = useRouter(); const [pending, start] = React.useTransition(); const [error, setError] = React.useState<string>();
-  return <div><Button variant="secondary" loading={pending} onClick={() => { setError(undefined); start(async () => { const res = await restrictCertificateAction(id); if (!res.ok) setError(res.message); else router.refresh(); }); }}>Restringir a somente consulta</Button>{error ? <p role="alert" className="text-xs text-danger">{error}</p> : null}</div>;
+  return <div><Button variant="secondary" loading={pending} onClick={() => { setError(undefined); start(async () => { const res = await restrictCertificateAction(id); if (!res.ok) setError(res.message); else router.refresh(); }); }}>Voltar para somente consulta</Button>{error ? <p role="alert" className="text-xs text-danger">{error}</p> : null}</div>;
 }
 
 export function TestCertificateTlsButton({ id }: { id: string }) {

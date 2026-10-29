@@ -5,7 +5,8 @@ import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
-import { TestCertificateTlsButton, RestrictCertificateButton, AuthorizedUsers, RevokeCertificateButton, UploadCertificateForm } from "@/modules/certificates/certificate-ui";
+import { SIGNING_STATE_LABEL, signingStateOf } from "@/lib/judicial/certificate-policy";
+import { TestCertificateTlsButton, RestrictCertificateButton, ReleaseSigningButton, AuthorizedUsers, RevokeCertificateButton, UploadCertificateForm } from "@/modules/certificates/certificate-ui";
 import { can } from "@/server/context";
 import { listAuthorizedUsers, listCertificates, runCertificateExpiryCheck, vaultAvailable, type CertStatus } from "@/server/services/certificate.service";
 import { listActiveMembers } from "@/server/services/members";
@@ -54,7 +55,7 @@ export default async function CertificatesPage() {
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-3 py-3">
                   <div className="min-w-0 space-y-0.5">
                     <p className="text-sm font-medium">
-                      {c.label} <Badge tone={STATUS[c.status].tone}>{STATUS[c.status].label}</Badge> <Badge tone={c.consultationOnly ? "info" : "warning"}>{c.consultationOnly ? "Somente consulta" : "Certificado anterior — sem trava de consulta"}</Badge>
+                      {c.label} <Badge tone={STATUS[c.status].tone}>{STATUS[c.status].label}</Badge> <Badge tone={c.consultationOnly ? "info" : "warning"}>{SIGNING_STATE_LABEL[signingStateOf(c)]}</Badge>
                     </p>
                     <p className="text-xs text-muted">
                       Titular: {c.ownerName} · {c.subjectCn}
@@ -63,9 +64,9 @@ export default async function CertificatesPage() {
                     <p className="text-xs text-muted">
                       Válido até {formatDate(c.notAfter, tz)} · {c.lastUsedAt ? `último uso ${formatDateTime(c.lastUsedAt, tz)}` : "ainda não usado"}
                     </p>
-                    {!c.revokedAt ? <AuthorizedUsers certificateId={c.id} authorized={authorizedById.get(c.id) ?? []} candidates={members.filter((m) => m.id !== c.ownerUserId).map((m) => ({ id: m.id, name: m.name }))} /> : null}
+                    {!c.revokedAt ? <AuthorizedUsers certificateId={c.id} authorized={authorizedById.get(c.id) ?? []} candidates={members.filter((m) => m.id !== c.ownerUserId).map((m) => ({ id: m.id, name: m.name }))} signingReleased={!c.consultationOnly} canManageSigning={can(ctx, "certificates:sign")} /> : null}
                   </div>
-                  {!c.revokedAt ? <div className="flex flex-wrap gap-2"><TestCertificateTlsButton id={c.id} />{!c.consultationOnly ? <RestrictCertificateButton id={c.id} /> : null}<RevokeCertificateButton id={c.id} /></div> : null}
+                  {!c.revokedAt ? <div className="flex flex-wrap gap-2"><TestCertificateTlsButton id={c.id} />{c.status !== "EXPIRED" && can(ctx, "certificates:sign") && (c.consultationOnly || !c.signingEnabledAt) ? <ReleaseSigningButton id={c.id} label={c.label} /> : null}{!c.consultationOnly ? <RestrictCertificateButton id={c.id} /> : null}<RevokeCertificateButton id={c.id} /></div> : null}
                 </li>
               ))}
             </ul>

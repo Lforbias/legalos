@@ -12,7 +12,7 @@ test("indicadores e central de alertas: abrem para o dono, abas navegam e o escr
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ind ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // Menu lateral leva às duas páginas.
   await page.getByRole("button", { name: "Gestão do escritório", exact: true }).click();

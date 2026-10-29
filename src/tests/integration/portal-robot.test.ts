@@ -83,6 +83,10 @@ describe("robô dos portais: acessos, fila e resultado", () => {
     expect(await drainQueue(depsFor(ok))).toBe(1);
     expect((await db.portalAccess.findMany({ where: { organizationId: a.org.id } })).every((r) => r.status === "CONNECTED")).toBe(true);
     expect(await db.auditLog.count({ where: { organizationId: a.org.id, action: "portal_access.login_ok" } })).toBeGreaterThanOrEqual(2);
+    // Box 2.0: o login vira evidência (simulada aqui, porque o login é injetado), com o tribunal e a operação
+    const ev = await db.connectorEvidence.findMany({ where: { organizationId: a.org.id, sourceId: rows[0]!.id } });
+    expect(ev).toHaveLength(1);
+    expect(ev[0]).toMatchObject({ connectorKey: "pje-portal", operation: "validateCredentials", outcome: "PASSED", environment: "SIMULATED", courtCode: "trf1-1g", accessMethod: "PORTAL_ROBOT" });
   });
 
   it("senha recusada: pede ação, não repete sozinho e só libera depois de salvar de novo", async () => {
@@ -92,6 +96,8 @@ describe("robô dos portais: acessos, fila e resultado", () => {
     expect(await runJob(job.id, depsFor(bad("BAD_CREDENTIALS")))).toEqual({ status: "WAITING_PERSON" });
     const access = await db.portalAccess.findFirstOrThrow({ where: { organizationId: a.org.id } });
     expect(access.status).toBe("NEEDS_ACTION");
+    const evFail = await db.connectorEvidence.findFirstOrThrow({ where: { organizationId: a.org.id, sourceId: access.id } });
+    expect(evFail).toMatchObject({ outcome: "FAILED", reasonCode: "AUTH_REJECTED", operation: "validateCredentials" });
     expect(await claimNextJob()).toBeNull();
     await db.robotJob.updateMany({ where: { accessId: access.id }, data: { createdAt: new Date(Date.now() - 10 * 60_000) } });
     await expect(testPortalAccess(a.ctx, access.id)).rejects.toThrow(/recusou/);

@@ -9,7 +9,7 @@ test("Box: filtros e revisão de lote alteram apenas a seleção explícita", as
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca lote ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   for (const suffix of ["A", "B"]) {
     await page.goto("/caixa-de-entrada/nova");

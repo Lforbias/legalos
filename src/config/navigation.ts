@@ -26,6 +26,9 @@ import {
   FlaskConical,
   Globe,
   Zap,
+  Radar,
+  HeartPulse,
+  SlidersHorizontal,
 } from "lucide-react";
 import type { PermissionKey } from "@/lib/permissions/catalog";
 
@@ -62,6 +65,8 @@ export type NavItem = {
   phase: number;
   implemented: boolean;
   summary: string;
+  /** Box 2.0: "v2" só aparece com LEGALOS_BOX_V2=1; "legacy" só aparece sem a chave. Sem valor = aparece sempre. */
+  box?: "v2" | "legacy";
 };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -81,7 +86,11 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "calculations", space: "func", label: "Cálculos", href: "/calculos", icon: Calculator, permission: "cases:read", phase: 12, implemented: true, summary: "Atrasados da Justiça Federal, débitos do TJSP, verbas trabalhistas, rescisão e prazos, com planilha pronta e cálculo salvo no processo." },
   { key: "deadlines", space: "func", label: "Prazos", href: "/prazos", icon: Hourglass, permission: "deadlines:read", phase: 3, implemented: true, summary: "Prazos cadastrados manualmente, com calculadora auxiliar e validação humana." },
   { key: "documents", space: "func", label: "Documentos", href: "/documentos", icon: FileText, permission: "documents:read", phase: 5, implemented: true, summary: "Repositório privado com versões e modelos com campos de mesclagem (OCR na Fase 8)." },
+  { key: "box-processes", space: "box", label: "Processos", href: "/box/processos", icon: Scale, permission: "inbox:read", phase: 4, implemented: true, summary: "Processos que já apareceram em comunicações do Box, com a situação dos autos e o que ainda precisa de confirmação.", box: "v2" },
   { key: "petitions", space: "box", label: "Peticionamento", href: "/peticoes", icon: PenLine, permission: "petitions:read", phase: 5, implemented: true, summary: "Preparação, revisão e aprovação; envio apenas por adaptador de demonstração (tribunais reais na Fase 8)." },
+  { key: "box-connections", space: "box", label: "Conexões Judiciais", href: "/box/conexoes", icon: Radar, permission: "inbox:read", phase: 4, implemented: true, summary: "De onde o LegalOS recebe suas comunicações, o que está funcionando de verdade e o que falta para cada tribunal.", box: "v2" },
+  { key: "box-health", space: "box", label: "Operação e Saúde", href: "/box/saude", icon: HeartPulse, permission: "inbox:read", phase: 4, implemented: true, summary: "Fontes, execuções, alertas, rotinas e certificados: o que está parado ou falhando, com ação sugerida.", box: "v2" },
+  { key: "box-settings", space: "box", label: "Configurações do Box", href: "/box/configuracoes", icon: SlidersHorizontal, permission: "integrations:manage", phase: 4, implemented: true, summary: "Advogados e OABs monitorados, avisos e preferências do Box.", box: "v2" },
   { key: "workflows", space: "func", label: "Automações", href: "/automacoes", icon: Zap, permission: "workflows:manage", phase: 6, implemented: true, summary: "Regras que criam tarefas automaticamente a partir de eventos." },
   { key: "finance", space: "func", label: "Financeiro", href: "/financeiro", icon: Wallet, permission: "finance:read", phase: 7, implemented: true, summary: "Contas a pagar e receber, baixas e estornos, parcelas e fluxo de caixa." },
   { key: "team", space: "func", label: "Equipe e produtividade", href: "/equipe", icon: UserSquare2, permission: "productivity:read", phase: 3, implemented: true, summary: "Carga de trabalho por responsável e registro de horas." },
@@ -92,14 +101,17 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "portal-team", space: "func", label: "Mensagens do portal", href: "/portal-equipe", icon: MessageCircle, permission: "clients:read", phase: 12, implemented: true, summary: "Mensagens dos clientes pelo portal e pendências em aberto." },
   { key: "management", space: "func", label: "Gestão", href: "/gestao", icon: LayoutDashboard, permission: "tasks:read", phase: 3, implemented: true, summary: "Quadros Kanban do escritório e pacotes de tarefas (contrato novo, encerramentos)." },
   { key: "ai", space: "func", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use", phase: 8, implemented: true, summary: "Perguntas sobre o processo com fontes citadas, opt-in por escritório e limite mensal de consumo." },
-  { key: "certificates", space: "box", label: "Certificados digitais", href: "/certificados", icon: KeyRound, permission: "certificates:manage", phase: 10, implemented: true, summary: "Cofre de certificados A1 cifrados, com registro de uso e alerta de vencimento (base do motor de tribunais)." },
-  { key: "pje-connect", space: "box", label: "Conectar PJe", href: "/integracoes/pje", icon: KeyRound, permission: "cases:read", phase: 14, implemented: true, summary: "Informe o seu login do PJe uma vez: o LegalOS entra, confere o acesso e mostra o resultado." },
-  { key: "integrations", space: "box", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "Consulta DataJud/CNJ (opt-in); e-mail e calendários em etapa futura." },
-  { key: "monitoring", space: "box", label: "Monitoramento", href: "/monitoramento", icon: Activity, permission: "integrations:manage", phase: 10, implemented: true, summary: "Saúde da captura de intimações (DJEN e PJe/MNI): última execução, erros e fontes paradas." },
+  { key: "certificates", space: "box", label: "Certificados digitais", href: "/certificados", icon: KeyRound, permission: "certificates:manage", phase: 10, implemented: true, summary: "Cofre de certificados A1 cifrados, com registro de uso e alerta de vencimento (base do motor de tribunais).", box: "legacy" },
+  { key: "pje-connect", space: "box", label: "Conectar PJe", href: "/integracoes/pje", icon: KeyRound, permission: "cases:read", phase: 14, implemented: true, summary: "Informe o seu login do PJe uma vez: o LegalOS entra, confere o acesso e mostra o resultado.", box: "legacy" },
+  { key: "integrations", space: "box", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", phase: 8, implemented: true, summary: "Consulta DataJud/CNJ (opt-in); e-mail e calendários em etapa futura.", box: "legacy" },
+  { key: "monitoring", space: "box", label: "Monitoramento", href: "/monitoramento", icon: Activity, permission: "integrations:manage", phase: 10, implemented: true, summary: "Saúde da captura de intimações (DJEN e PJe/MNI): última execução, erros e fontes paradas.", box: "legacy" },
   { key: "prototypes", space: "both", label: "Protótipos", href: "/prototipos", icon: FlaskConical, phase: 0, implemented: true, summary: "Telas só visuais das próximas versões (visível só com LEGALOS_PROTOTYPES=1)." },
   { key: "help", space: "both", label: "Ajuda", href: "/ajuda", icon: CircleHelp, phase: 1, implemented: true, summary: "Primeiros passos, guias de uso e caminhos da plataforma." },
   { key: "settings", space: "both", label: "Configurações", href: "/configuracoes", icon: Settings, phase: 1, implemented: true, summary: "Escritório, equipe, perfis e auditoria." },
 ];
+
+/** O item vale para a versão do Box em uso? (item sem marca vale sempre). */
+export const navItemInBoxVersion = (n: Pick<NavItem, "box">, boxV2: boolean) => !n.box || (n.box === "v2") === boxV2;
 
 export function getNavItem(key: string) {
   return NAV_ITEMS.find((n) => n.key === key);

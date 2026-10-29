@@ -6,6 +6,7 @@ import { audit } from "./audit.service";
 import { isUniqueViolation } from "./db-errors";
 import { notify } from "./notification.service";
 import { assertNoticeRecipients, getNotice, visibility } from "./notice.service";
+import { recordNoticeEvent } from "@/server/judicial/notice-events";
 
 // ---------------------------------------------------------------- equipes de trabalho
 export async function listTeams(ctx: TenantContext) {
@@ -80,6 +81,7 @@ export async function assignNoticeToTeam(ctx: TenantContext, id: string, teamId:
   await assertNoticeRecipients(ctx, id, team.members.map(m => m.userId));
   await db.$transaction(async (tx) => {
     await tx.courtNotice.update({ where: { id }, data: { teamId, assigneeId: null, assignedById: ctx.userId, status: "DISTRIBUTED" } });
+    await recordNoticeEvent(tx, ctx, id, "TEAM_ASSIGNED", { teamId });
     await audit({ action: "notice.assign_team", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: id, metadata: { teamId }, meta: ctx.meta }, tx);
   });
   for (const m of team.members) {
@@ -99,6 +101,7 @@ export async function returnNotice(ctx: TenantContext, id: string) {
   const back = n.assignedById && n.assignedById !== ctx.userId ? await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId: n.assignedById, status: "ACTIVE", role: { permissions: { has: "inbox:read" } } }, select: { userId: true } }) : null;
   await db.$transaction(async (tx) => {
     await tx.courtNotice.update({ where: { id }, data: back ? { assigneeId: back.userId, teamId: null, assignedById: ctx.userId, status: "DISTRIBUTED" } : { assigneeId: null, teamId: null, assignedById: null, status: "NEW" } });
+    await recordNoticeEvent(tx, ctx, id, "RETURNED", { to: back?.userId ?? null });
     await audit({ action: "notice.return", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: id, metadata: { to: back?.userId ?? null }, meta: ctx.meta }, tx);
   });
   if (back) await notify({ organizationId: ctx.organizationId, userId: back.userId, kind: "notice.assigned", title: `Intimação devolvida para você: ${n.title}`, link: `/caixa-de-entrada/${id}`, dedupeKey: `notice-return:${id}:${Date.now()}` });
@@ -113,6 +116,7 @@ export async function sendToEntrada(ctx: TenantContext, id: string) {
   if (n.status === "NEW" && !n.snoozedUntil) throw new ConflictError("A intimação já está na Entrada.");
   await db.$transaction(async (tx) => {
     await tx.courtNotice.update({ where: { id }, data: { status: "NEW", assigneeId: null, teamId: null, assignedById: null, snoozedUntil: null, processedAt: null, processedById: null } });
+    await recordNoticeEvent(tx, ctx, id, "TO_ENTRADA", { from: n.status });
     await audit({ action: "notice.to_entrada", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: id, metadata: { from: n.status }, meta: ctx.meta }, tx);
   });
 }
@@ -128,6 +132,7 @@ export async function snoozeNotice(ctx: TenantContext, id: string, until: string
   }
   await db.$transaction(async (tx) => {
     await tx.courtNotice.update({ where: { id }, data: { snoozedUntil: until ? ymdToDate(until) : null } });
+    await recordNoticeEvent(tx, ctx, id, until ? "SNOOZED" : "WOKEN", { until });
     await audit({ action: until ? "notice.snooze" : "notice.wake", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: id, metadata: { until }, meta: ctx.meta }, tx);
   });
 }

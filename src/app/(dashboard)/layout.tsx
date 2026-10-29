@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
-import { NAV_ITEMS } from "@/config/navigation";
+import { NAV_ITEMS, navItemInBoxVersion } from "@/config/navigation";
+import { boxV2Enabled } from "@/lib/features";
 import { can } from "@/server/context";
 import { prototypesEnabled } from "@/modules/prototypes/registry";
 import { ResendVerificationButton } from "@/modules/auth/components";
@@ -31,7 +32,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const chatBadge = can(ctx, "whatsapp:read") ? await unreadTotal(ctx).catch(() => 0) : 0;
   const ent = await getEntitlements(ctx.organizationId).catch(() => null);
   const planNotice = ent ? PLAN_NOTICE[ent.state]?.(ent.trialDaysLeft) ?? null : null;
-  const visibleKeys = NAV_ITEMS.filter((n) => (n.key !== "prototypes" || prototypesEnabled()) && (!n.permission || can(ctx, n.permission))).map((n) => n.key);
+  const boxV2 = boxV2Enabled(ctx.organizationId);
+  const visibleKeys = NAV_ITEMS.filter((n) => (n.key !== "prototypes" || prototypesEnabled()) && navItemInBoxVersion(n, boxV2) && (!n.permission || can(ctx, n.permission))).map((n) => n.key);
 
   return (
     <AppShell

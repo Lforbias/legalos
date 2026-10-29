@@ -16,7 +16,7 @@ async function signUp(page: Page, label: string) {
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return { id, email };
 }
 async function grantAdmin(email: string) {

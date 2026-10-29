@@ -1,4 +1,5 @@
 import { db } from "@/lib/db/client";
+import { boxV2Enabled } from "@/lib/features";
 import { assertCan, type TenantContext } from "@/server/context";
 import { getNoticeActivity } from "./notice-activity.service";
 import { notify } from "./notification.service";
@@ -45,7 +46,8 @@ export async function getMonitoringOverview(ctx: TenantContext, now = new Date()
 
 /** Avisa quem administra integrações quando uma fonte falha ou para. Idempotente por fonte + última execução. */
 export async function runMonitoringCheck(organizationId?: string, now = new Date()): Promise<{ checked: number; alerts: number }> {
-  const all = await loadSources(organizationId);
+  // Pelo agendador (sem escritório), o aviso legado só vale para quem ainda usa a tela antiga: com o Box 2.0 ligado, a verificação de saúde nova cobre as mesmas fontes.
+  const all = (await loadSources(organizationId)).filter((a) => organizationId || !boxV2Enabled(a.organizationId));
   const bad = all.map((a) => ({ ...a, health: classifySource(a.row, now) })).filter((a) => a.health === "ERROR" || a.health === "STALE");
   let alerts = 0;
   const admins = new Map<string, string[]>();

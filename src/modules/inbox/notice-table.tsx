@@ -12,13 +12,15 @@ import { dateToYmd, formatYmd } from "@/lib/dates/ymd";
 import { NOTICE_KIND_LABEL, NOTICE_STATUS_LABEL } from "./schemas";
 import { ORIGIN_LABEL, bulkNoticeSchema } from "./list-schemas";
 import { bulkNoticeAction } from "./bulk-actions";
+import { NoticeStateChips } from "@/modules/box/notice-states";
+import { originLabel } from "@/lib/judicial/notice-state";
 import type { listNotices } from "@/server/services/notice.service";
 
 type Row = Awaited<ReturnType<typeof listNotices>>["items"][number];
 const TONE = { NEW: "warning", DISTRIBUTED: "info", PROCESSED: "success", DISCARDED: "neutral" } as const;
 const ACTIONS = { ASSIGN_USER: "Distribuir para pessoa", ASSIGN_TEAM: "Distribuir para equipe", ADD_TAGS: "Adicionar etiquetas", SNOOZE: "Adormecer", PROCESS: "Marcar como tratadas" } as const;
 
-export function NoticeTable({ rows, members, teams, canWrite }: { rows: Row[]; members: { id: string; name: string }[]; teams: { id: string; name: string }[]; canWrite: boolean }) {
+export function NoticeTable({ rows, members, teams, canWrite, v2 = false }: { rows: Row[]; members: { id: string; name: string }[]; teams: { id: string; name: string }[]; canWrite: boolean; v2?: boolean }) {
   const router = useRouter();
   const teamNames = new Map(teams.map(t => [t.id, t.name]));
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -37,7 +39,8 @@ export function NoticeTable({ rows, members, teams, canWrite }: { rows: Row[]; m
     if (!result.success) { setError(true); setMessage(result.error.issues[0]?.message ?? "Confira o lote."); return; }
     setMessage(""); setReview(true);
   }
-  return <div className="space-y-3">
+  // Box 2.0: enquanto há seleção em andamento, a atualização ao vivo espera (não derruba o lote que a pessoa está montando).
+  return <div className="space-y-3" data-live-hold={selected.size > 0 || review ? "true" : undefined}>
     {message ? <Alert tone={error ? "error" : "success"}>{message}</Alert> : null}
     {canWrite ? <Card className="space-y-3 p-4">
       <p className="text-sm">{selected.size} selecionada(s). A seleção vale apenas para esta página, no máximo 100 por lote.</p>
@@ -75,15 +78,16 @@ export function NoticeTable({ rows, members, teams, canWrite }: { rows: Row[]; m
                 <th scope="col" className="px-3 py-2 font-medium">Processo</th>
                 <th scope="col" className="px-3 py-2 font-medium">Responsável</th>
                 <th scope="col" className="px-3 py-2 font-medium">Situação</th>
+                {v2 ? <th scope="col" className="px-3 py-2 font-medium">No LegalOS e no tribunal</th> : null}
               </tr>
             </thead>
             <tbody>
               {rows.map((n) => (
-                <tr key={n.id} className="border-b border-border last:border-0">
+                <tr key={n.id} data-viewed={v2 ? String(n.firstViewedAt !== null) : undefined} className="border-b border-border last:border-0">
                   {canWrite ? <td className="px-3 py-2.5"><input type="checkbox" aria-label={`Selecionar ${n.title}`} checked={selected.has(n.id)} disabled={pending || (!selected.has(n.id) && selected.size >= 100)} onChange={e => { setReview(false); const next = new Set(selected); if (e.target.checked) next.add(n.id); else next.delete(n.id); setSelected(next); }} /></td> : null}
                   <td className="whitespace-nowrap px-4 py-2.5 tabular-nums">{formatYmd(dateToYmd(n.receivedAt))}</td>
                   <td className="px-3 py-2.5">
-                    <Link href={`/caixa-de-entrada/${n.id}`} className="font-medium hover:underline">{n.title}</Link>
+                    <Link href={`/caixa-de-entrada/${n.id}`} className={v2 && n.firstViewedAt === null && (n.status === "NEW" || n.status === "DISTRIBUTED") ? "font-semibold hover:underline" : "font-medium hover:underline"}>{n.title}</Link>
                     <p className="text-xs text-muted">
                       {NOTICE_KIND_LABEL[n.kind]}{n.court ? ` · ${n.court}` : ""}
                       {n.duplicateOfId ? <Badge tone="warning" className="ml-2">Possível duplicata</Badge> : null}
@@ -93,12 +97,13 @@ export function NoticeTable({ rows, members, teams, canWrite }: { rows: Row[]; m
                       ))}
                     </p>
                   </td>
-                  <td className="px-3 py-2.5 text-xs text-muted">{n.source === "IMPORTED" ? n.externalKey?.startsWith("djen:") ? ORIGIN_LABEL.DJEN : n.externalKey?.startsWith("mni:") ? ORIGIN_LABEL.MNI : ORIGIN_LABEL.OTHER_IMPORT : ORIGIN_LABEL[n.source]}</td>
+                  <td className="px-3 py-2.5 text-xs text-muted">{v2 && n.originKind ? <>{originLabel(n.originKind)}{n.courtCode ? <span className="block">{n.courtCode}</span> : null}</> : n.source === "IMPORTED" ? n.externalKey?.startsWith("djen:") ? ORIGIN_LABEL.DJEN : n.externalKey?.startsWith("mni:") ? ORIGIN_LABEL.MNI : ORIGIN_LABEL.OTHER_IMPORT : ORIGIN_LABEL[n.source]}</td>
                   <td className="px-3 py-2.5">
                     {n.case ? <Link href={`/processos/${n.case.id}`} className="hover:underline">{n.case.title}</Link> : <span className="text-muted">{n.caseNumber ?? "Sem processo"}</span>}
                   </td>
                   <td className="px-3 py-2.5 text-muted">{n.assigneeName ?? (n.teamId ? `Equipe ${teamNames.get(n.teamId) ?? ""}`.trim() : "—")}</td>
                   <td className="px-3 py-2.5"><Badge tone={TONE[n.status]}>{NOTICE_STATUS_LABEL[n.status]}</Badge></td>
+                  {v2 ? <td className="px-3 py-2.5"><NoticeStateChips n={n} /></td> : null}
                 </tr>
               ))}
             </tbody>

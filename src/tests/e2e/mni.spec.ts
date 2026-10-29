@@ -12,7 +12,7 @@ test("Integrações mostra o conector PJe (MNI) desligado e avisa que falta a ch
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca mni ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");
   await expect(page.getByText("Conexões de tribunais — MNI 2.2.2")).toBeVisible();
@@ -30,7 +30,7 @@ test("Integrações mostra o monitoramento do DJEN, cadastra uma OAB e rejeita d
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca djen ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");
   await expect(page.getByText("DJEN — publicações por OAB")).toBeVisible();

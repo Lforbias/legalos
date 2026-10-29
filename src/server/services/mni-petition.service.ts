@@ -1,4 +1,5 @@
 import { connectionSoapAction } from "@/lib/connectors/capabilities";
+import { connectorKeyForMniSystem } from "@/lib/judicial/catalog";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { isValidCnj, onlyDigits } from "@/lib/validation/br-documents";
 import { jtrOfCnj } from "@/lib/mni/tribunals";
@@ -11,7 +12,7 @@ import { db } from "@/lib/db/client";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertCertificatePurpose, requireMfa } from "./certificate.service";
-import { connectionForCase, assertConnectionOperation, loadConnection, mtlsFor, record, type SoapPost } from "./mni.service";
+import { connectionForCase, assertConnectionOperation, evidenceEnv, loadConnection, mtlsFor, record, type SoapPost } from "./mni.service";
 
 const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const CODE = /^[A-Za-z0-9._-]{1,20}$/;
@@ -39,11 +40,11 @@ async function findConnection(ctx: TenantContext, caseNumber: string | null, cas
   let conn;
   if (caseId) {
     const selected = await connectionForCase(ctx, caseId, "entregarManifestacaoProcessual");
-    conn = selected ? await db.courtConnection.findFirst({ where: { id: selected.id, organizationId: ctx.organizationId }, select: { id: true, petitionTypes: true, label: true } }) : null;
+    conn = selected ? await db.courtConnection.findFirst({ where: { id: selected.id, organizationId: ctx.organizationId }, select: { id: true, petitionTypes: true, label: true, system: true, jtr: true, environment: true, endpointUrl: true } }) : null;
   } else {
     const { assertConnectorFor } = await import("./court-system-map.service");
     await assertConnectorFor(ctx.organizationId, jtr, "petition");
-    const candidates = jtr ? await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, jtr, enabled: true }, select: { id: true, petitionTypes: true, label: true } }) : [];
+    const candidates = jtr ? await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, jtr, enabled: true }, select: { id: true, petitionTypes: true, label: true, system: true, jtr: true, environment: true, endpointUrl: true } }) : [];
     if (candidates.length > 1) throw new ConflictError("Mais de uma conexão disponível; informe o processo para selecionar o sistema.");
     conn = candidates[0];
   }
@@ -74,6 +75,12 @@ export const mniAdapter: PetitioningAdapter = {
     }
     const total = input.document.sizeBytes + input.attachments.reduce((n, a) => n + a.sizeBytes, 0);
     if (total > MAX_TOTAL_BYTES) throw new ConflictError("O conjunto de arquivos passa de 25 MB, acima do que enviamos de uma vez ao tribunal.");
+  },
+  async describeTarget(input, env) {
+    const ctx = env.ctx as TenantContext;
+    const conn = await findConnection(ctx, input.caseNumber, env.caseId);
+    const post = (env.post as SoapPost | undefined) ?? postSoap;
+    return { connectorKey: connectorKeyForMniSystem(conn.system), courtCode: conn.jtr, environment: evidenceEnv(conn, post) as "SIMULATED" | "HOMOLOGATION" | "PRODUCTION" };
   },
   async submit(input, env) {
     if (!env) throw new Error("Contexto de envio ausente.");
@@ -106,7 +113,8 @@ export const mniAdapter: PetitioningAdapter = {
       const r = parseEntregarManifestacao(response);
       await record(c.id, true, `Petição protocolada (${r.protocolo}).`);
       await audit({ action: "mni.petition_delivered", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "petition", resourceId: input.petitionId, metadata: { connectionId: c.id, protocol: r.protocolo, documents: docs.length }, meta: ctx.meta });
-      return { protocol: r.protocolo, receipt: [`Protocolo ${r.protocolo} (${c.label})`, r.dataOperacao ? `Data no tribunal: ${r.dataOperacao.toISOString()}` : null, `Documentos enviados: ${docs.length}`, r.recibo ? `\nRecibo do tribunal:\n${r.recibo}` : null].filter(Boolean).join("\n") };
+      const environment = evidenceEnv(c, post) as "SIMULATED" | "HOMOLOGATION" | "PRODUCTION";
+      return { protocol: r.protocolo, environment, officialReceipt: Boolean(r.recibo?.trim()), filedAt: r.dataOperacao, receipt: [`Protocolo ${r.protocolo} (${c.label})`, r.dataOperacao ? `Data no tribunal: ${r.dataOperacao.toISOString()}` : null, `Documentos enviados: ${docs.length}`, r.recibo ? `\nRecibo do tribunal:\n${r.recibo}` : null].filter(Boolean).join("\n") };
     } catch (err) {
       if (!(err instanceof MniError)) throw err;
       await record(c.id, false, `Protocolo: ${err.message}`);

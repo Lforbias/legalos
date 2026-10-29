@@ -10,10 +10,10 @@ test("BOX: intimação até tarefa, prazo validado, documento e acervo", async (
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
   await page.getByLabel("Nome do escritório").fill(`Fluxo BOX ${id}`);
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Processo fluxo ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo", exact: true }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Processo fluxo ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo", exact: true }).click();
   await expect(page.getByRole("heading", { name: `Processo fluxo ${id}`, exact: true })).toBeVisible();
   const caseUrl = page.url().split("?")[0]!;
   await page.goto("/caixa-de-entrada/nova");
@@ -72,10 +72,10 @@ test("Autos: fila aparece após navegar e permite retomar uma falha", async ({ p
     await page.getByRole("button", { name: "Criar conta", exact: true }).click();
     await page.getByLabel("Nome do escritório").fill(`Fila ${id}`);
     await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
     await page.goto("/processos/novo");
-    await page.getByLabel("Título do processo").fill(`Fila UI ${id}`);
-    await page.getByRole("button", { name: "Cadastrar processo", exact: true }).click();
+    await page.getByLabel("Título do caso ou processo").fill(`Fila UI ${id}`);
+    await page.getByRole("button", { name: "Cadastrar caso ou processo", exact: true }).click();
     await expect(page.getByRole("heading", { name: `Fila UI ${id}`, exact: true })).toBeVisible();
     const caseId = page.url().split("/processos/")[1]!.split("?")[0]!;
     // Somente fixture de interface: nenhum acesso externo é feito com essa conexão.

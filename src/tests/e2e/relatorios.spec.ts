@@ -12,7 +12,7 @@ test("Relatórios: abas por permissão, período inválido é explicado e a plan
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca rel ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/relatorios");
   await expect(page.getByRole("heading", { name: "Relatórios e BI" })).toBeVisible();

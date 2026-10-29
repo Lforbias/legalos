@@ -9,7 +9,7 @@ test("Configuração Gemini persiste e erro de salvamento preserva os campos", a
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
   await page.getByLabel("Nome do escritório").fill(`Escritório IA ${id}`);
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await page.goto("/configuracoes");
   await page.getByRole("link", { name: /^IA do escritório/ }).click();
   await expect(page).toHaveURL(/\/configuracoes\/ia$/);

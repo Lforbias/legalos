@@ -66,10 +66,10 @@ describe("3.0-F9 — certificado com usuários autorizados e webhooks de protoco
   });
 
   it("o material do certificado só sai para titular, administrador do cofre ou usuário autorizado, e cada uso é registrado", async () => {
-    await expect(getCertificateMaterial(stranger.ctx, certId, "protocolo")).rejects.toBeInstanceOf(NotFoundError);
-    const m1 = await getCertificateMaterial(owner.ctx, certId, "protocolo");
+    await expect(getCertificateMaterial(stranger.ctx, certId, "mni:consultarProcesso")).rejects.toBeInstanceOf(NotFoundError);
+    const m1 = await getCertificateMaterial(owner.ctx, certId, "mni:consultarProcesso");
     expect(m1.certificateId).toBe(certId);
-    const m2 = await getCertificateMaterial(colleague.ctx, certId, "protocolo");
+    const m2 = await getCertificateMaterial(colleague.ctx, certId, "mni:consultarProcesso");
     expect(m2.subjectCn).toContain("ADV F9");
     const uses = await db.certificateUsage.findMany({ where: { certificateId: certId } });
     expect(uses.map((u) => u.userId)).toEqual(expect.arrayContaining([owner.ctx.userId, colleague.ctx.userId]));
@@ -77,7 +77,7 @@ describe("3.0-F9 — certificado com usuários autorizados e webhooks de protoco
 
   it("remover a autorização corta o acesso na hora; remover de novo dá não encontrado", async () => {
     await unauthorizeCertificateUser(A.ctx, certId, colleague.ctx.userId);
-    await expect(getCertificateMaterial(colleague.ctx, certId, "protocolo")).rejects.toBeInstanceOf(NotFoundError);
+    await expect(getCertificateMaterial(colleague.ctx, certId, "mni:consultarProcesso")).rejects.toBeInstanceOf(NotFoundError);
     await expect(unauthorizeCertificateUser(A.ctx, certId, colleague.ctx.userId)).rejects.toBeInstanceOf(NotFoundError);
     await expect(unauthorizeCertificateUser(B.ctx, certId, colleague.ctx.userId)).rejects.toBeInstanceOf(NotFoundError);
     await expect(unauthorizeCertificateUser(owner.ctx, certId, colleague.ctx.userId)).rejects.toBeInstanceOf(ForbiddenError);

@@ -8,7 +8,7 @@ test("Navegação organizada, configurações por assunto e RUTE no painel", asy
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
   await page.getByLabel("Nome do escritório").fill(`Escritório UX ${id}`);
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Navegação Func", exact: true });
   await expect(nav.getByRole("link", { name: "Processos", exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: "RUTE (IA)", exact: true })).toHaveCount(0);

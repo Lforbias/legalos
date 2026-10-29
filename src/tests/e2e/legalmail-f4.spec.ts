@@ -17,7 +17,7 @@ async function register(page: Page, label: string) {
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 }
 
 test("3.0-F4: importar processos por número, com inválidos e repetidos anotados", async ({ page }) => {

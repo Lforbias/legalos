@@ -12,7 +12,7 @@ async function signUpWithOffice(page: Page, label: string) {
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return id;
 }
 
@@ -21,8 +21,8 @@ test("tarefas, prazos (validação humana), agenda e notificações", async ({ p
 
   // processo para vincular
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso ${id}` })).toBeVisible();
   const caseUrl = page.url();
 
@@ -147,9 +147,9 @@ test("caixa de entrada: texto colado, vínculo automático, duplicidade, provid�
   const number = cnj("0007777");
 
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso ${id}`);
+  await page.getByLabel("Título do caso ou processo").fill(`Caso ${id}`);
   await page.getByLabel("Número CNJ").fill(number);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso ${id}` })).toBeVisible();
 
   await page.getByTestId("space-box").first().click();

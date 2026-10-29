@@ -13,7 +13,7 @@ export type PjeCredentials = { document: string; password: string; otpSecret?: s
 export type LoginFailureCode = "BAD_CREDENTIALS" | "ACCOUNT_BLOCKED" | "OTP_NOT_CONFIGURED" | "OTP_MISSING" | "OTP_REJECTED" | "NEEDS_PERSON" | "UNKNOWN_PAGE" | "TIMEOUT" | "NETWORK";
 export type LoginOutcome =
   | { ok: true; signature: PageSignature }
-  | { ok: false; code: LoginFailureCode; message: string; retryable: boolean; signature: PageSignature | null };
+  | { ok: false; code: LoginFailureCode; message: string; retryable: boolean; signature: PageSignature | null; /** Causa técnica curta (ex.: net::ERR_CONNECTION_RESET), sem dados pessoais. */ detail?: string };
 export type LoginOptions = {
   /** Palavras do nome da pessoa, retiradas das assinaturas de tela. */
   names?: string[];
@@ -98,12 +98,15 @@ export async function loginPje(page: Page, target: PjeTarget, creds: PjeCredenti
       return null;
     }
   };
-  const fail = async (code: LoginFailureCode, message: string, retryable: boolean): Promise<LoginOutcome> => ({ ok: false, code, message, retryable, signature: await sig() });
+  const fail = async (code: LoginFailureCode, message: string, retryable: boolean, detail?: string): Promise<LoginOutcome> => ({ ok: false, code, message, retryable, signature: await sig(), ...(detail ? { detail } : {}) });
 
   try {
     await page.goto(pjeLoginUrl(target), { waitUntil: "domcontentloaded", timeout: 45_000 });
-  } catch {
-    return fail("NETWORK", "Não foi possível abrir o PJe do tribunal agora. O sistema tentará de novo.", true);
+  } catch (e) {
+    const raw = e instanceof Error ? e.message : String(e);
+    const net = raw.match(/net::ERR_[A-Z_]+/)?.[0];
+    const detail = net ?? (/timeout/i.test(raw) ? "tempo esgotado (45 s) ao abrir a página de login" : (raw.split("\n")[0] ?? "").slice(0, 160));
+    return fail("NETWORK", "Não foi possível abrir o PJe do tribunal agora. O sistema tentará de novo.", true, detail);
   }
 
   let s = await waitFor(page, (x) => x.kind !== "UNKNOWN" || Boolean(x.errorText), 30_000, sleep);

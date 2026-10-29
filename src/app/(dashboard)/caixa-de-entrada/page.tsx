@@ -21,16 +21,22 @@ import { listNoticeTags, listTeams } from "@/server/services/inbox-flow.service"
 import { monitorProblems, noticeDayCounts } from "@/server/services/notice-desk.service";
 import { Alert } from "@/components/ui/alert";
 import { requireTenant } from "@/server/session";
+import { boxV2Enabled } from "@/lib/features";
+import { COMMUNICATION_ORIGINS, ORIGIN_LABEL as COMMUNICATION_ORIGIN_LABEL } from "@/lib/judicial/contracts";
+import { LiveRefresh } from "@/modules/box/live-refresh";
+import { countUnviewed, listProfessionalOptions } from "@/server/judicial/inbox-v2.service";
+import { latestBoxCursor } from "@/server/judicial/live";
 
 export const metadata: Metadata = { title: "Caixa de entrada jurídica" };
 
-type SP = { leitura?: string; selecionada?: string; q?: string; status?: string; responsavel?: string; duplicadas?: string; caixa?: string; etiqueta?: string; tipo?: string; origem?: string; orgao?: string; recebidaDe?: string; recebidaAte?: string; publicadaDe?: string; publicadaAte?: string; pagina?: string; porPagina?: string; ordem?: string };
+type SP = { leitura?: string; selecionada?: string; q?: string; status?: string; responsavel?: string; duplicadas?: string; caixa?: string; etiqueta?: string; tipo?: string; origem?: string; orgao?: string; recebidaDe?: string; recebidaAte?: string; publicadaDe?: string; publicadaAte?: string; pagina?: string; porPagina?: string; ordem?: string; profissional?: string; fonte?: string; vista?: string };
 const REASON = { FALHOU: "a última verificação falhou", NUNCA_VERIFICADO: "ainda não foi verificado", SEM_VERIFICAR: "está há mais de 36 horas sem verificar" } as const;
 
 export default async function InboxPage({ searchParams }: { searchParams: Promise<SP> }) {
   const { ctx } = await requireTenant();
   if (!can(ctx, "inbox:read")) return <AccessDenied />;
   const sp = await searchParams;
+  const v2 = boxV2Enabled(ctx.organizationId);
   const parsed = noticeListOptionsSchema.safeParse({ kind: sp.tipo || undefined, origin: sp.origem || undefined, court: sp.orgao, receivedFrom: sp.recebidaDe || undefined, receivedTo: sp.recebidaAte || undefined, publishedFrom: sp.publicadaDe || undefined, publishedTo: sp.publicadaAte || undefined, page: sp.pagina || undefined, pageSize: sp.porPagina || undefined, sort: sp.ordem || undefined });
   if (!parsed.success) return <div className="space-y-3"><PageHeader title="Caixa de entrada jurídica" /><Alert tone="error">{parsed.error.issues[0]?.message}</Alert><Link href="/caixa-de-entrada" className="underline">Limpar filtros</Link></div>;
   const status = (NOTICE_STATUSES as readonly string[]).includes(sp.status ?? "") ? (sp.status as (typeof NOTICE_STATUSES)[number]) : undefined;
@@ -39,14 +45,22 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const box = (NOTICE_BOXES as readonly string[]).includes(boxRaw ?? "") ? (boxRaw as NoticeBox) : undefined;
   const teamId = box === "equipe" && /^[0-9a-f-]{36}$/i.test(boxTeam ?? "") ? boxTeam : undefined;
   const tag = sp.etiqueta?.slice(0, 30);
-  const [result, counts, members, teams, tags, day, problems] = await Promise.all([
-    listNotices(ctx, { ...parsed.data, q: sp.q, status: box ? undefined : status, assigneeId, duplicates: sp.duplicadas === "1", box: box === "equipe" && !teamId ? undefined : box, teamId, tag }),
+  // Box 2.0: filtros pelo que o LegalOS sabe da origem. Valores inválidos são ignorados (nunca viram consulta).
+  const professionalId = v2 && /^[0-9a-f-]{36}$/i.test(sp.profissional ?? "") ? sp.profissional : undefined;
+  const originKind = v2 && (COMMUNICATION_ORIGINS as readonly string[]).includes(sp.fonte ?? "") ? sp.fonte : undefined;
+  const viewed = v2 ? (sp.vista === "nao" ? ("no" as const) : sp.vista === "sim" ? ("yes" as const) : undefined) : undefined;
+  // A marca vem ANTES de ler os dados: o que entrar depois dela é avisado pelo canal ao vivo.
+  const cursor = v2 ? await latestBoxCursor(ctx.organizationId) : undefined;
+  const [result, counts, members, teams, tags, day, problems, professionals, unviewed] = await Promise.all([
+    listNotices(ctx, { ...parsed.data, q: sp.q, status: box ? undefined : status, assigneeId, duplicates: sp.duplicadas === "1", box: box === "equipe" && !teamId ? undefined : box, teamId, tag, professionalId, originKind, viewed }),
     noticeBoxCounts(ctx),
     listActiveMembers(ctx),
     listTeams(ctx),
     listNoticeTags(ctx),
     noticeDayCounts(ctx),
     monitorProblems(ctx),
+    v2 ? listProfessionalOptions(ctx) : Promise.resolve([]),
+    v2 ? countUnviewed(ctx) : Promise.resolve(0),
   ]);
   const canWrite = can(ctx, "inbox:write");
   const reading = sp.leitura === "1";
@@ -83,7 +97,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
     params.set("pagina", String(page));
     return `/caixa-de-entrada?${params}`;
   };
-  const advancedCount = [tag, sp.duplicadas === "1", sp.tipo, sp.origem, sp.orgao, sp.recebidaDe, sp.recebidaAte, sp.publicadaDe, sp.publicadaAte, sp.ordem === "asc", sp.porPagina && sp.porPagina !== "25"].filter(Boolean).length;
+  const advancedCount = [tag, sp.duplicadas === "1", sp.tipo, sp.origem, sp.orgao, sp.recebidaDe, sp.recebidaAte, sp.publicadaDe, sp.publicadaAte, sp.ordem === "asc", sp.porPagina && sp.porPagina !== "25", professionalId, originKind, viewed].filter(Boolean).length;
   const clearParams = new URLSearchParams();
   if (reading) clearParams.set("leitura", "1");
   if (current) clearParams.set("caixa", current);
@@ -105,6 +119,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           </div>
         }
       />
+      {v2 ? <LiveRefresh cursor={cursor} /> : null}
       {problems.length > 0 ? (
         <div className="mb-4" data-testid="inbox-monitor-alert">
           <Alert tone="warning">
@@ -114,7 +129,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           </Alert>
         </div>
       ) : null}
-      <div className="mb-4 grid grid-cols-2 gap-2 md:grid-cols-4" data-testid="inbox-day-counts" role="group" aria-label="Resumo do dia">
+      <div className={cn("mb-4 grid grid-cols-2 gap-2", v2 ? "md:grid-cols-5" : "md:grid-cols-4")} data-testid="inbox-day-counts" role="group" aria-label="Resumo do dia">
         {[
           { k: "openReceivedToday", label: "Não tratadas de hoje", v: day.openReceivedToday },
           { k: "openTotal", label: "Não tratadas (todas)", v: day.openTotal },
@@ -126,6 +141,12 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
             <div className="text-xs text-muted">{c.label}</div>
           </Card>
         ))}
+        {v2 ? (
+          <Card className="px-4 py-3">
+            <div className="text-2xl font-semibold tabular-nums" data-testid="day-unviewed">{unviewed}</div>
+            <Link href="/caixa-de-entrada?vista=nao" className="text-xs text-muted underline">Ainda não vistas no LegalOS</Link>
+          </Card>
+        ) : null}
       </div>
       <nav aria-label="Situação" className="mb-5 min-w-0">
         <div className="md:hidden"><SectionSelect base="/caixa-de-entrada" label="Caixa de trabalho" current={current} tabs={tabs.map((t) => ({ ...t, href: href(t.key) }))} /></div>
@@ -186,6 +207,13 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
         </label>
         <label className="text-sm">Tipo<Select name="tipo" defaultValue={sp.tipo ?? ""}><option value="">Todos os tipos</option>{NOTICE_KINDS.map(k => <option key={k} value={k}>{NOTICE_KIND_LABEL[k]}</option>)}</Select></label>
         <label className="text-sm">Origem<Select name="origem" defaultValue={sp.origem ?? ""}><option value="">Todas as origens</option>{Object.entries(ORIGIN_LABEL).map(([k, v]) => <option key={k} value={k}>{v}</option>)}</Select></label>
+        {v2 ? (
+          <>
+            <label className="text-sm">Profissional (OAB)<Select name="profissional" defaultValue={professionalId ?? ""}><option value="">Todos</option>{professionals.map((p) => <option key={p.id} value={p.id}>{p.name} — OAB {p.oabNumber}/{p.oabUf}</option>)}</Select></label>
+            <label className="text-sm">Tipo de comunicação<Select name="fonte" defaultValue={originKind ?? ""}><option value="">Todas</option>{COMMUNICATION_ORIGINS.map((o) => <option key={o} value={o}>{COMMUNICATION_ORIGIN_LABEL[o]}</option>)}</Select></label>
+            <label className="text-sm">No LegalOS<Select name="vista" defaultValue={viewed === "no" ? "nao" : viewed === "yes" ? "sim" : ""}><option value="">Vistas e não vistas</option><option value="nao">Ainda não vistas</option><option value="sim">Já vistas</option></Select></label>
+          </>
+        ) : null}
         <label className="text-sm">Tribunal / órgão<Input name="orgao" defaultValue={sp.orgao ?? ""} maxLength={120} /></label>
         <label className="text-sm">Recebida de<Input type="date" name="recebidaDe" defaultValue={sp.recebidaDe ?? ""} /></label>
         <label className="text-sm">Recebida até<Input type="date" name="recebidaAte" defaultValue={sp.recebidaAte ?? ""} /></label>
@@ -211,7 +239,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
           <section aria-label="Intimação selecionada" className="min-w-0">{selected ? <NoticeReader key={selected.id} id={selected.id} embedded /> : null}</section>
         </div>
       ) : (
-        <NoticeTable key={JSON.stringify([sp, result.items.map(n => [n.id, n.updatedAt])])} rows={result.items} members={members} teams={teams} canWrite={canWrite} />
+        <NoticeTable key={JSON.stringify([sp, result.items.map(n => [n.id, n.updatedAt])])} rows={result.items} members={members} teams={teams} canWrite={canWrite} v2={v2} />
       )}
       <nav aria-label="Paginação de intimações" className="mt-5 flex flex-wrap items-center justify-between gap-3">
         {result.page > 1 ? <Link className={buttonVariants({ variant: "secondary" })} href={pageHref(result.page - 1)}>Página anterior</Link> : <span />}

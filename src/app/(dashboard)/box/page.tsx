@@ -12,6 +12,8 @@ import { formatDate, relativeTime } from "@/lib/dates/format";
 import { getBoxDashboard } from "@/server/services/box.service";
 import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
+import { boxV2Enabled } from "@/lib/features";
+import { BoxOverviewV2 } from "@/modules/box/overview-v2";
 
 export const metadata: Metadata = { title: "Visão geral do Box" };
 
@@ -35,6 +37,8 @@ function statusTone(s: string | null): "success" | "danger" | "neutral" {
 
 export default async function BoxOverviewPage() {
   const { ctx } = await requireTenant();
+  // Box 2.0 atrás da chave LEGALOS_BOX_V2: sem ela, esta página continua exatamente como era.
+  if (boxV2Enabled(ctx.organizationId)) return <BoxOverviewV2 ctx={ctx} />;
   const d = await getBoxDashboard(ctx);
   if (!d.notices && !d.captures && !d.certificates && !d.petitions && !d.integrations) return <AccessDenied />;
 

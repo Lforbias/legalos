@@ -94,6 +94,15 @@ describe("conector PJe/MNI (Etapa 1) — tribunal SIMULADO só nos testes", () =
     expect(notices.every((n) => n.caseId === proc.id)).toBe(true);
     expect(notices.some((n) => n.kind === "CITACAO")).toBe(true);
     expect(notices[0]!.content).toMatch(/NÃO foi aberto/);
+    // Box 2.0: origem privada, identificador oficial, ciência oficial NÃO presumida, evidência simulada (servidor local)
+    for (const n of notices) {
+      expect(n).toMatchObject({ originKind: "PRIVATE_COMMUNICATION", sourceSystem: "pje-mni", officialAckState: "UNKNOWN", officialAckAt: null, firstViewedAt: null });
+      expect(n.officialId).toBeTruthy();
+      expect(n.externalKey).toBe(`mni:5.05:${n.officialId}`);
+    }
+    const ev = await db.connectorEvidence.findMany({ where: { organizationId: A.org.id, sourceId: conn.id, operation: "listNotices" } });
+    expect(ev).toHaveLength(1);
+    expect(ev[0]).toMatchObject({ outcome: "PASSED", environment: "SIMULATED", courtCode: "5.05", connectorKey: "pje-mni" });
     const r2 = await syncAvisos(A.ctx, conn.id);
     expect(r2).toMatchObject({ imported: 0, alreadyKnown: 2 });
     expect((await db.courtConnection.findUniqueOrThrow({ where: { id: conn.id } })).lastStatus).toBe("OK");
@@ -128,6 +137,8 @@ describe("conector PJe/MNI (Etapa 1) — tribunal SIMULADO só nos testes", () =
     mode = "fault";
     await expect(syncAvisos(A.ctx, conn.id)).rejects.toThrow(/Credenciais inválidas/);
     expect((await db.courtConnection.findUniqueOrThrow({ where: { id: conn.id } })).lastStatus).toBe("ERROR");
+    const failEv = await db.connectorEvidence.findFirstOrThrow({ where: { organizationId: A.org.id, sourceId: conn.id, operation: "listNotices" } });
+    expect(failEv).toMatchObject({ outcome: "FAILED", reasonCode: "AUTH_REJECTED" }); // credencial recusada vira evidência, não "conectado"
     mode = "ok";
     await setConnectionEnabled(A.ctx, conn.id, false);
     await expect(syncAvisos(A.ctx, conn.id)).rejects.toThrow(/desligada/);

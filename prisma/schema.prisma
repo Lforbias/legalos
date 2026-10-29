@@ -934,6 +934,20 @@ model CourtNotice {
   updatedAt      DateTime     @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt      DateTime?    @map("deleted_at") @db.Timestamptz(3)
 
+  // Box 2.0 — origem, identificador oficial e estados distintos (capturada ≠ vista no LegalOS ≠ ciência oficial)
+  originKind       String?   @map("origin_kind")
+  sourceSystem     String?   @map("source_system")
+  officialId       String?   @map("official_id")
+  courtCode        String?   @map("court_code")
+  professionalId   String?   @map("professional_id") @db.Uuid
+  capturedAt       DateTime? @map("captured_at") @db.Timestamptz(3)
+  syncRunId        String?   @map("sync_run_id") @db.Uuid
+  firstViewedAt    DateTime? @map("first_viewed_at") @db.Timestamptz(3)
+  firstViewedById  String?   @map("first_viewed_by_id") @db.Uuid
+  officialAckAt    DateTime? @map("official_ack_at") @db.Timestamptz(3)
+  officialAckState String?   @map("official_ack_state")
+  caseMatchState   String?   @map("case_match_state")
+
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   case         Case?        @relation(fields: [caseId], references: [id], onDelete: Restrict)
   notes        NoticeNote[]
@@ -970,6 +984,12 @@ enum PetitionStatus {
   SUBMITTED
   FAILED
   CANCELED
+  /// Box 2.0: o tribunal respondeu, mas falta o recibo oficial. Uma pessoa confere e registra.
+  AWAITING_CONFIRMATION
+  /// Box 2.0: protocolada COM recibo oficial (tribunal real) ou confirmada por uma pessoa com o recibo anexado.
+  FILED_CONFIRMED
+  /// Box 2.0: sem resposta confiável: pode ter sido protocolada. Nunca é reenviada às cegas.
+  UNKNOWN
 }
 
 enum DocumentVersionSource {
@@ -1045,6 +1065,11 @@ model PetitionFiling {
   scheduledFor    DateTime?      @map("scheduled_for") @db.Timestamptz(3)
   scheduledById   String?        @map("scheduled_by_id") @db.Uuid
   scheduleNote    String?        @map("schedule_note")
+  /// Box 2.0: ambiente do último envio (DEMO, SIMULATED, HOMOLOGATION, PRODUCTION).
+  filingEnvironment String?      @map("filing_environment")
+  attemptCount    Int            @default(0) @map("attempt_count")
+  confirmedAt     DateTime?      @map("confirmed_at") @db.Timestamptz(3)
+  unknownSince    DateTime?      @map("unknown_since") @db.Timestamptz(3)
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(3)
   deletedAt       DateTime?      @map("deleted_at") @db.Timestamptz(3)
@@ -1543,6 +1568,9 @@ model Certificate {
   revokedAt         DateTime? @map("revoked_at") @db.Timestamptz(3)
   revokedById       String?   @map("revoked_by_id") @db.Uuid
   lastUsedAt        DateTime? @map("last_used_at") @db.Timestamptz(3)
+  /// Box 2.0: quando e por quem o certificado foi LIBERADO para assinar/protocolar (a consulta é independente). Nulo = nunca liberado explicitamente.
+  signingEnabledAt   DateTime? @map("signing_enabled_at") @db.Timestamptz(3)
+  signingEnabledById String?   @map("signing_enabled_by_id") @db.Uuid
 
   organization Organization                @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   owner        User                        @relation("CertificateOwner", fields: [ownerUserId], references: [id])
@@ -1563,6 +1591,8 @@ model CertificateAuthorizedUser {
   organizationId String   @map("organization_id") @db.Uuid
   createdById    String?  @map("created_by_id") @db.Uuid
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Box 2.0: poder de ASSINAR/PROTOCOLAR com este certificado, separado do poder de consultar.
+  canSign        Boolean  @default(false) @map("can_sign")
 
   certificate Certificate @relation(fields: [certificateId], references: [id], onDelete: Cascade)
 
@@ -1636,6 +1666,11 @@ model DjenMonitor {
   createdById       String    @map("created_by_id") @db.Uuid
   createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+  professionalId    String?   @map("professional_id") @db.Uuid
+  checkpoint        Json?
+  lastSuccessAt     DateTime? @map("last_success_at") @db.Timestamptz(3)
+  lastCaptureAt     DateTime? @map("last_capture_at") @db.Timestamptz(3)
+  firstVerifiedAt   DateTime? @map("first_verified_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
@@ -3990,4 +4025,167 @@ model RobotJob {
   @@index([status, runAfter])
   @@index([accessId, createdAt(sort: Desc)])
   @@map("robot_jobs")
+}
+
+
+// ───────── Box 2.0 — base estrutural (migração 20270106000000_box_v2_foundation) ─────────
+// Sem relações Prisma: as chaves estrangeiras existem no SQL; os serviços sempre filtram por organizationId.
+
+/// Identidade profissional (inscrição na OAB). Um escritório pode ter vários profissionais e várias inscrições.
+model ProfessionalIdentity {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String?  @map("user_id") @db.Uuid
+  name           String
+  oabNumber      String   @map("oab_number")
+  oabUf          String   @map("oab_uf")
+  notifyEmail    String?  @map("notify_email")
+  active         Boolean  @default(true)
+  createdById    String?  @map("created_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, oabUf, oabNumber])
+  @@index([organizationId, active])
+  @@map("professional_identities")
+}
+
+/// Uma execução de sincronização de uma fonte. No máximo uma em andamento por fonte (índice único parcial no SQL).
+model SyncRun {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  sourceKind     String    @map("source_kind")
+  sourceId       String    @map("source_id") @db.Uuid
+  trigger        String    @default("CRON")
+  status         String    @default("RUNNING")
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
+  heartbeatAt    DateTime  @default(now()) @map("heartbeat_at") @db.Timestamptz(3)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(3)
+  windowFrom     DateTime? @map("window_from") @db.Date
+  windowTo       DateTime? @map("window_to") @db.Date
+  cursor         Json?
+  pages          Int       @default(0)
+  fetched        Int       @default(0)
+  reportedTotal  Int?      @map("reported_total")
+  createdCount   Int       @default(0) @map("created_count")
+  duplicateCount Int       @default(0) @map("duplicate_count")
+  skippedCount   Int       @default(0) @map("skipped_count")
+  errorCode      String?   @map("error_code")
+  errorMessage   String?   @map("error_message")
+  coverage       String?
+
+  @@index([organizationId, sourceKind, sourceId, startedAt(sort: Desc)])
+  @@index([status, heartbeatAt])
+  @@map("sync_runs")
+}
+
+/// Evidência de funcionamento por tribunal × operação × método. É a única base para um conector aparecer como operacional.
+model ConnectorEvidence {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String?  @map("organization_id") @db.Uuid
+  sourceKind     String?  @map("source_kind")
+  sourceId       String?  @map("source_id") @db.Uuid
+  connectorKey   String   @map("connector_key")
+  courtCode      String   @default("*") @map("court_code")
+  operation      String
+  accessMethod   String   @map("access_method")
+  environment    String   @default("PRODUCTION")
+  outcome        String
+  reasonCode     String?  @map("reason_code")
+  summary        String?
+  details        Json     @default("{}")
+  runId          String?  @map("run_id") @db.Uuid
+  checkedById    String?  @map("checked_by_id") @db.Uuid
+  checkedAt      DateTime @default(now()) @map("checked_at") @db.Timestamptz(3)
+
+  @@index([organizationId, connectorKey, courtCode, operation, checkedAt(sort: Desc)])
+  @@index([sourceKind, sourceId, checkedAt(sort: Desc)])
+  @@map("connector_evidences")
+}
+
+/// Alerta de saúde persistente (abre, é reconhecido, é resolvido). Deduplicado por (organização, dedupeKey).
+model HealthAlert {
+  id               String    @id @default(uuid()) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  sourceKind       String?   @map("source_kind")
+  sourceId         String?   @map("source_id") @db.Uuid
+  code             String
+  severity         String
+  title            String
+  body             String?
+  state            String    @default("OPEN")
+  dedupeKey        String    @map("dedupe_key")
+  occurrences      Int       @default(1)
+  details          Json      @default("{}")
+  firstSeenAt      DateTime  @default(now()) @map("first_seen_at") @db.Timestamptz(3)
+  lastSeenAt       DateTime  @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+  acknowledgedById String?   @map("acknowledged_by_id") @db.Uuid
+  acknowledgedAt   DateTime? @map("acknowledged_at") @db.Timestamptz(3)
+  resolvedAt       DateTime? @map("resolved_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, dedupeKey])
+  @@index([organizationId, state, severity])
+  @@map("health_alerts")
+}
+
+/// Histórico e evidência de cada comunicação: captura, visualização no LegalOS, ciência oficial, atribuição...
+model NoticeEvent {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  noticeId       String   @map("notice_id") @db.Uuid
+  kind           String
+  actorId        String?  @map("actor_id") @db.Uuid
+  runId          String?  @map("run_id") @db.Uuid
+  data           Json     @default("{}")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([noticeId, createdAt])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("notice_events")
+}
+
+/// Box 2.0: uma tentativa de envio de petição (histórico que impede reenvio às cegas).
+model PetitionAttempt {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  petitionId     String    @map("petition_id") @db.Uuid
+  attemptNo      Int       @map("attempt_no")
+  adapter        String
+  environment    String
+  manifestSha256 String    @map("manifest_sha256")
+  idempotencyKey String    @map("idempotency_key")
+  outcome        String    @default("STARTED")
+  errorCode      String?   @map("error_code")
+  errorMessage   String?   @map("error_message")
+  startedById    String?   @map("started_by_id") @db.Uuid
+  startedAt      DateTime  @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime? @map("finished_at") @db.Timestamptz(3)
+  resolution     String?
+  resolvedById   String?   @map("resolved_by_id") @db.Uuid
+  resolvedAt     DateTime? @map("resolved_at") @db.Timestamptz(3)
+
+  @@unique([petitionId, attemptNo])
+  @@index([organizationId, petitionId])
+  @@map("petition_attempts")
+}
+
+/// Box 2.0: recibo / prova do protocolo (no máximo um por petição).
+model PetitionReceipt {
+  id                String    @id @default(uuid()) @db.Uuid
+  organizationId    String    @map("organization_id") @db.Uuid
+  petitionId        String    @unique @map("petition_id") @db.Uuid
+  attemptId         String?   @map("attempt_id") @db.Uuid
+  source            String
+  environment       String
+  protocol          String
+  receiptText       String?   @map("receipt_text")
+  receiptSha256     String?   @map("receipt_sha256")
+  receiptDocumentId String?   @map("receipt_document_id") @db.Uuid
+  filedAt           DateTime? @map("filed_at") @db.Timestamptz(3)
+  recordedById      String?   @map("recorded_by_id") @db.Uuid
+  note              String?
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("petition_receipts")
 }

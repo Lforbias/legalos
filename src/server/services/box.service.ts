@@ -77,7 +77,7 @@ export async function getBoxDashboard(ctx: TenantContext, days = 14): Promise<Bo
         const where = { organizationId: org, deletedAt: null, case: { is: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } } };
         const [g, sub] = await Promise.all([
           db.petitionFiling.groupBy({ by: ["status"], where, _count: { _all: true } }),
-          db.petitionFiling.count({ where: { ...where, status: "SUBMITTED", submittedAt: { gte: new Date(Date.now() - 30 * 86_400_000) } } }),
+          db.petitionFiling.count({ where: { ...where, status: { in: ["SUBMITTED", "FILED_CONFIRMED"] }, submittedAt: { gte: new Date(Date.now() - 30 * 86_400_000) } } }),
         ]);
         const c = (s: string) => g.find((x) => x.status === s)?._count._all ?? 0;
         return { draft: c("DRAFT"), inReview: c("IN_REVIEW"), approved: c("APPROVED"), failed: c("FAILED"), submitted30: sub };

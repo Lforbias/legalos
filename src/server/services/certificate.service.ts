@@ -2,6 +2,7 @@ import { createSecureContext } from "node:tls";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { decideCertificateUse } from "@/lib/judicial/certificate-policy";
 import { certKey, openBytes, parsePfx, pfxForTls, sealBytes } from "@/lib/security/pfx";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
@@ -32,7 +33,7 @@ export function certStatus(c: { revokedAt: Date | null; notAfter: Date }, now = 
   return "ACTIVE";
 }
 
-const safeSelect = { consultationOnly: true, id: true, label: true, ownerUserId: true, subjectCn: true, documentHint: true, issuerCn: true, serialNumber: true, notBefore: true, notAfter: true, createdAt: true, revokedAt: true, lastUsedAt: true } satisfies Prisma.CertificateSelect;
+const safeSelect = { consultationOnly: true, signingEnabledAt: true, id: true, label: true, ownerUserId: true, subjectCn: true, documentHint: true, issuerCn: true, serialNumber: true, notBefore: true, notAfter: true, createdAt: true, revokedAt: true, lastUsedAt: true } satisfies Prisma.CertificateSelect;
 
 export type CertificateRow = Prisma.CertificateGetPayload<{ select: typeof safeSelect }> & { ownerName: string; status: CertStatus };
 
@@ -110,7 +111,7 @@ export async function listAuthorizedUsers(ctx: TenantContext, certificateId: str
   if (!c) throw new NotFoundError("Certificado não encontrado.");
   const rows = await db.certificateAuthorizedUser.findMany({ where: { certificateId, organizationId: ctx.organizationId }, orderBy: { createdAt: "asc" } });
   const users = rows.length ? await db.user.findMany({ where: { id: { in: rows.map((r) => r.userId) } }, select: { id: true, name: true } }) : [];
-  return rows.map((r) => ({ userId: r.userId, name: users.find((u) => u.id === r.userId)?.name ?? "Usuário removido", createdAt: r.createdAt }));
+  return rows.map((r) => ({ userId: r.userId, name: users.find((u) => u.id === r.userId)?.name ?? "Usuário removido", createdAt: r.createdAt, canSign: r.canSign }));
 }
 
 export async function authorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string) {
@@ -143,16 +144,18 @@ export type CertificateMaterial = { pfx: Buffer; passphrase: string; subjectCn: 
  * Permitido ao titular do certificado ou a quem tem `certificates:manage`; recusa revogado/vencido.
  * Nenhuma tela, rota ou API devolve este material.
  */
-const READ_ONLY_PURPOSES = new Set(["local:tls-check", "mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos"]);
-async function enforceCertificatePurpose(ctx: TenantContext, certificate: { id: string; consultationOnly: boolean }, purpose: string) {
-  if (!certificate.consultationOnly || READ_ONLY_PURPOSES.has(purpose)) return;
-  await audit({ action: "certificate.use_blocked", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificate.id, metadata: { purpose, consultationOnly: true }, meta: ctx.meta });
-  throw new ConflictError("Este certificado é somente para consulta. Protocolo, assinatura, ciência de intimações e outras operações não autorizadas estão bloqueados.");
+async function enforceCertificatePurpose(ctx: TenantContext, certificate: { id: string; consultationOnly: boolean; ownerUserId: string }, purpose: string) {
+  // Ponto ÚNICO de decisão: consultar e assinar são poderes independentes (veja certificate-policy.ts).
+  const grant = certificate.consultationOnly || certificate.ownerUserId === ctx.userId ? null : await db.certificateAuthorizedUser.findUnique({ where: { certificateId_userId: { certificateId: certificate.id, userId: ctx.userId } }, select: { canSign: true } });
+  const decision = decideCertificateUse({ purpose, consultationOnly: certificate.consultationOnly, isOwner: certificate.ownerUserId === ctx.userId, authorizedCanSign: grant ? grant.canSign : null, hasSignPermission: can(ctx, "certificates:sign") });
+  if (decision.allowed) return;
+  await audit({ action: "certificate.use_blocked", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificate.id, metadata: { purpose, reason: decision.code, consultationOnly: certificate.consultationOnly }, meta: ctx.meta });
+  throw new ConflictError(decision.message);
 }
 /** Called before reserving/submitting a petition, also when invoking the adapter directly. */
 export async function assertCertificatePurpose(ctx: TenantContext, id: string, purpose: string) {
   await assertCertificateUsable(ctx, id);
-  const certificate = await db.certificate.findFirstOrThrow({ where: { id, organizationId: ctx.organizationId }, select: { id: true, consultationOnly: true } });
+  const certificate = await db.certificate.findFirstOrThrow({ where: { id, organizationId: ctx.organizationId }, select: { id: true, consultationOnly: true, ownerUserId: true } });
   await enforceCertificatePurpose(ctx, certificate, purpose.trim().slice(0, 120));
 }
 
@@ -168,7 +171,7 @@ export async function getCertificateMaterial(ctx: TenantContext, id: string, pur
   if (c.notAfter <= new Date()) throw new ConflictError("Este certificado está vencido.");
   const cleanPurpose = purpose.trim().slice(0, 120);
   if (!cleanPurpose) throw new ValidationError("Informe a finalidade do uso.");
-  await enforceCertificatePurpose(ctx, c, cleanPurpose);
+  await enforceCertificatePurpose(ctx, { id: c.id, consultationOnly: c.consultationOnly, ownerUserId: c.ownerUserId }, cleanPurpose);
   await db.$transaction([
     db.certificateUsage.create({ data: { organizationId: ctx.organizationId, certificateId: id, userId: ctx.userId, purpose: cleanPurpose, caseId: caseId ?? null } }),
     db.certificate.update({ where: { id }, data: { lastUsedAt: new Date() } }),
@@ -217,12 +220,56 @@ export async function runCertificateExpiryCheck(organizationId?: string, now = n
   return created;
 }
 
-/** One-way protection for a certificate uploaded before consultation-only was introduced. */
+/**
+ * Volta o certificado para SOMENTE CONSULTA e retira o poder de assinar de todos os autorizados.
+ * É a trava de segurança: quem administra o cofre pode acionar a qualquer momento; liberar de novo exige o ato explícito abaixo.
+ */
 export async function restrictCertificateToConsultation(ctx: TenantContext, id: string) {
   assertCan(ctx, "certificates:manage"); await requireMfa(ctx.userId);
-  const changed = await db.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null }, data: { consultationOnly: true } });
-  if (!changed.count) throw new NotFoundError("Certificado não encontrado.");
+  const changed = await db.$transaction(async (tx) => {
+    const r = await tx.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null }, data: { consultationOnly: true, signingEnabledAt: null, signingEnabledById: null } });
+    if (r.count) await tx.certificateAuthorizedUser.updateMany({ where: { certificateId: id, organizationId: ctx.organizationId }, data: { canSign: false } });
+    return r.count;
+  });
+  if (!changed) throw new NotFoundError("Certificado não encontrado.");
   await audit({ action: "certificate.restrict_consultation", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: id, meta: ctx.meta });
+}
+
+/**
+ * Libera o certificado para ASSINAR e PROTOCOLAR (ato explícito, separado da consulta). Exige: permissão de administrar o cofre E de
+ * assinar, verificação em duas etapas, certificado vigente e a digitação do nome do certificado. Fica registrado em auditoria.
+ * Liberar não envia nada ao tribunal: cada protocolo ainda passa pela aprovação, pela confirmação do número do processo e pela homologação do conector.
+ */
+export async function enableCertificateSigning(ctx: TenantContext, id: string, confirmLabel: string) {
+  assertCan(ctx, "certificates:manage");
+  assertCan(ctx, "certificates:sign");
+  await requireMfa(ctx.userId);
+  const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { id: true, label: true, revokedAt: true, notAfter: true, consultationOnly: true, signingEnabledAt: true } });
+  if (!c) throw new NotFoundError("Certificado não encontrado.");
+  if (c.revokedAt) throw new ConflictError("Este certificado foi revogado.");
+  if (c.notAfter <= new Date()) throw new ConflictError("Este certificado está vencido.");
+  if (!c.consultationOnly && c.signingEnabledAt) throw new ConflictError("Este certificado já está liberado para assinatura e protocolo.");
+  if (confirmLabel.trim() !== c.label) throw new ValidationError("Digite o nome do certificado para confirmar a liberação.", { confirm: ["O nome digitado não confere com o do certificado."] });
+  const res = await db.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null, OR: [{ consultationOnly: true }, { signingEnabledAt: null }] }, data: { consultationOnly: false, signingEnabledAt: new Date(), signingEnabledById: ctx.userId } });
+  if (res.count !== 1) throw new ConflictError("O certificado mudou de situação. Recarregue a página.");
+  await audit({ action: "certificate.enable_signing", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: id, metadata: { label: c.label }, meta: ctx.meta });
+}
+
+/** Dá ou retira de uma pessoa JÁ autorizada o poder de assinar/protocolar com o certificado (a consulta não muda). */
+export async function setCertificateSigner(ctx: TenantContext, certificateId: string, userId: string, canSign: boolean) {
+  assertCan(ctx, "certificates:manage");
+  assertCan(ctx, "certificates:sign");
+  await requireMfa(ctx.userId);
+  const c = await db.certificate.findFirst({ where: { id: certificateId, organizationId: ctx.organizationId, revokedAt: null }, select: { id: true, consultationOnly: true } });
+  if (!c) throw new NotFoundError("Certificado não encontrado ou revogado.");
+  if (canSign) {
+    if (c.consultationOnly) throw new ConflictError("Libere o certificado para assinatura antes de autorizar alguém a assinar com ele.");
+    const m = await db.membership.findFirst({ where: { organizationId: ctx.organizationId, userId, status: "ACTIVE", role: { permissions: { has: "certificates:sign" } } }, select: { userId: true } });
+    if (!m) throw new ValidationError("Essa pessoa não tem, no perfil, a permissão de assinar e protocolar com certificado.", { userId: ["Perfil sem permissão de assinar."] });
+  }
+  const res = await db.certificateAuthorizedUser.updateMany({ where: { certificateId, userId, organizationId: ctx.organizationId }, data: { canSign } });
+  if (res.count !== 1) throw new NotFoundError("Autorização não encontrada. Autorize a pessoa a usar o certificado primeiro.");
+  await audit({ action: canSign ? "certificate.signer_grant" : "certificate.signer_revoke", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificateId, metadata: { target: userId }, meta: ctx.meta });
 }
 
 /** Local crypto validation only: no network, no login, no protocol and no change to the stored certificate. */

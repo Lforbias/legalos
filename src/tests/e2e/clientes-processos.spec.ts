@@ -19,7 +19,7 @@ async function signUpWithOffice(page: Page, label: string) {
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return id;
 }
 
@@ -50,15 +50,15 @@ test("clientes e processos: validação, cadastro, linha do tempo, documento e i
 
   // ---- processo: número CNJ inválido, depois válido, vinculado ao cliente ----
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Ação ${id}`);
+  await page.getByLabel("Título do caso ou processo").fill(`Ação ${id}`);
   await page.getByLabel("Número CNJ").fill("0000001-00.2024.8.26.0100");
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByText(/Número CNJ inválido/)).toBeVisible();
   await page.getByLabel("Número CNJ").fill(cnj("0000001"));
   await page.getByPlaceholder("Buscar cliente pelo nome…").fill(clientName.slice(0, 8));
   await page.getByRole("button", { name: new RegExp(clientName) }).click();
   await page.getByLabel("Processo sigiloso").check();
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Ação ${id}` })).toBeVisible();
   await expect(page.getByText("Sigiloso").first()).toBeVisible();
   const caseUrl = page.url();

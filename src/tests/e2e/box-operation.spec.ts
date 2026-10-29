@@ -10,10 +10,10 @@ test("BOX: autos com prévia autenticada, favoritos e etapas personalizadas", as
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
   await page.getByLabel("Nome do escritório").fill(`Autos ${id}`);
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso autos ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo", exact: true }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso autos ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo", exact: true }).click();
   await expect(page.getByRole("heading", { name: `Caso autos ${id}`, exact: true })).toBeVisible();
   const caseUrl = page.url().split("?")[0]!;
   await page.goto(`${caseUrl}?aba=documentos`);

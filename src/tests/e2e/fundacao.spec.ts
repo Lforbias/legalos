@@ -35,7 +35,7 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   await page.getByRole("button", { name: "Criar escritório" }).click();
 
   // dashboard conectado ao banco
-  await expect(page.getByRole("heading", { name: /Olá, Talita/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia, Talita/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "O que precisa da sua atenção" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Financeiro do escritório" })).toBeVisible();
   // todos os módulos do menu estão implementados: Relatórios abre a tela real
@@ -67,7 +67,7 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   await guest.getByLabel("Nome completo").fill("Advogado Convidado");
   await guest.getByLabel("Senha", { exact: true }).fill(password);
   await guest.getByRole("button", { name: "Criar conta" }).click();
-  await expect(guest.getByRole("heading", { name: /Olá, Advogado/ })).toBeVisible();
+  await expect(guest.getByRole("heading", { name: /Bom dia, Advogado/ })).toBeVisible();
 
   // permissões: advogado não vê auditoria nem gestão de equipe
   await guest.goto("/configuracoes/auditoria");
@@ -112,7 +112,7 @@ test("escritórios são isolados: um usuário não enxerga a equipe de outro esc
     await register(p, `Dono ${label}${id}`, `dono-${label.toLowerCase()}-${id}@example.test`);
     await p.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
     await p.getByRole("button", { name: "Criar escritório" }).click();
-    await expect(p.getByRole("heading", { name: /Olá/ })).toBeVisible();
+    await expect(p.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   }
   await a.goto("/configuracoes/equipe");
   await expect(a.getByText(`Dono A${id}`)).toBeVisible();

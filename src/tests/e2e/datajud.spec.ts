@@ -12,7 +12,7 @@ test("DataJud sem chave: página de integrações avisa, não oferece ligar e o 
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca dj ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.getByTestId("space-box").first().click();
   await expect(page.getByTestId("box-dashboard")).toBeVisible();
@@ -23,8 +23,8 @@ test("DataJud sem chave: página de integrações avisa, não oferece ligar e o 
   await expect(page.getByRole("button", { name: /Ligar DataJud/ })).toHaveCount(0);
 
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso DJ ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso DJ ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso DJ ${id}` })).toBeVisible();
   await expect(page.getByRole("button", { name: "Consultar DataJud" })).toHaveCount(0);
 });
@@ -48,7 +48,7 @@ test("DataJud: falha externa aparece sem referência genérica e último teste p
     await page.getByRole("button", { name: "Criar conta", exact: true }).click();
     await page.getByLabel("Nome do escritório").fill(`Conexão ${id}`);
     await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-    await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
     await page.goto("/integracoes");
     await page.getByLabel("Chave pública do DataJud", { exact: true }).fill("chave-publica-ficticia-para-teste-123");
     await page.getByRole("button", { name: "Guardar chave DataJud", exact: true }).click();

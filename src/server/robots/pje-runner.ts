@@ -3,6 +3,8 @@ import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { loginPje, type LoginOutcome } from "@/lib/robots/pje/login";
 import { MAX_ATTEMPTS, backoffMs, mapOutcome } from "@/lib/robots/pje/outcome";
+import { failureCodeForLogin } from "@/lib/judicial/robot-evidence";
+import { recordEvidence } from "@/server/judicial/evidence.service";
 import { probePjePanel } from "@/lib/robots/pje/panel";
 import { getPjeTarget } from "@/lib/robots/pje/targets";
 import { openBytes, certKey } from "@/lib/security/pfx";
@@ -101,13 +103,31 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     if (outcome.ok && job.kind === "SYNC_NOTICES") panel = await (deps.probe ?? probePjePanel)(rp.page, target, names);
   } catch (e) {
     logger.error("robot.job_crashed", { jobId, error: sanitizeError(e) });
-    outcome = { ok: false, code: "NETWORK", message: "O navegador do robô falhou durante o teste.", retryable: true, signature: null };
+    outcome = { ok: false, code: "NETWORK", message: "O navegador do robô falhou durante o teste.", retryable: true, signature: null, detail: String(sanitizeError(e)).slice(0, 240) };
   } finally {
     await rp?.close().catch(() => undefined);
   }
 
   const m = mapOutcome(outcome, job.attempts);
-  const summary = { code: outcome.ok ? "OK" : outcome.code, signature: outcome.signature, ...(panel ? { panel } : {}) };
+  // Evidência real do acesso (login): é isto — e não o cadastro do acesso — que sustenta o estado "conectado" na Central de Conexões.
+  try {
+    await recordEvidence({
+      organizationId: access.organizationId,
+      source: { kind: "PORTAL", id: access.id },
+      connectorKey: "pje-portal",
+      courtCode: access.target,
+      operation: "validateCredentials",
+      accessMethod: "PORTAL_ROBOT",
+      environment: deps.login ? "SIMULATED" : "PRODUCTION",
+      outcome: outcome.ok ? "PASSED" : "FAILED",
+      reasonCode: outcome.ok ? null : failureCodeForLogin(outcome.code),
+      summary: outcome.ok ? "O login no portal funcionou." : outcome.message.slice(0, 200),
+      details: { job: job.kind, attempt: job.attempts, ...(!outcome.ok && outcome.detail ? { cause: outcome.detail } : {}) },
+    });
+  } catch (e) {
+    logger.error("robot.evidence_failed", { jobId, error: sanitizeError(e) });
+  }
+  const summary = { code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
   if (m.retry) {
     await db.robotJob.update({ where: { id: job.id }, data: { status: "QUEUED", runAfter: new Date(now().getTime() + backoffMs(job.attempts)), message: m.message.slice(0, 400), summary: summary as never } });
   } else {

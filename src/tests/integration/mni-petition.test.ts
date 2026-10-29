@@ -110,20 +110,29 @@ describe("protocolo de petição pelo MNI (Etapa 5) — tribunal SIMULADO só no
     await expect(submitPetition(A.ctx, p.id, { confirmCase: cnj, post: async () => okXml("PROT-2") })).resolves.toMatchObject({ protocol: "PROT-2" });
   });
 
-  it("sem confirmação do tribunal (queda, resposta sem protocolo) é INCERTO: avisa para conferir antes de reenviar", async () => {
+  it("sem confirmação do tribunal (queda, resposta sem protocolo) vira ESTADO DESCONHECIDO: nunca é reenviada às cegas", async () => {
     const p1 = await approved("Queda");
     await expect(submitPetition(A.ctx, p1.id, { confirmCase: cnj, post: async () => { throw new MniError("O tribunal demorou demais para responder."); } })).rejects.toThrow(/PODE ter sido protocolada/);
     const r1 = await status(p1.id);
-    expect(r1.status).toBe("FAILED");
+    expect(r1.status).toBe("UNKNOWN");
     expect(r1.error).toMatch(/ATENÇÃO/);
     expect(r1.protocol).toBeNull();
+    // não há reenvio: nem direto, nem por rota alternativa
+    let reached = 0;
+    await expect(submitPetition(A.ctx, p1.id, { confirmCase: cnj, post: async () => { reached++; return okXml("PROT-X"); } })).rejects.toBeInstanceOf(ConflictError);
+    expect(reached).toBe(0); // o tribunal nem foi acionado de novo
     const p2 = await approved("Sem protocolo");
     const semProtocolo = soap(`<ns2:entregarManifestacaoProcessualResposta xmlns:ns2="x"><sucesso>true</sucesso></ns2:entregarManifestacaoProcessualResposta>`);
     await expect(submitPetition(A.ctx, p2.id, { confirmCase: cnj, post: async () => semProtocolo })).rejects.toThrow(/PODE ter sido protocolada/);
-    expect((await status(p2.id)).error).toMatch(/ATENÇÃO/);
+    const r2 = await status(p2.id);
+    expect(r2.status).toBe("UNKNOWN");
+    expect(r2.error).toMatch(/ATENÇÃO/);
+    // recusa explícita (credenciais/certificado) continua sendo falha definitiva, que pode ser reenviada
     const p3 = await approved("Acesso recusado");
     await expect(submitPetition(A.ctx, p3.id, { confirmCase: cnj, post: async () => { throw new MniError("O tribunal recusou o acesso (credenciais ou certificado)."); } })).rejects.toBeInstanceOf(ConflictError);
-    expect((await status(p3.id)).error).not.toMatch(/ATENÇÃO/);
+    const r3 = await status(p3.id);
+    expect(r3.status).toBe("FAILED");
+    expect(r3.error).not.toMatch(/ATENÇÃO/);
   });
 
   it("anexo com classificação sem código é recusado antes do envio", async () => {
