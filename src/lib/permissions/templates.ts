@@ -12,4 +12,4 @@ export const ROLE_TEMPLATES: RoleTemplate[] = [
 ];
 
 /** Permissões que merecem revisão periódica: quem as tem pode ver segredo, mexer em dinheiro, acessos ou integrações. */
-export const SENSITIVE_PERMISSIONS: PermissionKey[] = ["vault:read", "vault:manage", "finance:manage", "members:manage", "roles:manage", "integrations:manage", "certificates:manage", "audit:read", "whatsapp:manage", "billing:manage", "clients:delete", "cases:delete"];
+export const SENSITIVE_PERMISSIONS: PermissionKey[] = ["vault:read", "vault:manage", "finance:manage", "members:manage", "roles:manage", "integrations:manage", "certificates:manage", "certificates:sign", "audit:read", "whatsapp:manage", "billing:manage", "clients:delete", "cases:delete"];

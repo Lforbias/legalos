@@ -18,7 +18,7 @@ async function register(page: Page, label: string, withOrg: boolean) {
   if (withOrg) {
     await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
     await page.getByRole("button", { name: "Criar escritório" }).click();
-    await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   } else {
     await expect(page.getByLabel("Nome do escritório")).toBeVisible();
   }
@@ -102,6 +102,6 @@ test("2FA obrigatório: o dono liga, quem não ativou fica preso na tela de ativ
   await page2.getByRole("button", { name: "Ativar verificação em duas etapas" }).click();
   await enableMfa(page2);
   await expect(page2).not.toHaveURL(/\/exigir-2fa/);
-  await expect(page2.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page2.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await ctx2.close();
 });

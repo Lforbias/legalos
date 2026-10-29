@@ -28,6 +28,11 @@ import { FlowButtons, NotesPanel, TagsEditor, TeamAssignControl } from "@/module
 import { listDocuments } from "@/server/services/document.service";
 import { todayYmd } from "@/lib/dates/ymd";
 import { requireTenant } from "@/server/session";
+import { boxV2Enabled } from "@/lib/features";
+import { getNoticeTimeline } from "@/server/judicial/inbox-v2.service";
+import { NoticeStatesCard, NoticeTimelineCard } from "@/modules/box/notice-states";
+import { ViewTracker } from "@/modules/box/view-tracker";
+import { db } from "@/lib/db/client";
 
 
 const TONE = { NEW: "warning", DISTRIBUTED: "info", PROCESSED: "success", DISCARDED: "neutral" } as const;
@@ -53,10 +58,15 @@ export async function NoticeReader({ id, embedded = false }: { id: string; embed
   const sug = await suggestAvailability(ctx);
   const tri = await getTriage(ctx, n.id);
   const triAv = triageAvailability(ctx);
+  const v2 = boxV2Enabled(ctx.organizationId);
+  const [timeline, firstViewedBy] = v2
+    ? await Promise.all([getNoticeTimeline(ctx, n.id), n.firstViewedById ? db.user.findFirst({ where: { id: n.firstViewedById }, select: { name: true } }) : Promise.resolve(null)])
+    : [[], null];
   const documents = n.caseId && can(ctx, "documents:read") && can(ctx, "cases:read") ? await listDocuments(ctx, { caseId: n.caseId }) : [];
 
   return (
     <div className={embedded ? "min-w-0" : "mx-auto max-w-5xl"}>
+      {v2 ? <ViewTracker noticeId={n.id} /> : null}
       <PageHeader
         title={n.title}
         description={`${NOTICE_KIND_LABEL[n.kind]} · ${NOTICE_SOURCE_LABEL[n.source]} · recebida em ${formatYmd(dateToYmd(n.receivedAt))}`}
@@ -112,6 +122,7 @@ export async function NoticeReader({ id, embedded = false }: { id: string; embed
           </Card>
         </div>
         <div className="space-y-4">
+          {v2 ? <NoticeStatesCard n={n} capturedAt={n.capturedAt} firstViewedAt={n.firstViewedAt} firstViewedByName={firstViewedBy?.name ?? null} officialAckAt={n.officialAckAt} tz={tz} /> : null}
           <Card>
             <CardHeader title="Notas internas" description="Só a equipe vê." />
             <CardBody><NotesPanel id={n.id} notes={n.notes.map((x) => ({ id: x.id, body: x.body, authorId: x.authorId, authorName: x.authorName, createdAt: x.createdAt.toISOString() }))} fmt={n.notes.map((x) => formatDateTime(x.createdAt, tz))} canWrite={canWrite} myId={ctx.userId} isOwner={ctx.isOwner} /></CardBody>
@@ -168,6 +179,7 @@ export async function NoticeReader({ id, embedded = false }: { id: string; embed
             <CardHeader title="Situação" />
             <CardBody><StatusControls id={n.id} status={n.status} canWrite={canWrite} canDelete={canWrite} /></CardBody>
           </Card>
+          {v2 ? <NoticeTimelineCard entries={timeline} tz={tz} /> : null}
         </div>
       </div>
     </div>

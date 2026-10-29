@@ -14,7 +14,7 @@ async function register(page: Page, label: string) {
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return id;
 }
 
@@ -23,8 +23,8 @@ test("3.0-F3: timbrado com logo, novas variáveis e prévia em PDF antes de gera
 
   // processo com partes
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso ${id}` })).toBeVisible();
 
   // timbrado

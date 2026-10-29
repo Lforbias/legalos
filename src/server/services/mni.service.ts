@@ -19,6 +19,10 @@ import { requireMfa, getCertificateMaterial } from "./certificate.service";
 import { resolveMyCredential } from "./court-credential.service";
 import { isUniqueViolation } from "./db-errors";
 import { createNotice } from "./notice.service";
+import { connectorKeyForMniSystem } from "@/lib/judicial/catalog";
+import type { EvidenceEnvironment, OperationFailure } from "@/lib/judicial/contracts";
+import { isLocalOrFakeUrl } from "@/lib/judicial/evidence";
+import { recordEvidence } from "@/server/judicial/evidence.service";
 import { classifyFile, MAX_DOCUMENT_BYTES, sanitizeFileName, storeNewDocument } from "./document.service";
 import { resolveTenantContext } from "./tenant.service";
 
@@ -171,6 +175,30 @@ export async function record(connectionId: string, ok: boolean, message: string)
 
 const brDate = (d: Date) => dateToYmd(new Date(d.getTime() - 3 * 3600 * 1000));
 
+/** Ambiente da evidência: transporte injetado (testes) é SIMULADO; conexão em homologação é HOMOLOGAÇÃO; o resto é produção real. */
+export const evidenceEnv = (c: { environment: string; endpointUrl: string }, post: SoapPost): EvidenceEnvironment => {
+  if (post !== postSoap || isLocalOrFakeUrl(c.endpointUrl)) return "SIMULATED"; // servidor local/fictício nunca prova um tribunal real
+  return c.environment === "HOMOLOGATION" ? "HOMOLOGATION" : "PRODUCTION";
+};
+
+/** O MNI não devolve código estruturado: classifica a falha pelo que o tribunal respondeu (conservador; na dúvida, formato inesperado). */
+export function mniFailureCode(message: string): OperationFailure["code"] {
+  if (/certificado|autentic|senha|credenci|login|acesso negado|permiss|n[ãa]o autorizad|unauthorized/i.test(message)) return "AUTH_REJECTED";
+  if (/tempo|timeout|expirou/i.test(message)) return "TIMEOUT";
+  if (/comunica[çc][ãa]o com|conex|rede|indispon|inst[áa]vel|recusou a conex/i.test(message)) return "UNAVAILABLE";
+  return "INVALID_RESPONSE";
+}
+
+async function mniEvidence(ctx: TenantContext, c: { id: string; system: string; jtr: string; label: string }, operation: "listNotices" | "getCase" | "listDocuments", r: { ok: true } | OperationFailure, environment: EvidenceEnvironment, details: Record<string, unknown> = {}) {
+  const connectorKey = connectorKeyForMniSystem(c.system);
+  if (!connectorKey) return;
+  try {
+    await recordEvidence({ organizationId: ctx.organizationId, source: { kind: "MNI", id: c.id }, connectorKey, courtCode: c.jtr, operation, accessMethod: "MNI", environment, outcome: r.ok ? "PASSED" : "FAILED", reasonCode: r.ok ? null : r.code, summary: r.ok ? "O tribunal respondeu à consulta." : r.message.slice(0, 200), details });
+  } catch {
+    /* evidência é best-effort: nunca impede a captura */
+  }
+}
+
 export type SyncAvisosResult = { found: number; imported: number; alreadyKnown: number };
 
 /**
@@ -189,6 +217,7 @@ export async function syncAvisos(ctx: TenantContext, connectionId: string, post:
   } catch (err) {
     if (err instanceof MniError) {
       await record(c.id, false, err.message);
+      await mniEvidence(ctx, c, "listNotices", { ok: false, code: mniFailureCode(err.message), message: err.message, retryable: true }, evidenceEnv(c, post));
       throw new ConflictError(err.message);
     }
     throw err;
@@ -196,6 +225,7 @@ export async function syncAvisos(ctx: TenantContext, connectionId: string, post:
   let imported = 0;
   let alreadyKnown = 0;
   const today = brDate(new Date());
+  const capturedAt = new Date();
   for (const a of avisos) {
     const externalKey = `mni:${c.system === "pje-mni" ? "" : `${c.system}:`}${c.jtr}:${a.idAviso}`;
     if (await db.courtNotice.findFirst({ where: { organizationId: ctx.organizationId, externalKey }, select: { id: true } })) {
@@ -218,7 +248,8 @@ export async function syncAvisos(ctx: TenantContext, connectionId: string, post:
           receivedAt: today,
           caseId: "",
         },
-        { source: "IMPORTED", externalKey },
+        // comunicação ELETRÔNICA PRIVADA: origem e identificador oficial próprios; ciência oficial desconhecida (nunca presumida)
+        { source: "IMPORTED", externalKey, capture: { originKind: "PRIVATE_COMMUNICATION", sourceSystem: c.system, officialId: a.idAviso, courtCode: c.jtr, capturedAt, evidence: { connection: c.id } } },
       );
       imported++;
     } catch (e) {
@@ -226,6 +257,7 @@ export async function syncAvisos(ctx: TenantContext, connectionId: string, post:
       else throw e;
     }
   }
+  await mniEvidence(ctx, c, "listNotices", { ok: true }, evidenceEnv(c, post), { found: avisos.length, imported, alreadyKnown });
   await record(c.id, true, `${avisos.length} aviso(s) pendente(s); ${imported} novo(s).`);
   await audit({ action: "mni.sync_avisos", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_connection", resourceId: c.id, metadata: { found: avisos.length, imported }, meta: ctx.meta });
   return { found: avisos.length, imported, alreadyKnown };

@@ -143,4 +143,6 @@ export const EVENT_KIND_LABEL: Record<string, string> = {
   PETITION_RETURNED: "Petição devolvida",
   PETITION_SUBMITTED: "Petição enviada",
   PETITION_CANCELED: "Petição cancelada",
+  PETITION_UNKNOWN: "Petição em estado desconhecido",
+  PETITION_RECONCILED: "Petição conferida no tribunal",
 };

@@ -18,6 +18,9 @@ export const PETITION_STATUS_LABEL = {
   APPROVED: "Aprovada",
   SUBMITTING: "Enviando…",
   SUBMITTED: "Enviada",
+  AWAITING_CONFIRMATION: "Enviada — falta a confirmação oficial",
+  FILED_CONFIRMED: "Protocolada com confirmação oficial",
+  UNKNOWN: "Estado desconhecido — confira no tribunal",
   FAILED: "Falha no envio",
   CANCELED: "Cancelada",
 } as const;
@@ -27,7 +30,10 @@ export const PETITION_STATUS_TONE: Record<PetitionStatusKey, "neutral" | "info" 
   IN_REVIEW: "warning",
   APPROVED: "info",
   SUBMITTING: "info",
-  SUBMITTED: "success",
+  SUBMITTED: "warning",
+  AWAITING_CONFIRMATION: "warning",
+  FILED_CONFIRMED: "success",
+  UNKNOWN: "danger",
   FAILED: "danger",
   CANCELED: "neutral",
 };
@@ -47,3 +53,10 @@ export const attachmentSchema = z.object({
   classification: z.enum(Object.keys(ATTACHMENT_CLASS_LABEL) as [AttachmentClassKey, ...AttachmentClassKey[]], { message: "Escolha a classificação." }),
 });
 export type AttachmentInput = z.infer<typeof attachmentSchema>;
+
+export const reconcileFiledSchema = z.object({
+  protocol: z.string().trim().min(3, "Informe o número do protocolo.").max(60, "Máximo de 60 caracteres."),
+  receiptDocumentId: z.uuid("Escolha o documento do recibo."),
+  note: z.string().trim().max(1000, "Máximo de 1000 caracteres.").optional(),
+});
+export const reconcileNotFiledSchema = z.object({ note: z.string().trim().min(10, "Explique onde conferiu (mín. 10 caracteres).").max(1000, "Máximo de 1000 caracteres.") });

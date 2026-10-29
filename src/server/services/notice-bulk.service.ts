@@ -9,6 +9,7 @@ import { logCaseEvent } from "./case.service";
 import { normalizeTags } from "./inbox-flow.service";
 import { notify } from "./notification.service";
 import { visibility } from "./notice.service";
+import { recordNoticeEvent } from "@/server/judicial/notice-events";
 
 /** Lote atômico e limitado: seleção explícita, sigilo, versões e notificações na mesma transação. */
 export async function bulkUpdateNotices(ctx: TenantContext, raw: unknown, transaction?: Tx) {
@@ -63,6 +64,8 @@ export async function bulkUpdateNotices(ctx: TenantContext, raw: unknown, transa
         const result = await tx.courtNotice.updateMany({ where: { AND: [{ id: n.id, organizationId: ctx.organizationId, deletedAt: null, updatedAt: n.updatedAt }, visibility(ctx)] }, data });
         if (result.count !== 1) throw new ConflictError("Uma intimação foi alterada por outra pessoa. Recarregue a lista; nada foi alterado.");
         if (input.action === "PROCESS" && n.caseId) await logCaseEvent(tx, ctx, n.caseId, { kind: "NOTICE_PROCESSED", title: `Intimação tratada: ${n.title}` });
+        const bulkEvent = input.action === "ASSIGN_USER" ? ["ASSIGNED", { to: input.userId, bulk: true }] as const : input.action === "ASSIGN_TEAM" ? ["TEAM_ASSIGNED", { teamId: input.teamId, bulk: true }] as const : input.action === "SNOOZE" ? ["SNOOZED", { until: input.until, bulk: true }] as const : input.action === "PROCESS" ? ["PROCESSED", { bulk: true }] as const : null;
+        if (bulkEvent) await recordNoticeEvent(tx, ctx, n.id, bulkEvent[0], bulkEvent[1]);
         await audit({ action: `notice.bulk.${input.action.toLowerCase()}`, organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: n.id, metadata: { batchSize: ids.length, ...(input.action === "ASSIGN_USER" ? { to: input.userId } : input.action === "ASSIGN_TEAM" ? { teamId: input.teamId } : input.action === "SNOOZE" ? { until: input.until } : {}) }, meta: ctx.meta }, tx);
         if (recipients.length) await notify(recipients.filter(userId => userId !== ctx.userId).map(userId => ({ organizationId: ctx.organizationId, userId, kind: "notice.assigned", title: `Intimação distribuída para você: ${n.title}`, link: `/caixa-de-entrada/${n.id}`, dedupeKey: `notice-bulk:${n.id}:${n.updatedAt.toISOString()}:${userId}` })), tx);
       }

@@ -13,7 +13,7 @@ export const JOBS = {
   "push-due": { label: "Avisos no celular (prazos e tarefas a vencer)", everyMin: 15, manual: true },
   "petition-queue": { label: "Fila de protocolos agendados", everyMin: 1, manual: true },
   "autos-queue": { label: "Fila de download dos autos", everyMin: 1, manual: false },
-  monitoring: { label: "Alertas do monitoramento de intimações", everyMin: 30, manual: true },
+  monitoring: { label: "Saúde e alertas do Box (conexões, certificados, rotinas)", everyMin: 5, manual: true },
   robots: { label: "Leitura dos portais dos tribunais (robô)", everyMin: 15, manual: false },
   "whatsapp-billing": { label: "Lembretes de cobrança no WhatsApp", everyMin: 60, manual: false },
 } as const;

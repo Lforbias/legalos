@@ -12,7 +12,7 @@ async function signUpWithOffice(page: Page, label: string) {
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return id;
 }
 
@@ -20,8 +20,8 @@ test("modelos, geração de .docx, versões e fluxo de peticionamento (demonstra
   const id = await signUpWithOffice(page, "d");
 
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso ${id}` })).toBeVisible();
 
   // ---- modelo ----
@@ -118,8 +118,8 @@ test("isolamento: outro escritório não vê documentos, modelos nem petições"
 test("autotextos no modelo e anexos classificados na petição", async ({ page }) => {
   const id = await signUpWithOffice(page, "at");
   await page.goto("/processos/novo");
-  await page.getByLabel("Título do processo").fill(`Caso ${id}`);
-  await page.getByRole("button", { name: "Cadastrar processo" }).click();
+  await page.getByLabel("Título do caso ou processo").fill(`Caso ${id}`);
+  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByRole("heading", { name: `Caso ${id}` })).toBeVisible();
 
   // ---- autotexto ----

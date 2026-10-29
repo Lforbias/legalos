@@ -13,7 +13,7 @@ test("Chaves de API: criar na tela (exige 2FA), usar a API sem cookie, token só
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca api ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // sem 2FA, criar chave é recusado com explicação
   await page.goto("/integracoes");

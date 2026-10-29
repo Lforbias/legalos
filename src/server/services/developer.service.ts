@@ -17,7 +17,7 @@ import { runDjenAll } from "./djen.service";
 import { runMailOutbox } from "./mail-outbox.service";
 import { runMniAll } from "./mni.service";
 import { runDueSchedules } from "./petition-queue.service";
-import { runMonitoringCheck } from "./monitoring.service";
+import { runHealthCheck } from "@/server/judicial/health.service";
 import { assertPlatform, integrationsHealth, listPlatformAudit, type PlatformCtx } from "./platform.service";
 import { runWebhookDeliveries } from "./webhook.service";
 import { runSlaCheck } from "./chat-sla.service";
@@ -93,7 +93,7 @@ export async function runJobManually(pc: PlatformCtx, job: string) {
   const key = job as JobKey;
   const running = await db.jobRun.findFirst({ where: { job: key, status: "RUNNING", startedAt: { gte: ago(10 * MIN) } }, select: { id: true } });
   if (running) throw new ConflictError("Esta rotina já está rodando. Aguarde terminar.");
-  const fn: () => Promise<object> = { webhooks: () => runWebhookDeliveries(), mail: () => runMailOutbox(), djen: () => runDjenAll(), mni: () => runMniAll(), "chat-sla": () => runSlaCheck(), "chat-extras": () => runChatExtras(), "push-due": () => runPushDue(), "petition-queue": () => runDueSchedules(), monitoring: () => runMonitoringCheck() }[key as "webhooks" | "mail" | "djen" | "mni" | "chat-sla" | "chat-extras" | "push-due" | "petition-queue" | "monitoring"];
+  const fn: () => Promise<object> = { webhooks: () => runWebhookDeliveries(), mail: () => runMailOutbox(), djen: () => runDjenAll(), mni: () => runMniAll(), "chat-sla": () => runSlaCheck(), "chat-extras": () => runChatExtras(), "push-due": () => runPushDue(), "petition-queue": () => runDueSchedules(), monitoring: () => runHealthCheck() }[key as "webhooks" | "mail" | "djen" | "mni" | "chat-sla" | "chat-extras" | "push-due" | "petition-queue" | "monitoring"];
   await audit({ action: "platform.job_run", userId: pc.userId, resourceType: "job", metadata: { job: key }, meta: pc.meta });
   try {
     const r = await withJobRun<object>(key, "MANUAL", fn);

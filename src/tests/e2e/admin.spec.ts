@@ -16,7 +16,7 @@ async function signUp(page: Page, label: string) {
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return { id, email };
 }
 async function grantAdmin(email: string) {
@@ -68,7 +68,7 @@ test("painel de admin: super-admin sem 2FA vai ativar o 2FA; com 2FA vê as tela
   await page.getByRole("button", { name: "Reativar" }).click();
   await expect(page.getByText("Ativo", { exact: true })).toBeVisible();
   await alvo.goto("/");
-  await expect(alvo.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(alvo.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // plano e assinatura: cancelar pela administração pausa só o que aumenta uso e avisa o escritório
   await alvo.goto("/configuracoes/plano");

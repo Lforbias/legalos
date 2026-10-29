@@ -13,7 +13,7 @@ test("protótipos: índice e todas as telas abrem com a faixa de aviso", async (
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca proto ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/prototipos");
   await expect(page.getByRole("heading", { name: "Protótipos das próximas versões" })).toBeVisible();

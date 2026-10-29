@@ -4,7 +4,8 @@ import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
-import { NAV_ITEMS, getNavItem } from "@/config/navigation";
+import { NAV_ITEMS, getNavItem, navItemInBoxVersion } from "@/config/navigation";
+import { boxV2Enabled } from "@/lib/features";
 import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
 
@@ -20,7 +21,7 @@ export default async function ModulePage({ params }: { params: Promise<{ key: st
         <PageHeader title="Roadmap e status dos módulos" description="O que já está operacional e o que será entregue em cada fase." />
         <Card>
           <ul className="divide-y divide-border">
-            {NAV_ITEMS.filter((n) => n.key !== "prototypes").map((n) => (
+            {NAV_ITEMS.filter((n) => n.key !== "prototypes" && navItemInBoxVersion(n, boxV2Enabled(ctx.organizationId))).map((n) => (
               <li key={n.key} className="flex items-start justify-between gap-4 px-4 py-3">
                 <div>
                   <p className="text-sm font-medium">{n.label}</p>

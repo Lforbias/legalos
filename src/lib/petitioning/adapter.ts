@@ -13,7 +13,19 @@ export type PetitionSubmission = {
   attachments: { fileName: string; mimeType: string; sizeBytes: number; sha256: string; classification: string }[];
 };
 
-export type PetitionReceipt = { protocol: string; receipt: string };
+/** Onde o envio vai cair. Sem isto, um adaptador REAL não pode protocolar (o servidor não consegue conferir a homologação). */
+export type FilingTarget = { connectorKey: string; courtCode: string; environment: "SIMULATED" | "HOMOLOGATION" | "PRODUCTION" };
+
+export type PetitionReceipt = {
+  protocol: string;
+  receipt: string;
+  /** Ambiente real do envio, informado pelo adaptador (omitido = mesmo ambiente de `describeTarget`). */
+  environment?: FilingTarget["environment"];
+  /** O tribunal devolveu o recibo oficial do protocolo (e não só um número). */
+  officialReceipt?: boolean;
+  /** Data do protocolo no tribunal, quando informada. */
+  filedAt?: Date | null;
+};
 
 /** O envio chegou (ou pode ter chegado) ao tribunal, mas a resposta não foi recebida: NÃO reenviar sem conferir no tribunal. */
 export class SubmissionUncertainError extends Error {}
@@ -28,6 +40,8 @@ export interface PetitioningAdapter {
   isDemo: boolean;
   /** Verificações ANTES de reservar o envio (erro claro ao usuário, sem marcar a petição como falha). */
   preflight?(input: PetitionSubmission, env: Omit<SubmitEnv, "files">): Promise<void>;
+  /** Tribunal, conector e ambiente do envio (para conferir a homologação ANTES de reservar). Obrigatório em adaptador real. */
+  describeTarget?(input: PetitionSubmission, env: Omit<SubmitEnv, "files">): Promise<FilingTarget>;
   submit(input: PetitionSubmission, env?: SubmitEnv): Promise<PetitionReceipt>;
 }
 

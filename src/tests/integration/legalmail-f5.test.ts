@@ -149,7 +149,7 @@ describe("3.0-F5 — fila de protocolos e agendamento", () => {
   });
 
   it("protocolo REAL: exige digitar o número do processo para agendar", async () => {
-    const real: PetitioningAdapter = { key: "fake-real", label: "Real (teste)", isDemo: false, async submit() { return { protocol: "REAL-1", receipt: "recibo real" }; } };
+    const real: PetitioningAdapter = { key: "fake-real", label: "Real (teste)", isDemo: false, async describeTarget() { return { connectorKey: "fake-real", courtCode: "TST", environment: "SIMULATED" }; }, async submit() { return { protocol: "REAL-1", receipt: "recibo real" }; } };
     registerPetitioningAdapter(real);
     process.env.PETITIONING_ADAPTER = "fake-real";
     try {

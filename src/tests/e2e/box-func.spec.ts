@@ -12,7 +12,7 @@ test("LegalOS Func e Box: alternador, painéis distintos, menus separados e atal
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca box ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // Func: menu de gestão, sem os itens do Box
   const shell = page.locator("[data-space]").first();
@@ -37,10 +37,10 @@ test("LegalOS Func e Box: alternador, painéis distintos, menus separados e atal
   await boxNav.getByRole("link", { name: /Caixa de entrada/ }).first().click();
   await expect(page.locator("[data-space]").first()).toHaveAttribute("data-space", "box");
   await page.getByTestId("space-func").first().click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // Link direto do painel do Box ao Func
   await page.goto("/box");
   await page.getByTestId("box-to-func").click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 });

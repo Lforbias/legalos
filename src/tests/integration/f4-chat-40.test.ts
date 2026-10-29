@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { db } from "@/lib/db/client";
+import { todayYmd, ymdToDate } from "@/lib/dates/ymd";
 import { __setTranscriberForTests } from "@/lib/ai/gemini";
 import { ConflictError, ForbiddenError, ValidationError } from "@/lib/permissions/check";
 import { ipAllowed, normalizeIpEntry } from "@/lib/security/ip";
@@ -47,8 +48,9 @@ describe("4.0 — Chat: robô 2.0, campanhas, relatórios, segurança e módulos
     const en = await startEnrollment(A.owner.id, A.owner.email);
     await confirmEnrollment(A.owner.id, totpCode(en.secret, totpStep()), META);
     await connectAccount(A.ctx, { label: "Principal", phoneNumberId: P1, token: WA_TOKEN });
-    const today = new Date();
-    const bday = new Date(Date.UTC(1990, today.getUTCMonth(), today.getUTCDate()));
+    // O sistema decide "hoje" pelo fuso do escritório; o teste precisa usar o mesmo dia (entre 21h e meia-noite em Brasília o dia em UTC já é o seguinte).
+    const [, month, day] = todayYmd("America/Sao_Paulo").split("-").map(Number);
+    const bday = new Date(Date.UTC(1990, month! - 1, day!));
     mariaId = (await db.client.create({ data: { organizationId: A.org.id, type: "PERSON", name: "Maria Souza", phone: MARIA, birthDate: bday } })).id;
     joseId = (await db.client.create({ data: { organizationId: A.org.id, type: "PERSON", name: "José Lima", phone: JOSE } })).id;
   });
@@ -191,7 +193,7 @@ describe("4.0 — Chat: robô 2.0, campanhas, relatórios, segurança e módulos
 
     const hearing = await saveDialog(A.ctx, null, { kind: "HEARING", name: "Audiência", text: "Olá {nome}, lembrete: {titulo} em {data} às {hora}.", config: { daysBefore: 0, sendHour: 0 } });
     await setDialogActive(A.ctx, hearing.id, true);
-    const startsAt = new Date(Date.now() + 2 * 3600_000);
+    const startsAt = new Date(ymdToDate(todayYmd("America/Sao_Paulo")).getTime() + 15 * 3600_000); // meio-dia de hoje em Brasília, qualquer que seja a hora em que o teste rode
     await db.agendaEvent.create({ data: { organizationId: A.org.id, title: "Audiência de instrução", kind: "HEARING", startsAt, clientId: joseId } });
     await db.agendaEvent.create({ data: { organizationId: A.org.id, title: "Audiência da Maria", kind: "HEARING", startsAt, clientId: mariaId } });
     await db.whatsappBillingOptout.create({ data: { organizationId: A.org.id, waId: JOSE } });

@@ -13,7 +13,7 @@ test("Webhooks: exige 2FA, recusa endereço inseguro, mostra o segredo uma vez, 
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca hook ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");
   await page.getByLabel("Nome (para que serve)").fill("Planilha de intimações");

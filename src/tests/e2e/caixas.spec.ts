@@ -13,7 +13,7 @@ test("caixas: equipe, distribuir à equipe, nota, etiqueta, adormecer e acervo",
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca cxf ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // equipe
   await page.goto("/caixa-de-entrada/equipes");

@@ -14,7 +14,7 @@ test("2FA: ativar na conta, login pede o código, código errado falha, recupera
   await page.getByRole("button", { name: "Criar conta" }).click();
   await page.getByLabel("Nome do escritório").fill(`Banca mfa ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   const res = await page.goto("/conta");
   expect(res?.headers()["content-security-policy"]).toContain("frame-ancestors 'none'");
@@ -40,5 +40,5 @@ test("2FA: ativar na conta, login pede o código, código errado falha, recupera
   await expect(page.getByText("Código inválido.")).toBeVisible();
   await page.getByLabel("Código").fill(codes[0]!);
   await page.getByRole("button", { name: "Verificar" }).click();
-  await expect(page.getByRole("heading", { name: /Olá/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 });

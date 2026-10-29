@@ -1,5 +1,5 @@
 "use server";
-import { testCertificateTls, restrictCertificateToConsultation } from "@/server/services/certificate.service";
+import { testCertificateTls, restrictCertificateToConsultation, enableCertificateSigning, setCertificateSigner } from "@/server/services/certificate.service";
 
 import { revalidatePath } from "next/cache";
 import { uuidSchema, type ActionState } from "@/lib/validation/common";
@@ -36,6 +36,14 @@ export async function unauthorizeCertificateUserAction(certificateId: string, us
 
 export async function restrictCertificateAction(id: string): Promise<ActionState> {
   return runAction(async () => { const { ctx } = await requireTenant(); await restrictCertificateToConsultation(ctx, parse(uuidSchema, id)); revalidatePath("/certificados"); return undefined; });
+}
+
+export async function enableCertificateSigningAction(id: string, confirm: string): Promise<ActionState> {
+  return runAction(async () => { const { ctx } = await requireTenant(); await enableCertificateSigning(ctx, parse(uuidSchema, id), String(confirm ?? "").slice(0, 200)); revalidatePath("/certificados"); return undefined; });
+}
+
+export async function setCertificateSignerAction(certificateId: string, userId: string, canSign: boolean): Promise<ActionState> {
+  return runAction(async () => { const { ctx } = await requireTenant(); await setCertificateSigner(ctx, parse(uuidSchema, certificateId), parse(uuidSchema, userId), canSign === true); revalidatePath("/certificados"); return undefined; });
 }
 
 export async function testCertificateTlsAction(id: string) {
