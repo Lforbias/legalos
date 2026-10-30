@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 import { CONNECTORS, coverageMatrix } from "@/lib/box-v3/core";
-import { can } from "@/server/context";
 import { loadEvidence } from "@/server/judicial/evidence.service";
 import { getTenant } from "@/server/session";
 
@@ -17,7 +16,10 @@ export async function GET() {
   if (!boxV3PreviewEnabled()) return NextResponse.json({ error: { code: "not_found", message: "Prévia do Box 3.0 indisponível." } }, { status: 404 });
   const tenant = await getTenant();
   if (!tenant) return NextResponse.json({ error: { code: "unauthorized", message: "Sessão inválida ou expirada." } }, { status: 401 });
-  if (!can(tenant.ctx, "inbox:read")) return NextResponse.json({ error: { code: "forbidden", message: "Sem acesso ao Box." } }, { status: 403 });
+  // Permissão bruta do cargo, não `can()`: `can()` zera qualquer `inbox:*` enquanto BOX_AVAILABLE for
+  // falso (retirada do Box autenticado), mas esta rota expõe capacidades do Box 3.0 (conectores públicos
+  // como DJEN/DataJud inclusive), que são independentes dela — mesmo padrão de src/server/judicial/box-v3.service.ts.
+  if (!tenant.ctx.permissions.has("inbox:read")) return NextResponse.json({ error: { code: "forbidden", message: "Sem acesso ao Box." } }, { status: 403 });
 
   const now = new Date();
   const evidence = await loadEvidence(tenant.ctx.organizationId);

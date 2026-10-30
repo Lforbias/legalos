@@ -34,8 +34,9 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const drive = await getDriveSettings(ctx);
   const s = await datajudStatus(ctx);
-  const monitors = BOX_AVAILABLE ? await listMonitors(ctx) : [];
-  const [rcvMembers, rcvTeams] = await Promise.all([BOX_AVAILABLE ? listActiveMembers(ctx) : Promise.resolve([]), BOX_AVAILABLE ? listTeams(ctx) : Promise.resolve([])]);
+  // Box 3.0: DJEN é fonte pública (consulta por OAB/UF), independente do Box autenticado retirado (BOX_AVAILABLE).
+  const monitors = await listMonitors(ctx);
+  const [rcvMembers, rcvTeams] = await Promise.all([listActiveMembers(ctx), listTeams(ctx)]);
   const tribunals = listTribunals();
   const names = new Map(tribunals.map((t) => [t.jtr, t.label]));
   const vault = vaultAvailable();
@@ -72,15 +73,15 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             {s.keyConfigured ? <DatajudToggle enabled={s.orgEnabled} /> : null}
           </CardBody>
         </Card>
-        {BOX_AVAILABLE ? <>
         <Card>
-          <CardHeader title="DJEN — publicações por OAB" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
+          <CardHeader title="DJEN — publicações por OAB · Box 3.0" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
           <CardBody className="space-y-4 text-sm">
-            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado e coloca as publicações na caixa de entrada, sem repetir. Não precisa de certificado nem de senha. A verificação automática depende de um agendador chamar o sistema (variável CRON_SECRET); sem isso, use “Verificar agora”. Esta consulta pública não tem documentação oficial estável: se o CNJ mudar o formato, o sistema avisa em vez de importar dados incorretos. Relatos indicam que o DJEN recusa servidores fora do Brasil.</p>
+            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado e coloca as publicações na caixa de entrada, sem repetir. Não precisa de certificado nem de senha. A verificação automática depende de um agendador chamar o sistema (variável CRON_SECRET); sem isso, use “Verificar agora”. Esta consulta pública não tem documentação oficial estável: se o CNJ mudar o formato, o sistema avisa em vez de importar dados incorretos. Relatos indicam que o DJEN recusa servidores fora do Brasil. Esta consulta pública é independente do Box autenticado retirado: funciona mesmo com ele desligado.</p>
             <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} recipients={{ members: rcvMembers.map((u) => ({ id: u.id, name: u.name })), teams: rcvTeams.map((t) => ({ id: t.id, name: t.name })) }} />
             <MonitorForm ufs={UFS} />
           </CardBody>
         </Card>
+        {BOX_AVAILABLE ? <>
         <details className="rounded-xl border border-border p-4">
           <summary className="cursor-pointer text-sm font-medium">Avançado: conexão oficial MNI (exige autorização do tribunal e liberação de IP)</summary>
           <div className="mt-4">
