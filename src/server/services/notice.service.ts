@@ -1,9 +1,10 @@
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { contentHash, parseNoticeText } from "@/lib/notices/parse";
 import { decideCaseMatch, type CaseMatchState } from "@/lib/judicial/communication";
 import type { OriginKind } from "@/lib/judicial/contracts";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { noticeListOptionsSchema } from "@/modules/inbox/list-schemas";
 import { assignSchema, discardSchema, noticeSchema, toNoticeData, type NoticeInput } from "@/modules/inbox/schemas";
 import { assertCan, type TenantContext } from "@/server/context";
@@ -330,8 +331,14 @@ export async function deleteNotice(ctx: TenantContext, id: string) {
 }
 
 /** Valida e devolve a intimação de origem para criação de tarefa/prazo (mesmo escritório, visível). */
-export async function resolveSourceNotice(ctx: TenantContext, id: string | undefined) {
+export async function resolveSourceNotice(ctx: TenantContext, id: string | undefined, surface: "legacy" | "v3" = "legacy") {
   if (!id) return undefined;
+  if (surface === "v3") {
+    if (!boxV3PreviewEnabled() || !ctx.permissions.has("inbox:read")) throw new ForbiddenError();
+    const notice = await db.courtNotice.findFirst({ where: { AND: [{ id, organizationId: ctx.organizationId, deletedAt: null }, visibility(ctx)] }, select: { id: true, title: true, caseId: true, content: true } });
+    if (!notice) throw new NotFoundError("Intimação não encontrada.");
+    return { id: notice.id, title: notice.title, caseId: notice.caseId, parsed: parseNoticeText(notice.content) };
+  }
   assertCan(ctx, "inbox:read");
   const n = await getNotice(ctx, id);
   return n;

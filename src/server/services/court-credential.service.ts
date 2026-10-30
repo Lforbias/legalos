@@ -1,4 +1,5 @@
 import { assertBoxAvailable } from "@/server/box-guard";
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 import { connectionSupports } from "@/lib/connectors/capabilities";
 import { db } from "@/lib/db/client";
 import { checkRequirements, COURT_SYSTEMS, getCourtSystem, type AuthMode } from "@/lib/court-systems";
@@ -9,6 +10,13 @@ import { onlyDigits } from "@/lib/validation/br-documents";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertCertificateUsable, requireMfa } from "./certificate.service";
+
+type BoxSurface = "legacy" | "v3";
+function assertBoxSurface(surface: BoxSurface = "legacy") {
+  if (surface === "v3") {
+    if (!boxV3PreviewEnabled()) throw new ConflictError("A configuração do Box 3.0 está indisponível.");
+  } else assertBoxAvailable();
+}
 
 /**
  * 3.0-F6b — credenciais de acesso aos sistemas dos tribunais, por USUÁRIO e por tribunal/sistema.
@@ -43,26 +51,26 @@ async function rows(ctx: TenantContext, where: { userId?: string }): Promise<Cre
   });
 }
 
-export async function listMyCredentials(ctx: TenantContext) {
-  assertBoxAvailable();
+export async function listMyCredentials(ctx: TenantContext, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
   assertCan(ctx, "cases:read");
   return rows(ctx, { userId: ctx.userId });
 }
 
 /** Para quem administra integrações: quem tem credencial de quê (sem segredo). */
-export async function listOrgCredentials(ctx: TenantContext) {
-  assertBoxAvailable();
+export async function listOrgCredentials(ctx: TenantContext, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
   assertCan(ctx, "integrations:manage");
   return rows(ctx, {});
 }
 
 export type SaveCredentialInput = { system: string; courtCode?: string | null; authMode: string; document: string; password?: string | null; certificateId?: string | null };
 
-export async function saveMyCredential(ctx: TenantContext, input: SaveCredentialInput) {
-  assertBoxAvailable();
+export async function saveMyCredential(ctx: TenantContext, input: SaveCredentialInput, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
   assertCan(ctx, "cases:read");
   const key = requireKey();
-  await requireMfa(ctx.userId);
+  await requireMfa(ctx.userId, surface);
   const sys = getCourtSystem(input.system);
   if (!sys) throw new ValidationError("Sistema de tribunal inválido.", { system: ["Escolha um sistema da lista."] });
   const courtCode = (input.courtCode ?? "").trim();
@@ -71,7 +79,7 @@ export async function saveMyCredential(ctx: TenantContext, input: SaveCredential
   if (problems.length) throw new ValidationError(problems[0]!, { form: problems });
   const needsPassword = input.authMode !== "CERTIFICATE";
   const needsCert = input.authMode !== "PASSWORD";
-  if (needsCert) await assertCertificateUsable(ctx, input.certificateId!);
+  if (needsCert) await assertCertificateUsable(ctx, input.certificateId!, surface);
   const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document: onlyDigits(input.document), password: needsPassword ? input.password : "" }), "utf8"), key);
   const data = { authMode: input.authMode, certificateId: needsCert ? input.certificateId! : null, secretEnc, checkedAt: null, checkStatus: null, checkMessage: null };
   const c = await db.courtCredential.upsert({
@@ -85,9 +93,9 @@ export async function saveMyCredential(ctx: TenantContext, input: SaveCredential
 }
 
 /** O dono remove a própria; quem administra integrações remove a de qualquer pessoa do escritório. */
-export async function deleteCredential(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
-  await requireMfa(ctx.userId);
+export async function deleteCredential(ctx: TenantContext, id: string, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
+  await requireMfa(ctx.userId, surface);
   const admin = can(ctx, "integrations:manage");
   const r = await db.courtCredential.deleteMany({ where: { id, organizationId: ctx.organizationId, ...(admin ? {} : { userId: ctx.userId }) } });
   if (r.count !== 1) throw new NotFoundError("Credencial não encontrada.");
@@ -98,14 +106,14 @@ export async function deleteCredential(ctx: TenantContext, id: string) {
  * Confere a credencial da própria pessoa contra o que o sistema exige e contra o estado do certificado.
  * NÃO acessa o tribunal (isso depende do conector e de acesso real): diz "completa e pronta" ou o que falta.
  */
-export async function verifyMyCredential(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
+export async function verifyMyCredential(ctx: TenantContext, id: string, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
   const c = await db.courtCredential.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId } });
   if (!c) throw new NotFoundError("Credencial não encontrada.");
   const key = requireKey();
   const secret = JSON.parse(openBytes(c.secretEnc, key).toString("utf8")) as { document: string; password: string };
   const problems = checkRequirements({ system: c.system, authMode: c.authMode, document: secret.document, password: secret.password, certificateId: c.certificateId });
-  if (c.authMode !== "PASSWORD" && c.certificateId) await assertCertificateUsable(ctx, c.certificateId).catch((e: Error) => problems.push(e.message));
+  if (c.authMode !== "PASSWORD" && c.certificateId) await assertCertificateUsable(ctx, c.certificateId, surface).catch((e: Error) => problems.push(e.message));
   const sys = getCourtSystem(c.system);
   const connections = c.system !== "pje-mni" ? await db.courtConnection.findMany({ where: { organizationId: ctx.organizationId, system: c.system, enabled: true, ...(c.courtCode ? { jtr: c.courtCode } : {}) } }) : [];
   const configured = c.system === "pje-mni" ? Boolean(sys?.connector) : connections.some(row => connectionSupports(row, "consultarProcesso"));

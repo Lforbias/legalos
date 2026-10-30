@@ -96,11 +96,11 @@ async function notifyAssignment(ctx: TenantContext, task: { id: string; title: s
   });
 }
 
-export async function createTask(ctx: TenantContext, raw: TaskInput, opts: { sourceNoticeId?: string } = {}) {
+export async function createTask(ctx: TenantContext, raw: TaskInput, opts: { sourceNoticeId?: string; surface?: "legacy" | "v3" } = {}) {
   assertCan(ctx, "tasks:write");
   const data = toTaskData(taskSchema.parse(raw));
   await validateLinks(ctx, data);
-  if (opts.sourceNoticeId) await assertNoticeUsable(ctx, opts.sourceNoticeId);
+  if (opts.sourceNoticeId) await assertNoticeUsable(ctx, opts.sourceNoticeId, opts.surface, opts.surface === "v3" ? data.caseId ?? undefined : undefined);
   const created = await db.$transaction(async (tx) => {
     const t = await tx.task.create({
       data: { ...data, organizationId: ctx.organizationId, createdById: ctx.userId, sourceNoticeId: opts.sourceNoticeId ?? null, completedAt: data.status === "DONE" ? new Date() : null },

@@ -6,6 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { reconcileFiledAction, reconcileNotFiledAction } from "./actions";
+import { reconcileBoxV3PetitionFiledAction, reconcileBoxV3PetitionNotFiledAction } from "@/app/(dashboard)/box-v3/peticionamento/actions";
 
 /**
  * Conferência no tribunal. Uma pessoa abre o sistema do tribunal e registra o que viu:
@@ -13,7 +14,7 @@ import { reconcileFiledAction, reconcileNotFiledAction } from "./actions";
  *  - não protocolada: só assim a petição volta a poder ser enviada.
  * Não há "palpite": sem recibo não existe confirmação oficial.
  */
-export function ReconcilePanel({ id, documents, doubt }: { id: string; documents: { id: string; name: string }[]; doubt: boolean }) {
+export function ReconcilePanel({ id, documents, doubt, surface = "legacy" }: { id: string; documents: { id: string; name: string }[]; doubt: boolean; surface?: "legacy" | "v3" }) {
   const router = useRouter();
   const [mode, setMode] = React.useState<"FILED" | "NOT_FILED" | null>(null);
   const [protocol, setProtocol] = React.useState("");
@@ -33,9 +34,10 @@ export function ReconcilePanel({ id, documents, doubt }: { id: string; documents
     <div className="space-y-3" data-testid="reconcile-panel">
       <Alert tone={doubt ? "warning" : "info"}>
         {doubt
-          ? "Não temos prova oficial desta petição. Abra o sistema do tribunal e confira se ela foi protocolada. Enquanto isso, o reenvio fica bloqueado para não protocolar em duplicidade."
-          : "Já protocolou esta petição direto no sistema do tribunal? Registre aqui o número do protocolo e o recibo para o processo ficar em dia."}
+          ? "Não temos prova oficial desta petição. Confira no portal do tribunal se ela foi protocolada. O reenvio permanece bloqueado para evitar duplicidade."
+          : "Se a petição já foi protocolada no portal do tribunal, registre o número do protocolo e anexe o recibo aqui."}
       </Alert>
+      {surface === "v3" ? <p className="text-xs text-muted">Esta conferência é manual: o LegalOS não acessa nem envia petições ao tribunal por esta tela.</p> : null}
       <div className="flex flex-wrap gap-2">
         <Button variant="secondary" onClick={() => setMode("FILED")} aria-pressed={mode === "FILED"}>Foi protocolada — registrar recibo</Button>
         {doubt ? <Button variant="secondary" onClick={() => setMode("NOT_FILED")} aria-pressed={mode === "NOT_FILED"}>Conferi: não foi protocolada</Button> : null}
@@ -51,13 +53,13 @@ export function ReconcilePanel({ id, documents, doubt }: { id: string; documents
             </Select>
           </Field>
           <Field label="Observação (opcional)" htmlFor="rc-note"><Textarea id="rc-note" rows={2} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-          <Button loading={pending} disabled={!protocol.trim() || !doc} onClick={() => start(async () => done(await reconcileFiledAction(id, { protocol, receiptDocumentId: doc, note: note || undefined })))}>Registrar protocolo</Button>
+          <Button loading={pending} disabled={!protocol.trim() || !doc} onClick={() => start(async () => done(await (surface === "v3" ? reconcileBoxV3PetitionFiledAction(id, { protocol, receiptDocumentId: doc, note: note || undefined }) : reconcileFiledAction(id, { protocol, receiptDocumentId: doc, note: note || undefined }))))}>Registrar protocolo</Button>
         </div>
       ) : null}
       {mode === "NOT_FILED" ? (
         <div className="max-w-md space-y-2">
           <Field label="Como e onde você conferiu?" htmlFor="rc-nf" hint="Ex.: “Consultei o processo no PJe do TRF3 em 28/10; não consta a petição.”"><Textarea id="rc-nf" rows={3} value={note} onChange={(e) => setNote(e.target.value)} /></Field>
-          <Button variant="danger" loading={pending} disabled={note.trim().length < 10} onClick={() => start(async () => done(await reconcileNotFiledAction(id, { note })))}>Confirmar que não foi protocolada</Button>
+          <Button variant="danger" loading={pending} disabled={note.trim().length < 10} onClick={() => start(async () => done(await (surface === "v3" ? reconcileBoxV3PetitionNotFiledAction(id, { note }) : reconcileNotFiledAction(id, { note }))))}>Confirmar que não foi protocolada</Button>
         </div>
       ) : null}
     </div>

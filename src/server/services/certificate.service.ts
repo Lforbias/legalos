@@ -1,8 +1,9 @@
 import { assertBoxAvailable } from "@/server/box-guard";
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 import { createSecureContext } from "node:tls";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { decideCertificateUse } from "@/lib/judicial/certificate-policy";
 import { certKey, openBytes, parsePfx, pfxForTls, sealBytes } from "@/lib/security/pfx";
 import { assertCan, can, type TenantContext } from "@/server/context";
@@ -15,14 +16,30 @@ const DAY = 24 * 60 * 60 * 1000;
 
 export const vaultAvailable = () => certKey() !== null;
 
+type BoxSurface = "legacy" | "v3";
+function assertBoxSurface(surface: BoxSurface = "legacy") {
+  if (surface === "v3") {
+    if (!boxV3PreviewEnabled()) throw new ConflictError("A configuração do Box 3.0 está indisponível.");
+  } else assertBoxAvailable();
+}
+
+/** The preview only permits local vault administration; signing/material access keeps the legacy guard. */
+function canManageVault(ctx: TenantContext, surface: BoxSurface): boolean {
+  return surface === "v3" ? boxV3PreviewEnabled() && ctx.permissions.has("certificates:manage") : can(ctx, "certificates:manage");
+}
+
+function assertManageVault(ctx: TenantContext, surface: BoxSurface): void {
+  if (!canManageVault(ctx, surface)) throw new ForbiddenError();
+}
+
 function requireKey(): Buffer {
   const k = certKey();
   if (!k) throw new ConflictError("O cofre de certificados não está configurado neste sistema (falta CERT_ENCRYPTION_KEY).");
   return k;
 }
 
-export async function requireMfa(userId: string) {
-  assertBoxAvailable();
+export async function requireMfa(userId: string, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
   const m = await db.userMfa.findUnique({ where: { userId }, select: { enabledAt: true } });
   if (!m?.enabledAt) throw new ConflictError("Ative a verificação em duas etapas em Minha conta para gerenciar certificados digitais.");
 }
@@ -40,18 +57,18 @@ const safeSelect = { consultationOnly: true, signingEnabledAt: true, id: true, l
 export type CertificateRow = Prisma.CertificateGetPayload<{ select: typeof safeSelect }> & { ownerName: string; status: CertStatus };
 
 /** Lista SEM nenhum material secreto (arquivo e senha nunca saem do banco por aqui). */
-export async function listCertificates(ctx: TenantContext): Promise<CertificateRow[]> {
-  assertBoxAvailable();
-  assertCan(ctx, "certificates:manage");
+export async function listCertificates(ctx: TenantContext, surface: BoxSurface = "legacy"): Promise<CertificateRow[]> {
+  assertBoxSurface(surface);
+  assertManageVault(ctx, surface);
   const rows = await db.certificate.findMany({ where: { organizationId: ctx.organizationId }, select: { ...safeSelect, owner: { select: { name: true } } }, orderBy: [{ revokedAt: { sort: "asc", nulls: "first" } }, { notAfter: "asc" }] });
   return rows.map(({ owner, ...r }) => ({ ...r, ownerName: owner.name, status: certStatus(r) }));
 }
 
-export async function uploadCertificate(ctx: TenantContext, input: { file: Buffer; password: string; label: string; ownerUserId: string }) {
-  assertBoxAvailable();
-  assertCan(ctx, "certificates:manage");
+export async function uploadCertificate(ctx: TenantContext, input: { file: Buffer; password: string; label: string; ownerUserId: string }, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
+  assertManageVault(ctx, surface);
   const key = requireKey();
-  await requireMfa(ctx.userId);
+  await requireMfa(ctx.userId, surface);
   const label = input.label.trim();
   if (!label || label.length > 120) throw new ValidationError("Informe um nome de até 120 caracteres.", { label: ["Nome obrigatório (até 120 caracteres)."] });
   if (!input.password) throw new ValidationError("Informe a senha do certificado.", { password: ["Senha obrigatória."] });
@@ -93,10 +110,10 @@ export async function uploadCertificate(ctx: TenantContext, input: { file: Buffe
 }
 
 /** Revoga e APAGA o material cifrado (irreversível: para voltar a usar, envie o certificado de novo). */
-export async function revokeCertificate(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
-  assertCan(ctx, "certificates:manage");
-  await requireMfa(ctx.userId);
+export async function revokeCertificate(ctx: TenantContext, id: string, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
+  assertManageVault(ctx, surface);
+  await requireMfa(ctx.userId, surface);
   const res = await db.certificate.updateMany({ where: { id, organizationId: ctx.organizationId, revokedAt: null }, data: { revokedAt: new Date(), revokedById: ctx.userId, pfxEnc: "", passEnc: "" } });
   if (res.count !== 1) throw new NotFoundError("Certificado não encontrado ou já revogado.");
   await audit({ action: "certificate.revoke", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: id, meta: ctx.meta });
@@ -111,9 +128,9 @@ export async function listCertificateUsage(ctx: TenantContext, id: string, take 
 }
 
 /* ---------- usuários autorizados (3.0-F9) ---------- */
-export async function listAuthorizedUsers(ctx: TenantContext, certificateId: string) {
-  assertBoxAvailable();
-  assertCan(ctx, "certificates:manage");
+export async function listAuthorizedUsers(ctx: TenantContext, certificateId: string, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
+  assertManageVault(ctx, surface);
   const c = await db.certificate.findFirst({ where: { id: certificateId, organizationId: ctx.organizationId }, select: { id: true } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
   const rows = await db.certificateAuthorizedUser.findMany({ where: { certificateId, organizationId: ctx.organizationId }, orderBy: { createdAt: "asc" } });
@@ -121,10 +138,10 @@ export async function listAuthorizedUsers(ctx: TenantContext, certificateId: str
   return rows.map((r) => ({ userId: r.userId, name: users.find((u) => u.id === r.userId)?.name ?? "Usuário removido", createdAt: r.createdAt, canSign: r.canSign }));
 }
 
-export async function authorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string) {
-  assertBoxAvailable();
-  assertCan(ctx, "certificates:manage");
-  await requireMfa(ctx.userId);
+export async function authorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
+  assertManageVault(ctx, surface);
+  await requireMfa(ctx.userId, surface);
   const c = await db.certificate.findFirst({ where: { id: certificateId, organizationId: ctx.organizationId, revokedAt: null }, select: { id: true, ownerUserId: true } });
   if (!c) throw new NotFoundError("Certificado não encontrado ou revogado.");
   if (c.ownerUserId === userId) throw new ValidationError("O titular já pode usar o certificado.", { userId: ["O titular já tem acesso."] });
@@ -138,9 +155,10 @@ export async function authorizeCertificateUser(ctx: TenantContext, certificateId
   await audit({ action: "certificate.authorize", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificateId, metadata: { target: userId }, meta: ctx.meta });
 }
 
-export async function unauthorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string) {
-  assertBoxAvailable();
-  assertCan(ctx, "certificates:manage");
+export async function unauthorizeCertificateUser(ctx: TenantContext, certificateId: string, userId: string, surface: BoxSurface = "legacy") {
+  assertBoxSurface(surface);
+  assertManageVault(ctx, surface);
+  await requireMfa(ctx.userId, surface);
   const res = await db.certificateAuthorizedUser.deleteMany({ where: { certificateId, userId, organizationId: ctx.organizationId } });
   if (res.count !== 1) throw new NotFoundError("Autorização não encontrada.");
   await audit({ action: "certificate.unauthorize", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "certificate", resourceId: certificateId, metadata: { target: userId }, meta: ctx.meta });
@@ -192,10 +210,10 @@ export async function getCertificateMaterial(ctx: TenantContext, id: string, pur
 }
 
 /** Certificados que ESTA pessoa pode usar agora (titular, autorizada ou administradora do cofre). Só id e nome. */
-export async function listUsableCertificates(ctx: TenantContext): Promise<{ id: string; label: string }[]> {
-  assertBoxAvailable();
+export async function listUsableCertificates(ctx: TenantContext, surface: BoxSurface = "legacy"): Promise<{ id: string; label: string }[]> {
+  assertBoxSurface(surface);
   const now = new Date();
-  const manage = can(ctx, "certificates:manage");
+  const manage = canManageVault(ctx, surface);
   const authIds = manage ? [] : (await db.certificateAuthorizedUser.findMany({ where: { userId: ctx.userId, organizationId: ctx.organizationId }, select: { certificateId: true } })).map((a) => a.certificateId);
   return db.certificate.findMany({
     where: { organizationId: ctx.organizationId, revokedAt: null, notAfter: { gt: now }, ...(manage ? {} : { OR: [{ ownerUserId: ctx.userId }, { id: { in: authIds } }] }) },
@@ -205,11 +223,11 @@ export async function listUsableCertificates(ctx: TenantContext): Promise<{ id: 
 }
 
 /** Confere (sem registrar uso nem abrir o segredo) se este usuário pode usar o certificado agora: titular, administrador do cofre ou autorizado; vigente e não revogado. */
-export async function assertCertificateUsable(ctx: TenantContext, id: string): Promise<void> {
-  assertBoxAvailable();
+export async function assertCertificateUsable(ctx: TenantContext, id: string, surface: BoxSurface = "legacy"): Promise<void> {
+  assertBoxSurface(surface);
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { ownerUserId: true, revokedAt: true, notAfter: true } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
-  if (c.ownerUserId !== ctx.userId && !can(ctx, "certificates:manage")) {
+  if (c.ownerUserId !== ctx.userId && !canManageVault(ctx, surface)) {
     const auth = await db.certificateAuthorizedUser.findUnique({ where: { certificateId_userId: { certificateId: id, userId: ctx.userId } }, select: { userId: true } });
     if (!auth) throw new NotFoundError("Certificado não encontrado.");
   }

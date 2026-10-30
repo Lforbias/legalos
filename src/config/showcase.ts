@@ -168,4 +168,7 @@ export const PWA = {
 export const MODULES = ALL_MODULES.filter(m => BOX_AVAILABLE || m.id !== "caixa");
 export const SPACES = ALL_SPACES.filter(s => BOX_AVAILABLE || s.name !== "LegalOS Box");
 
-export const INTEGRATIONS = ALL_INTEGRATIONS.filter(i => BOX_AVAILABLE || !["DJEN", "PJe / MNI", "DataJud (CNJ)"].includes(i.name));
+// Box 3.0: DJEN e DataJud (CNJ) são fontes públicas (sem certificado, sem sessão de tribunal) e funcionam
+// mesmo com o Box autenticado retirado — só "PJe / MNI" (sessão/certificado) continua fora da vitrine pública
+// enquanto BOX_AVAILABLE for falso, para nunca prometer uma integração que o escritório ainda não pode usar.
+export const INTEGRATIONS = ALL_INTEGRATIONS.filter(i => BOX_AVAILABLE || i.name !== "PJe / MNI");

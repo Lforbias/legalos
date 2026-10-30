@@ -1,3 +1,4 @@
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 import type { Metadata } from "next";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
@@ -17,7 +18,7 @@ export default async function NewDeadlinePage({ searchParams }: { searchParams: 
   if (!can(ctx, "deadlines:write") || !can(ctx, "cases:read")) return <AccessDenied />;
   const sp = await searchParams;
   const [members, cases] = await Promise.all([listActiveMembers(ctx), listCaseOptions(ctx)]);
-  const notice = /^[0-9a-f-]{36}$/i.test(sp.intimacao ?? "") && can(ctx, "inbox:read") ? await resolveSourceNotice(ctx, sp.intimacao).catch((e) => (e instanceof NotFoundError ? undefined : Promise.reject(e))) : undefined;
+  const notice = /^[0-9a-f-]{36}$/i.test(sp.intimacao ?? "") && (can(ctx, "inbox:read") || (boxV3PreviewEnabled() && ctx.permissions.has("inbox:read"))) ? await resolveSourceNotice(ctx, sp.intimacao, boxV3PreviewEnabled() ? "v3" : "legacy").catch((e) => (e instanceof NotFoundError ? undefined : Promise.reject(e))) : undefined;
   const caseId = cases.some((c) => c.id === (sp.processo ?? notice?.caseId)) ? ((sp.processo ?? notice?.caseId) as string) : "";
   const p = notice?.parsed;
   // sugestão da IA (vem pela URL): só preenche o formulário; o prazo continua como rascunho até a validação humana

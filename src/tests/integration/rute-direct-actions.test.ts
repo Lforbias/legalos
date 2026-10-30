@@ -20,7 +20,7 @@ describe("Ações diretas com escopo explícito", () => {
   });
   it("descobre 20 ações sem ampliar escopos existentes ou o padrão OAuth", () => {
     expect(toolCatalog(a.ctx, scopes)).toHaveLength(20);
-    expect(toolCatalog(a.ctx, new Set(["read", "propose"]))).toHaveLength(87);
+    expect(toolCatalog(a.ctx, new Set(["read", "propose"]))).toHaveLength(90);
     expect(parseScopes(null)).not.toContain("mcp:execute");
     expect(parseScopes("mcp:execute")).toEqual(["mcp:execute"]);
   });

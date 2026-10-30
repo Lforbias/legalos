@@ -1,4 +1,3 @@
-import { assertBoxAvailable } from "@/server/box-guard";
 import { db } from "@/lib/db/client";
 import { addDays, todayYmd, ymdToDate, dateToYmd } from "@/lib/dates/ymd";
 import { DJEN_PAGE_SIZE, defaultHttp, djenBase, type DjenHttp } from "@/lib/djen/client";
@@ -7,7 +6,7 @@ import { djenHeader } from "@/lib/judicial/communication";
 import type { EvidenceEnvironment, OperationFailure } from "@/lib/judicial/contracts";
 import { coverageLevelOf, isLocalOrFakeUrl, type CoverageLevel } from "@/lib/judicial/evidence";
 import { UFS } from "@/lib/mni/tribunals";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { onlyDigits } from "@/lib/validation/br-documents";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
@@ -21,6 +20,19 @@ import { recordEvidence } from "@/server/judicial/evidence.service";
 import { ensureProfessional } from "@/server/judicial/professional.service";
 import { finishRun, heartbeat, recoverInterruptedRuns, startRun, type RunTrigger } from "@/server/judicial/sync-engine";
 
+/**
+ * Box 3.0: o DJEN (Diário de Justiça Eletrônico Nacional, CNJ) é fonte pública — consulta por OAB/UF, sem
+ * certificado, sem sessão autenticada em tribunal — e por isso também NÃO depende de `BOX_AVAILABLE`, que
+ * permanece reservado ao Box autenticado (PJe/eproc, certificados, sessões) e segue retirado. O motor de
+ * sincronização abaixo (trava por execução, checkpoint por página, evidência por operação) já é o padrão de
+ * orquestração única do Box 3.0: grava evidência via `recordEvidence` a cada página/resultado real, nunca
+ * marca sucesso de janela parcial como completa, e distingue transporte injetado/local (SIMULATED) de
+ * resposta real do DJEN (PRODUCTION). Mantido no formato de chamadas diretas a `recordEvidence` (em vez do
+ * `runCapability` usado pelo DataJud) porque esta sincronização grava várias evidências por execução
+ * (checkAvailability na primeira página, listNotices por página/falha, listNotices final) dentro do mesmo
+ * laço com checkpoint — refatorar para uma única chamada de `runCapability` encobriria esse detalhamento
+ * sem necessidade; o ponto de centralização real é `recordEvidence`, usado por ambos.
+ */
 export type MonitorRow = { id: string; label: string; oabNumber: string; oabUf: string; enabled: boolean; lastSyncAt: Date | null; lastStatus: string | null; lastMessage: string | null; defaultAssigneeId: string | null; defaultTeamId: string | null; professionalId: string | null; lastSuccessAt: Date | null; lastCaptureAt: Date | null; firstVerifiedAt: Date | null };
 
 /** Já existe uma sincronização desta fonte em andamento (trava). Não é falha da fonte: não altera o estado do monitoramento. */
@@ -44,13 +56,11 @@ const FIRST_SYNC_DAYS = 7;
 const MAX_DAYS = 30;
 
 export async function listMonitors(ctx: TenantContext): Promise<MonitorRow[]> {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   return db.djenMonitor.findMany({ where: { organizationId: ctx.organizationId }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, oabNumber: true, oabUf: true, enabled: true, lastSyncAt: true, lastStatus: true, lastMessage: true, defaultAssigneeId: true, defaultTeamId: true, professionalId: true, lastSuccessAt: true, lastCaptureAt: true, firstVerifiedAt: true } });
 }
 
 export async function createMonitor(ctx: TenantContext, input: { label: string; oabNumber: string; oabUf: string }) {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const label = input.label.trim();
   if (label.length < 2 || label.length > 80) throw new ValidationError("Dê um nome ao monitoramento (2 a 80 caracteres).", { label: ["Nome inválido."] });
@@ -71,7 +81,6 @@ export async function createMonitor(ctx: TenantContext, input: { label: string; 
 
 /** Define quem recebe as publicações novas deste monitoramento: um membro, uma equipe, ou ninguém (vão para a Entrada). */
 export async function setMonitorRecipients(ctx: TenantContext, id: string, input: { userId?: string | null; teamId?: string | null }) {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const userId = input.userId || null;
   const teamId = input.teamId || null;
@@ -90,7 +99,6 @@ export async function setMonitorRecipients(ctx: TenantContext, id: string, input
 }
 
 export async function setMonitorEnabled(ctx: TenantContext, id: string, enabled: boolean) {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const r = await db.djenMonitor.updateMany({ where: { id, organizationId: ctx.organizationId }, data: { enabled } });
   if (r.count !== 1) throw new NotFoundError("Monitoramento não encontrado.");
@@ -98,7 +106,6 @@ export async function setMonitorEnabled(ctx: TenantContext, id: string, enabled:
 }
 
 export async function deleteMonitor(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   await requireMfa(ctx.userId);
   const r = await db.djenMonitor.deleteMany({ where: { id, organizationId: ctx.organizationId } });
@@ -145,8 +152,10 @@ export type SyncOptions = { days?: number; http?: DjenHttp; pauseMs?: number; tr
  *  - cada resultado vira evidência (inclusive falhas); respostas de transporte injetado nunca contam como prova real.
  */
 export async function syncDjen(ctx: TenantContext, monitorId: string, opts: SyncOptions = {}): Promise<DjenSyncResult> {
-  assertBoxAvailable();
-  assertCan(ctx, "inbox:write");
+  // `assertCan`/`can()` zeram qualquer permissão `inbox:*` enquanto BOX_AVAILABLE for falso (retirada do Box
+  // autenticado). O DJEN é público e faz parte do Box 3.0, por isso a verificação aqui é a permissão bruta do
+  // cargo (mesmo padrão já usado em src/server/judicial/box-v3.service.ts e em src/app/(dashboard)/box-v3/*).
+  if (!ctx.permissions.has("inbox:write")) throw new ForbiddenError();
   const m = await db.djenMonitor.findFirst({ where: { id: monitorId, organizationId: ctx.organizationId } });
   if (!m) throw new NotFoundError("Monitoramento não encontrado.");
   const now = opts.now ?? new Date();
@@ -284,7 +293,6 @@ export async function syncDjen(ctx: TenantContext, monitorId: string, opts: Sync
 
 /** Execução automática (chamada pelo agendador externo): sincroniza todos os monitoramentos ligados, cada um com o contexto de quem o criou. */
 export async function runDjenAll(opts: { http?: DjenHttp; pauseMs?: number } = {}) {
-  assertBoxAvailable();
   await recoverInterruptedRuns(); // execuções que pararam de dar sinal de vida não podem travar a fonte
   const monitors = await db.djenMonitor.findMany({ where: { enabled: true, organization: { deletedAt: null, suspendedAt: null } }, select: { id: true, organizationId: true, createdById: true }, orderBy: { lastSyncAt: { sort: "asc", nulls: "first" } } });
   const out = { total: monitors.length, ok: 0, failed: 0, busy: 0, partial: 0, imported: 0 };

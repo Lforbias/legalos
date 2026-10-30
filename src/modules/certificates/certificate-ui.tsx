@@ -5,7 +5,7 @@ import * as React from "react";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
-import { testCertificateTlsAction, restrictCertificateAction, authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction, enableCertificateSigningAction, setCertificateSignerAction } from "./actions";
+import { testCertificateTlsAction, restrictCertificateAction, authorizeCertificateUserAction, revokeCertificateAction, unauthorizeCertificateUserAction, enableCertificateSigningAction, setCertificateSignerAction, authorizeBoxV3CertificateUserAction, unauthorizeBoxV3CertificateUserAction } from "./actions";
 
 export function UploadCertificateForm({ members }: { members: { id: string; name: string }[] }) {
   const router = useRouter();
@@ -101,7 +101,7 @@ export function RevokeCertificateButton({ id }: { id: string }) {
   );
 }
 
-export function AuthorizedUsers({ certificateId, authorized, candidates, signingReleased = false, canManageSigning = false }: { certificateId: string; authorized: { userId: string; name: string; canSign?: boolean }[]; candidates: { id: string; name: string }[]; signingReleased?: boolean; canManageSigning?: boolean }) {
+export function AuthorizedUsers({ certificateId, authorized, candidates, signingReleased = false, canManageSigning = false, surface = "legacy" }: { certificateId: string; authorized: { userId: string; name: string; canSign?: boolean }[]; candidates: { id: string; name: string }[]; signingReleased?: boolean; canManageSigning?: boolean; surface?: "legacy" | "v3" }) {
   const router = useRouter();
   const [error, setError] = React.useState<string | null>(null);
   const [pending, start] = React.useTransition();
@@ -130,8 +130,8 @@ export function AuthorizedUsers({ certificateId, authorized, candidates, signing
                 <button type="button" aria-label={a.canSign ? `Retirar de ${a.name} o poder de assinar` : `Dar a ${a.name} o poder de assinar`} disabled={pending} className="text-primary-text hover:underline" onClick={() => run(() => setCertificateSignerAction(certificateId, a.userId, !a.canSign))}>
                   {a.canSign ? "pode assinar · retirar" : "só consulta · permitir assinar"}
                 </button>
-              ) : a.canSign ? <span className="text-muted">pode assinar</span> : null}
-              <button type="button" aria-label={`Remover ${a.name}`} disabled={pending} className="text-danger hover:underline" onClick={() => run(() => unauthorizeCertificateUserAction(certificateId, a.userId))}>
+              ) : a.canSign ? <span className="text-muted">{surface === "v3" ? "permissão antiga de assinatura · inativa na prévia" : "pode assinar"}</span> : null}
+              <button type="button" aria-label={`Remover ${a.name}`} disabled={pending} className="text-danger hover:underline" onClick={() => run(() => surface === "v3" ? unauthorizeBoxV3CertificateUserAction(certificateId, a.userId) : unauthorizeCertificateUserAction(certificateId, a.userId))}>
                 remover
               </button>
             </li>
@@ -148,7 +148,7 @@ export function AuthorizedUsers({ certificateId, authorized, candidates, signing
               </option>
             ))}
           </Select>
-          <Button size="sm" variant="secondary" loading={pending} disabled={!pick} onClick={() => run(() => authorizeCertificateUserAction(certificateId, pick))}>
+          <Button size="sm" variant="secondary" loading={pending} disabled={!pick} onClick={() => run(() => surface === "v3" ? authorizeBoxV3CertificateUserAction(certificateId, pick) : authorizeCertificateUserAction(certificateId, pick))}>
             Autorizar
           </Button>
         </div>

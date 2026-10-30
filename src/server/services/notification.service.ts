@@ -50,7 +50,8 @@ export async function unreadCount(ctx: TenantContext): Promise<number> {
 
 function activeNotificationLinks() {
   if (BOX_AVAILABLE) return {};
-  return { OR: [{ link: null }, { AND: ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/monitoramento", "/integracoes/pje"].map(prefix => ({ NOT: { link: { startsWith: prefix } } })) }] };
+  const retiredPrefixes = ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/monitoramento", "/integracoes/pje"];
+  return { OR: [{ link: null }, { AND: retiredPrefixes.flatMap((prefix) => [{ NOT: { link: prefix } }, { NOT: { link: { startsWith: `${prefix}/` } } }]) }] };
 }
 
 export async function markRead(ctx: TenantContext, id: string) {

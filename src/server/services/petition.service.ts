@@ -1,10 +1,11 @@
 import { assertBoxAvailable } from "@/server/box-guard";
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { PETITION_STATUS_KEYS, canSubmitAgain, isDefiniteFailure, isLegacyUncertain, statusAfterDelivery, type AttemptOutcome, type FilingEnvironment } from "@/lib/judicial/petition-state";
 import { logger } from "@/lib/logging/logger";
-import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { getPetitioningAdapter, registerPetitioningAdapter, SubmissionUncertainError, type FilingTarget } from "@/lib/petitioning/adapter";
 import { onlyDigits } from "@/lib/validation/br-documents";
 import { mniAdapter } from "./mni-petition.service";
@@ -497,10 +498,18 @@ const PROTOCOL_RE = /^[A-Za-z0-9][A-Za-z0-9 ._/-]{2,59}$/;
  *    (um documento do processo): sem recibo, não há "confirmação oficial".
  *  - NOT_FILED: conferido no tribunal que NADA foi protocolado. Só então a petição volta a poder ser enviada.
  */
-export async function reconcilePetition(ctx: TenantContext, id: string, input: ReconcileInput) {
-  assertBoxAvailable();
-  assertCan(ctx, "petitions:approve");
+export async function reconcilePetition(ctx: TenantContext, id: string, input: ReconcileInput, surface: "legacy" | "v3" = "legacy") {
+  if (surface === "v3") {
+    if (!boxV3PreviewEnabled()) throw new ConflictError("A prévia do Box 3.0 está indisponível.");
+    if (!ctx.permissions.has("petitions:approve")) throw new ForbiddenError();
+  } else {
+    assertBoxAvailable();
+    assertCan(ctx, "petitions:approve");
+  }
   const p = await loadPetition(ctx, id);
+  if (surface === "v3" && !["UNKNOWN", "AWAITING_CONFIRMATION"].includes(p.status)) {
+    throw new ConflictError("Na prévia do Box 3.0, só é possível conferir petições em estado incerto.");
+  }
   const legacyDoubt = p.status === "FAILED" && isLegacyUncertain(p.error);
   const now = new Date();
 

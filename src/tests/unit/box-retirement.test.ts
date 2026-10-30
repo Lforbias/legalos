@@ -33,13 +33,21 @@ describe("retirada provisória do Box", () => {
     const openPage = vi.fn();
     expect(await drainQueue({ openPage })).toBe(0);
     expect(openPage).not.toHaveBeenCalled();
-    for (const run of [() => runDjenAll(), () => runMniAll(), () => runDueSchedules(), () => runAutosQueue(), () => enqueueDueSyncs()]) await expect(run()).rejects.toThrow("retirado temporariamente");
+    // MNI (sessão autenticada em tribunal), fila de peticionamento e fila de autos continuam presos à retirada do Box.
+    for (const run of [() => runMniAll(), () => runDueSchedules(), () => runAutosQueue(), () => enqueueDueSyncs()]) await expect(run()).rejects.toThrow("retirado temporariamente");
+  });
+  it("Box 3.0: o DJEN (fonte pública, sem certificado nem sessão de tribunal) não depende da retirada do Box autenticado", async () => {
+    // runDjenAll() só varre monitoramentos habilitados; sem nenhum cadastrado neste teste, resolve com total 0 sem tocar a rede.
+    await expect(runDjenAll()).resolves.toMatchObject({ total: 0 });
   });
   it("retira atalhos, apresentação comercial e agendamentos do Box", () => {
     expect(SETTINGS_ITEMS.some(item => isBoxPath(item.href))).toBe(false);
     expect(SPACES.some(s => s.name === "LegalOS Box")).toBe(false);
     expect(MODULES.some(m => m.id === "caixa")).toBe(false);
-    expect(INTEGRATIONS.some(i => i.name === "DJEN" || i.name === "PJe / MNI")).toBe(false);
+    // DJEN é público (Box 3.0) e continua na vitrine mesmo com o Box retirado; só o PJe/MNI (sessão de
+    // tribunal) some, porque ele sim depende do Box autenticado.
+    expect(INTEGRATIONS.some(i => i.name === "DJEN")).toBe(true);
+    expect(INTEGRATIONS.some(i => i.name === "PJe / MNI")).toBe(false);
     const cron = fs.readFileSync("scripts/server/install-cron.sh", "utf8");
     for (const job of ["djen", "mni", "robots", "petition-queue", "autos-queue", "monitoring"]) expect(cron).not.toContain(`cron-call.sh ${job}`);
     expect(cron).toContain("cron-call.sh chat-sla"); expect(cron).toContain("backup-docker.sh");

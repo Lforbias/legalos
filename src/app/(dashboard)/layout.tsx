@@ -33,7 +33,11 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const ent = await getEntitlements(ctx.organizationId).catch(() => null);
   const planNotice = ent ? PLAN_NOTICE[ent.state]?.(ent.trialDaysLeft) ?? null : null;
   const boxV2 = boxV2Enabled(ctx.organizationId);
-  const visibleKeys = NAV_ITEMS.filter((n) => (n.key !== "prototypes" || prototypesEnabled()) && navItemInBoxVersion(n, boxV2) && (!n.permission || can(ctx, n.permission))).map((n) => n.key);
+  const visibleKeys = NAV_ITEMS.filter((n) => {
+    const hasPermission = n.permissionAny ? n.permissionAny.some((permission) => ctx.permissions.has(permission)) : !n.permission || ctx.permissions.has(n.permission);
+    const permitted = n.box === "v3" ? hasPermission : !n.permission || can(ctx, n.permission);
+    return (n.key !== "prototypes" || prototypesEnabled()) && navItemInBoxVersion(n, boxV2) && permitted;
+  }).map((n) => n.key);
 
   return (
     <AppShell

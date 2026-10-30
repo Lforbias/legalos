@@ -6,11 +6,12 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Field, Input, Select } from "@/components/ui/form";
 import { deleteCredentialAction, saveCredentialAction, verifyCredentialAction } from "./actions";
+import { deleteBoxV3CredentialAction, saveBoxV3CredentialAction, verifyBoxV3CredentialAction } from "./actions";
 
 type SystemOpt = { key: string; label: string; authModes: string[]; connector: boolean; notes: string };
 const MODE_LABEL: Record<string, string> = { PASSWORD: "Usuário e senha", CERTIFICATE: "Certificado digital", PASSWORD_AND_CERTIFICATE: "Senha e certificado" };
 
-export function CredentialForm({ systems, tribunals, certificates }: { systems: SystemOpt[]; tribunals: { jtr: string; label: string }[]; certificates: { id: string; label: string }[] }) {
+export function CredentialForm({ systems, tribunals, certificates, surface = "legacy" }: { systems: SystemOpt[]; tribunals: { jtr: string; label: string }[]; certificates: { id: string; label: string }[]; surface?: "legacy" | "v3" }) {
   const router = useRouter();
   const [pending, start] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
@@ -79,7 +80,8 @@ export function CredentialForm({ systems, tribunals, certificates }: { systems: 
         onClick={() =>
           start(async () => {
             setOk(false);
-            const r = await saveCredentialAction({ system, courtCode: courtCode || null, authMode: effectiveMode, document, password: needsPassword ? password : null, certificateId: needsCert ? certificateId || null : null });
+            const input = { system, courtCode: courtCode || null, authMode: effectiveMode, document, password: needsPassword ? password : null, certificateId: needsCert ? certificateId || null : null };
+            const r = surface === "v3" ? await saveBoxV3CredentialAction(input) : await saveCredentialAction(input);
             if (!r.ok) setError(Object.values(r.fieldErrors ?? {})[0]?.[0] ?? r.message ?? "Não foi possível guardar.");
             else {
               setError(null);
@@ -96,7 +98,7 @@ export function CredentialForm({ systems, tribunals, certificates }: { systems: 
   );
 }
 
-export function CredentialActions({ id, mine }: { id: string; mine: boolean }) {
+export function CredentialActions({ id, mine, surface = "legacy" }: { id: string; mine: boolean; surface?: "legacy" | "v3" }) {
   const router = useRouter();
   const [pending, start] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
@@ -112,7 +114,7 @@ export function CredentialActions({ id, mine }: { id: string; mine: boolean }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       {mine ? (
-        <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => verifyCredentialAction(id))}>
+        <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => surface === "v3" ? verifyBoxV3CredentialAction(id) : verifyCredentialAction(id))}>
           Conferir requisitos
         </Button>
       ) : null}
@@ -122,7 +124,7 @@ export function CredentialActions({ id, mine }: { id: string; mine: boolean }) {
         loading={pending}
         onClick={() => {
           if (!window.confirm("Remover esta credencial? O segredo cifrado é apagado.")) return;
-          run(() => deleteCredentialAction(id));
+          run(() => surface === "v3" ? deleteBoxV3CredentialAction(id) : deleteCredentialAction(id));
         }}
       >
         Remover

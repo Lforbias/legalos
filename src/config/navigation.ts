@@ -32,18 +32,19 @@ import {
 } from "lucide-react";
 import type { PermissionKey } from "@/lib/permissions/catalog";
 import { BOX_AVAILABLE } from "@/lib/box-retirement";
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 
 /** Os três "lugares" do LegalOS. Func = gestão do escritório (estilo Astrea/Advbox); Box = caixa de intimações, capturas e peticionamento (estilo LegalMail); Chat = atendimento por WhatsApp (estilo ChatGuru). */
 export type Space = "func" | "box" | "chat";
 
 export const SPACES: Record<Space, { name: string; short: string; home: string; summary: string }> = {
   func: { name: "LegalOS Func", short: "Func", home: "/dashboard", summary: "Gestão do escritório: processos, clientes, prazos, tarefas, agenda, documentos, financeiro e relatórios." },
-  box: { name: "LegalOS Box", short: "Box", home: "/box", summary: "Caixa de intimações, capturas dos tribunais, peticionamento e certificados." },
+  box: { name: "LegalOS Box", short: "Box", home: "/box-v3", summary: "Caixa judicial, conexões, monitoramento e filas do escritório." },
   chat: { name: "LegalOS Chat", short: "Chat", home: "/atendimento", summary: "Atendimento por WhatsApp: conversas, equipe, respostas rápidas e ligação com os clientes." },
 };
 
 /** Caminhos que pertencem ao Box e ao Chat; todo o resto pertence ao Func. */
-const BOX_PREFIXES = ["/box", "/caixa-de-entrada", "/peticoes", "/certificados", "/monitoramento", "/integracoes/pje"];
+const BOX_PREFIXES = ["/box", "/box-v3", "/caixa-de-entrada", "/peticoes", "/certificados", "/monitoramento", "/integracoes/pje"];
 const CHAT_PREFIXES = ["/atendimento"];
 const under = (pathname: string, prefixes: string[]) => prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 
@@ -62,12 +63,14 @@ export type NavItem = {
   icon: LucideIcon;
   /** Permissão exigida para ver o item. Sem permissão => oculto. */
   permission?: PermissionKey;
+  /** Uma destas permissões basta para ver a seção. */
+  permissionAny?: PermissionKey[];
   /** Fase do roadmap em que o módulo é entregue. Módulos não implementados abrem uma página de status honesta. */
   phase: number;
   implemented: boolean;
   summary: string;
   /** Box 2.0: "v2" só aparece com LEGALOS_BOX_V2=1; "legacy" só aparece sem a chave. Sem valor = aparece sempre. */
-  box?: "v2" | "legacy";
+  box?: "v2" | "v3" | "legacy";
 };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -76,6 +79,14 @@ export const NAV_ITEMS: NavItem[] = [
   { key: "indicators", space: "func", label: "Indicadores", href: "/indicadores", icon: BarChart3, phase: 9, implemented: true, summary: "Atrasados por tipo, movimentação de processos, evolução da carteira, processos por cliente e os seus números." },
   { key: "alerts", space: "func", label: "Central de alertas", href: "/alertas", icon: Bell, phase: 9, implemented: true, summary: "Publicações, andamentos, processos parados, tarefas, prazos, agenda, financeiro e integrações, com link direto para agir." },
   { key: "box-overview", space: "box", label: "Visão geral do Box", href: "/box", icon: LayoutDashboard, permission: "inbox:read", phase: 4, implemented: true, summary: "Painel do Box: intimações, capturas, certificados e petições." },
+  { key: "box-v3-preview", space: "box", label: "Visão geral do Box", href: "/box-v3", icon: LayoutDashboard, permission: "inbox:read", phase: 0, implemented: true, summary: "Fontes, fila e cobertura do Box 3.0.", box: "v3" },
+  { key: "box-v3-inbox", space: "box", label: "Caixa de entrada", href: "/box-v3/entrada", icon: Inbox, permission: "inbox:read", phase: 0, implemented: true, summary: "Comunicações judiciais, com captura, leitura interna e ciência oficial separadas.", box: "v3" },
+  { key: "box-v3-connections", space: "box", label: "Conexões", href: "/box-v3/conexoes", icon: Radar, permission: "inbox:read", phase: 0, implemented: true, summary: "Fontes judiciais e operações com evidência própria.", box: "v3" },
+  { key: "box-v3-monitoring", space: "box", label: "Monitoramento", href: "/box-v3/monitoramento", icon: HeartPulse, permission: "inbox:read", phase: 0, implemented: true, summary: "Saúde e evidências das fontes, com limitações e histórico.", box: "v3" },
+  { key: "box-v3-sync", space: "box", label: "Sincronizações", href: "/box-v3/sincronizacoes", icon: Activity, permission: "inbox:read", phase: 0, implemented: true, summary: "Execuções e cobertura registradas; sem disparar novas consultas.", box: "v3" },
+  { key: "box-v3-petitions", space: "box", label: "Fila de protocolos", href: "/box-v3/peticionamento", icon: PenLine, permission: "petitions:read", phase: 0, implemented: true, summary: "Rascunhos, aprovações, protocolos e recibos históricos em leitura.", box: "v3" },
+  { key: "box-v3-imports", space: "box", label: "Importações", href: "/box-v3/importacoes", icon: FolderOpen, permission: "cases:read", phase: 0, implemented: true, summary: "Lotes preservados e resultados registrados, sem consultar ou baixar autos.", box: "v3" },
+  { key: "box-v3-settings", space: "box", label: "Certificados e acessos", href: "/box-v3/configuracoes", icon: KeyRound, permissionAny: ["certificates:manage", "integrations:manage", "cases:read"], phase: 0, implemented: true, summary: "Estado e responsáveis por credenciais e certificados, sem exibir segredos.", box: "v3" },
   { key: "inbox", space: "box", label: "Caixa de entrada", href: "/caixa-de-entrada", icon: Inbox, permission: "inbox:read", phase: 4, implemented: true, summary: "Central de intimações: registro manual ou por texto colado, duplicidade, distribuição e criação de tarefas e prazos (importação de tribunais na Fase 8)." },
   { key: "cases", space: "func", label: "Processos e casos", href: "/processos", icon: Scale, permission: "cases:read", phase: 2, implemented: true, summary: "Cadastro de processos, partes, linha do tempo e carteira." },
   { key: "clients", space: "func", label: "Clientes", href: "/clientes", icon: Users, permission: "clients:read", phase: 2, implemented: true, summary: "Cadastro de pessoas físicas e jurídicas com perfil completo." },
@@ -112,7 +123,10 @@ export const NAV_ITEMS: NavItem[] = [
 ];
 
 /** O item vale para a versão do Box em uso? (item sem marca vale sempre). */
-export const navItemInBoxVersion = (n: Pick<NavItem, "box"> & { space?: string }, boxV2: boolean) => (BOX_AVAILABLE || (n.space !== "box" && !n.box)) && (!n.box || (n.box === "v2") === boxV2);
+export const navItemInBoxVersion = (n: Pick<NavItem, "box"> & { space?: string }, boxV2: boolean) => {
+  if (n.box === "v3") return boxV3PreviewEnabled();
+  return (BOX_AVAILABLE || (n.space !== "box" && !n.box)) && (!n.box || (n.box === "v2") === boxV2);
+};
 
 export function getNavItem(key: string) {
   return NAV_ITEMS.find((n) => n.key === key);

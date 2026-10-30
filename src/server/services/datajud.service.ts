@@ -1,6 +1,5 @@
-import { BOX_AVAILABLE } from "@/lib/box-retirement";
-import { assertBoxAvailable } from "@/server/box-guard";
 import { z } from "zod";
+import { runCapability } from "@/server/judicial/orchestrator";
 import { mfaKey, encryptSecret, decryptSecret } from "@/lib/security/totp";
 import { DatajudError, testDatajudKey } from "@/lib/datajud/client";
 import { db } from "@/lib/db/client";
@@ -10,11 +9,16 @@ import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertCaseVisible } from "./case.service";
 
+/**
+ * Box 3.0: o DataJud é uma fonte pública (sem autenticação de tribunal, sem certificado, sem sessão) e por
+ * isso NÃO depende de `BOX_AVAILABLE` — essa chave continua reservada ao Box autenticado (PJe/eproc,
+ * certificados, sessões) que segue retirado. Cada consulta real passa pelo orquestrador (`runCapability`),
+ * que grava a evidência de funcionamento usada pela matriz de cobertura do Box 3.0.
+ */
 export type DatajudStatus = { keyConfigured: boolean; orgEnabled: boolean; ownKey: boolean; vaultAvailable: boolean; lastTest: { at: Date; ok: boolean; reason: string | null } | null };
 export type DatajudSyncResult = { alias: string; found: boolean; total: number; imported: number; classe: string | null; orgaoJulgador: string | null };
 
 export async function datajudStatus(ctx: TenantContext): Promise<DatajudStatus> {
-  if (!BOX_AVAILABLE) return { keyConfigured: false, orgEnabled: false, ownKey: false, vaultAvailable: false, lastTest: null };
   assertCan(ctx, "cases:read");
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { datajudEnabled: true, datajudApiKeyEnc: true } });
   const check = await db.auditLog.findFirst({ where: { organizationId: ctx.organizationId, resourceId: ctx.organizationId, action: { in: ["datajud.connection_test", "datajud.connection_test_failed", "datajud.key_saved"] } }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], select: { action: true, createdAt: true, metadata: true } });
@@ -24,7 +28,6 @@ export async function datajudStatus(ctx: TenantContext): Promise<DatajudStatus> 
 
 /** Liga/desliga a consulta ao DataJud (o número do processo é enviado ao CNJ). Exige `integrations:manage`. */
 export async function setOrgDatajudEnabled(ctx: TenantContext, enabled: boolean) {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   await db.organization.update({ where: { id: ctx.organizationId }, data: { datajudEnabled: enabled } });
   await audit({ action: enabled ? "datajud.enable" : "datajud.disable", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "organization", resourceId: ctx.organizationId, meta: ctx.meta });
@@ -32,7 +35,6 @@ export async function setOrgDatajudEnabled(ctx: TenantContext, enabled: boolean)
 
 /** Busca os andamentos públicos no DataJud e importa só os novos (idempotente). Processos sigilosos nunca são consultados. */
 export async function syncCaseFromDatajud(ctx: TenantContext, caseId: string, fetcher?: (cnj: string) => Promise<DatajudResult>): Promise<DatajudSyncResult> {
-  assertBoxAvailable();
   assertCan(ctx, "cases:write");
   await assertCaseVisible(ctx, caseId);
   const org = await db.organization.findUnique({ where: { id: ctx.organizationId }, select: { datajudEnabled: true, datajudApiKeyEnc: true } });
@@ -43,9 +45,26 @@ export async function syncCaseFromDatajud(ctx: TenantContext, caseId: string, fe
   if (c.confidential) throw new ValidationError("Processos sigilosos não são consultados em serviços externos.");
   if (!c.number) throw new ValidationError("Informe o número CNJ do processo para consultar o DataJud.");
   if (!datajudAlias(c.number)) throw new ValidationError("Este tribunal não é coberto pelo DataJud.");
+  const cnj = c.number;
 
   let r: DatajudResult;
-  try { r = await (fetcher ? fetcher(c.number) : fetchDatajud(c.number, key)); }
+  try {
+    r = await runCapability(
+      {
+        organizationId: ctx.organizationId,
+        connectorKey: "datajud",
+        operation: "getCase",
+        accessMethod: "OFFICIAL_API",
+        courtCode: datajudAlias(cnj) ?? "*",
+        outcomeOf: (res: DatajudResult) => ({
+          outcome: res.found ? "PASSED" : "INCONCLUSIVE",
+          summary: res.found ? `Processo localizado; ${res.movements.length} andamento(s) recebido(s).` : "Processo não localizado no DataJud.",
+          details: { found: res.found, movements: res.movements.length },
+        }),
+      },
+      () => (fetcher ? fetcher(cnj) : fetchDatajud(cnj, key)),
+    );
+  }
   catch (e) {
     if (!(e instanceof DatajudError)) throw e;
     await audit({ action: "datajud.sync_failed", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: caseId, metadata: { reason: e.code }, meta: ctx.meta });
@@ -82,7 +101,6 @@ async function orgDatajudKey(ctx: TenantContext): Promise<string | null> {
   catch { throw new ConflictError("Não foi possível abrir a chave do DataJud. Cadastre-a novamente ou confira a chave de cifra do servidor."); }
 }
 export async function saveOrgDatajudKey(ctx: TenantContext, raw: unknown) {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const key = z.string().trim().max(600).parse(raw).replace(/^Authorization:\s*/i, "").replace(/^APIKey\s+/i, "").trim();
   if (!/^[A-Za-z0-9+/_=-]{16,512}$/.test(key)) throw new ValidationError("Informe apenas a chave pública do DataJud, sem espaços.");
@@ -94,11 +112,12 @@ export async function saveOrgDatajudKey(ctx: TenantContext, raw: unknown) {
   });
 }
 export async function testOrgDatajud(ctx: TenantContext, test: (key: string) => Promise<void> = testDatajudKey) {
-  assertBoxAvailable();
   assertCan(ctx, "integrations:manage");
   const key = await orgDatajudKey(ctx);
   if (!key) throw new ConflictError("Cadastre uma chave do DataJud antes de testar.");
-  try { await test(key); }
+  try {
+    await runCapability({ organizationId: ctx.organizationId, connectorKey: "datajud", operation: "checkAvailability", accessMethod: "OFFICIAL_API" }, () => test(key));
+  }
   catch (e) {
     if (!(e instanceof DatajudError)) throw e;
     await audit({ action: "datajud.connection_test_failed", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "organization", resourceId: ctx.organizationId, metadata: { reason: e.code }, meta: ctx.meta });

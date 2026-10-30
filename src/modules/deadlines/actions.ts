@@ -1,4 +1,5 @@
 "use server";
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 
 import { revalidatePath } from "next/cache";
 import { uuidSchema, type ActionState } from "@/lib/validation/common";
@@ -18,7 +19,7 @@ const touch = (id?: string, caseId?: string) => {
 export async function createDeadlineAction(input: unknown, noticeId?: string): Promise<ActionState<{ id: string }>> {
   return runAction(async () => {
     const { ctx } = await requireTenant();
-    const d = await createDeadline(ctx, parse(deadlineSchema, input), { sourceNoticeId: noticeId ? parse(uuidSchema, noticeId) : undefined });
+    const d = await createDeadline(ctx, parse(deadlineSchema, input), { surface: boxV3PreviewEnabled() ? "v3" : "legacy", sourceNoticeId: noticeId ? parse(uuidSchema, noticeId) : undefined });
     touch(undefined, d.caseId);
     return { id: d.id };
   });

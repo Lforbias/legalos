@@ -55,17 +55,26 @@ export async function getDeadline(ctx: TenantContext, id: string) {
   return { ...d, responsibleName: n(d.responsibleId), validatedByName: n(d.validatedById), createdByName: n(d.createdById) };
 }
 
-export async function createDeadline(ctx: TenantContext, raw: DeadlineInput, opts: { sourceNoticeId?: string } = {}) {
+export async function createDeadline(ctx: TenantContext, raw: DeadlineInput, opts: { sourceNoticeId?: string; triageId?: string; surface?: "legacy" | "v3" } = {}) {
   assertCan(ctx, "deadlines:write");
   const data = toDeadlineData(deadlineSchema.parse(raw));
   await assertCaseVisible(ctx, data.caseId);
   if (data.responsibleId) await assertActiveMember(ctx, data.responsibleId);
-  if (opts.sourceNoticeId) await assertNoticeUsable(ctx, opts.sourceNoticeId);
+  if (opts.sourceNoticeId) await assertNoticeUsable(ctx, opts.sourceNoticeId, opts.surface, opts.triageId || opts.surface === "v3" ? data.caseId : undefined);
+  if (opts.triageId && !opts.sourceNoticeId) throw new ConflictError("A triagem exige uma comunicação de origem.");
   const created = await db.$transaction(async (tx) => {
+    if (opts.triageId) {
+      const claimed = await tx.noticeTriage.updateMany({ where: { id: opts.triageId, organizationId: ctx.organizationId, noticeId: opts.sourceNoticeId, status: "DRAFT" }, data: { status: "VALIDATED", validatedById: ctx.userId, validatedAt: new Date() } });
+      if (claimed.count !== 1) throw new ConflictError("A triagem já foi encerrada. Atualize a página.");
+    }
     // todo prazo nasce como RASCUNHO: só vale como definitivo após validação humana
     const d = await tx.deadline.create({ data: { ...data, organizationId: ctx.organizationId, createdById: ctx.userId, status: "DRAFT", source: "MANUAL", sourceNoticeId: opts.sourceNoticeId ?? null } });
     await logCaseEvent(tx, ctx, d.caseId, { kind: "DEADLINE_CREATED", title: `Prazo cadastrado (aguardando validação): ${d.title}`, description: `Data fatal: ${dateToYmd(d.dueDate).split("-").reverse().join("/")}.` });
     await audit({ action: "deadline.create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "deadline", resourceId: d.id, meta: ctx.meta }, tx);
+    if (opts.triageId) {
+      await tx.noticeTriage.update({ where: { id: opts.triageId }, data: { deadlineId: d.id } });
+      await audit({ action: "notice.triage_validate", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: opts.sourceNoticeId, metadata: { deadlineId: d.id }, meta: ctx.meta }, tx);
+    }
     return d;
   });
   await emitWebhookEvent(ctx.organizationId, "deadline.created", { deadlineId: created.id, caseId: created.caseId, dueDate: dateToYmd(created.dueDate) });
