@@ -61,19 +61,17 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             <DriveSettingsPanel s={drive} />
           </CardBody>
         </Card>
-        {BOX_AVAILABLE ? <>
         <Card>
-          <CardHeader title="DataJud (CNJ)" action={active ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Desligada</Badge>} />
+          <CardHeader title="DataJud (CNJ) · Box 3.0" action={active ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-3 text-sm">
             <p>Importa os andamentos públicos de um processo a partir do número CNJ (Justiça Estadual, Federal, do Trabalho, Eleitoral, STJ e TST). Só o número do processo é enviado ao CNJ; processos sigilosos nunca são consultados. Cada andamento é importado uma única vez.</p>
             {!s.keyConfigured ? <Alert tone="warning">Cadastre a chave pública do DataJud abaixo para habilitar a consulta.</Alert> : null}
-            <p className="text-xs text-muted">Fonte: Conselho Nacional de Justiça (CNJ), Base Nacional de Dados do Poder Judiciário (DataJud). Habilitar a consulta não confirma a disponibilidade do CNJ.</p>
+            <p className="text-xs text-muted">Fonte: Conselho Nacional de Justiça (CNJ), Base Nacional de Dados do Poder Judiciário (DataJud). Habilitar a consulta não confirma a disponibilidade do CNJ. Esta consulta pública é independente do Box retirado: funciona mesmo com o Box desligado.</p>
             <p className="text-xs" role="status">{s.lastTest ? `Último teste: ${formatDateTime(s.lastTest.at, ctx.timezone)} — ${s.lastTest.ok ? "autenticação aceita pelo CNJ" : ({ TIMEOUT: "tempo de resposta esgotado", NETWORK: "falha de conexão", AUTH: "acesso recusado (chave ou permissão)", RATE_LIMIT: "limite de consultas atingido", UNAVAILABLE: "serviço indisponível ou resposta incompleta", INVALID_RESPONSE: "resposta inválida" }[s.lastTest.reason ?? ""] ?? "não concluído")}.` : "Conexão ainda não testada com a chave atual."}</p>
             <DatajudKeyForm ownKey={s.ownKey} vaultAvailable={s.vaultAvailable} configured={s.keyConfigured} />
             {s.keyConfigured ? <DatajudToggle enabled={s.orgEnabled} /> : null}
           </CardBody>
         </Card>
-        </> : null}
         {BOX_AVAILABLE ? <>
         <Card>
           <CardHeader title="DJEN — publicações por OAB" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
