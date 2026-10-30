@@ -50,7 +50,11 @@ Ver `CONNECTOR_MATRIX.md` para a tabela completa. Resumo por conector (`src/lib/
 - Reativação de qualquer autenticação real (certificado, MNI, portal) — exige credencial real e autorização
   explícita da Dra. Talita; nada disso foi desbloqueado.
 - A3/PJeOffice ("LegalOS Box Companion"): continua experimental, sem código novo.
-- e-SAJ/PROJUDI além do que o MNI já cobre: não iniciado.
+- e-SAJ/PROJUDI além do que o MNI já cobre: pesquisado, não implementado — ver
+  `ESAJ_PROJUDI_ESCOPO.md`. Achado principal: pelo menos dois tribunais (TJPB, TRT-SC) adotaram CAPTCHA em
+  2026 justamente contra consulta pública automatizada, então um scraper próprio pararia (corretamente) no
+  primeiro CAPTCHA; não há API pública oficial além de DataJud/DJEN; é decisão de produto da Dra. Talita,
+  não pendência técnica.
 - Rodar `scripts/djen-probe.ts`/`.py` contra o DJEN real a partir de um servidor no Brasil (o DJEN recusa IP fora
   do Brasil; nenhuma máquina usada nesta entrega está no Brasil).
 - Bateria completa de testes automatizados (`vitest`) — ver `TESTING.md`: não roda nestes ambientes (binding
