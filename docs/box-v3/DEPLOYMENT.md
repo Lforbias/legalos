@@ -18,6 +18,9 @@
 
 ## Banco de dados
 
+A imagem de produção habilita a prévia com `LEGALOS_BOX3_PREVIEW=1`. O ambiente do servidor pode definir
+`LEGALOS_BOX3_PREVIEW=0` para ocultá-la. Isso não altera `BOX_AVAILABLE=false` nem habilita envio MNI.
+
 Nenhuma migração nova nesta entrega. A tabela usada pela evidência (`connector_evidences`, modelo
 `ConnectorEvidence`) já existe desde a migração `20270106000000_box_v2_foundation` — confirmado checando
 `prisma/migrations/` diretamente. Todo o trabalho desta sessão (DJEN/DataJud desacoplados, caixa do Box 3.0,
