@@ -1,4 +1,5 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
+vi.unmock("@/lib/box-retirement");
 import { db } from "@/lib/db/client";
 import { BOX_AVAILABLE } from "@/lib/box-retirement";
 import { callTool, toolList, type Origin } from "@/server/services/rute-tools.service";
@@ -67,7 +68,7 @@ describe("Box 3.0: ferramentas da RUTE para a caixa pública não dependem do Bo
   });
 
   it("caixa_v3_cobertura devolve a matriz de conectores para quem tem a permissão bruta inbox:read", async () => {
-    const r = await callTool(office.ctx, new Set(["read"]), ORIGIN, "caixa_v3_cobertura", {});
+    const r = await callTool(office.ctx, new Set(["read"]), ORIGIN, "caixa_v3_cobertura", { conector: "djen" });
     expect(r.ok).toBe(true);
     const data = r.data as { conectores: Array<{ chave: string }>; cobertura: unknown[] };
     expect(data.conectores.length).toBeGreaterThan(0);
