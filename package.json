@@ -25,6 +25,7 @@
     "rotate-keys": "tsx scripts/rotate-keys.ts",
     "mail-test": "tsx scripts/mail-test.ts",
     "djen:probe": "tsx scripts/djen-probe.ts",
+    "mni:probe": "tsx scripts/mni-probe.ts",
     "postinstall": "prisma generate",
     "test:e2e": "playwright test",
     "check": "npm run typecheck && npm run lint && npm run test",
