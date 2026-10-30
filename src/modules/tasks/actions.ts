@@ -1,4 +1,5 @@
 "use server";
+import { boxV3PreviewEnabled } from "@/lib/box-v3-preview";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -18,7 +19,7 @@ const touch = (id?: string, caseId?: string) => {
 export async function createTaskAction(input: unknown, noticeId?: string): Promise<ActionState<{ id: string }>> {
   return runAction(async () => {
     const { ctx } = await requireTenant();
-    const t = await createTask(ctx, parse(taskSchema, input), { sourceNoticeId: noticeId ? parse(uuidSchema, noticeId) : undefined });
+    const t = await createTask(ctx, parse(taskSchema, input), { surface: boxV3PreviewEnabled() ? "v3" : "legacy", sourceNoticeId: noticeId ? parse(uuidSchema, noticeId) : undefined });
     touch(undefined, t.caseId ?? undefined);
     return { id: t.id };
   });

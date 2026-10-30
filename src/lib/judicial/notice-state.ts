@@ -68,7 +68,7 @@ export function noticeStates(n: NoticeStateInput): StateChip[] {
  * O banco restringe `notice_events.kind` a poucos tipos (CHECK da migração do Box 2.0). Ações mais finas ficam em
  * `data.action`; aqui está o mapa entre a AÇÃO (o que aconteceu) e o TIPO gravado, nos dois sentidos.
  */
-export const NOTICE_ACTIONS = ["CAPTURED", "CREATED", "VIEWED", "ASSIGNED", "TEAM_ASSIGNED", "RETURNED", "TO_ENTRADA", "SNOOZED", "WOKEN", "CASE_LINKED", "PROCESSED", "DISCARDED", "REOPENED", "OFFICIAL_ACK"] as const;
+export const NOTICE_ACTIONS = ["CAPTURED", "CREATED", "VIEWED", "ASSIGNED", "TEAM_ASSIGNED", "RETURNED", "TO_ENTRADA", "SNOOZED", "WOKEN", "CASE_LINKED", "DOCUMENT_LINKED", "PROCESSED", "DISCARDED", "REOPENED", "OFFICIAL_ACK"] as const;
 export type NoticeAction = (typeof NOTICE_ACTIONS)[number];
 export const NOTICE_DB_KINDS = ["CAPTURED", "VIEWED", "ASSIGNED", "LINKED", "STATUS", "OFFICIAL_ACK", "DOCUMENT", "NOTE", "EVIDENCE"] as const;
 export type NoticeDbKind = (typeof NOTICE_DB_KINDS)[number];
@@ -84,6 +84,7 @@ const STORED: Record<NoticeAction, { kind: NoticeDbKind; action?: string }> = {
   SNOOZED: { kind: "STATUS", action: "snoozed" },
   WOKEN: { kind: "STATUS", action: "woken" },
   CASE_LINKED: { kind: "LINKED" },
+  DOCUMENT_LINKED: { kind: "DOCUMENT", action: "document_linked" },
   PROCESSED: { kind: "STATUS", action: "processed" },
   DISCARDED: { kind: "STATUS", action: "discarded" },
   REOPENED: { kind: "STATUS", action: "reopened" },
@@ -142,6 +143,8 @@ export function describeNoticeEvent(kind: string, data: Record<string, unknown>,
       return { title: "Despertada", detail: names.actor ? `Por ${names.actor}.` : null, tone: "neutral" };
     case "CASE_LINKED":
       return { title: names.caseTitle ? `Vinculada ao processo ${names.caseTitle}` : data.caseId ? "Vinculada a um processo" : "Vínculo com o processo removido", detail: str(data.how) === "AUTO_CNJ" ? "Vinculada automaticamente pelo número CNJ." : names.actor ? `Por ${names.actor}.` : null, tone: "info" };
+    case "DOCUMENT_LINKED":
+      return { title: data.documentId ? "Peça vinculada à comunicação" : "Vínculo da peça removido", detail: names.actor ? `Por ${names.actor}.` : null, tone: "info" };
     case "PROCESSED":
       return { title: "Tratada internamente", detail: names.actor ? `Por ${names.actor}.` : null, tone: "success" };
     case "DISCARDED":
