@@ -1,6 +1,6 @@
 # LegalOS 3.0.0 — plano (comparação com o LegalMail)
 
-Fonte desta primeira versão: a documentação oficial da API do LegalMail (spec OpenAPI e guia do agente), lida em 2026-10-21. A navegação pela tela do LegalMail ainda NÃO foi feita (a extensão do Chrome não chegou à sessão). Quando houver acesso, percorrer as telas só para leitura e completar a lista.
+Fontes: a documentação da API do LegalMail e inspeção somente de leitura da aplicação autenticada em 2026-10-29. A inspeção completou o levantamento de UX da F11; ela não revela nem comprova a arquitetura interna do LegalMail. Veja `docs/box-v3-reconstrucao.md` para observações, limites e o estado da nova prévia.
 
 ## O que o LegalMail faz e o LegalOS ainda não faz (ou faz só em parte)
 
@@ -42,8 +42,17 @@ Conferido na documentação completa (referências da API): nada além do acima 
 | 3.0-F6b (feita, só testada com simuladores) | Credenciais por tribunal e usuário no cofre, com checagem de requisitos do sistema | L17 |
 | 3.0-F9 (feita) | Certificado: usuários autorizados e avisos; webhooks de petição, protocolo e certificado | L12, L15 |
 | 3.0-F10 (feita, só testada com simuladores) | Créditos e custos (se o LegalOS for vendido como serviço) | L14 |
-| 3.0-F11 | Completar com o que aparecer nas telas do LegalMail | — |
+| 3.0-F11 (caixa, fluxo interno de petições e cadastro manual de lotes implementados; conectores pendentes) | Caixa por pastas, conexões, monitoramento, histórico de sincronizações, fila de protocolos e importações, com estados internos e oficiais separados | Inspeção de 29/10/2026; sem comprovação da arquitetura interna |
 
 Regra mantida: nada de protocolo, mensagem ou cobrança sem confirmação humana, e nada falso.
+
+## Estado da reconstrução no aplicativo
+
+- A prévia `/box-v3` possui visão geral e seções de caixa, conexões, monitoramento, sincronizações, fila de protocolos e importações. O histórico de sincronizações é paginado e tem detalhe por execução com período, contagens, cobertura, evidências e alertas relacionados, sem cursores ou mensagens técnicas brutas; uma pessoa com `integrations:manage` pode encerrar somente registros sem heartbeat há mais do que o limite do motor, sem retomar a execução. A fila permite criar/editar rascunhos e gerir anexos internos vinculados ao mesmo processo; envio para revisão, aprovação interna, devolução com orientação, cancelamento com cópia em rascunho e registro assistido de conferência humana de protocolo incerto ficam auditados e conferem as versões dos documentos. A conferência registra protocolo/recibo ou a constatação humana de ausência de protocolo; não consulta nem envia ao tribunal e não libera reenvio na V3. A importação V3 valida CNJs e cria apenas registros internos; a ação força DataJud, autos e atualização de existentes para desligado. Aprovação V3 não agenda nem envia: agendamento, consultas externas e qualquer envio seguem indisponíveis. As consultas e ações internas V3 não chamam os serviços antigos protegidos, exceto o serviço compartilhado de reconciliação, explicitamente limitado à prévia.
+- Caixa e processos respeitam visibilidade por organização e sigilo. Os detalhes exibem o teor da comunicação apenas para quem tem permissão de leitura. Abrir a tela não grava visualização e não altera ciência oficial.
+- Peças já existentes podem ser vinculadas à comunicação se pertencerem ao mesmo processo. A aprovação interna exige leitura dos documentos; o detalhe abre a versão registrada para revisão.
+- As execuções, resultados e protocolos são apresentados como histórico. Cursor de sincronização, conteúdo bruto de erro e recibo completo não são mostrados nas listas.
+- A primeira entrega permite pesquisa e filtros por tipo, origem, leitura e ciência oficial; vincular a processo visível e peça documental do mesmo processo; registrar abertura interna; distribuir para pessoa ou equipe com acesso; adicionar notas e etiquetas; adormecer/despertar e devolver à Entrada; marcar/reabrir o tratamento; iniciar tarefa vinculada à comunicação; gerar triagem baseada em regras e revisar minuta, com validação humana explícita e criação opcional de prazo em rascunho; criar/editar/revisar/aprovar rascunhos com anexos; importar processos manualmente por lote CNJ sem consulta externa; e gerenciar credenciais/certificados no cofre com permissões e MFA, sem permitir que estes cadastros acionem fontes judiciais. Monitoramento expõe alertas históricos sem detalhes técnicos brutos e permite reconhecê-los internamente. Nenhuma integração real, sincronização, importação de tribunal, download de autos, ciência ou peticionamento foi liberada. A retirada anterior continua em vigor.
+- F1–F10 no repositório são cobertura de código registrada no roadmap, não prova de operação real. Onde o roadmap diz “só testada com simuladores” ou “aguarda validação em tribunal real”, continua pendente de homologação externa.
 
 > Decisão (21/10/2026): a 3.0-F3b é opcional e por escritório — cada escritório cadastra o próprio Client ID/Secret do Google (criptografado, com liga/desliga), escopo `drive.file`; nenhuma chave global no servidor.

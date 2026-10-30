@@ -25,6 +25,8 @@ Merge e publicação aguardam a confirmação escrita exigida pela titular. Nenh
 
 O futuro Box precisa de especificação e validação próprias: autenticação no servidor, tratamento legítimo de segundo fator, coleta completa por tribunal, deduplicação por identificador oficial, checkpoint, agendamento, observabilidade e teste com navegador local fechado. Não reativar o código antigo nem apresentar importação manual como monitoramento automático.
 
+Em 29/10/2026 começou a prévia do Box 3.0 em `/box-v3`. Ela lê os cadastros preservados e permite ações internas explícitas de abertura, distribuição e notas com controle de sigilo, sem alterar ciência oficial. Não consulta tribunais nem envia petições e não altera a disponibilidade do Box antigo. O atalho aparece no desenvolvimento local ou quando `LEGALOS_BOX3_PREVIEW=1`; as rotas, APIs, credenciais e rotinas judiciais retiradas continuam bloqueadas.
+
 ## Testes
 
 Os testes novos `unit/box-retirement.test.ts` e `integration/box-retirement.test.ts` usam a política real de retirada, inclusive para provar que titular não acessa o Box e que monitores/registros não são alterados. As regressões históricas de domínio usam um mock explícito de disponibilidade somente no setup do Vitest para continuar testando o código isolado. Isso não é variável de ambiente nem caminho de reativação no aplicativo. Os testes novos de retirada não usam esse mock. Testes antigos de navegador que esperam telas do Box precisam ser atualizados para a ausência do módulo.
