@@ -86,7 +86,7 @@ function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; act
   );
 }
 
-export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras, tools, transcripts, canTranscribe }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData; tools?: ConvToolsData; transcripts?: Record<string, string>; canTranscribe?: boolean }) {
+export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, crmPanel, extras, tools, transcripts, canTranscribe }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; crmPanel?: React.ReactNode; extras?: ConversationExtrasData; tools?: ConvToolsData; transcripts?: Record<string, string>; canTranscribe?: boolean }) {
   const router = useRouter();
   const [text, setText] = React.useState("");
   const [note, setNote] = React.useState(false);
@@ -215,6 +215,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           title={chat.title}
           phone={chat.phone}
           data={side}
+          crmPanel={crmPanel}
           controls={controls}
           extras={extras || tools ? <>{extras ? <ConversationExtras d={extras} /> : null}{tools ? <ConversationTools d={tools} /> : null}</> : null}
           meta={chat.canWrite && meta ? <MetaPanel key={JSON.stringify([meta.selected, meta.values])} chatId={chat.id} labels={meta.labels} selected={meta.selected} fields={meta.fields} values={meta.values} onMsg={setMsg} /> : null}

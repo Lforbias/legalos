@@ -6,7 +6,8 @@ import { fieldError, useServerForm } from "@/components/forms/use-server-form";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody } from "@/components/ui/card";
-import { Field, Input, Select, Textarea } from "@/components/ui/form";
+import { Field, Input, Select } from "@/components/ui/form";
+import { TaskDescription } from "@/components/editor/task-description";
 import { ClientPicker } from "@/modules/clients/client-picker";
 import { createTaskAction, updateTaskAction } from "./actions";
 import { TASK_PRIORITIES, TASK_PRIORITY_LABEL, TASK_STATUSES, TASK_STATUS_LABEL, taskSchema, type TaskInput } from "./schemas";
@@ -60,7 +61,7 @@ export function TaskForm({
           </div>
           <div className="md:col-span-2">
             <Field label="Descrição" htmlFor="description" error={err("description")}>
-              <Textarea id="description" rows={4} {...form.register("description")} />
+              <TaskDescription initial={initial.description ?? ""} onChange={value => form.setValue("description", value, { shouldDirty: true, shouldValidate: true })} />
             </Field>
           </div>
           <Field label="Situação" htmlFor="status" error={err("status")}>

@@ -6,7 +6,7 @@ import { uuidSchema, type ActionState } from "@/lib/validation/common";
 import { parse, runAction } from "@/server/action-helpers";
 import { requireTenant } from "@/server/session";
 import { connectAccount, deleteQuickReply, removeAccount, saveQuickReply, setAccountEnabled, syncTemplates, updateSettings } from "@/server/services/whatsapp-account.service";
-import { attachMessageToDocuments, caseOptions, createDeadlineFromConversation, createEventFromConversation, createLeadFromConversation, createTaskFromConversation, linkCase, type CaseOption } from "@/server/services/chat-links.service";
+import { attachMessageToDocuments, caseOptions, createDeadlineFromConversation, createEventFromConversation, createLeadFromConversation, createTaskFromConversation, linkCase, linkExistingLead, type CaseOption } from "@/server/services/chat-links.service";
 import { deleteQueue, distributePending, saveQueue, setMyAvailability, transferToQueue } from "@/server/services/chat-queue.service";
 import { deleteAutomation, saveAutomation, setAutomationActive } from "@/server/services/chat-automation.service";
 import { setSwitch, stopAllMessaging, SWITCH_KEYS } from "@/server/services/chat-switches.service";
@@ -488,5 +488,16 @@ export async function sendToClientAction(input: unknown, source: "case" | "clien
     const r = await sendToClient(ctx, input, parse(z.enum(["case", "client", "birthday"]), source));
     revalidatePath("/atendimento");
     return { status: r.status, error: r.error };
+  });
+}
+
+
+export async function linkExistingLeadAction(conversationId: string, leadId: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    await linkExistingLead(ctx, parse(uuidSchema, conversationId), parse(uuidSchema, leadId));
+    revalidatePath("/atendimento");
+    revalidatePath(`/crm/${leadId}`);
+    return undefined;
   });
 }

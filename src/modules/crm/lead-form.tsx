@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { fieldError, useServerForm } from "@/components/forms/use-server-form";
 import { Alert } from "@/components/ui/alert";
@@ -9,8 +10,9 @@ import { Field, Input, Select, Textarea } from "@/components/ui/form";
 import { createLeadAction, updateLeadAction } from "./actions";
 import { leadSchema, type LeadInput } from "./schemas";
 
-export function LeadForm({ leadId, initial, members }: { leadId?: string; initial: LeadInput; members: { id: string; name: string }[] }) {
+export function LeadForm({ leadId, initial, members, inline = false }: { leadId?: string; inline?: boolean; initial: LeadInput; members: { id: string; name: string }[] }) {
   const router = useRouter();
+  const [saved, setSaved] = useState(false);
   const { form, submit, pending, message } = useServerForm<LeadInput, { id: string }>({
     schema: leadSchema,
     defaultValues: initial,
@@ -22,13 +24,14 @@ export function LeadForm({ leadId, initial, members }: { leadId?: string; initia
       return createLeadAction(v);
     },
     onSuccess: (d) => {
-      router.replace(`/crm/${d?.id ?? leadId}`);
+      if (inline) setSaved(true);
+      else router.replace(`/crm/${d?.id ?? leadId}`);
       router.refresh();
     },
   });
   const err = (n: keyof LeadInput) => fieldError(form, n);
   return (
-    <form onSubmit={submit} noValidate className="space-y-4">
+    <form onSubmit={event => { setSaved(false); submit(event); }} onChange={() => setSaved(false)} noValidate className="space-y-4">
       {message ? <Alert tone="error">{message}</Alert> : null}
       <Card>
         <CardBody className="grid gap-4 md:grid-cols-2">
@@ -76,7 +79,7 @@ export function LeadForm({ leadId, initial, members }: { leadId?: string; initia
       </Card>
       <div className="flex gap-2">
         <Button type="submit" loading={pending}>{leadId ? "Salvar alterações" : "Cadastrar lead"}</Button>
-        <Button variant="ghost" onClick={() => router.back()} disabled={pending}>Cancelar</Button>
+        {inline ? (saved ? <p role="status" className="text-sm">Alterações salvas no CRM.</p> : null) : <Button variant="ghost" onClick={() => router.back()} disabled={pending}>Cancelar</Button>}
       </div>
     </form>
   );

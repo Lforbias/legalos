@@ -48,7 +48,7 @@ export async function listLeads(ctx: TenantContext, f: LeadFilters = {}) {
   const [items, total, sums] = await Promise.all([
     db.lead.findMany({ where, orderBy: { updatedAt: "desc" }, take: 300, select: { id: true, name: true, type: true, stage: true, estimatedValue: true, interest: true, ownerId: true, nextActionDate: true, updatedAt: true } }),
     db.lead.count({ where }),
-    db.lead.groupBy({ by: ["stage"], where: { organizationId: ctx.organizationId, deletedAt: null }, _count: { _all: true }, _sum: { estimatedValue: true } }),
+    db.lead.groupBy({ by: ["stage"], where, _count: { _all: true }, _sum: { estimatedValue: true } }),
   ]);
   const names = await userNames(ctx, items.map((i) => i.ownerId));
   return { items: items.map((i) => ({ ...i, ownerName: i.ownerId ? (names.get(i.ownerId) ?? null) : null })), total, truncated: total > items.length, summary: sums };

@@ -1,5 +1,7 @@
+import { formatCpf as formatBrCpf, isValidCpf as validateBrCpf, isValidCnpj as validateBrCnpj } from "@brazilian-utils/brazilian-utils";
+
 /**
- * Validadores de documentos brasileiros (algoritmos oficiais). Funções puras, sem dependências.
+ * Validadores de documentos brasileiros (algoritmos oficiais). CPF e CNPJ validados com Brazilian Utils.
  * - CPF: 11 dígitos, 2 dígitos verificadores (módulo 11).
  * - CNPJ: 14 posições; desde jul/2026 a base (12 primeiras) pode ser alfanumérica (valor = código ASCII − 48),
  *   mantendo os 2 dígitos verificadores numéricos. CNPJs numéricos antigos continuam válidos.
@@ -11,15 +13,7 @@ export function onlyDigits(value: string): string {
 }
 
 export function isValidCpf(input: string): boolean {
-  const cpf = onlyDigits(input);
-  if (cpf.length !== 11 || /^(\d)\1{10}$/.test(cpf)) return false;
-  const calc = (len: number) => {
-    let sum = 0;
-    for (let i = 0; i < len; i++) sum += Number(cpf[i]) * (len + 1 - i);
-    const r = (sum * 10) % 11;
-    return r === 10 ? 0 : r;
-  };
-  return calc(9) === Number(cpf[9]) && calc(10) === Number(cpf[10]);
+  return validateBrCpf(onlyDigits(input));
 }
 
 /** Remove máscara do CNPJ preservando letras (maiúsculas) e dígitos. */
@@ -29,22 +23,12 @@ export function normalizeCnpj(input: string): string {
 
 export function isValidCnpj(input: string): boolean {
   const cnpj = normalizeCnpj(input);
-  if (!/^[0-9A-Z]{12}[0-9]{2}$/.test(cnpj)) return false;
-  if (/^(.)\1{13}$/.test(cnpj)) return false;
-  const value = (ch: string) => ch.charCodeAt(0) - 48;
-  const calc = (len: number) => {
-    const weights = len === 12 ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2] : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-    let sum = 0;
-    for (let i = 0; i < len; i++) sum += value(cnpj[i] as string) * (weights[i] as number);
-    const r = sum % 11;
-    return r < 2 ? 0 : 11 - r;
-  };
-  return calc(12) === Number(cnpj[12]) && calc(13) === Number(cnpj[13]);
+  return !/^(.)\1{13}$/.test(cnpj) && validateBrCnpj(cnpj, { version: 2 });
 }
 
 export function formatCpf(digits: string): string {
   const d = onlyDigits(digits);
-  return d.length === 11 ? `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}` : digits;
+  return d.length === 11 ? formatBrCpf(d) : digits;
 }
 
 export function formatCnpj(value: string): string {

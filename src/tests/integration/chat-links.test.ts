@@ -4,8 +4,9 @@ import { db } from "@/lib/db/client";
 import { ConflictError, ForbiddenError, NotFoundError } from "@/lib/permissions/check";
 import { putObject } from "@/lib/storage/local-storage";
 import { sealBytes } from "@/lib/security/pfx";
-import { attachMessageToDocuments, caseOptions, conversationsOfCase, conversationsOfClient, conversationsOfLead, createDeadlineFromConversation, createEventFromConversation, createLeadFromConversation, createTaskFromConversation, linkCase } from "@/server/services/chat-links.service";
-import { convertLead } from "@/server/services/crm.service";
+import { attachMessageToDocuments, caseOptions, conversationsOfCase, conversationsOfClient, conversationsOfLead, createDeadlineFromConversation, createEventFromConversation, createLeadFromConversation, createTaskFromConversation, linkCase, linkExistingLead } from "@/server/services/chat-links.service";
+import { EMPTY_LEAD } from "@/modules/crm/schemas";
+import { changeLeadStage, convertLead, createLead, listLeads } from "@/server/services/crm.service";
 import { listDocuments } from "@/server/services/document.service";
 import { addMember, makeOrgWithOwner } from "./helpers";
 
@@ -46,6 +47,17 @@ describe("LegalOS Chat ↔ resto do sistema", () => {
   afterAll(async () => {
     await db.whatsappAccount.deleteMany({ where: { organizationId: A.org.id } }); // não deixar segredo cifrado para a troca de chaves de outros testes
     process.env = { ...saved };
+  });
+
+  it("vincula um lead existente e reflete sua etapa no funil sem duplicá-lo", async () => {
+    const lead = await createLead(A.ctx, { ...EMPTY_LEAD, name: "Lead existente do Chat" });
+    await expect(linkExistingLead(B.ctx, convA, lead.id)).rejects.toBeInstanceOf(NotFoundError);
+    await linkExistingLead(A.ctx, convA, lead.id);
+    await expect(linkExistingLead(A.ctx, convA, lead.id)).rejects.toBeInstanceOf(ConflictError);
+    await changeLeadStage(A.ctx, lead.id, "CONTACTED");
+    const result = await listLeads(A.ctx, { q: lead.name });
+    expect(result.items.map(({ id, stage }) => ({ id, stage }))).toEqual([{ id: lead.id, stage: "CONTACTED" }]);
+    expect((await conversationsOfLead(A.ctx, lead.id)).map(row => row.id)).toContain(convA);
   });
 
   it("vincula a conversa a um processo visível, liga o cliente sozinho e registra na linha do tempo", async () => {

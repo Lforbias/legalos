@@ -43,7 +43,7 @@ const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
 );
 const Empty = ({ children }: { children: React.ReactNode }) => <p className="text-xs text-muted">{children}</p>;
 
-export function SidePanel({ title, phone, data, meta, actions, controls, extras }: { title: string; phone: string; data: PanelView; meta: React.ReactNode; actions: React.ReactNode; controls?: React.ReactNode; extras?: React.ReactNode }) {
+export function SidePanel({ title, phone, data, meta, actions, controls, extras, crmPanel }: { title: string; phone: string; data: PanelView; meta: React.ReactNode; actions: React.ReactNode; controls?: React.ReactNode; extras?: React.ReactNode; crmPanel?: React.ReactNode }) {
   const [tab, setTab] = React.useState<Tab>("contato");
   const d = data;
   const counts: Partial<Record<Tab, number>> = {
@@ -92,6 +92,7 @@ export function SidePanel({ title, phone, data, meta, actions, controls, extras 
                 </div>
               ) : null}
             </Section>
+            {crmPanel ? <Section title="CRM comercial">{crmPanel}</Section> : null}
             <Section title="Atendimento">
               <div data-testid="side-stats" className="space-y-1">
                 <Row k="Primeiro contato" v={dt(d.stats.firstContact)} />
