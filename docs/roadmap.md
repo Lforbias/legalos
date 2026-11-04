@@ -21,6 +21,8 @@
 
 ## Ideias (ainda não planejadas)
 
+- **Pesquisa open source para FUNC, BOX, CHAT e RUTE:** roteiro de avaliação, sem instalar nem integrar dependências. Ver [`open-source-research-roadmap.md`](open-source-research-roadmap.md).
+
 - **API própria `/api/v1`:** chaves de API por escritório (somente hash, mostradas uma vez, com escopo leitura/escrita, validade e revogação, auditadas), começando por clientes, processos, tarefas e prazos; processos sigilosos nunca expostos a chaves.
 - **Dashboard de administração:** a versão da PLATAFORMA (dono do sistema) está pronta em `/admin`. Falta a versão por escritório (administrador do escritório ver uso, 2FA da equipe e saúde das integrações do próprio escritório), armazenamento em disco por escritório e estado dos backups.
 - **Integração LegalMail como adaptador real** de intimações, autos e protocolo (substitui o adaptador de demonstração do peticionamento).
