@@ -36,7 +36,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   const s = await datajudStatus(ctx);
   // Box 3.0: DJEN é fonte pública (consulta por OAB/UF), independente do Box autenticado retirado (BOX_AVAILABLE).
   const monitors = await listMonitors(ctx);
-  const [rcvMembers, rcvTeams] = await Promise.all([listActiveMembers(ctx), listTeams(ctx)]);
+  const [rcvMembers, rcvTeams] = await Promise.all([listActiveMembers(ctx), can(ctx, "inbox:read") ? listTeams(ctx) : Promise.resolve([])]);
   const tribunals = listTribunals();
   const names = new Map(tribunals.map((t) => [t.jtr, t.label]));
   const vault = vaultAvailable();
