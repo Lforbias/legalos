@@ -1,3 +1,4 @@
+import { enqueuePushDue } from "@/server/queues/func";
 import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 import { withJobRun } from "@/server/job-runs";
@@ -19,6 +20,10 @@ function authorized(req: Request): boolean {
 export async function POST(req: Request) {
   if (!process.env.CRON_SECRET) return NextResponse.json({ error: "Agendamento não configurado." }, { status: 503 });
   if (!authorized(req)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
+  if (process.env.FUNC_QUEUE_ENABLED === "1") {
+    const jobId = await enqueuePushDue();
+    return NextResponse.json({ queued: true, jobId }, { status: 202 });
+  }
   const r = await withJobRun("push-due", "CRON", () => runPushDue());
   return NextResponse.json(r);
 }

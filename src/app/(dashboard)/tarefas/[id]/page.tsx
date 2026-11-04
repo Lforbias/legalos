@@ -1,3 +1,4 @@
+import { TaskDescription } from "@/components/editor/task-description";
 import { ActivityDetailsSection } from "@/modules/activities/details-section";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -82,7 +83,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         <div className="space-y-4 lg:col-span-2">
           <Card>
             <CardHeader title="Descrição" />
-            <CardBody className="whitespace-pre-wrap text-sm">{t.description ?? <span className="text-muted">Sem descrição.</span>}</CardBody>
+            <CardBody className="whitespace-pre-wrap text-sm">{t.description ? <TaskDescription key={t.description} initial={t.description} readOnly /> : <span className="text-muted">Sem descrição.</span>}</CardBody>
           </Card>
           <Card id="comentarios" className="scroll-mt-6">
             <CardHeader title={`Comentários (${t.comments.length})`} description="Registre combinações, mencione colegas e atualize o vencimento da tarefa no mesmo envio." />
