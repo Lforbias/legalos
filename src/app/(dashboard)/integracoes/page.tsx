@@ -111,6 +111,15 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           <CardHeader title="Webhooks — avisos para outros sistemas" action={hooks.some((h) => h.enabled) ? <Badge tone="success">Em uso</Badge> : <Badge tone="warning">Nenhum ativo</Badge>} />
           <CardBody className="space-y-4 text-sm">
             <p>O LegalOS envia um aviso (POST em JSON, assinado) ao endereço que você cadastrar sempre que algo acontece: processo ou prazo cadastrado. O aviso traz só identificadores; o sistema receptor busca os detalhes pela API usando uma chave. Entregas que falham são repetidas (1 min, 5 min, 30 min, 2 h e 6 h) e dá para reenviar manualmente. A entrega depende de um agendador chamando o sistema a cada minuto (CRON_SECRET; veja docs/api.md). Assinatura, formato e verificação estão em docs/api.md.</p>
+            <details className="rounded border border-border p-3">
+              <summary className="cursor-pointer font-medium">Conectar ao Activepieces</summary>
+              <ol className="mt-2 list-decimal space-y-1 pl-5">
+                <li>No Activepieces, crie um fluxo com o gatilho Webhook → Catch Webhook e publique o fluxo.</li>
+                <li>Cadastre a URL do gatilho abaixo e marque Tarefa concluída.</li>
+                <li>Use Enviar teste para conferir a conexão. Depois, conclua uma tarefa para conferir a execução do fluxo.</li>
+              </ol>
+              <p className="mt-2">O evento de conclusão envia o identificador da tarefa. Use o identificador do evento para evitar ações duplicadas em reenvios.</p>
+            </details>
             {!webhooksAvailable() ? <Alert tone="warning">Falta a chave de cifra do sistema (MFA_ENCRYPTION_KEY): webhooks ficam indisponíveis.</Alert> : null}
             <WebhookList items={hooks.map((h) => ({ id: h.id, name: h.name, url: h.url, events: h.events, enabled: h.enabled, disabledReason: h.disabledReason, lastSuccessAt: h.lastSuccessAt ? h.lastSuccessAt.toISOString() : null }))} deliveries={deliveries.map((d) => ({ id: d.id, endpoint: d.endpoint.name, eventType: d.eventType, status: d.status as "PENDING" | "SUCCEEDED" | "FAILED", attempts: d.attempts, lastStatusCode: d.lastStatusCode, lastError: d.lastError, createdAt: d.createdAt.toISOString() }))} eventLabels={eventLabels} />
             {webhooksAvailable() ? <WebhookForm events={eventOptions} /> : null}

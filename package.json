@@ -33,6 +33,7 @@
     "worker:func": "tsx scripts/func-worker.ts"
   },
   "dependencies": {
+    "@brazilian-utils/brazilian-utils": "^2.5.0",
     "@hookform/resolvers": "^5.9.1",
     "@lexical/list": "^0.53.0",
     "@lexical/markdown": "^0.53.0",

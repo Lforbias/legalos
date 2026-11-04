@@ -1,3 +1,5 @@
+import { changeTaskStatus, createTask } from "@/server/services/task.service";
+import { EMPTY_TASK } from "@/modules/tasks/schemas";
 import { createHmac } from "node:crypto";
 import http from "node:http";
 import type { AddressInfo } from "node:net";
@@ -92,9 +94,10 @@ describe("webhooks", () => {
   it("entrega: corpo, cabeçalhos e assinatura HMAC conferem; fica SUCCEEDED; rota do agendador exige segredo", async () => {
     await db.webhookEndpoint.updateMany({ where: { organizationId: A.org.id }, data: { deletedAt: new Date() } });
     await db.webhookDelivery.deleteMany({ where: { organizationId: A.org.id } });
-    const w = await createWebhook(A.ctx, { name: "Entrega", url, events: ["notice.created"] });
+    const w = await createWebhook(A.ctx, { name: "Entrega", url, events: ["task.completed"] });
     hits.length = 0;
-    await createNotice(A.ctx, noticeInput("Entrega-1"));
+    const task = await createTask(A.ctx, { ...EMPTY_TASK, title: "Entrega de teste" });
+    await changeTaskStatus(A.ctx, task.id, "DONE");
     process.env.CRON_SECRET = "segredo-de-teste-com-mais-de-24-chars";
     const denied = await cronPost(new Request("http://localhost/api/cron/webhooks", { method: "POST", headers: { authorization: "Bearer errado" } }));
     expect(denied.status).toBe(401);
@@ -107,12 +110,12 @@ describe("webhooks", () => {
     const t = /t=(\d+)/.exec(sig)![1]!;
     const v1 = /v1=([0-9a-f]+)/.exec(sig)![1]!;
     expect(Math.abs(Date.now() / 1000 - Number(t))).toBeLessThan(30);
-    expect(h.headers["x-legalos-event"]).toBe("notice.created");
+    expect(h.headers["x-legalos-event"]).toBe("task.completed");
     expect(h.headers["content-type"]).toContain("application/json");
     const row = await db.webhookEndpoint.findUniqueOrThrow({ where: { id: w.id } });
     expect(v1).toBe(createHmac("sha256", w.secret).update(`${t}.${h.body}`).digest("hex"));
     expect(sig).toBe(signPayload(w.secret, h.body, Number(t)));
-    expect(JSON.parse(h.body).type).toBe("notice.created");
+    expect(JSON.parse(h.body).type).toBe("task.completed");
     expect(row.lastSuccessAt).not.toBeNull();
     const d = await db.webhookDelivery.findFirstOrThrow({ where: { endpointId: w.id } });
     expect(d.status).toBe("SUCCEEDED");
@@ -122,9 +125,10 @@ describe("webhooks", () => {
 
   it("falha → reagenda com espera; ao esgotar 6 tentativas fica FAILED; reenvio manual volta a PENDING; disparo não repete antes da hora", async () => {
     await db.webhookEndpoint.updateMany({ where: { organizationId: A.org.id }, data: { deletedAt: new Date() } });
-    const w = await createWebhook(A.ctx, { name: "Instável", url, events: ["notice.created"] });
+    const w = await createWebhook(A.ctx, { name: "Instável", url, events: ["task.completed"] });
     respondWith = 500;
-    await createNotice(A.ctx, noticeInput("Falha-1"));
+    const task = await createTask(A.ctx, { ...EMPTY_TASK, title: "Falha de teste" });
+    await changeTaskStatus(A.ctx, task.id, "DONE");
     const r1 = await runWebhookDeliveries();
     expect(r1.claimed).toBe(1);
     expect(r1.retrying).toBe(1);
@@ -215,4 +219,15 @@ describe("webhooks", () => {
       env.NODE_ENV = prev;
     }
   });
+  it("enfileira a conclusão de tarefa uma vez, com somente o identificador", async () => {
+    const endpoint = await createWebhook(A.ctx, { name: "Activepieces", url, events: ["task.completed"] });
+    const task = await createTask(A.ctx, { ...EMPTY_TASK, title: "Tarefa de teste" });
+    await changeTaskStatus(A.ctx, task.id, "DONE");
+    await changeTaskStatus(A.ctx, task.id, "DONE");
+    const deliveries = await db.webhookDelivery.findMany({ where: { endpointId: endpoint.id } });
+    expect(deliveries).toHaveLength(1);
+    expect(deliveries[0]?.payload).toMatchObject({ type: "task.completed", data: { taskId: task.id } });
+    expect((deliveries[0]?.payload as { data: unknown }).data).toEqual({ taskId: task.id });
+  });
+
 });

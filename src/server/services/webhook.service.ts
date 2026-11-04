@@ -15,6 +15,7 @@ export const WEBHOOK_EVENTS = {
   "chat.conversation.updated": "Atendimento atualizado",
   "notice.created": "Intimação registrada",
   "case.created": "Processo cadastrado",
+  "task.completed": "Tarefa concluída",
   "deadline.created": "Prazo cadastrado",
   "petition.submitted": "Petição protocolada",
   "petition.failed": "Falha no protocolo de petição",

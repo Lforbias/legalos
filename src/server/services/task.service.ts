@@ -1,3 +1,4 @@
+import { emitWebhookEvent } from "./webhook.service";
 import { assertTaskReady, advanceTaskDependencies } from "./task-dependency";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
@@ -169,6 +170,7 @@ export async function changeTaskStatus(ctx: TenantContext, id: string, status: S
 }
 
 export async function runTaskCompletionWorkflows(ctx: TenantContext, task: { id: string; title: string; caseId: string | null; clientId: string | null }) {
+  await emitWebhookEvent(ctx.organizationId, "task.completed", { taskId: task.id });
   return runWorkflows(ctx, "TASK_COMPLETED", { type: "task", id: task.id, userId: ctx.userId, label: task.title, baseDate: todayYmd(ctx.timezone), caseId: task.caseId, clientId: task.clientId });
 }
 
