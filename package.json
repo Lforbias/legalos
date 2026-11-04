@@ -37,6 +37,7 @@
     "@prisma/client": "^6.19.3",
     "@types/pg": "^8.23.1",
     "@whiskeysockets/baileys": "7.0.0-rc14",
+    "@xyflow/react": "^12.12.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "docx": "^9.5.1",

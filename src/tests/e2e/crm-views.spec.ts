@@ -1,0 +1,30 @@
+import { expect, test } from "@playwright/test";
+
+test("CRM mantém o atendimento entre quadro, tabela e fluxo visual", async ({ page }) => {
+  const suffix = `${Date.now()}`;
+  await page.goto("/register");
+  await page.getByLabel("Nome completo").fill("Pessoa de teste CRM");
+  await page.getByLabel("E-mail").fill(`crm-${suffix}@example.test`);
+  await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
+  await page.getByRole("button", { name: "Criar conta" }).click();
+  await page.getByLabel("Nome do escritório").fill(`Escritório CRM ${suffix}`);
+  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await expect(page).not.toHaveURL(/onboarding/);
+  await page.goto("/crm/novo");
+  await page.getByLabel("Nome", { exact: true }).fill(`Atendimento ${suffix}`);
+  await page.getByRole("button", { name: "Cadastrar lead" }).click();
+  await expect(page.getByRole("heading", { name: `Atendimento ${suffix}` })).toBeVisible();
+  await page.goto("/crm?view=table");
+  await page.getByLabel("Etapa do lead", { exact: true }).selectOption("CONTACTED");
+  await expect(page.getByLabel("Etapa do lead", { exact: true })).toHaveValue("CONTACTED");
+  await page.reload();
+  await expect(page.getByLabel("Etapa do lead", { exact: true })).toHaveValue("CONTACTED");
+  await page.getByRole("link", { name: "Fluxo visual", exact: true }).click();
+  await expect(page.locator(".react-flow__node")).toHaveCount(6);
+  await page.locator('.react-flow__node[data-id="CONTACTED"]').click();
+  await expect(page.getByRole("link", { name: `Atendimento ${suffix}` })).toBeVisible();
+  await page.locator('.react-flow__node[data-id="WON"]').click();
+  await expect(page.getByText("Nenhum atendimento corresponde aos filtros.")).toBeVisible();
+  await page.getByRole("link", { name: "Quadro", exact: true }).click();
+  await expect(page.getByRole("region", { name: "Contato feito" }).getByRole("link", { name: `Atendimento ${suffix}` })).toBeVisible();
+});

@@ -60,6 +60,17 @@ describe("CRM, automações e portal (Fase 6)", () => {
       await addLeadActivity(lawyer.ctx, l.id, { kind: "CALL", body: "Liguei e combinamos reunião" });
     });
 
+    it("resume somente os leads que correspondem à busca", async () => {
+      await createLead(lawyer.ctx, lead("Resumo filtrado exclusivo", { estimatedValue: "250,00" }));
+      const result = await listLeads(lawyer.ctx, { q: "Resumo filtrado exclusivo" });
+      expect(result.total).toBe(1);
+      expect(result.summary).toHaveLength(1);
+      expect(result.summary[0]?._count._all).toBe(1);
+      expect(result.summary[0]?._sum.estimatedValue?.toString()).toBe("250");
+      const empty = await listLeads(lawyer.ctx, { q: "nome-sem-correspondencia-xyz" });
+      expect(empty.summary).toEqual([]);
+    });
+
     it("valida entradas e valor estimado", async () => {
       await expect(createLead(lawyer.ctx, lead("X"))).rejects.toThrow();
       await expect(createLead(lawyer.ctx, lead("Fulano", { email: "invalido" }))).rejects.toThrow();

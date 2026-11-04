@@ -9,6 +9,7 @@ import { Input, Select } from "@/components/ui/form";
 import { formatYmd, dateToYmd } from "@/lib/dates/ymd";
 import { formatMoneyBR } from "@/lib/validation/money";
 import { LEAD_STAGES, LEAD_STAGE_LABEL, type LeadStageKey } from "@/modules/crm/schemas";
+import { PipelineView } from "@/modules/crm/pipeline-view";
 import { StageSelect } from "@/modules/crm/lead-controls";
 import { can } from "@/server/context";
 import { listLeads } from "@/server/services/crm.service";
@@ -17,12 +18,19 @@ import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "CRM comercial" };
 
-type SP = { q?: string; responsavel?: string };
+type SP = { q?: string; responsavel?: string; view?: string };
 
 export default async function CrmPage({ searchParams }: { searchParams: Promise<SP> }) {
   const { ctx } = await requireTenant();
   if (!can(ctx, "crm:read")) return <AccessDenied />;
   const sp = await searchParams;
+  const view = sp.view === "flow" || sp.view === "table" ? sp.view : "board";
+  const viewHref = (value: string) => {
+    const params = new URLSearchParams({ view: value });
+    if (sp.q) params.set("q", sp.q);
+    if (sp.responsavel) params.set("responsavel", sp.responsavel);
+    return `/crm?${params}`;
+  };
   const ownerId = sp.responsavel === "eu" ? ctx.userId : sp.responsavel;
   const [result, members] = await Promise.all([listLeads(ctx, { q: sp.q, ownerId }), listActiveMembers(ctx)]);
   const canWrite = can(ctx, "crm:write");
@@ -36,7 +44,11 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
         description="Funil de leads, propostas e conversão em cliente. Valores são estimativas do escritório, não receita realizada."
         actions={canWrite ? <Link href="/crm/novo" className={bv({})}><Plus className="h-4 w-4" aria-hidden /> Novo lead</Link> : undefined}
       />
+      <nav aria-label="Visualização do CRM" className="mb-4 flex gap-2">
+        {[["board", "Quadro"], ["table", "Tabela"], ["flow", "Fluxo visual"]].map(([key, label]) => <Link key={key} href={viewHref(key!)} aria-current={view === key ? "page" : undefined} className={bv({ variant: view === key ? "primary" : "secondary" })}>{label}</Link>)}
+      </nav>
       <form method="get" role="search" aria-label="Filtrar leads" className="mb-4 flex flex-wrap items-center gap-2">
+        <input type="hidden" name="view" value={view} />
         <label htmlFor="q" className="sr-only">Buscar</label>
         <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Buscar por nome, e-mail ou interesse…" className="w-72" />
         <label htmlFor="responsavel" className="sr-only">Responsável</label>
@@ -50,7 +62,7 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
         <button type="submit" className={bv({ variant: "secondary" })}>Filtrar</button>
       </form>
       {result.truncated ? <p className="mb-2 text-xs text-warning">Mostrando os 300 leads mais recentes de {result.total}. Refine a busca.</p> : null}
-      <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
+      {view !== "board" ? <PipelineView mode={view} canWrite={canWrite} leads={result.items.map(lead => ({ ...lead, estimatedValue: lead.estimatedValue?.toString() ?? null, nextActionDate: lead.nextActionDate ? dateToYmd(lead.nextActionDate) : null }))} summary={result.summary.map(item => ({ stage: item.stage, count: item._count._all, amount: item._sum.estimatedValue?.toString() ?? "0" }))} /> : <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
         {LEAD_STAGES.map((s) => {
           const items = byStage(s);
           const sum = sums.get(s);
@@ -78,7 +90,8 @@ export default async function CrmPage({ searchParams }: { searchParams: Promise<
           );
         })}
       </div>
-      {result.total === 0 ? <Card className="mt-4 p-6 text-center text-sm text-muted">Nenhum lead cadastrado ainda.</Card> : null}
+      }
+      {view === "board" && result.total === 0 ? <Card className="mt-4 p-6 text-center text-sm text-muted">Nenhum lead cadastrado ainda.</Card> : null}
     </div>
   );
 }
