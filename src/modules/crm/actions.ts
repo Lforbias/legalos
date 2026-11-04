@@ -12,6 +12,7 @@ import { activitySchema, convertSchema, leadSchema, lostSchema, proposalSchema }
 
 const touch = (id?: string) => {
   revalidatePath("/crm");
+  revalidatePath("/atendimento");
   if (id) revalidatePath(`/crm/${id}`);
 };
 

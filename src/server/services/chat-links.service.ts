@@ -190,3 +190,22 @@ export async function conversationsOfLead(ctx: TenantContext, leadId: string) {
   if (!can(ctx, "whatsapp:read")) return [];
   return db.whatsappConversation.findMany({ where: { organizationId: ctx.organizationId, leadId }, orderBy: { lastMessageAt: { sort: "desc", nulls: "last" } }, take: 10, select: rowSelect });
 }
+
+export async function linkExistingLead(ctx: TenantContext, conversationId: string, leadId: string) {
+  assertCan(ctx, "whatsapp:write");
+  assertCan(ctx, "crm:read");
+  assertCan(ctx, "crm:write");
+  await db.$transaction(async (tx) => {
+    const lead = await tx.lead.findFirst({
+      where: { id: leadId, organizationId: ctx.organizationId, deletedAt: null },
+      select: { id: true },
+    });
+    if (!lead) throw new NotFoundError("Lead não encontrado.");
+    const result = await tx.whatsappConversation.updateMany({
+      where: { id: conversationId, organizationId: ctx.organizationId, leadId: null },
+      data: { leadId: lead.id },
+    });
+    if (!result.count) throw new ConflictError("Conversa indisponível ou já vinculada a um lead.");
+  });
+  await audit({ action: "whatsapp.link_lead", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "whatsapp_conversation", resourceId: conversationId, metadata: { leadId }, meta: ctx.meta });
+}

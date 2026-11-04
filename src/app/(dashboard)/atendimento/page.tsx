@@ -11,6 +11,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
+import { dateToYmd } from "@/lib/dates/ymd";
+import { LeadForm } from "@/modules/crm/lead-form";
+import { StageSelect } from "@/modules/crm/lead-controls";
+import { listActiveMembers } from "@/server/services/members";
 import { db } from "@/lib/db/client";
 import { formatWaId } from "@/lib/whatsapp/phone";
 import { can } from "@/server/context";
@@ -23,6 +27,7 @@ import { conversationMeta, listFields, listLabels } from "@/server/services/chat
 import { Avatar } from "@/modules/whatsapp/avatar";
 import { labelStyle } from "@/modules/whatsapp/label-style";
 import { AutoRefresh } from "@/modules/whatsapp/auto-refresh";
+import { LinkLeadForm } from "@/modules/whatsapp/link-lead-form";
 import { ChatPane } from "@/modules/whatsapp/chat-pane";
 import { conversationPanel } from "@/server/services/chat-panel.service";
 import { listNumbers } from "@/server/services/whatsapp-numbers.service";
@@ -93,6 +98,18 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   const [team, quick, templates] = opened ? await Promise.all([teamForAssignment(ctx), listQuickReplies(ctx), listTemplatesLocal(ctx)]) : [[], [], []];
   const [fields, cmeta] = opened ? await Promise.all([listFields(ctx, true), conversationMeta(ctx, opened.conversation.id)]) : [[], { labelIds: [] as string[], values: {} as Record<string, string> }];
   const side = opened ? JSON.parse(JSON.stringify(await conversationPanel(ctx, opened.conversation.id))) : null;
+  const canEditCrm = writer && can(ctx, "crm:write") && can(ctx, "crm:read");
+  const linkedLead = opened?.conversation.lead;
+  const lead = linkedLead && canEditCrm ? await db.lead.findFirst({
+    where: { id: linkedLead.id, organizationId: ctx.organizationId, deletedAt: null },
+  }) : null;
+  const crmMembers = lead ? await listActiveMembers(ctx) : [];
+  const leadOptions = opened && canEditCrm && !linkedLead ? await db.lead.findMany({
+    where: { organizationId: ctx.organizationId, deletedAt: null },
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+    select: { id: true, name: true, interest: true },
+  }) : [];
   let extras: ConversationExtrasData | null = null;
   if (opened) {
     const [settings, followUps, scheduled, forms, agents, survey] = await Promise.all([
@@ -250,7 +267,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
                 status: opened.conversation.status, serviceStatus:opened.conversation.serviceStatus,
                 client: opened.conversation.client,
                 case: opened.conversation.case,
-                lead: opened.conversation.lead,
+                lead: can(ctx, "crm:read") && side?.lead ? linkedLead ?? null : null,
                 can: { cases: can(ctx, "cases:read"), tasks: can(ctx, "tasks:write"), events: can(ctx, "deadlines:write") || can(ctx, "tasks:write"), deadlines: can(ctx, "deadlines:write"), leads: can(ctx, "crm:write"), documents: can(ctx, "documents:write") },
                 assignedToId: opened.conversation.assignedTo?.id ?? null,
                 windowOpen: opened.conversation.windowOpen,
@@ -266,6 +283,29 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               queues={queues.filter((x) => x.active).map((x) => ({ id: x.id, name: x.name }))}
               quick={quick}
               side={side}
+              crmPanel={side?.lead ? (
+                <div className="space-y-3">
+                  <Link className="text-sm underline" href={`/crm?view=flow&q=${encodeURIComponent(side.lead.name)}`}>Ver no fluxo visual</Link>
+                  {lead ? <>
+                    {lead.stage !== "WON" && lead.stage !== "LOST" ? <StageSelect leadId={lead.id} stage={lead.stage} /> : null}
+                    <details key={lead.id}>
+                      <summary className="cursor-pointer text-sm font-medium">Editar dados do CRM</summary>
+                      <LeadForm
+                        inline
+                        leadId={lead.id}
+                        members={crmMembers}
+                        initial={{
+                          name: lead.name, type: lead.type, email: lead.email ?? "", phone: lead.phone ?? "",
+                          source: lead.source ?? "", interest: lead.interest ?? "", ownerId: lead.ownerId ?? "",
+                          estimatedValue: lead.estimatedValue?.toString().replace(".", ",") ?? "",
+                          nextActionDate: lead.nextActionDate ? dateToYmd(lead.nextActionDate) : "",
+                          notes: lead.notes ?? "",
+                        }}
+                      />
+                    </details>
+                  </> : null}
+                </div>
+              ) : leadOptions.length ? <LinkLeadForm key={opened.conversation.id} conversationId={opened.conversation.id} options={leadOptions} /> : null}
               extras={extras ?? undefined}
               tools={tools ?? undefined}
               transcripts={transcripts}
