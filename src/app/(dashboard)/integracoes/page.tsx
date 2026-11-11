@@ -36,7 +36,10 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   const s = await datajudStatus(ctx);
   // Box 3.0: DJEN é fonte pública (consulta por OAB/UF), independente do Box autenticado retirado (BOX_AVAILABLE).
   const monitors = await listMonitors(ctx);
-  const [rcvMembers, rcvTeams] = await Promise.all([listActiveMembers(ctx), listTeams(ctx)]);
+  // A área de integrações também mantém DataJud/DJEN públicos quando o Box está retirado.
+  // As opções de distribuição pertencem à Entrada, cujas permissões são bloqueadas com o Box;
+  // não chame listTeams (que exige inbox:read) nem carregue destinatários nessa situação.
+  const [rcvMembers, rcvTeams] = BOX_AVAILABLE ? await Promise.all([listActiveMembers(ctx), listTeams(ctx)]) : [[], []];
   const tribunals = listTribunals();
   const names = new Map(tribunals.map((t) => [t.jtr, t.label]));
   const vault = vaultAvailable();
