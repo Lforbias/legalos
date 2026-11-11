@@ -1,13 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TenantContext } from "@/server/context";
 const mocks = vi.hoisted(() => ({ findFirst: vi.fn() }));
+const preview = vi.hoisted(() => ({ enabled: vi.fn(() => true) }));
 vi.mock("@/lib/db/client", () => ({ db: { courtNotice: { findFirst: mocks.findFirst } } }));
+vi.mock("@/lib/box-v3-preview", () => ({ boxV3PreviewEnabled: preview.enabled }));
 import { assertNoticeUsable } from "@/server/services/notice-guard";
 
 const ctx: TenantContext = { userId: "user", organizationId: "office", membershipId: "member", roleId: "role", roleKey: "LAWYER", isOwner: false, timezone: "America/Sao_Paulo", meta: {}, permissions: new Set(["inbox:read"]) };
 
 describe("Box V3 — acesso interno à comunicação de origem", () => {
-  beforeEach(() => { vi.stubEnv("NODE_ENV", "test"); vi.stubEnv("LEGALOS_BOX3_PREVIEW", "1"); mocks.findFirst.mockReset(); mocks.findFirst.mockResolvedValue({ id: "notice" }); });
+  beforeEach(() => { preview.enabled.mockReturnValue(true); mocks.findFirst.mockReset(); mocks.findFirst.mockResolvedValue({ id: "notice" }); });
   afterEach(() => vi.unstubAllEnvs());
   it("permite vínculo V3 autorizado, exigindo escritório e processo correspondentes", async () => {
     await assertNoticeUsable(ctx, "notice", "v3", "case");
@@ -19,7 +21,7 @@ describe("Box V3 — acesso interno à comunicação de origem", () => {
   });
   it("nega antes da consulta quando não há permissão ou a prévia está desligada", async () => {
     await expect(assertNoticeUsable({ ...ctx, permissions: new Set() }, "notice", "v3")).rejects.toThrow();
-    vi.stubEnv("LEGALOS_BOX3_PREVIEW", "0");
+    preview.enabled.mockReturnValue(false);
     await expect(assertNoticeUsable(ctx, "notice", "v3")).rejects.toThrow();
     expect(mocks.findFirst).not.toHaveBeenCalled();
   });
