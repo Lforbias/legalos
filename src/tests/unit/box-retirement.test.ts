@@ -7,7 +7,6 @@ import { can, type TenantContext } from "@/server/context";
 import { SETTINGS_ITEMS } from "@/config/settings";
 import { SPACES, MODULES, INTEGRATIONS } from "@/config/showcase";
 import { drainQueue } from "@/server/robots/pje-runner";
-import { runDjenAll } from "@/server/services/djen.service";
 import { runMniAll } from "@/server/services/mni.service";
 import { runDueSchedules } from "@/server/services/petition-queue.service";
 import { enqueueDueSyncs } from "@/server/services/portal-access.service";
@@ -19,9 +18,12 @@ describe("retirada provisória do Box", () => {
     for (const path of ["/box", "/box/conexoes", "/caixa-de-entrada/id", "/peticoes/nova", "/certificados", "/integracoes/pje", "/configuracoes/credenciais", "/processos/id/autos", "/downloads/legalos-pje.zip"]) {
       expect(proxy(new NextRequest(`https://example.test${path}`, { method: "POST" })).status).toBe(404);
     }
-    for (const path of ["/api/v1/pje/discoveries", "/api/v1/notices", "/api/certificates", "/api/box/events", "/api/cron/djen", "/api/cron/mni", "/api/cron/robots", "/api/cron/petition-queue"]) {
+    for (const path of ["/api/v1/pje/discoveries", "/api/v1/notices", "/api/certificates", "/api/box/events", "/api/cron/mni", "/api/cron/robots", "/api/cron/petition-queue"]) {
       expect(proxy(new NextRequest(`https://example.test${path}`, { method: "POST" })).status).toBe(410);
     }
+    expect(proxy(new NextRequest("https://example.test/api/cron/djen", { method: "POST" })).status).not.toBe(410);
+    expect(isBoxPath("/box-v3/entrada")).toBe(true);
+    expect(isBoxPath("/api/cron/djen")).toBe(false);
   });
   it("mantém caminhos compartilhados e permissões de Func, Chat, API e documentos", () => {
     for (const path of ["/dashboard", "/atendimento", "/integracoes", "/api/v1/tools", "/api/ready", "/documentos", "/processos/id"]) expect(isBoxPath(path)).toBe(false);
@@ -36,9 +38,8 @@ describe("retirada provisória do Box", () => {
     // MNI (sessão autenticada em tribunal), fila de peticionamento e fila de autos continuam presos à retirada do Box.
     for (const run of [() => runMniAll(), () => runDueSchedules(), () => runAutosQueue(), () => enqueueDueSyncs()]) await expect(run()).rejects.toThrow("retirado temporariamente");
   });
-  it("Box 3.0: o DJEN (fonte pública, sem certificado nem sessão de tribunal) não depende da retirada do Box autenticado", async () => {
-    // runDjenAll() só varre monitoramentos habilitados; sem nenhum cadastrado neste teste, resolve com total 0 sem tocar a rede.
-    await expect(runDjenAll()).resolves.toMatchObject({ total: 0 });
+  it("mantém a rota agendada do DJEN público fora do bloqueio do Box autenticado", () => {
+    expect(isBoxPath("/api/cron/djen")).toBe(false);
   });
   it("retira atalhos, apresentação comercial e agendamentos do Box", () => {
     expect(SETTINGS_ITEMS.some(item => isBoxPath(item.href))).toBe(false);
