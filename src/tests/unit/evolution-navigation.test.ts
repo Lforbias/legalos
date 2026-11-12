@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { NAV_ITEMS } from "@/config/navigation";
 import {
   DEPARTMENTS,
   EVOLUTION_NAV,
@@ -99,7 +100,27 @@ describe("route matrix", () => {
 
   it("references only valid departments", () => {
     for (const entry of ROUTE_MATRIX) {
-      expect(Object.keys(DEPARTMENTS)).toContain(entry.evolution);
+      if (entry.evolution !== "external") expect(Object.keys(DEPARTMENTS)).toContain(entry.evolution);
     }
+  });
+
+  it("covers every internal Ethos route and links it from Evolution", () => {
+    const internalRoutes = NAV_ITEMS.filter((item) =>
+      (item.space === "func" || item.space === "chat") &&
+      !item.box &&
+      !["overview", "portal", "prototypes", "help"].includes(item.key),
+    );
+    const matrixRoutes = new Set(ROUTE_MATRIX.map((entry) => entry.ethos));
+    const evolutionRoutes = new Set(EVOLUTION_NAV.filter((item) => item.existingRoute).map((item) => item.href));
+
+    for (const item of internalRoutes) {
+      expect(matrixRoutes, `${item.key} missing from route matrix`).toContain(item.href);
+      expect(evolutionRoutes, `${item.key} missing from Evolution navigation`).toContain(item.href);
+    }
+  });
+
+  it("keeps the authenticated client portal outside staff navigation", () => {
+    expect(ROUTE_MATRIX.find((entry) => entry.ethos === "/portal")?.evolution).toBe("external");
+    expect(EVOLUTION_NAV.some((item) => item.href === "/portal" || item.permission === "portal:access")).toBe(false);
   });
 });
