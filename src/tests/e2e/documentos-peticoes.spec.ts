@@ -48,6 +48,13 @@ test("modelos, geração de .docx e versões com peticionamento retirado", async
   await expect(page.getByText(/ficaram marcados como/)).toBeVisible();
   await expect(page.getByText("gerado de modelo")).toBeVisible();
 
+  const documentUrl = page.url();
+  await page.getByRole("button", { name: "Solicitar revisão da versão 1", exact: true }).click();
+  await expect(page.getByText("Aguardando conferência por outra pessoa com acesso ao documento.")).toBeVisible();
+  await page.goto("/evolution/juridico");
+  await expect(page.getByRole("region", { name: "Fila de revisão jurídica" }).getByRole("link", { name: new RegExp(`Procuração ${id}`) })).toBeVisible();
+  await page.goto(documentUrl);
+
   // ---- nova versão ----
   await page.getByLabel("Arquivo da nova versão").setInputFiles({ name: "assinada.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n% assinada\n%%EOF") });
   await page.getByLabel("O que mudou (opcional)").fill("Versão assinada");
@@ -56,6 +63,9 @@ test("modelos, geração de .docx e versões com peticionamento retirado", async
   await expect(page.getByRole("heading", { name: "Histórico de versões" })).toBeVisible();
   await expect(page.getByText("atual", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Baixar versão 1" })).toBeVisible();
+
+  await expect(page.getByText(/Substituída por nova versão/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Solicitar revisão da versão 2", exact: true })).toBeVisible();
 
   // arquivo inválido é recusado
   await page.getByLabel("Arquivo da nova versão").setInputFiles({ name: "falso.pdf", mimeType: "application/pdf", buffer: Buffer.from("MZ não é pdf") });

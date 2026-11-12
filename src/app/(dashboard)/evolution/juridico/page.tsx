@@ -1,3 +1,4 @@
+import { listDocumentReviews } from "@/server/services/document-review.service";
 import Link from "next/link";
 import { ArrowUpRight, FolderOpen, Hourglass, FileText, Calculator, Bot, Plus } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
@@ -16,6 +17,7 @@ export default async function JuridicoPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.juridico;
   const [ind, indErr] = await getIndicators(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
+  const reviews = can(ctx, "documents:read") ? await listDocumentReviews(ctx, undefined, true).then(items => ({ items, error: false })).catch(() => ({ items: [], error: true })) : null;
   const hasCases = can(ctx, "cases:read");
   const [cases, casesErr] = hasCases
     ? await listCases(ctx, { page: 1, status: "ACTIVE" }).then((r) => [r, false] as const).catch(() => [{ items: [] as CaseListResult["items"], total: 0 }, true] as const)
@@ -78,6 +80,18 @@ export default async function JuridicoPage() {
         ) : <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">Nenhum processo ativo visível nesta carteira.</p>}
         {casesErr && <p className="mt-3 text-sm text-muted">A lista de processos recentes não pôde ser carregada.</p>}
       </section>
+
+      {reviews && <section className="mt-8" aria-label="Fila de revisão jurídica">
+        <h2 className="mb-3 text-base font-semibold">Produção jurídica · revisão de documentos</h2>
+        {reviews.error ? <DataError message="Não foi possível carregar as revisões" /> : <>
+          <p className="mb-3 text-sm text-muted">Até 100 revisões pendentes visíveis para seu perfil, da mais recente à mais antiga. Abra o documento para conferir a versão, aprovar ou solicitar ajustes.</p>
+          <div className="divide-y divide-border rounded-xl border border-border bg-surface">
+            {reviews.items.filter(r => r.status === "IN_REVIEW").map(r => <Link key={r.id} href={`/documentos/${r.documentId}`} className="flex justify-between gap-3 p-4 hover:bg-surface-2"><span>{r.document.name}</span><span className="text-sm text-muted">Versão {r.version} · Em revisão</span></Link>)}
+            {!reviews.items.some(r => r.status === "IN_REVIEW") && <p className="p-4 text-sm text-muted">Nenhuma revisão pendente nesta lista.</p>}
+          </div>
+          <Link href="/documentos" className="mt-3 inline-block text-sm text-primary">Abrir documentos e solicitar revisão</Link>
+        </>}
+      </section>}
 
       <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

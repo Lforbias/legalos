@@ -257,6 +257,7 @@ export async function addDocumentVersion(ctx: TenantContext, id: string, file: {
       await tx.documentVersion.create({
         data: { organizationId: ctx.organizationId, documentId: doc.id, version: next, fileName: name, mimeType: mime, sizeBytes: file.buffer.length, sha256, storageKey: key, source: "UPLOAD", note: cleanNote, uploadedById: ctx.userId },
       });
+      await tx.documentReview.updateMany({ where: { documentId: doc.id, organizationId: ctx.organizationId, status: "IN_REVIEW" }, data: { status: "SUPERSEDED" } });
       const reopened = await tx.petitionFiling.updateMany({
         where: { documentId: doc.id, organizationId: ctx.organizationId, status: { in: ["IN_REVIEW", "APPROVED"] }, deletedAt: null },
         data: { status: "DRAFT", scheduledFor: null, scheduledById: null, reviewerId: null, reviewedAt: null, reviewNote: `O documento recebeu a versão ${next}; a petição precisa de nova revisão.` },

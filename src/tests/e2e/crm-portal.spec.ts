@@ -142,3 +142,23 @@ test("CRM → cliente → automação → portal do cliente com compartilhamento
   await expect(cp.getByText(/acesso ao portal não está ativo/)).toBeVisible();
   await cctx.close();
 });
+
+test("Comercial converte novo lead para cliente já cadastrado", async ({ page }) => {
+  const id = await signUpWithOffice(page, "existing");
+  await page.goto("/crm/novo");
+  await page.getByLabel("Nome", { exact: true }).fill(`Cliente preservado ${id}`);
+  await page.getByRole("button", { name: "Cadastrar lead" }).click();
+  await page.getByRole("button", { name: "Converter em cliente", exact: true }).click();
+  await page.waitForURL(/\/clientes\/[0-9a-f-]{36}/);
+  const clientUrl = page.url();
+  await page.goto("/crm/novo");
+  await page.getByLabel("Nome", { exact: true }).fill(`Nova contratação ${id}`);
+  await page.getByRole("button", { name: "Cadastrar lead" }).click();
+  await page.getByLabel("Vincular a cliente já cadastrado").check();
+  await expect(page.getByRole("button", { name: "Converter em cliente", exact: true })).toBeDisabled();
+  await page.getByPlaceholder("Buscar cliente pelo nome…").fill(`Cliente preservado ${id}`);
+  await page.getByRole("button", { name: new RegExp(`Cliente preservado ${id}`) }).click();
+  await page.getByRole("button", { name: "Converter em cliente", exact: true }).click();
+  await expect(page).toHaveURL(clientUrl);
+  await expect(page.getByRole("heading", { name: `Cliente preservado ${id}`, exact: true })).toBeVisible();
+});
