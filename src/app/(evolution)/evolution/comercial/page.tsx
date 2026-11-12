@@ -1,16 +1,28 @@
 import Link from "next/link";
-import { Briefcase, Globe, TrendingUp } from "lucide-react";
+import { ArrowUpRight, Briefcase, Globe, TrendingUp } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
+import { StatCard } from "@/components/evolution/stat-card";
 import { EmptyState } from "@/components/evolution/empty-state";
+import { DataError } from "@/components/evolution/data-error";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
+import { listLeads } from "@/server/services/crm.service";
+import { LEAD_STAGE_LABEL, type LeadStageKey } from "@/modules/crm/schemas";
+import { formatMoneyBR } from "@/lib/validation/money";
+import { dateToYmd, formatYmd } from "@/lib/dates/ymd";
 
 export default async function ComercialPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.comercial;
   const hasCrm = can(ctx, "crm:read");
   const hasPortalTeam = can(ctx, "clients:read");
+  const canWriteCrm = can(ctx, "crm:write");
+  const [leads, leadsErr] = hasCrm
+    ? await listLeads(ctx).then((result) => [result, false] as const).catch(() => [null, true] as const)
+    : [null, false] as const;
+  const leadCounts = new Map((leads?.summary ?? []).map((stage) => [stage.stage, stage._count._all]));
+  const openCount = (["NEW", "CONTACTED", "MEETING", "PROPOSAL"] as LeadStageKey[]).reduce((sum, stage) => sum + (leadCounts.get(stage) ?? 0), 0);
 
   if (!hasCrm && !hasPortalTeam) {
     return (
@@ -24,6 +36,48 @@ export default async function ComercialPage() {
   return (
     <>
       <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
+
+      {leadsErr && <DataError message="Não foi possível carregar os indicadores do CRM" />}
+      {hasCrm && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard icon={Briefcase} label="Leads em andamento" value={leadsErr ? "—" : openCount} color={dept.color} />
+            <StatCard icon={TrendingUp} label="Propostas" value={leadsErr ? "—" : leadCounts.get("PROPOSAL") ?? 0} detail="leads na etapa de proposta" color="#f59e0b" />
+            <StatCard icon={Briefcase} label="Convertidos" value={leadsErr ? "—" : leadCounts.get("WON") ?? 0} detail="clientes ganhos" color="#10b981" />
+            <StatCard icon={Briefcase} label="Total de leads" value={leadsErr ? "—" : leads?.total ?? 0} color="#6366f1" />
+          </div>
+
+          <section className="mt-8">
+            <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h2 className="text-base font-semibold">Leads atualizados recentemente</h2>
+                <p className="mt-1 text-sm text-muted">Acompanhe a etapa e a próxima ação registrada.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {canWriteCrm && <Link href="/crm/novo" className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-3 text-sm font-medium text-primary-fg transition hover:bg-primary-hover">Novo lead</Link>}
+                <Link href="/crm" className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-sm transition hover:bg-surface-2">Abrir funil <ArrowUpRight className="h-4 w-4" aria-hidden /></Link>
+              </div>
+            </div>
+            {leadsErr ? null : leads?.items.length ? (
+              <div className="divide-y divide-border rounded-xl border border-border bg-surface">
+                {leads.items.slice(0, 6).map((lead) => (
+                  <Link key={lead.id} href={`/crm/${lead.id}`} className="flex flex-wrap items-center justify-between gap-3 p-4 transition hover:bg-surface-2">
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium hover:text-primary">{lead.name}</p>
+                      <p className="mt-1 truncate text-xs text-muted">{lead.interest ?? "Interesse ainda não informado"}{lead.ownerName ? ` · ${lead.ownerName}` : ""}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-3 text-xs text-muted">
+                      <span>{LEAD_STAGE_LABEL[lead.stage as LeadStageKey]}</span>
+                      <span>{lead.estimatedValue ? formatMoneyBR(lead.estimatedValue.toString()) : "Sem valor"}</span>
+                      {lead.nextActionDate && <span>Próxima ação: {formatYmd(dateToYmd(lead.nextActionDate))}</span>}
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">Nenhum lead cadastrado ainda.</p>}
+          </section>
+        </>
+      )}
 
       <h2 className="mb-4 text-base font-semibold">Estações de trabalho</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
