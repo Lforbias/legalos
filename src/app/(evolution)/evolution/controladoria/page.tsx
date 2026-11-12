@@ -3,6 +3,7 @@ import { Inbox, Bell } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
+import { DataError } from "@/components/evolution/data-error";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
 import { alertCounts } from "@/server/services/insights.service";
@@ -12,17 +13,20 @@ import { BOX_AVAILABLE } from "@/lib/box-retirement";
 export default async function ControladoriaPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.controladoria;
-  const alerts = await alertCounts(ctx).catch(() => ({} as Record<string, number>));
+  const [alerts, alertsErr] = await alertCounts(ctx).then((r) => [r, false] as const).catch(() => [{} as Record<string, number>, true] as const);
   const totalAlerts = Object.values(alerts).reduce((a, b) => a + b, 0);
-  const noticeCount = can(ctx, "inbox:read") && BOX_AVAILABLE ? await countNewNotices(ctx).catch(() => 0) : 0;
+  const [noticeCount, noticeErr] = can(ctx, "inbox:read") && BOX_AVAILABLE
+    ? await countNewNotices(ctx).then((r) => [r, false] as const).catch(() => [0, true] as const)
+    : [0, false] as const;
 
   return (
     <>
       <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
 
+      {(alertsErr || noticeErr) && <DataError message="Não foi possível carregar alguns indicadores da Controladoria" />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Bell} label="Alertas pendentes" value={totalAlerts} color={dept.color} />
-        {BOX_AVAILABLE && <StatCard icon={Inbox} label="Intimações novas" value={noticeCount} color="#f59e0b" />}
+        <StatCard icon={Bell} label="Alertas pendentes" value={alertsErr ? "—" : totalAlerts} color={dept.color} />
+        {BOX_AVAILABLE && <StatCard icon={Inbox} label="Intimações novas" value={noticeErr ? "—" : noticeCount} color="#f59e0b" />}
       </div>
 
       <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>

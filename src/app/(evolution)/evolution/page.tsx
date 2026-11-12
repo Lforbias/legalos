@@ -13,7 +13,7 @@ export default async function EvolutionLobby() {
     <>
       <DepartmentHeader
         icon={DEPARTMENTS.lobby.icon}
-        color="hsl(var(--primary))"
+        color={DEPARTMENTS.lobby.color}
         title="Meu Escritório"
         description="Bem-vindo ao LegalOS Evolution. Escolha um departamento para começar."
       />

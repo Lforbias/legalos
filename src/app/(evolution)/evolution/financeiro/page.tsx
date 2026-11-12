@@ -4,6 +4,7 @@ import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
 import { EmptyState } from "@/components/evolution/empty-state";
+import { DataError } from "@/components/evolution/data-error";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
 import { getIndicators } from "@/server/services/insights.service";
@@ -22,14 +23,15 @@ export default async function FinanceiroPage() {
     );
   }
 
-  const ind = await getIndicators(ctx).catch(() => null);
-  const overdueReceivable = ind?.overdue.find((r) => r.key === "finance-receivable");
-  const overduePayable = ind?.overdue.find((r) => r.key === "finance-payable");
+  const [ind, indErr] = await getIndicators(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
+  const overdueReceivable = ind?.overdue.find((r) => r.key === "receivable");
+  const overduePayable = ind?.overdue.find((r) => r.key === "payable");
 
   return (
     <>
       <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
 
+      {indErr && <DataError message="Não foi possível carregar indicadores financeiros" />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {overdueReceivable && (
           <StatCard icon={TrendingDown} label="A receber em atraso" value={overdueReceivable.count} detail={overdueReceivable.amount ? `R$ ${overdueReceivable.amount.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : undefined} color="#ef4444" />

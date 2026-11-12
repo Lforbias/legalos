@@ -6,16 +6,18 @@ import { StatCard } from "@/components/evolution/stat-card";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
 import { getIndicators } from "@/server/services/insights.service";
+import { DataError } from "@/components/evolution/data-error";
 
 export default async function MesaPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.mesa;
-  const ind = await getIndicators(ctx).catch(() => null);
+  const [ind, indErr] = await getIndicators(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
 
   return (
     <>
       <DepartmentHeader icon={dept.icon} color={dept.color} title="Minha Mesa" description="Suas tarefas, prazos e compromissos pessoais." />
 
+      {indErr && <DataError message="Não foi possível carregar os indicadores pessoais" />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {ind?.mine.tasksOpen != null && <StatCard icon={CheckSquare} label="Tarefas pendentes" value={ind.mine.tasksOpen} detail={ind.mine.tasksOverdue ? `${ind.mine.tasksOverdue} em atraso` : undefined} color="#6366f1" />}
         {ind?.mine.deadlinesOpen != null && <StatCard icon={Clock} label="Prazos abertos" value={ind.mine.deadlinesOpen} detail={ind.mine.deadlinesNext7 ? `${ind.mine.deadlinesNext7} nos próximos 7 dias` : undefined} color="#f59e0b" />}

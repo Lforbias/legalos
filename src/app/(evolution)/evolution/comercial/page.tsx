@@ -10,9 +10,9 @@ export default async function ComercialPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.comercial;
   const hasCrm = can(ctx, "crm:read");
-  const hasPortal = can(ctx, "portal:access");
+  const hasPortalTeam = can(ctx, "clients:read");
 
-  if (!hasCrm && !hasPortal) {
+  if (!hasCrm && !hasPortalTeam) {
     return (
       <>
         <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
@@ -36,12 +36,12 @@ export default async function ComercialPage() {
             </div>
           </Link>
         )}
-        {hasPortal && (
-          <Link href="/portal" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+        {hasPortalTeam && (
+          <Link href="/portal-equipe" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
             <Globe className="h-5 w-5 text-muted" aria-hidden />
             <div>
-              <p className="text-sm font-medium group-hover:text-primary">Portal do cliente</p>
-              <p className="text-[12px] text-muted">Processos e documentos compartilhados</p>
+              <p className="text-sm font-medium group-hover:text-primary">Mensagens do portal</p>
+              <p className="text-[12px] text-muted">Solicitações e mensagens dos clientes pelo portal</p>
             </div>
           </Link>
         )}

@@ -8,13 +8,16 @@ import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
 import { getIndicators } from "@/server/services/insights.service";
 import { listCases } from "@/server/services/case.service";
+import { DataError } from "@/components/evolution/data-error";
 
 export default async function JuridicoPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.juridico;
-  const ind = await getIndicators(ctx).catch(() => null);
+  const [ind, indErr] = await getIndicators(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
   const hasCases = can(ctx, "cases:read");
-  const cases = hasCases ? await listCases(ctx, { page: 1 }).catch(() => ({ rows: [], total: 0 })) : { rows: [], total: 0 };
+  const [cases, casesErr] = hasCases
+    ? await listCases(ctx, { page: 1, status: "ACTIVE" }).then((r) => [r, false] as const).catch(() => [{ items: [] as unknown[], total: 0 }, true] as const)
+    : [{ items: [] as unknown[], total: 0 }, false] as const;
 
   if (!hasCases) {
     return (
@@ -25,19 +28,20 @@ export default async function JuridicoPage() {
     );
   }
 
-  const overdueProcesses = ind?.overdue.find((r) => r.key === "cases-stale");
   const overdueTasks = ind?.overdue.find((r) => r.key === "tasks");
   const overdueDeadlines = ind?.overdue.find((r) => r.key === "deadlines");
+  const staleCases = ind?.movement?.windows[0]?.without ?? null;
 
   return (
     <>
       <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
 
+      {(indErr || casesErr) && <DataError message="Não foi possível carregar alguns indicadores do Jurídico" />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={FolderOpen} label="Processos ativos" value={cases.total} color={dept.color} />
+        <StatCard icon={FolderOpen} label="Processos ativos" value={casesErr ? "—" : cases.total} color={dept.color} />
         {overdueDeadlines && <StatCard icon={Hourglass} label="Prazos em atraso" value={overdueDeadlines.count} color="#ef4444" />}
         {overdueTasks && <StatCard icon={FolderOpen} label="Tarefas em atraso" value={overdueTasks.count} color="#f59e0b" />}
-        {overdueProcesses && <StatCard icon={FolderOpen} label="Processos parados" value={overdueProcesses.count} detail="sem movimentação recente" color="#64748b" />}
+        {staleCases !== null && staleCases > 0 && <StatCard icon={FolderOpen} label="Processos parados" value={staleCases} detail="sem movimentação recente" color="#64748b" />}
       </div>
 
       <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>

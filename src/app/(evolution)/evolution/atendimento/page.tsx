@@ -3,6 +3,7 @@ import { MessageCircle, Users, Bot, HeadphonesIcon } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
+import { DataError } from "@/components/evolution/data-error";
 import { EmptyState } from "@/components/evolution/empty-state";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
@@ -11,8 +12,10 @@ import { unreadTotal } from "@/server/services/whatsapp.service";
 export default async function AtendimentoPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.atendimento;
-  const chatUnread = can(ctx, "whatsapp:read") ? await unreadTotal(ctx).catch(() => 0) : 0;
   const hasChat = can(ctx, "whatsapp:read");
+  const [chatUnread, chatErr] = hasChat
+    ? await unreadTotal(ctx).then((r) => [r, false] as const).catch(() => [0, true] as const)
+    : [0, false] as const;
   const hasClients = can(ctx, "clients:read");
 
   if (!hasChat && !hasClients) {
@@ -28,9 +31,10 @@ export default async function AtendimentoPage() {
     <>
       <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
 
+      {chatErr && <DataError message="Não foi possível carregar contagem de mensagens" />}
       {hasChat && (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard icon={MessageCircle} label="Mensagens não lidas" value={chatUnread} color={dept.color} />
+          <StatCard icon={MessageCircle} label="Mensagens não lidas" value={chatErr ? "—" : chatUnread} color={dept.color} />
         </div>
       )}
 

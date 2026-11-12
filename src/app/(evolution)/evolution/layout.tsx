@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { EvolutionShell } from "@/components/evolution/evolution-shell";
-import { EVOLUTION_NAV } from "@/config/evolution-navigation";
+import { EVOLUTION_NAV, expandVisibleKeys } from "@/config/evolution-navigation";
 import { evolutionEnabled } from "@/lib/evolution";
 import { can } from "@/server/context";
 import { listNotifications, syncDueNotifications, unreadCount } from "@/server/services/notification.service";
@@ -17,11 +17,12 @@ export default async function EvolutionLayout({ children }: { children: React.Re
   await syncDueNotifications(ctx).catch(() => 0);
   const [unread, latest] = await Promise.all([unreadCount(ctx), listNotifications(ctx, { take: 8 })]);
 
-  const visibleKeys = EVOLUTION_NAV.filter((n) => {
+  const evoKeys = EVOLUTION_NAV.filter((n) => {
     if (!n.permission && !n.permissionAny) return true;
     if (n.permissionAny) return n.permissionAny.some((p) => ctx.permissions.has(p));
     return n.permission ? can(ctx, n.permission) : true;
   }).map((n) => n.key);
+  const visibleKeys = expandVisibleKeys(evoKeys);
 
   return (
     <EvolutionShell

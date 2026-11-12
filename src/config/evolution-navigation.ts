@@ -38,8 +38,8 @@ export type Department =
   | "administracao";
 
 export const DEPARTMENTS: Record<Department, { name: string; color: string; icon: LucideIcon; summary: string }> = {
-  lobby: { name: "Meu Escritório", color: "hsl(var(--primary))", icon: Home, summary: "Visão geral do escritório e atalhos rápidos." },
-  mesa: { name: "Minha Mesa", color: "hsl(var(--primary))", icon: Monitor, summary: "Suas tarefas, agenda e atividades pessoais." },
+  lobby: { name: "Meu Escritório", color: "#FF3B4E", icon: Home, summary: "Visão geral do escritório e atalhos rápidos." },
+  mesa: { name: "Minha Mesa", color: "#FF3B4E", icon: Monitor, summary: "Suas tarefas, agenda e atividades pessoais." },
   juridico: { name: "Jurídico", color: "#6366f1", icon: Scale, summary: "Processos, prazos, documentos e cálculos." },
   controladoria: { name: "Controladoria", color: "#0ea5e9", icon: ShieldCheck, summary: "Publicações, caixa de entrada e monitoramento judicial." },
   atendimento: { name: "Atendimento", color: "#10b981", icon: HeadphonesIcon, summary: "Conversas, clientes e copiloto de atendimento." },
@@ -88,7 +88,7 @@ export const EVOLUTION_NAV: EvolutionNavItem[] = [
   // Comercial
   { key: "evo-comercial", department: "comercial", label: "Comercial", href: "/evolution/comercial", icon: TrendingUp },
   { key: "evo-comercial-crm", department: "comercial", label: "CRM / Leads", href: "/crm", icon: Briefcase, permission: "crm:read", existingRoute: true },
-  { key: "evo-comercial-portal", department: "comercial", label: "Portal do cliente", href: "/portal", icon: Globe, permission: "portal:access", existingRoute: true },
+  { key: "evo-comercial-portal", department: "comercial", label: "Portal do cliente", href: "/portal-equipe", icon: Globe, permission: "clients:read", existingRoute: true },
 
   // Financeiro
   { key: "evo-financeiro", department: "financeiro", label: "Financeiro & Contábil", href: "/evolution/financeiro", icon: Wallet },
@@ -105,6 +105,47 @@ export const EVOLUTION_NAV: EvolutionNavItem[] = [
 
 export function departmentItems(dept: Department) {
   return EVOLUTION_NAV.filter((n) => n.department === dept && n.key !== `evo-${dept}`);
+}
+
+/**
+ * Maps Evolution nav items with `existingRoute` to their corresponding Ethos
+ * NAV_ITEMS key so the Topbar's GlobalSearch and Desktop shortcut keep working.
+ */
+const ETHOS_KEY_MAP: Record<string, string> = {
+  "evo-mesa-tarefas": "tasks",
+  "evo-mesa-agenda": "calendar",
+  "evo-juridico-processos": "cases",
+  "evo-juridico-prazos": "deadlines",
+  "evo-juridico-documentos": "documents",
+  "evo-juridico-calculos": "calculations",
+  "evo-controladoria-caixa": "inbox",
+  "evo-controladoria-alertas": "alerts",
+  "evo-atendimento-conversas": "whatsapp",
+  "evo-atendimento-clientes": "clients",
+  "evo-atendimento-copiloto": "copilot",
+  "evo-comercial-crm": "crm",
+  "evo-comercial-portal": "portal-team",
+  "evo-financeiro-lancamentos": "finance",
+  "evo-admin-indicadores": "indicators",
+  "evo-admin-equipe": "team",
+  "evo-admin-integracoes": "integrations",
+  "evo-admin-automacoes": "workflows",
+  "evo-admin-config": "settings",
+};
+
+/**
+ * Expands Evolution visible keys to include the corresponding Ethos keys,
+ * plus always-available keys like "workspace" (for the Desktop shortcut).
+ */
+export function expandVisibleKeys(evoKeys: string[]): string[] {
+  const expanded = new Set(evoKeys);
+  for (const k of evoKeys) {
+    const ethos = ETHOS_KEY_MAP[k];
+    if (ethos) expanded.add(ethos);
+  }
+  expanded.add("workspace");
+  expanded.add("overview");
+  return Array.from(expanded);
 }
 
 /** Map from old Ethos routes to Evolution departments for traceability. */
