@@ -20,6 +20,10 @@ import { ApiKeyForm, ApiKeyList } from "@/modules/api-keys/api-keys-ui";
 import { API_SCOPES, listApiKeys } from "@/server/services/apikey.service";
 import { WebhookForm, WebhookList } from "@/modules/webhooks/webhooks-ui";
 import { listWebhooks, recentDeliveries, webhooksAvailable, WEBHOOK_EVENTS } from "@/server/services/webhook.service";
+import { db } from "@/lib/db/client";
+import { LegalMailKeyForm, LegalMailWebhookKeyButton } from "@/modules/legalmail/setup";
+import { appUrl } from "@/server/services/auth.service";
+import { canImportLegalMail, isLegalMailOffice } from "@/server/legalmail-access";
 import { can } from "@/server/context";
 import { datajudStatus } from "@/server/services/datajud.service";
 import { DriveSettingsPanel } from "@/modules/google/google-ui";
@@ -47,7 +51,13 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   const usableCerts = certs.filter((c) => c.status === "ACTIVE" || c.status === "EXPIRING").map((c) => ({ id: c.id, label: c.label }));
   const apiKeys = await listApiKeys(ctx);
   const scopeLabels = Object.fromEntries(Object.entries(API_SCOPES).map(([k, v]) => [k, v.label]));
-  const scopeOptions = Object.entries(API_SCOPES).filter(([key, v]) => BOX_AVAILABLE || (!key.startsWith("pje:") && !isBoxPermission(v.permission))).map(([key, v]) => ({ key, label: v.label, allowed: can(ctx, v.permission) }));
+  const legalMailOffice = await isLegalMailOffice(ctx.organizationId);
+  const legalMailAllowed = legalMailOffice && await canImportLegalMail(ctx);
+  const [legalMailStatus] = legalMailAllowed ? await db.$queryRaw<{ configured: boolean }[]>`
+    SELECT api_key_enc IS NOT NULL AS configured FROM legalmail_pilot
+    WHERE singleton AND organization_id = ${ctx.organizationId}::uuid
+  ` : [];
+  const scopeOptions = Object.entries(API_SCOPES).filter(([key, v]) => key !== "legalmail:ingest" && (BOX_AVAILABLE || (!key.startsWith("pje:") && !isBoxPermission(v.permission)))).map(([key, v]) => ({ key, label: v.label, allowed: can(ctx, v.permission) }));
   const [hooks, deliveries] = await Promise.all([listWebhooks(ctx), recentDeliveries(ctx)]);
   const eventLabels: Record<string, string> = { ...WEBHOOK_EVENTS, ping: "Teste" };
   const eventOptions = Object.entries(WEBHOOK_EVENTS).filter(([key]) => BOX_AVAILABLE || !isBoxEvent(key)).map(([key, label]) => ({ key, label }));
@@ -102,6 +112,16 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
         </details>
         </> : null}
         <Alert tone="info">Google Agenda, Gmail e envio de e-mail ficam para uma próxima etapa.</Alert>
+        {legalMailOffice ? <Card>
+          <CardHeader title="LegalMail → FUNC — intimações e movimentações" action={<Badge tone="info">Entrada somente</Badge>} />
+          <CardBody className="space-y-3 text-sm">
+            {legalMailAllowed ? <LegalMailKeyForm configured={legalMailStatus?.configured ?? false} /> : null}
+            <p className="break-all">URL do webhook: <code>{appUrl("/api/webhooks/legalmail")}</code></p>
+            <p>No painel LegalMail, cadastre a URL acima em <strong>Webhooks</strong> e selecione “Intimações e movimentações”. A chave de API acima valida o acesso à sua conta. A chave do webhook abaixo autentica as entregas ao LegalOS.</p>
+            {legalMailAllowed ? <LegalMailWebhookKeyButton /> : null}
+            <p className="text-xs text-muted">As comunicações em texto aparecem na ficha do processo pelo CNJ. A importação de PDFs ainda está pendente.</p>
+          </CardBody>
+        </Card> : null}
         <Card>
           <CardHeader title="API do LegalOS — chaves de acesso" action={apiKeys.some((k) => k.status === "ACTIVE") ? <Badge tone="success">Em uso</Badge> : <Badge tone="warning">Sem chaves</Badge>} />
           <CardBody className="space-y-4 text-sm">

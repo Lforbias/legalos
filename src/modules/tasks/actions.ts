@@ -16,10 +16,10 @@ const touch = (id?: string, caseId?: string) => {
   if (caseId) revalidatePath(`/processos/${caseId}`);
 };
 
-export async function createTaskAction(input: unknown, noticeId?: string): Promise<ActionState<{ id: string }>> {
+export async function createTaskAction(input: unknown, noticeId?: string, fromFunc = false): Promise<ActionState<{ id: string }>> {
   return runAction(async () => {
     const { ctx } = await requireTenant();
-    const t = await createTask(ctx, parse(taskSchema, input), { surface: boxV3PreviewEnabled() ? "v3" : "legacy", sourceNoticeId: noticeId ? parse(uuidSchema, noticeId) : undefined });
+    const t = await createTask(ctx, parse(taskSchema, input), { surface: fromFunc === true ? "func" : boxV3PreviewEnabled() ? "v3" : "legacy", sourceNoticeId: noticeId ? parse(uuidSchema, noticeId) : undefined });
     touch(undefined, t.caseId ?? undefined);
     return { id: t.id };
   });

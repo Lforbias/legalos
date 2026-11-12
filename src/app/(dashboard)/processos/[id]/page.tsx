@@ -27,7 +27,8 @@ import { CaseShareToggle } from "@/modules/portal/share-toggle";
 import { listPetitions } from "@/server/services/petition.service";
 import { PETITION_STATUS_LABEL, PETITION_STATUS_TONE, type PetitionStatusKey } from "@/modules/petitions/schemas";
 import { NOTICE_KIND_LABEL, NOTICE_STATUS_LABEL } from "@/modules/inbox/schemas";
-import { listNotices } from "@/server/services/notice.service";
+import { canReadLegalMailInFunc } from "@/server/legalmail-access";
+import { listCaseNoticesForFunc } from "@/server/services/notice.service";
 import { listTasksForCase } from "@/server/services/task.service";
 import { dateToYmd, formatYmd } from "@/lib/dates/ymd";
 import { AcervoButton, CaseNotesPanel, CustomValuesCard } from "@/modules/cases/extras-ui";
@@ -108,7 +109,7 @@ export default async function CaseDetailPage({
   const canDocs = can(ctx, "documents:read");
   const canDeadlines = can(ctx, "deadlines:read");
   const canTasks = can(ctx, "tasks:read");
-  const canNotices = can(ctx, "inbox:read");
+  const canNotices = can(ctx, "inbox:read") || await canReadLegalMailInFunc(ctx);
   const canPetitions = can(ctx, "petitions:read");
   const tabs = [
     { key: "resumo", label: "Resumo" },
@@ -132,7 +133,7 @@ export default async function CaseDetailPage({
   const tz = organization.timezone;
   const cnj = c.number ? parseCnj(c.number) : null;
   const caseDeadlines = tab === "prazos" && canDeadlines ? await listDeadlinesForCase(ctx, c.id) : null;
-  const caseNotices = tab === "intimacoes" && canNotices ? await listNotices(ctx, { caseId: c.id, status: undefined }).then(async (open) => ({ items: [...open.items, ...(await listNotices(ctx, { caseId: c.id, status: "PROCESSED" })).items] })) : null;
+  const caseNotices = tab === "intimacoes" && canNotices ? await listCaseNoticesForFunc(ctx, c.id) : null;
   const caseTasks = tab === "tarefas" && canTasks ? await listTasksForCase(ctx, c.id) : null;
   const casePetitions = tab === "peticoes" && canPetitions ? await listPetitions(ctx, { caseId: c.id }) : null;
   const caseNotes = tab === "notas" ? await listCaseNotes(ctx, c.id) : null;
@@ -332,22 +333,35 @@ export default async function CaseDetailPage({
 
       {tab === "intimacoes" && canNotices ? (
         <Card>
-          <CardHeader title="Intimações do processo" description="Em aberto e tratadas, vinculadas a este processo." />
-          <CardBody>
-            {caseNotices && caseNotices.items.length > 0 ? (
+          <CardHeader title="Intimações do processo" description="As comunicações ficam ligadas a este processo e podem gerar tarefas do FUNC." />
+          <CardBody className="space-y-3">
+            {caseNotices && caseNotices.length > 0 ? (
               <ul className="divide-y divide-border">
-                {caseNotices.items.map((n) => (
-                  <li key={n.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                    <Link href={`/caixa-de-entrada/${n.id}`} className="font-medium hover:underline">{n.title}</Link>
-                    <Badge>{NOTICE_KIND_LABEL[n.kind]}</Badge>
-                    <Badge tone={n.status === "PROCESSED" ? "success" : "warning"}>{NOTICE_STATUS_LABEL[n.status]}</Badge>
+                {caseNotices.map((n) => (
+                  <li key={n.id} className="space-y-2 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{n.title}</span>
+                      <Badge>{NOTICE_KIND_LABEL[n.kind]}</Badge>
+                      <Badge tone={n.status === "PROCESSED" ? "success" : "warning"}>{NOTICE_STATUS_LABEL[n.status]}</Badge>
+                    </div>
+                    <p className="text-xs text-muted">
+                      {[n.sourceSystem ?? n.source, n.court, n.publishedAt ? `Disponibilizada ${formatDate(n.publishedAt, tz)}` : null, `Recebida ${formatDateTime(n.receivedAt, tz)}`].filter(Boolean).join(" · ")}
+                    </p>
+                    <details className="rounded-md border border-border bg-surface-2 px-3 py-2">
+                      <summary className="cursor-pointer text-sm text-primary-text">Ler comunicação</summary>
+                      <p className="mt-2 whitespace-pre-wrap text-sm">{n.content}{n.contentTruncated ? "\n\n[Texto exibido parcialmente]" : ""}</p>
+                    </details>
+                    <div className="flex flex-wrap gap-2">
+                      {can(ctx, "tasks:write") ? <Link href={`/tarefas/nova?intimacao=${n.id}${n.sourceSystem === "LEGALMAIL" ? "&origem=func" : ""}`} className={buttonVariants({ size: "sm", variant: "secondary" })}>Criar tarefa no FUNC</Link> : null}
+                      {canDocs ? <Link href={`/processos/${c.id}?aba=documentos`} className={buttonVariants({ size: "sm", variant: "ghost" })}>Ver documentos do processo</Link> : null}
+                    </div>
                   </li>
                 ))}
               </ul>
             ) : (
               <p className="text-sm text-muted">Nenhuma intimação vinculada a este processo.</p>
             )}
-            <p className="mt-3 text-xs text-muted">As intimações são tratadas no LegalOS Box. <Link href="/caixa-de-entrada" className="text-primary-text hover:underline" data-testid="case-to-box">Abrir a caixa de entrada</Link></p>
+            {caseNotices && caseNotices.length === 50 ? <p className="text-xs text-muted">Exibindo as 50 comunicações mais recentes deste processo.</p> : null}
           </CardBody>
         </Card>
       ) : null}
