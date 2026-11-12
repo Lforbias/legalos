@@ -1,10 +1,9 @@
 "use client";
 
-import { WorkbenchComposer } from "./workbench-composer";
 import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus } from "@/lib/whatsapp/lifecycle";
 import { serviceStatusAction } from "./operations-actions";
 import { ManualCallForm } from "./operations-ui";
-import { ArrowLeft, Check, CheckCheck, Clock, PanelRightClose, PanelRightOpen, Paperclip, SendHorizontal, TriangleAlert, X, Zap } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Clock, Paperclip, SendHorizontal, TriangleAlert, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -102,26 +101,6 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
   const [params, setParams] = React.useState<string[]>([]);
   const [q, setQ] = React.useState("");
   const [found, setFound] = React.useState<{ id: string; name: string }[]>([]);
-  const [showSide, setShowSide] = React.useState(false);
-  const [wide, setWide] = React.useState(false);
-  const infoDialog = React.useRef<HTMLDialogElement>(null);
-  const infoTrigger = React.useRef<HTMLButtonElement>(null);
-  const infoId = React.useId();
-
-  React.useEffect(() => {
-    const media = window.matchMedia("(min-width: 1280px)");
-    const sync = () => { setWide(media.matches); };
-    sync();
-    media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
-
-  React.useEffect(() => {
-    const dialog = infoDialog.current;
-    if (!dialog || wide) return;
-    if (showSide && !dialog.open) dialog.showModal();
-    if (!showSide && dialog.open) dialog.close();
-  }, [showSide, wide]);
 
   React.useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
@@ -223,8 +202,8 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
   ) : null;
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col lg:flex-row" data-testid="wa-chat-wrap">
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col" data-testid="wa-chat">
+    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col xl:flex-row" data-testid="wa-chat-wrap">
+      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${side ? "h-[62%] shrink-0 xl:h-full" : "h-full"}`} data-testid="wa-chat">
         <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-4">
           <Link href={chat.backHref ?? "/atendimento"} aria-label="Voltar às conversas" className="rounded-full p-1.5 hover:bg-surface-2 lg:hidden"><ArrowLeft className="h-5 w-5" aria-hidden /></Link>
           <Avatar name={chat.title} size={40} />
@@ -241,11 +220,6 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
             <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => setStatusAction(chat.id, open ? "CLOSED" : "OPEN"))}>
               {open ? "Encerrar" : "Reabrir"}
             </Button>
-          ) : null}
-          {side ? (
-            <button ref={infoTrigger} type="button" aria-expanded={showSide} aria-controls={infoId} aria-haspopup={!wide ? "dialog" : undefined} aria-label={showSide ? "Ocultar informações" : "Informações"} title={showSide ? "Ocultar informações" : "Informações"} onClick={() => setShowSide(!showSide)} className="rounded-full p-2 text-muted hover:bg-surface-2">
-              {showSide ? <PanelRightClose className="h-5 w-5" aria-hidden /> : <PanelRightOpen className="h-5 w-5" aria-hidden />}
-            </button>
           ) : null}
         </div>
 
@@ -309,7 +283,6 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
                 {quickMatch.map((r) => <button key={r.id} type="button" className="rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2" onClick={() => setText(r.body)}>/{r.shortcut} — {r.title}</button>)}
               </div>
             ) : null}
-            <WorkbenchComposer key={chat.id} id={chat.id} text={text} onDraft={setText} />
             <label className="flex w-fit items-center gap-2 rounded-full border border-border px-2.5 py-0.5 text-xs"><input type="checkbox" checked={note} onChange={(e) => setNote(e.target.checked)} /> Nota interna</label>
             {(chat.windowOpen || note) ? (
               <div className={`flex items-end gap-1.5 rounded-2xl border px-1.5 py-1.5 ${note ? "border-warning/50 bg-warning-bg" : "border-border bg-surface-2"}`}>
@@ -345,16 +318,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           </div>
         ) : null}
       </div>
-      {side && (wide ? showSide : true) ? (
-        wide ? <div id={infoId} data-chat-info-panel className="h-full min-h-0 w-[320px] shrink-0">
-          {informationPanel}
-        </div> : <dialog ref={infoDialog} id={infoId} aria-label="Informações da conversa" onClose={() => { setShowSide(false); infoTrigger.current?.focus(); }} className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-[min(400px,100vw)] max-w-none border-l border-border bg-surface p-0 text-fg shadow-2xl backdrop:bg-black/40">
-        <div className="flex h-full flex-col">
-        <header className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3"><h2 className="text-sm font-semibold">Informações da conversa</h2><button type="button" aria-label="Fechar informações" onClick={() => setShowSide(false)} className="rounded-lg p-2 text-muted hover:bg-surface-2"><X className="h-4 w-4" aria-hidden /></button></header>
-        <div className="min-h-0 flex-1">
-        {informationPanel}
-        </div></div></dialog>
-      ) : null}
+      {side ? <div data-chat-info-panel className="h-[38%] min-h-0 w-full shrink-0 border-t border-border bg-surface xl:h-full xl:w-[400px] xl:border-l xl:border-t-0 2xl:w-[440px]">{informationPanel}</div> : null}
     </div>
   );
 }

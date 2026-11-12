@@ -70,6 +70,7 @@ test("clientes e processos: validação, cadastro, linha do tempo, documento e i
   await expect(page.getByText("Nosso cliente")).toBeVisible();
 
   // linha do tempo: anotação interna e mudança de situação (automática)
+  await page.getByRole("link", { name: "Atividade", exact: true }).click();
   await page.getByRole("link", { name: "Linha do tempo" }).click();
   await page.getByLabel("Anotação", { exact: true }).fill("Cliente enviou os documentos pelo WhatsApp.");
   await page.getByRole("button", { name: "Registrar anotação" }).click();
@@ -78,6 +79,7 @@ test("clientes e processos: validação, cadastro, linha do tempo, documento e i
   await expect(page.getByText("Processo judicial cadastrado no sistema")).toBeVisible();
   await page.goto(`${caseUrl}`);
   await page.getByLabel("Situação do processo").selectOption("SUSPENDED");
+  await page.getByRole("link", { name: "Atividade", exact: true }).click();
   await page.getByRole("link", { name: "Linha do tempo" }).click();
   await expect(page.getByText('Situação alterada para "Suspenso"')).toBeVisible();
   // filtro por origem: nada foi importado de tribunal

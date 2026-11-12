@@ -18,9 +18,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   const id = uid();
   await page.setViewportSize({ width: 1440, height: 900 });
   const openInfo = async () => {
-    const button = page.getByRole("button", { name: /^(Ocultar informações|Informações)$/ });
-    await expect(button).toBeVisible();
-    if (await button.getAttribute("aria-expanded") !== "true") await button.click();
+    await expect(page.getByRole("button", { name: /^(Ocultar informações|Informações)$/ })).toHaveCount(0);
     await expect(page.getByTestId("wa-side")).toBeVisible();
   };
   const pnid = `7${Date.now().toString().slice(-9)}`;

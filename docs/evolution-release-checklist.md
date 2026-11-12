@@ -9,10 +9,18 @@
 - Validação: 1.353 testes de código aprovados; 25 testes focados do CRM e seis de revisão com Box desativado aprovados. Compilação final aprovada.
 - Interface: primeira execução completa 72/73; o teste da Controladoria recarregava antes da resposta de gravação. Após ajustar a espera, os seis cenários finais de documentos, departamentos e CRM passaram, incluindo a persistência após recarga e o novo caso de conversão para cliente existente.
 - Revisão visual da mesa de controle e navegação desktop/móvel realizada em escritório de teste. Sem validação de provedores externos reais.
-- Alterações salvas no PR https://github.com/Lforbias/legalos/pull/33; ainda não publicadas em produção.
+- PR #33 foi integrado no commit `da2f796` e publicado pelo deploy `43310690679`; `/api/ready` confirmou banco, migrações e armazenamento ativos.
 - **Evolution completa: NÃO APTA PARA HOMOLOGAÇÃO INTEGRAL.** Restam conferência/escalonamento formal, repasse Comercial→Jurídico/Financeiro, gestão por departamento e confirmação de toda a lista funcional. O aceite destes blocos não representa aceite integral.
 
 Detalhes: `docs/evolution-department-workflows.md`.
+
+## Atualização do Atendimento e desativação da RUTE
+
+- O painel lateral do Chat fica fixo, mais largo e com abas nomeadas; o celular mostra o painel abaixo da conversa.
+- A navegação na ficha do processo agora agrupa as seções em seis categorias; a revisão visual em tela desktop confirmou nomes legíveis, destaques e acesso às abas sem rolagem horizontal.
+- Removidos o botão flutuante e os atalhos da RUTE, incluindo o acionador de copiloto/macros/dados, configurações, ajuda e fichas de processo/cliente. A tela de provedor exibe o aviso de indisponibilidade e não permite alterações. O Copiloto independente permanece disponível. Serviços e exportações da RUTE ficam bloqueados por padrão.
+- Build, tipos, ESLint, teste unitário da ajuda, 18 testes de integração e nove E2E focados passaram, incluindo os fluxos atualizados de configuração desativada e navegação agrupada.
+- O CI do PR #34 está sendo repetido com o estado atualizado. A integração e o deploy dessa atualização ainda não foram feitos.
 
 ## Histórico de validações anteriores
 

@@ -11,7 +11,7 @@ import { PageActionsMenu } from "@/components/layout/page-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { TabsNav } from "@/components/ui/tabs-nav";
+import { CaseSectionsNav } from "@/modules/cases/case-sections-nav";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
 import { NotFoundError } from "@/lib/permissions/check";
 import { formatCnj, CNJ_SEGMENTS, isValidCnj, parseCnj } from "@/lib/validation/br-documents";
@@ -171,7 +171,6 @@ export default async function CaseDetailPage({
             {can(ctx, "ai:use") ? (
               <PageActionsMenu label="Mais ações do processo" items={[
                 { href: `/ia?processo=${c.id}`, label: "Perguntar à IA sobre este processo" },
-                { href: `/rute?aba=assistente&caso=${c.id}`, label: "Abrir RUTE neste processo" },
               ]} />
             ) : null}
             {canSyncLegalMail ? <LegalMailHistoryButton caseId={c.id} /> : null}
@@ -186,7 +185,7 @@ export default async function CaseDetailPage({
           </div>
         }
       />
-      <TabsNav base={`/processos/${c.id}`} current={tab} tabs={tabs} compactOnMobile />
+      <CaseSectionsNav base={`/processos/${c.id}`} current={tab} tabs={tabs} />
 
       {tab === "resumo" ? (
         <div className="grid gap-4 lg:grid-cols-3">
