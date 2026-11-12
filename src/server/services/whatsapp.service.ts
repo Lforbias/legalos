@@ -1,3 +1,4 @@
+import { safeChatPreview } from "@/lib/whatsapp/safe-preview";
 import { humanReplyLifecycle, setServiceStatus } from "./chat-lifecycle.service";
 import { interactivePayload,interactiveSchema } from "@/lib/whatsapp/interactive";
 import { sendInteractive } from "@/lib/whatsapp/client";
@@ -43,7 +44,8 @@ export async function listConversations(ctx: TenantContext, filter: Conversation
     const digits = q.replace(/\D/g, "");
     where.OR = [{ contactName: { contains: q, mode: "insensitive" } }, { client: { name: { contains: q, mode: "insensitive" } } }, ...(digits.length >= 4 ? [{ waId: { contains: digits } }] : []), { fieldValues: { some: { value: { contains: q, mode: "insensitive" } } } }];
   }
-  return db.whatsappConversation.findMany({ where, orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }], take: 200, select: listSelect });
+  const items = await db.whatsappConversation.findMany({ where, orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }], take: 200, select: listSelect });
+  return items.map(item => ({ ...item, lastPreview: safeChatPreview(item.lastPreview) }));
 }
 
 export async function unreadTotal(ctx: TenantContext): Promise<number> {
@@ -55,7 +57,7 @@ export async function unreadTotal(ctx: TenantContext): Promise<number> {
 async function loadConversation(ctx: TenantContext, id: string) {
   const c = await db.whatsappConversation.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { ...listSelect, accountId: true } });
   if (!c) throw new NotFoundError("Conversa não encontrada.");
-  return c;
+  return { ...c, lastPreview: safeChatPreview(c.lastPreview) };
 }
 
 /** Abre a conversa: devolve as últimas 300 mensagens e zera o contador de não lidas (e avisa a Meta, em melhor esforço). */
@@ -91,7 +93,7 @@ async function markLastInboundRead(organizationId: string, conversationId: strin
   }
 }
 
-const preview = (body: string | null, type: string) => (body ? body.replace(/\s+/g, " ").slice(0, 120) : `[${type}]`);
+const preview = (body: string | null, type: string) => (body ? safeChatPreview(body)!.replace(/\s+/g, " ").slice(0, 120) : `[${type}]`);
 
 async function touch(conversationId: string, text: string | null, type: string, at: Date) {
   await db.whatsappConversation.update({ where: { id: conversationId }, data: { lastMessageAt: at, lastPreview: preview(text, type) } });
