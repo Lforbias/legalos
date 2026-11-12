@@ -20,6 +20,7 @@ import { ApiKeyForm, ApiKeyList } from "@/modules/api-keys/api-keys-ui";
 import { API_SCOPES, listApiKeys } from "@/server/services/apikey.service";
 import { WebhookForm, WebhookList } from "@/modules/webhooks/webhooks-ui";
 import { listWebhooks, recentDeliveries, webhooksAvailable, WEBHOOK_EVENTS } from "@/server/services/webhook.service";
+import { canImportLegalMail, isLegalMailOffice } from "@/server/legalmail-access";
 import { can } from "@/server/context";
 import { datajudStatus } from "@/server/services/datajud.service";
 import { DriveSettingsPanel } from "@/modules/google/google-ui";
@@ -47,7 +48,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   const usableCerts = certs.filter((c) => c.status === "ACTIVE" || c.status === "EXPIRING").map((c) => ({ id: c.id, label: c.label }));
   const apiKeys = await listApiKeys(ctx);
   const scopeLabels = Object.fromEntries(Object.entries(API_SCOPES).map(([k, v]) => [k, v.label]));
-  const scopeOptions = Object.entries(API_SCOPES).filter(([key, v]) => BOX_AVAILABLE || (!key.startsWith("pje:") && !isBoxPermission(v.permission))).map(([key, v]) => ({ key, label: v.label, allowed: can(ctx, v.permission) }));
+  const scopeOptions = Object.entries(API_SCOPES).filter(([key, v]) => key === "legalmail:ingest" ? canImportLegalMail(ctx) : BOX_AVAILABLE || (!key.startsWith("pje:") && !isBoxPermission(v.permission))).map(([key, v]) => ({ key, label: v.label, allowed: can(ctx, v.permission) }));
   const [hooks, deliveries] = await Promise.all([listWebhooks(ctx), recentDeliveries(ctx)]);
   const eventLabels: Record<string, string> = { ...WEBHOOK_EVENTS, ping: "Teste" };
   const eventOptions = Object.entries(WEBHOOK_EVENTS).filter(([key]) => BOX_AVAILABLE || !isBoxEvent(key)).map(([key, label]) => ({ key, label }));
@@ -102,6 +103,14 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
         </details>
         </> : null}
         <Alert tone="info">Google Agenda, Gmail e envio de e-mail ficam para uma próxima etapa.</Alert>
+        {isLegalMailOffice(ctx.organizationId) ? <Card>
+          <CardHeader title="LegalMail → FUNC — intimações e movimentações" action={<Badge tone="info">Entrada somente</Badge>} />
+          <CardBody className="space-y-3 text-sm">
+            <p>O LegalOS pode receber intimações e movimentações do LegalMail e vinculá-las ao processo pelo número CNJ. Na configuração de Webhooks do painel LegalMail, use o endereço público deste sistema seguido de <code>/api/webhooks/legalmail</code> e marque apenas “Intimações e movimentações”.</p>
+            <p>Como <code>clientkey</code>, use uma chave de API do LegalOS com somente o acesso <strong>Receber eventos do LegalMail</strong> (<code>legalmail:ingest</code>). O evento de teste é aceito sem importar dados; reenvios são deduplicados pelo identificador da movimentação. Eventos sem vínculo único ficam pendentes para revisão.</p>
+            <p className="text-xs text-muted">Esta etapa importa os eventos com teor textual. Arquivos PDF enviados como link assinado não são baixados ainda. Peticionamento e notificações de protocolo são ignorados. A conexão só começa depois de cadastrar URL e chave no painel LegalMail.</p>
+          </CardBody>
+        </Card> : null}
         <Card>
           <CardHeader title="API do LegalOS — chaves de acesso" action={apiKeys.some((k) => k.status === "ACTIVE") ? <Badge tone="success">Em uso</Badge> : <Badge tone="warning">Sem chaves</Badge>} />
           <CardBody className="space-y-4 text-sm">

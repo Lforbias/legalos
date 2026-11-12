@@ -19,6 +19,7 @@ export function TaskForm({
   cases,
   initialClientLabel = "",
   noticeId,
+  noticeFromFunc = false,
 }: {
   taskId?: string;
   initial: TaskInput;
@@ -26,6 +27,7 @@ export function TaskForm({
   cases: { id: string; title: string; number: string | null }[];
   initialClientLabel?: string;
   noticeId?: string;
+  noticeFromFunc?: boolean;
 }) {
   const router = useRouter();
   const [clientLabel, setClientLabel] = React.useState(initialClientLabel);
@@ -37,7 +39,7 @@ export function TaskForm({
         const res = await updateTaskAction(taskId, v);
         return res.ok ? { ok: true, data: { id: taskId } } : { ok: false, message: res.message, fieldErrors: res.fieldErrors };
       }
-      return createTaskAction(v, noticeId);
+      return createTaskAction(v, noticeId, noticeFromFunc);
     },
     onSuccess: (data) => {
       router.replace(`/tarefas/${data?.id ?? taskId}`);

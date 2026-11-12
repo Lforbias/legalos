@@ -6,7 +6,7 @@ import type { NoticeInput } from "@/modules/inbox/schemas";
 import { createCase } from "@/server/services/case.service";
 import { createDeadline } from "@/server/services/deadline.service";
 import {
-  assignNotice, createNotice, deleteNotice, discardNotice, getNotice, linkNoticeCase, listNotices, markProcessed, noticeCounts, reopenNotice,
+  assignNotice, createNotice, deleteNotice, discardNotice, getNotice, linkNoticeCase, listCaseNoticesForFunc, listNotices, markProcessed, noticeCounts, reopenNotice,
 } from "@/server/services/notice.service";
 import { createTask } from "@/server/services/task.service";
 import { unreadCount } from "@/server/services/notification.service";
@@ -47,6 +47,20 @@ describe("central de intimações (Fase 4)", () => {
     expect(n.caseId).toBe(caseA.id);
     const kinds = (await db.caseEvent.findMany({ where: { caseId: caseA.id } })).map((e) => e.kind);
     expect(kinds).toContain("NOTICE_LINKED");
+  });
+
+  it("mostra a comunicação na ficha do processo no FUNC, sem depender da caixa geral", async () => {
+    const n = await createNotice(lawyer.ctx, notice({
+      title: "Comunicação direto no processo",
+      content: "Texto que a equipe pode ler dentro da ficha do processo.",
+      caseId: caseA.id,
+      receivedAt: "2030-03-02",
+    }));
+    const rows = await listCaseNoticesForFunc(lawyer.ctx, caseA.id);
+    expect(rows.map((row) => row.id)).toContain(n.id);
+    expect(rows.find((row) => row.id === n.id)?.content).toContain("dentro da ficha do processo");
+    await expect(listCaseNoticesForFunc(B.ctx, caseA.id)).rejects.toBeInstanceOf(NotFoundError);
+    await expect(listCaseNoticesForFunc(finance.ctx, caseA.id)).rejects.toBeInstanceOf(ForbiddenError);
   });
 
   it("não vincula a processo de outro escritório nem a número desconhecido", async () => {

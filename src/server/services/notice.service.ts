@@ -7,7 +7,8 @@ import type { OriginKind } from "@/lib/judicial/contracts";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { noticeListOptionsSchema } from "@/modules/inbox/list-schemas";
 import { assignSchema, discardSchema, noticeSchema, toNoticeData, type NoticeInput } from "@/modules/inbox/schemas";
-import { assertCan, type TenantContext } from "@/server/context";
+import { assertCan, can, type TenantContext } from "@/server/context";
+import { canImportLegalMail, canReadLegalMailInFunc } from "@/server/legalmail-access";
 import { audit } from "./audit.service";
 import { assertActiveMember, assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service";
 import { dateToYmd, todayYmd, ymdToDate } from "@/lib/dates/ymd";
@@ -102,6 +103,45 @@ export async function listNotices(ctx: TenantContext, f: NoticeFilters = {}) {
   return { total, page, pageSize: o.pageSize, pageCount, truncated: total > rows.length, items: rows.map((r) => ({ ...r, assigneeName: r.assigneeId ? (names.get(r.assigneeId) ?? null) : null })) };
 }
 
+/**
+ * Comunicações judiciais mostradas dentro do FUNC, na ficha do processo.
+ * Mantém o recorte por escritório e sigilo e não depende de abrir a caixa geral do Box.
+ */
+export async function listCaseNoticesForFunc(ctx: TenantContext, caseId: string) {
+  const canReadPilot = canReadLegalMailInFunc(ctx);
+  const canReadLegacy = can(ctx, "inbox:read");
+  if (!canReadLegacy && !canReadPilot) throw new ForbiddenError();
+  await assertCaseVisible(ctx, caseId);
+  const rows = await db.courtNotice.findMany({
+    where: {
+      organizationId: ctx.organizationId,
+      caseId,
+      ...(!canReadLegacy ? { sourceSystem: "LEGALMAIL" } : !canReadPilot ? { OR: [{ sourceSystem: null }, { sourceSystem: { not: "LEGALMAIL" } }] } : {}),
+      deletedAt: null,
+      status: { in: ["NEW", "DISTRIBUTED", "PROCESSED"] },
+    },
+    orderBy: [{ receivedAt: "desc" }, { createdAt: "desc" }, { id: "asc" }],
+    take: 50,
+    select: {
+      id: true,
+      title: true,
+      content: true,
+      kind: true,
+      status: true,
+      source: true,
+      sourceSystem: true,
+      court: true,
+      receivedAt: true,
+      publishedAt: true,
+    },
+  });
+  return rows.map((row) => ({
+    ...row,
+    content: row.content.slice(0, 8000),
+    contentTruncated: row.content.length > 8000,
+  }));
+}
+
 export async function noticeCounts(ctx: TenantContext) {
   assertCan(ctx, "inbox:read");
   const groups = await db.courtNotice.groupBy({ by: ["status"], where: { AND: [{ organizationId: ctx.organizationId, deletedAt: null }, visibility(ctx)] }, _count: { _all: true } });
@@ -162,8 +202,12 @@ export type CaptureMeta = {
   evidence?: Record<string, unknown>;
 };
 
-export async function createNotice(ctx: TenantContext, raw: NoticeInput, opts: { source?: "IMPORTED"; externalKey?: string; capture?: CaptureMeta } = {}) {
-  assertCan(ctx, "inbox:write");
+export async function createNotice(ctx: TenantContext, raw: NoticeInput, opts: { source?: "IMPORTED"; externalKey?: string; capture?: CaptureMeta; integrationImport?: boolean } = {}) {
+  if (opts.integrationImport) {
+    if (!canImportLegalMail(ctx)) throw new ForbiddenError();
+  } else {
+    assertCan(ctx, "inbox:write");
+  }
   const input = noticeSchema.parse(raw);
   const data = toNoticeData(input);
   let caseId: string | null = null;
@@ -199,9 +243,10 @@ export async function createNotice(ctx: TenantContext, raw: NoticeInput, opts: {
         caseId,
         contentHash: hash,
         duplicateOfId: dup?.id ?? null,
-        createdById: ctx.userId,
+        createdById: opts.integrationImport ? null : ctx.userId,
         originKind,
         caseMatchState,
+        ...(opts.integrationImport ? { sourceSystem: "LEGALMAIL", officialId: opts.externalKey ?? null, capturedAt: new Date(), officialAckState: "UNKNOWN" } : {}),
         ...(cap
           ? {
               sourceSystem: cap.sourceSystem,
@@ -218,15 +263,16 @@ export async function createNotice(ctx: TenantContext, raw: NoticeInput, opts: {
     await tx.noticeEvent.create({
       data: cap
         ? { organizationId: ctx.organizationId, noticeId: n.id, kind: "CAPTURED", runId: cap.syncRunId ?? null, data: { origin: cap.originKind, source: cap.sourceSystem, officialId: cap.officialId, ...(cap.evidence ?? {}) } as never }
-        : { organizationId: ctx.organizationId, noticeId: n.id, kind: "STATUS", actorId: ctx.userId, data: { action: "created", origin: originKind } as never },
+        : { organizationId: ctx.organizationId, noticeId: n.id, kind: "STATUS", actorId: opts.integrationImport ? null : ctx.userId, data: { action: "created", origin: originKind } as never },
     });
     if (caseId) {
       await logCaseEvent(tx, ctx, caseId, { kind: "NOTICE_LINKED", title: `Intimação recebida: ${n.title}`, description: autoLinked ? "Vinculada automaticamente pelo número CNJ." : null });
-      await tx.noticeEvent.create({ data: { organizationId: ctx.organizationId, noticeId: n.id, kind: "LINKED", actorId: cap ? null : ctx.userId, data: { caseId, how: autoLinked ? "AUTO_CNJ" : "MANUAL" } as never } });
+      await tx.noticeEvent.create({ data: { organizationId: ctx.organizationId, noticeId: n.id, kind: "LINKED", actorId: cap || opts.integrationImport ? null : ctx.userId, data: { caseId, how: autoLinked ? "AUTO_CNJ" : "MANUAL" } as never } });
     }
     await audit({ action: "notice.create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: n.id, metadata: { source: n.source, duplicate: Boolean(dup), autoLinked }, meta: ctx.meta }, tx);
     return n;
   });
+  if (opts.integrationImport) return { ...created, autoLinked, duplicate: Boolean(dup) };
   notifyBoxChange(ctx.organizationId);
   if (!dup) await emitWebhookEvent(ctx.organizationId, "notice.created", { noticeId: created.id, caseId: created.caseId, source: created.source });
   if (!dup) await runWorkflows(ctx, "NOTICE_RECEIVED", { type: "notice", id: created.id, userId: ctx.userId, label: created.title, baseDate: dateToYmd(created.receivedAt), caseId: created.caseId, noticeId: created.id });
@@ -331,8 +377,17 @@ export async function deleteNotice(ctx: TenantContext, id: string) {
 }
 
 /** Valida e devolve a intimação de origem para criação de tarefa/prazo (mesmo escritório, visível). */
-export async function resolveSourceNotice(ctx: TenantContext, id: string | undefined, surface: "legacy" | "v3" = "legacy") {
+export async function resolveSourceNotice(ctx: TenantContext, id: string | undefined, surface: "legacy" | "v3" | "func" = "legacy") {
   if (!id) return undefined;
+  if (surface === "func") {
+    if (!canReadLegalMailInFunc(ctx)) throw new ForbiddenError();
+    const notice = await db.courtNotice.findFirst({
+      where: { id, organizationId: ctx.organizationId, deletedAt: null, sourceSystem: "LEGALMAIL", status: { not: "DISCARDED" }, case: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } },
+      select: { id: true, title: true, caseId: true, content: true },
+    });
+    if (!notice) throw new NotFoundError("Intimação não encontrada.");
+    return { id: notice.id, title: notice.title, caseId: notice.caseId, parsed: parseNoticeText(notice.content) };
+  }
   if (surface === "v3") {
     if (!boxV3PreviewEnabled() || !ctx.permissions.has("inbox:read")) throw new ForbiddenError();
     const notice = await db.courtNotice.findFirst({ where: { AND: [{ id, organizationId: ctx.organizationId, deletedAt: null }, visibility(ctx)] }, select: { id: true, title: true, caseId: true, content: true } });

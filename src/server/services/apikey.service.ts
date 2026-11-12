@@ -4,6 +4,7 @@ import { db } from "@/lib/db/client";
 import type { PermissionKey } from "@/lib/permissions/catalog";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { assertCan, can, type RequestMeta, type TenantContext } from "@/server/context";
+import { canImportLegalMail } from "@/server/legalmail-access";
 import { audit } from "./audit.service";
 import { resolveTenantContext } from "./tenant.service";
 
@@ -15,6 +16,7 @@ export const API_SCOPES = {
   "clients:read": { label: "Ler clientes", permission: "clients:read" },
   "deadlines:read": { label: "Ler prazos", permission: "deadlines:read" },
   "notices:read": { label: "Ler intimações", permission: "inbox:read" },
+  "legalmail:ingest": { label: "Receber eventos do LegalMail", permission: "integrations:manage" },
   "notices:write": { label: "Registrar intimações", permission: "inbox:write" },
   "tools:read": { label: "Ferramentas via API: consultar dados", permission: "ai:use" },
   "tools:execute": { label: "Ferramentas via API: criar e alterar diretamente (sem aprovação posterior)", permission: "ai:use" },
@@ -64,6 +66,9 @@ async function issueApiKey(ctx: TenantContext, input: ApiKeyInput) {
   if (name.length < 3 || name.length > 80) throw new ValidationError("Nome inválido.", { name: ["Informe um nome de 3 a 80 caracteres."] });
   const scopes = [...new Set(input.scopes)];
   if (scopes.length === 0 || scopes.some((s) => !Object.hasOwn(API_SCOPES, s))) throw new ValidationError("Escolha ao menos um acesso válido.", { scopes: ["Escolha ao menos um acesso."] });
+  if (scopes.includes("legalmail:ingest") && (scopes.length !== 1 || !canImportLegalMail(ctx))) {
+    throw new ConflictError("Use uma chave exclusiva do LegalMail no escritório autorizado.");
+  }
   for (const s of scopes) {
     if (!BOX_AVAILABLE && (s.startsWith("pje:") || isBoxPermission(API_SCOPES[s as ApiScope].permission))) throw new ConflictError("O Box foi retirado; estes acessos estão indisponíveis.");
     if (!can(ctx, API_SCOPES[s as ApiScope].permission)) throw new ValidationError("Você não tem permissão para conceder um dos acessos escolhidos.", { scopes: [`Seu perfil não permite: ${API_SCOPES[s as ApiScope].label}.`] });
@@ -95,7 +100,7 @@ export async function listApiKeys(ctx: TenantContext) {
     select: { id: true, name: true, prefix: true, scopes: true, expiresAt: true, lastUsedAt: true, revokedAt: true, createdAt: true },
   });
   const now = new Date();
-  return rows.map((r) => ({ ...r, status: r.revokedAt ? ("REVOKED" as const) : r.expiresAt && r.expiresAt <= now ? ("EXPIRED" as const) : !BOX_AVAILABLE && r.scopes.every(s => s.startsWith("pje:") || (API_SCOPES[s as ApiScope] && isBoxPermission(API_SCOPES[s as ApiScope].permission))) ? ("SUSPENDED" as const) : ("ACTIVE" as const) }));
+  return rows.map((r) => ({ ...r, status: r.revokedAt ? ("REVOKED" as const) : r.expiresAt && r.expiresAt <= now ? ("EXPIRED" as const) : r.scopes.every(s => s === "legalmail:ingest" ? !canImportLegalMail(ctx) : !BOX_AVAILABLE && (s.startsWith("pje:") || (API_SCOPES[s as ApiScope] && isBoxPermission(API_SCOPES[s as ApiScope].permission)))) ? ("SUSPENDED" as const) : ("ACTIVE" as const) }));
 }
 
 export async function revokeApiKey(ctx: TenantContext, id: string) {
@@ -126,6 +131,7 @@ export async function authenticateApiKey(token: string, meta: RequestMeta = {}):
   if (!ctx) return null;
   const scopes = new Set<ApiScope>();
   for (const s of key.scopes) {
+    if (s === "legalmail:ingest" && (key.scopes.length !== 1 || !canImportLegalMail(ctx))) continue;
     const def = API_SCOPES[s as ApiScope];
     if (def && (BOX_AVAILABLE || (!s.startsWith("pje:") && !isBoxPermission(def.permission))) && can(ctx, def.permission)) scopes.add(s as ApiScope);
   }
