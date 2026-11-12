@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
 import { NAV_ITEMS, navItemInBoxVersion } from "@/config/navigation";
 import { boxV2Enabled } from "@/lib/features";
+import { evolutionEnabled } from "@/lib/evolution";
 import { can } from "@/server/context";
 import { prototypesEnabled } from "@/modules/prototypes/registry";
 import { ResendVerificationButton } from "@/modules/auth/components";
@@ -47,6 +48,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       visibleKeys={visibleKeys}
       boxBadge={boxBadge}
       chatBadge={chatBadge}
+      evolutionEnabled={evolutionEnabled()}
       canInvite={can(ctx, "members:invite")}
       canCreateClient={can(ctx, "clients:write")}
       canCreateCase={can(ctx, "cases:write")}
