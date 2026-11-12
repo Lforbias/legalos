@@ -17,9 +17,10 @@ Detalhes: `docs/evolution-department-workflows.md`.
 ## Atualização do Atendimento e desativação da RUTE
 
 - O painel lateral do Chat fica fixo, mais largo e com abas nomeadas; o celular mostra o painel abaixo da conversa.
+- A navegação na ficha do processo agora agrupa as seções em seis categorias; a revisão visual em tela desktop confirmou nomes legíveis, destaques e acesso às abas sem rolagem horizontal.
 - Removidos o botão flutuante e os atalhos da RUTE, incluindo o acionador de copiloto/macros/dados, configurações, ajuda e fichas de processo/cliente. O Copiloto independente permanece disponível. Serviços e exportações da RUTE ficam bloqueados por padrão.
-- Build, tipos, ESLint, teste unitário da ajuda, 18 testes de integração e sete E2E focados passaram; cobertura E2E inclui telas desktop/celular, configuração e desativação.
-- O CI do PR #34 será repetido após essa correção. A integração e o deploy dessa atualização ainda não foram feitos.
+- Build, tipos, ESLint, teste unitário da ajuda, 18 testes de integração e oito E2E focados passaram; cobertura E2E inclui telas desktop/celular, ficha do processo, configuração e desativação.
+- O CI do PR #34 será repetido com o agrupamento de navegação. A integração e o deploy dessa atualização ainda não foram feitos.
 
 ## Histórico de validações anteriores
 
