@@ -2,8 +2,8 @@
 
 ## PR Sequence
 - PR #17: Fundação e correções (concluído na branch; PR aberto para revisão)
-- PR #18: Central de Atendimento
-- PR #19: Cliente 360° e Processo 360°
+- PR #18: Central de Atendimento (aberto para revisão)
+- PR #19: Cliente 360° e Processo 360° (em implementação)
 - PR #20: Controladoria
 - PR #21: Jurídico completo
 - PR #22: Comercial do escritório
@@ -17,8 +17,8 @@
 - PR #30: Fechamento e preparação para lançamento
 
 ## Current checkpoint
-- PR #17: commit `271912e` na `feature/evolution-1.0`; 24 testes unitários focados passaram.
-- PR #18: Central de Atendimento em implementação na `feature/evolution-1.1-central-atendimento`.
-- Entregue nesta etapa: fila real, conversas recentes, estado de disponibilidade e canais; sem alterar dados ou simular integração.
-- Validação do #18: typecheck, ESLint focado e 24 testes unitários passaram.
-- Próximo: concluir revisão do #18 e abrir o PR; depois avançar ao Cliente e Processo 360° (#19).
+- PR #17: commit `271912e` em `feature/evolution-1.0`; PR aberto; 24 testes unitários focados passaram.
+- PR #18: aberto como [#18](https://github.com/Lforbias/legalos/pull/18), branch `feature/evolution-1.1-central-atendimento`, baseado no #17.
+- PR #18 entregue: fila e conversas reais, disponibilidade e canais; sem alterar dados ou simular integrações. Typecheck, ESLint focado e 24 testes passaram.
+- PR #19: branch `feature/evolution-1.2-360`, baseado no #18; ligando conversas às fichas 360° existentes com permissões preservadas.
+- Próximo: validar e abrir o #19; em seguida iniciar Controladoria (#20).

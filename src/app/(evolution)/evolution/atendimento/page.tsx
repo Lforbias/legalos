@@ -22,6 +22,7 @@ export default async function AtendimentoPage() {
   const dept = DEPARTMENTS.atendimento;
   const hasChat = can(ctx, "whatsapp:read");
   const hasClients = can(ctx, "clients:read");
+  const hasCases = can(ctx, "cases:read");
   const canManageChat = can(ctx, "whatsapp:manage");
   const canWorkChat = can(ctx, "whatsapp:write");
 
@@ -118,16 +119,18 @@ export default async function AtendimentoPage() {
             {conversations.length > 0 ? (
               <div className="divide-y divide-border rounded-xl border border-border bg-surface">
                 {conversations.slice(0, 6).map((conversation) => (
-                  <Link key={conversation.id} href={`/atendimento?c=${encodeURIComponent(conversation.id)}`} className="flex items-center justify-between gap-4 p-4 transition hover:bg-surface-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{conversation.client?.name ?? conversation.contactName ?? formatWaId(conversation.waId)}</p>
+                  <div key={conversation.id} className="flex flex-wrap items-center justify-between gap-3 p-4 transition hover:bg-surface-2">
+                    <Link href={`/atendimento?c=${encodeURIComponent(conversation.id)}`} className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium hover:text-primary">{conversation.client?.name ?? conversation.contactName ?? formatWaId(conversation.waId)}</p>
                       <p className="mt-1 truncate text-xs text-muted">{conversation.lastPreview || "Conversa sem prévia de mensagem"}</p>
-                    </div>
+                    </Link>
                     <div className="flex shrink-0 items-center gap-3 text-xs text-muted">
                       {conversation.unreadCount > 0 && <span className="rounded-full bg-primary/10 px-2 py-1 font-medium text-primary">{conversation.unreadCount} não lidas</span>}
                       <span>{messageTime(conversation.lastMessageAt, ctx.timezone)}</span>
                     </div>
-                  </Link>
+                    {(hasClients && conversation.client ? <Link href={`/clientes/${conversation.client.id}`} className="text-xs font-medium text-primary hover:underline">Cliente 360°</Link> : null)}
+                    {(hasCases && conversation.case ? <Link href={`/processos/${conversation.case.id}`} className="text-xs font-medium text-primary hover:underline">Processo 360°</Link> : null)}
+                  </div>
                 ))}
               </div>
             ) : conversationsResult.error ? null : <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">Nenhuma conversa aberta no momento.</p>}
