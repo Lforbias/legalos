@@ -16,6 +16,7 @@ const MAX_MOVEMENTS = 50;
 const lawsuitSchema = z.object({
   idprocessos: z.number().int().positive(),
   numero_processo: z.string(),
+  nome_classe: z.string().nullish(),
 });
 const movementSchema = z.object({
   idmovimentacoes: z.number().int().positive(),
@@ -39,7 +40,7 @@ async function getLegalMailList(path: "all" | "case-files", key: string, params:
   return body as unknown[];
 }
 
-export async function syncLegalMailHistory(ctx: TenantContext, caseId: string, fetcher: typeof fetch = fetch) {
+export async function syncLegalMailHistory(ctx: TenantContext, caseId: string, fetcher: typeof fetch = fetch, selectedId?: number) {
   assertCan(ctx, "cases:write");
   if (!(await canImportLegalMail(ctx))) throw new ConflictError("O LegalMail está disponível apenas para administradores do escritório autorizado.");
   const local = await assertCaseVisible(ctx, caseId);
@@ -59,7 +60,7 @@ export async function syncLegalMailHistory(ctx: TenantContext, caseId: string, f
   }
 
   const signal = AbortSignal.timeout(30000);
-  const matched = new Set<number>();
+  const matched = new Map<number, string | null>();
   for (let page = 0; page < MAX_PAGES; page++) {
     const results = await getLegalMailList("all", key, {
       offset: String(page * PAGE_SIZE), limit: String(PAGE_SIZE),
@@ -67,21 +68,33 @@ export async function syncLegalMailHistory(ctx: TenantContext, caseId: string, f
     const parsed = z.array(lawsuitSchema).safeParse(results);
     if (!parsed.success) throw new ConflictError("O LegalMail retornou uma lista de processos inválida.");
     for (const entry of parsed.data) {
-      if (isValidCnj(entry.numero_processo) && formatCnj(entry.numero_processo) === cnj) matched.add(entry.idprocessos);
+      if (isValidCnj(entry.numero_processo) && formatCnj(entry.numero_processo) === cnj) matched.set(entry.idprocessos, entry.nome_classe ?? null);
     }
-    if (matched.size > 1) throw new ConflictError("O LegalMail tem mais de um cadastro com este CNJ. A importação precisa de um vínculo explícito.");
+    if (selectedId !== undefined && matched.has(selectedId)) break;
     if (results.length < PAGE_SIZE) break;
     if (page === MAX_PAGES - 1) throw new ConflictError("Não foi possível verificar todo o acervo do LegalMail nesta consulta.");
   }
-  const [processId] = matched;
-  if (processId === undefined) return { found: false, total: 0, imported: 0 };
+  async function readMovements(processId: number) {
+    const raw = await getLegalMailList("case-files", key, { idprocessos: String(processId) }, signal, fetcher);
+    return raw
+      .map((item) => movementSchema.safeParse(item))
+      .flatMap((item) => item.success && item.data.fk_processo === processId ? [item.data] : [])
+      .sort((a, b) => b.data_movimentacao.localeCompare(a.data_movimentacao) || b.idmovimentacoes - a.idmovimentacoes);
+  }
 
-  const raw = await getLegalMailList("case-files", key, { idprocessos: String(processId) }, signal, fetcher);
-  const movements = raw
-    .map((item) => movementSchema.safeParse(item))
-    .flatMap((item) => item.success && item.data.fk_processo === processId ? [item.data] : [])
-    .sort((a, b) => b.data_movimentacao.localeCompare(a.data_movimentacao) || b.idmovimentacoes - a.idmovimentacoes)
-    .slice(0, MAX_MOVEMENTS);
+  if (selectedId !== undefined && !matched.has(selectedId)) {
+    throw new ConflictError("O cadastro escolhido não corresponde ao CNJ deste processo.");
+  }
+  if (selectedId === undefined && matched.size > 1) {
+    const candidates = await Promise.all([...matched].slice(0, 10).map(async ([id, className]) => {
+      const movements = await readMovements(id).catch(() => null);
+      return { id, className, total: movements?.length ?? null, latest: movements?.[0]?.data_movimentacao ?? null };
+    }));
+    return { found: true, total: 0, imported: 0, candidates };
+  }
+  const processId = selectedId ?? matched.keys().next().value;
+  if (processId === undefined) return { found: false, total: 0, imported: 0 };
+  const movements = (await readMovements(processId)).slice(0, MAX_MOVEMENTS);
 
   return db.$transaction(async (tx) => {
     const current = await assertCaseVisible(ctx, caseId, tx);

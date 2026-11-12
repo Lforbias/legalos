@@ -26,12 +26,17 @@ it("imports text movements from the matching process once and ignores documents"
     courtState: "SP", subject: "", claimValue: "", status: "ACTIVE", phase: "", distributedAt: "",
     confidential: false, notes: "", responsibleId: "", clientId: "", clientRole: "PLAINTIFF",
   });
+  let multiple = false;
   const fetcher = vi.fn<typeof fetch>(async (input) => {
     const url = new URL(String(input));
     expect(url.hostname).toBe("api.legalmail.com.br");
     if (url.pathname.endsWith("/all")) {
-      return Response.json([{ idprocessos: 456, numero_processo: number.replace(/\D/g, "") }]);
+      return Response.json([
+        { idprocessos: 456, numero_processo: number.replace(/\D/g, "") },
+        ...(multiple ? [{ idprocessos: 457, numero_processo: number, nome_classe: "Classe de teste" }] : []),
+      ]);
     }
+    if (url.searchParams.get("idprocessos") === "457") return Response.json([]);
     expect(url.searchParams.get("idprocessos")).toBe("456");
     return Response.json([
       { idmovimentacoes: 57, fk_processo: 456, titulo: "Movimentação", tipo: "movimentacao", data_movimentacao: "2026-11-09", texto: "Conclusos para despacho." },
@@ -43,6 +48,16 @@ it("imports text movements from the matching process once and ignores documents"
   try {
     expect(await syncLegalMailHistory(office.ctx, row.id, fetcher)).toEqual({ found: true, total: 1, imported: 1 });
     expect(await syncLegalMailHistory(office.ctx, row.id, fetcher)).toEqual({ found: true, total: 1, imported: 0 });
+    multiple = true;
+    expect(await syncLegalMailHistory(office.ctx, row.id, fetcher)).toMatchObject({
+      imported: 0,
+      candidates: [
+        { id: 456, total: 1, latest: "2026-11-09" },
+        { id: 457, total: 0, latest: null },
+      ],
+    });
+    await expect(syncLegalMailHistory(office.ctx, row.id, fetcher, 900)).rejects.toThrow("não corresponde ao CNJ");
+    expect(await syncLegalMailHistory(office.ctx, row.id, fetcher, 456)).toEqual({ found: true, total: 1, imported: 0 });
     expect(await listCaseEvents(office.ctx, row.id, "IMPORTED")).toMatchObject([
       { kind: "LEGALMAIL_MOVEMENT", description: "Conclusos para despacho.", externalKey: "legalmail:57" },
     ]);

@@ -93,11 +93,12 @@ export async function createLegalMailWebhookKey() {
   });
 }
 
-export async function syncLegalMailHistoryAction(input: string) {
+export async function syncLegalMailHistoryAction(input: string, selected?: number) {
   return runAction(async () => {
     const { ctx } = await requireTenant();
     const caseId = z.uuid().parse(input);
-    const result = await syncLegalMailHistory(ctx, caseId);
+    const providerId = z.number().int().positive().optional().parse(selected);
+    const result = await syncLegalMailHistory(ctx, caseId, undefined, providerId);
     revalidatePath(`/processos/${caseId}`);
     return result;
   });
