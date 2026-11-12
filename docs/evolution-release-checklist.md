@@ -2,7 +2,7 @@
 
 ## Situação
 
-**Ainda não liberada para homologação.** Os PRs #17–#29 estão abertos e marcados como mergeáveis no GitHub na data deste checkpoint. Nenhum foi integrado à `main`; nenhum deploy foi feito.
+**Ainda não liberada para homologação.** Os PRs #17–#30 estão abertos e marcados como mergeáveis no GitHub na data deste checkpoint. Nenhum foi integrado à `main`; nenhum deploy foi feito.
 
 ## Evidências desta rodada
 
