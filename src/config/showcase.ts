@@ -107,9 +107,9 @@ const ALL_MODULES: ModuleShot[] = [
 ];
 
 const ALL_SPACES = [
-  { name: "LegalOS Func", tone: "#7C8CFF", text: "A gestão do escritório: clientes, processos, tarefas, prazos, agenda, documentos, financeiro, CRM e relatórios.", items: ["Clientes e processos", "Tarefas, prazos e agenda", "Financeiro e relatórios", "Portal do cliente"] },
+  { name: "Gestão do escritório", tone: "#7C8CFF", text: "A gestão do escritório: clientes, processos, tarefas, prazos, agenda, documentos, financeiro, CRM e relatórios.", items: ["Clientes e processos", "Tarefas, prazos e agenda", "Financeiro e relatórios", "Portal do cliente"] },
   { name: "LegalOS Box", tone: "#0f8f83", text: "A caixa de intimações e o peticionamento: captura, distribuição, certificados digitais e integrações com tribunais.", items: ["Caixa de entrada jurídica", "DJEN e DataJud", "Cofre de certificados A1", "Petições e conector PJe/MNI"] },
-  { name: "LegalOS Chat", tone: "#e0a800", text: "WhatsApp ligado à rotina jurídica e caixa de e-mail compartilhada, com configuração por escritório.", items: ["Filas, etiquetas, macros e listas salvas", "Copiloto com revisão humana", "Campanhas com aprovação e agendamento", "E-mail IMAP/SMTP e respostas em texto"] },
+  { name: "Atendimento", tone: "#e0a800", text: "WhatsApp ligado à rotina jurídica e caixa de e-mail compartilhada, com configuração por escritório.", items: ["Filas, etiquetas, macros e listas salvas", "Copiloto com revisão humana", "Campanhas com aprovação e agendamento", "E-mail IMAP/SMTP e respostas em texto"] },
 ] as const;
 
 /** A RUTE já está disponível (6.0). Nasce desligada em cada escritório. */

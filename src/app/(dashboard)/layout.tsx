@@ -4,13 +4,11 @@ import { AppShell } from "@/components/layout/app-shell";
 import { EVOLUTION_NAV } from "@/config/evolution-navigation";
 import { NAV_ITEMS, navItemInBoxVersion } from "@/config/navigation";
 import { boxV2Enabled } from "@/lib/features";
-import { evolutionEnabled } from "@/lib/evolution";
 import { can } from "@/server/context";
 import { prototypesEnabled } from "@/modules/prototypes/registry";
 import { ResendVerificationButton } from "@/modules/auth/components";
 import { listNotifications, syncDueNotifications, unreadCount } from "@/server/services/notification.service";
 import { listUserOrganizations } from "@/server/services/organization.service";
-import { countNewNotices } from "@/server/services/box.service";
 import { getEntitlements } from "@/server/services/plan.service";
 import { requireTenant } from "@/server/session";
 import { unreadTotal } from "@/server/services/whatsapp.service";
@@ -30,7 +28,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
   // avisos de vencimento são gerados sob demanda (no máximo 1x/min por usuário); falha aqui nunca derruba a página
   await syncDueNotifications(ctx).catch(() => 0);
   const [unread, latest] = await Promise.all([unreadCount(ctx), listNotifications(ctx, { take: 8 })]);
-  const boxBadge = can(ctx, "inbox:read") ? await countNewNotices(ctx).catch(() => 0) : 0;
   const chatBadge = can(ctx, "whatsapp:read") ? await unreadTotal(ctx).catch(() => 0) : 0;
   const ent = await getEntitlements(ctx.organizationId).catch(() => null);
   const planNotice = ent ? PLAN_NOTICE[ent.state]?.(ent.trialDaysLeft) ?? null : null;
@@ -41,9 +38,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return (n.key !== "prototypes" || prototypesEnabled()) && navItemInBoxVersion(n, boxV2) && permitted;
   }).map((n) => n.key);
 
-  const evolutionKeys = evolutionEnabled() ? EVOLUTION_NAV.filter((item) =>
+  const evolutionKeys = EVOLUTION_NAV.filter((item) =>
     item.permissionAny ? item.permissionAny.some((permission) => can(ctx, permission)) : !item.permission || can(ctx, item.permission),
-  ).map((item) => item.key) : undefined;
+  ).map((item) => item.key);
 
   return (
     <AppShell
@@ -51,7 +48,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
       organizations={organizations.map((o) => ({ id: o.id, name: o.name, roleName: o.roleName }))}
       activeOrganizationId={ctx.organizationId}
       visibleKeys={visibleKeys}
-      boxBadge={boxBadge}
       chatBadge={chatBadge}
       evolutionKeys={evolutionKeys}
       canInvite={can(ctx, "members:invite")}

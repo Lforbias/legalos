@@ -4,32 +4,29 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { PanelLeftClose, PanelLeftOpen, ChevronDown, X } from "lucide-react";
 import * as React from "react";
-import { DEPARTMENTS, EVOLUTION_NAV, ROUTE_MATRIX, type Department } from "@/config/evolution-navigation";
+import { DEPARTMENTS, EVOLUTION_NAV, type Department } from "@/config/evolution-navigation";
 import { NAV_ITEMS } from "@/config/navigation";
 import { useLocalStorageValue } from "@/lib/hooks/use-local-storage";
 import { cn } from "@/lib/utils";
 import { Brand } from "@/components/layout/brand";
 
 function deptOfPath(pathname: string): Department | null {
-  if (pathname === "/evolution" || pathname === "/evolution/") return "lobby";
-  const match = pathname.match(/^\/evolution\/([^/]+)/);
-  if (!match) {
-    if (pathname.startsWith("/box-v3")) return "controladoria";
-    if (pathname === "/ajuda" || pathname === "/prototipos") return "administracao";
-    const route = ROUTE_MATRIX.find(({ ethos }) => pathname === ethos || pathname.startsWith(`${ethos}/`));
-    return route && route.evolution !== "external" ? route.evolution : null;
-  }
-  return (match[1] as Department) in DEPARTMENTS ? (match[1] as Department) : null;
+  if (pathname === "/evolution") return "lobby";
+  if (pathname === "/box-v3" || pathname.startsWith("/box-v3/")) return "controladoria";
+  if (pathname === "/ajuda" || pathname === "/prototipos") return "administracao";
+  return EVOLUTION_NAV.find(({ href }) => pathname === href || pathname.startsWith(`${href}/`))?.department ?? null;
 }
 
 export function EvolutionSidebar({
   visibleKeys,
   menuKeys,
+  chatBadge,
   mobileOpen,
   onCloseMobile,
 }: {
   visibleKeys: string[];
   menuKeys: string[];
+  chatBadge: number;
   mobileOpen: boolean;
   onCloseMobile: () => void;
 }) {
@@ -108,6 +105,9 @@ export function EvolutionSidebar({
               ) : (
                 <>
                   <span className="flex-1 truncate text-left">{info.name}</span>
+                  {dept === "atendimento" && chatBadge > 0 && (
+                    <span aria-hidden="true" title={`${chatBadge} mensagens não lidas`} className="rounded-full bg-primary/10 px-1.5 text-[11px] tabular-nums text-primary-text">{chatBadge}</span>
+                  )}
                   <ChevronDown aria-hidden className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")} />
                 </>
               )}

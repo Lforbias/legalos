@@ -53,140 +53,60 @@ export type EvolutionNavItem = {
   key: string;
   department: Department;
   label: string;
-  /** Path within Evolution for the department landing page, or existing route for deep links. */
   href: string;
   icon: LucideIcon;
   permission?: PermissionKey;
   permissionAny?: PermissionKey[];
-  /** When set, this links to an existing Ethos route rather than an Evolution page. */
-  existingRoute?: boolean;
 };
 
 export const EVOLUTION_NAV: EvolutionNavItem[] = [
   // Minha Mesa
   { key: "evo-mesa", department: "mesa", label: "Minha Mesa", href: "/evolution/mesa", icon: Monitor },
-  { key: "evo-mesa-tarefas", department: "mesa", label: "Tarefas", href: "/tarefas", icon: CheckSquare, permission: "tasks:read", existingRoute: true },
-  { key: "evo-mesa-agenda", department: "mesa", label: "Agenda", href: "/agenda", icon: CalendarClock, permission: "deadlines:read", existingRoute: true },
-  { key: "evo-mesa-workspace", department: "mesa", label: "Área de Trabalho", href: "/area-de-trabalho", icon: FolderOpen, permission: "clients:read", existingRoute: true },
-  { key: "evo-mesa-gestao", department: "mesa", label: "Gestão", href: "/gestao", icon: FolderKanban, permission: "tasks:read", existingRoute: true },
+  { key: "evo-mesa-tarefas", department: "mesa", label: "Tarefas", href: "/tarefas", icon: CheckSquare, permission: "tasks:read" },
+  { key: "evo-mesa-agenda", department: "mesa", label: "Agenda", href: "/agenda", icon: CalendarClock, permission: "deadlines:read" },
+  { key: "evo-mesa-workspace", department: "mesa", label: "Área de Trabalho", href: "/area-de-trabalho", icon: FolderOpen, permission: "clients:read" },
+  { key: "evo-mesa-gestao", department: "mesa", label: "Gestão", href: "/gestao", icon: FolderKanban, permission: "tasks:read" },
 
   // Jurídico
   { key: "evo-juridico", department: "juridico", label: "Jurídico", href: "/evolution/juridico", icon: Scale },
-  { key: "evo-juridico-processos", department: "juridico", label: "Processos", href: "/processos", icon: FolderOpen, permission: "cases:read", existingRoute: true },
-  { key: "evo-juridico-prazos", department: "juridico", label: "Prazos", href: "/prazos", icon: Hourglass, permission: "deadlines:read", existingRoute: true },
-  { key: "evo-juridico-documentos", department: "juridico", label: "Documentos", href: "/documentos", icon: FileText, permission: "documents:read", existingRoute: true },
-  { key: "evo-juridico-calculos", department: "juridico", label: "Cálculos", href: "/calculos", icon: Calculator, permission: "cases:read", existingRoute: true },
-  { key: "evo-juridico-ia", department: "juridico", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use", existingRoute: true },
+  { key: "evo-juridico-processos", department: "juridico", label: "Processos", href: "/processos", icon: FolderOpen, permission: "cases:read" },
+  { key: "evo-juridico-prazos", department: "juridico", label: "Prazos", href: "/prazos", icon: Hourglass, permission: "deadlines:read" },
+  { key: "evo-juridico-documentos", department: "juridico", label: "Documentos", href: "/documentos", icon: FileText, permission: "documents:read" },
+  { key: "evo-juridico-calculos", department: "juridico", label: "Cálculos", href: "/calculos", icon: Calculator, permission: "cases:read" },
+  { key: "evo-juridico-ia", department: "juridico", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use" },
 
   // Controladoria
   { key: "evo-controladoria", department: "controladoria", label: "Controladoria", href: "/evolution/controladoria", icon: ShieldCheck },
-  { key: "evo-controladoria-caixa", department: "controladoria", label: "Caixa de entrada", href: "/caixa-de-entrada", icon: FolderOpen, permission: "inbox:read", existingRoute: true },
-  { key: "evo-controladoria-alertas", department: "controladoria", label: "Central de alertas", href: "/alertas", icon: ShieldCheck, existingRoute: true },
+  { key: "evo-controladoria-caixa", department: "controladoria", label: "Caixa de entrada", href: "/caixa-de-entrada", icon: FolderOpen, permission: "inbox:read" },
+  { key: "evo-controladoria-alertas", department: "controladoria", label: "Central de alertas", href: "/alertas", icon: ShieldCheck },
 
   // Atendimento
   { key: "evo-atendimento", department: "atendimento", label: "Atendimento", href: "/evolution/atendimento", icon: HeadphonesIcon },
-  { key: "evo-atendimento-conversas", department: "atendimento", label: "Conversas", href: "/atendimento", icon: MessageCircle, permission: "whatsapp:read", existingRoute: true },
-  { key: "evo-atendimento-clientes", department: "atendimento", label: "Clientes", href: "/clientes", icon: Users, permission: "clients:read", existingRoute: true },
-  { key: "evo-atendimento-copiloto", department: "atendimento", label: "Copiloto", href: "/copiloto", icon: Bot, permission: "ai:use", existingRoute: true },
-  { key: "evo-atendimento-config", department: "atendimento", label: "Configurar o Chat", href: "/atendimento/configuracoes", icon: Settings2, permission: "whatsapp:manage", existingRoute: true },
+  { key: "evo-atendimento-conversas", department: "atendimento", label: "Conversas", href: "/atendimento", icon: MessageCircle, permission: "whatsapp:read" },
+  { key: "evo-atendimento-clientes", department: "atendimento", label: "Clientes", href: "/clientes", icon: Users, permission: "clients:read" },
+  { key: "evo-atendimento-copiloto", department: "atendimento", label: "Copiloto", href: "/copiloto", icon: Bot, permission: "ai:use" },
+  { key: "evo-atendimento-config", department: "atendimento", label: "Configurar o Chat", href: "/atendimento/configuracoes", icon: Settings2, permission: "whatsapp:manage" },
 
   // Comercial
   { key: "evo-comercial", department: "comercial", label: "Comercial", href: "/evolution/comercial", icon: TrendingUp },
-  { key: "evo-comercial-crm", department: "comercial", label: "CRM / Leads", href: "/crm", icon: Briefcase, permission: "crm:read", existingRoute: true },
-  { key: "evo-comercial-portal", department: "comercial", label: "Mensagens do portal", href: "/portal-equipe", icon: Globe, permission: "clients:read", existingRoute: true },
+  { key: "evo-comercial-crm", department: "comercial", label: "CRM / Leads", href: "/crm", icon: Briefcase, permission: "crm:read" },
+  { key: "evo-comercial-portal", department: "comercial", label: "Mensagens do portal", href: "/portal-equipe", icon: Globe, permission: "clients:read" },
 
   // Financeiro
   { key: "evo-financeiro", department: "financeiro", label: "Financeiro & Contábil", href: "/evolution/financeiro", icon: Wallet },
-  { key: "evo-financeiro-lancamentos", department: "financeiro", label: "Lançamentos", href: "/financeiro", icon: Wallet, permission: "finance:read", existingRoute: true },
+  { key: "evo-financeiro-lancamentos", department: "financeiro", label: "Lançamentos", href: "/financeiro", icon: Wallet, permission: "finance:read" },
 
   // Administração
   { key: "evo-administracao", department: "administracao", label: "Administração & Gestão", href: "/evolution/administracao", icon: Settings2 },
-  { key: "evo-admin-indicadores", department: "administracao", label: "Indicadores", href: "/indicadores", icon: BarChart3, existingRoute: true },
-  { key: "evo-admin-equipe", department: "administracao", label: "Equipe", href: "/equipe", icon: UserSquare2, permission: "productivity:read", existingRoute: true },
-  { key: "evo-admin-integracoes", department: "administracao", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage", existingRoute: true },
-  { key: "evo-admin-automacoes", department: "administracao", label: "Automações", href: "/automacoes", icon: Zap, permission: "workflows:manage", existingRoute: true },
-  { key: "evo-admin-config", department: "administracao", label: "Configurações", href: "/configuracoes", icon: LayoutDashboard, existingRoute: true },
-  { key: "evo-admin-reports", department: "administracao", label: "Relatórios e BI", href: "/relatorios", icon: BarChart3, permission: "reports:read", existingRoute: true },
-  { key: "evo-admin-rute", department: "administracao", label: "RUTE (IA)", href: "/rute", icon: Bot, permission: "ai:use", existingRoute: true },
+  { key: "evo-admin-indicadores", department: "administracao", label: "Indicadores", href: "/indicadores", icon: BarChart3 },
+  { key: "evo-admin-equipe", department: "administracao", label: "Equipe", href: "/equipe", icon: UserSquare2, permission: "productivity:read" },
+  { key: "evo-admin-integracoes", department: "administracao", label: "Integrações", href: "/integracoes", icon: Plug, permission: "integrations:manage" },
+  { key: "evo-admin-automacoes", department: "administracao", label: "Automações", href: "/automacoes", icon: Zap, permission: "workflows:manage" },
+  { key: "evo-admin-config", department: "administracao", label: "Configurações", href: "/configuracoes", icon: LayoutDashboard },
+  { key: "evo-admin-reports", department: "administracao", label: "Relatórios e BI", href: "/relatorios", icon: BarChart3, permission: "reports:read" },
+  { key: "evo-admin-rute", department: "administracao", label: "RUTE (IA)", href: "/rute", icon: Bot, permission: "ai:use" },
 ];
 
 export function departmentItems(dept: Department) {
   return EVOLUTION_NAV.filter((n) => n.department === dept && n.key !== `evo-${dept}`);
 }
-
-/**
- * Maps Evolution nav items with `existingRoute` to their corresponding Ethos
- * NAV_ITEMS key so the Topbar's GlobalSearch and Desktop shortcut keep working.
- */
-const ETHOS_KEY_MAP: Record<string, string> = {
-  "evo-mesa-tarefas": "tasks",
-  "evo-mesa-agenda": "calendar",
-  "evo-mesa-workspace": "workspace",
-  "evo-mesa-gestao": "management",
-  "evo-juridico-processos": "cases",
-  "evo-juridico-prazos": "deadlines",
-  "evo-juridico-documentos": "documents",
-  "evo-juridico-calculos": "calculations",
-  "evo-juridico-ia": "ai",
-  "evo-controladoria-caixa": "inbox",
-  "evo-controladoria-alertas": "alerts",
-  "evo-atendimento-conversas": "whatsapp",
-  "evo-atendimento-clientes": "clients",
-  "evo-atendimento-copiloto": "copilot",
-  "evo-atendimento-config": "chat-settings",
-  "evo-comercial-crm": "crm",
-  "evo-comercial-portal": "portal-team",
-  "evo-financeiro-lancamentos": "finance",
-  "evo-admin-indicadores": "indicators",
-  "evo-admin-equipe": "team",
-  "evo-admin-integracoes": "integrations",
-  "evo-admin-automacoes": "workflows",
-  "evo-admin-config": "settings",
-  "evo-admin-reports": "reports",
-  "evo-admin-rute": "rute",
-};
-
-/**
- * Expands Evolution visible keys to include the corresponding Ethos keys,
- * preserving the permissions checked before calling this function.
- */
-export function expandVisibleKeys(evoKeys: string[]): string[] {
-  const expanded = new Set(evoKeys);
-  for (const k of evoKeys) {
-    const ethos = ETHOS_KEY_MAP[k];
-    if (ethos) expanded.add(ethos);
-  }
-  expanded.add("overview");
-  return Array.from(expanded);
-}
-
-/** Map from old Ethos routes to Evolution departments for traceability. */
-export const ROUTE_MATRIX: { ethos: string; evolution: Department | "external"; description: string }[] = [
-  { ethos: "/dashboard", evolution: "lobby", description: "Dashboard → Lobby do escritório" },
-  { ethos: "/area-de-trabalho", evolution: "mesa", description: "Área de Trabalho → Minha Mesa > Área de Trabalho" },
-  { ethos: "/tarefas", evolution: "mesa", description: "Tarefas → Minha Mesa > Tarefas" },
-  { ethos: "/agenda", evolution: "mesa", description: "Agenda → Minha Mesa > Agenda" },
-  { ethos: "/gestao", evolution: "mesa", description: "Gestão → Minha Mesa > Gestão" },
-  { ethos: "/processos", evolution: "juridico", description: "Processos → Jurídico > Processos" },
-  { ethos: "/prazos", evolution: "juridico", description: "Prazos → Jurídico > Prazos" },
-  { ethos: "/documentos", evolution: "juridico", description: "Documentos → Jurídico > Documentos" },
-  { ethos: "/calculos", evolution: "juridico", description: "Cálculos → Jurídico > Cálculos" },
-  { ethos: "/ia", evolution: "juridico", description: "Inteligência artificial → Jurídico > Inteligência artificial" },
-  { ethos: "/caixa-de-entrada", evolution: "controladoria", description: "Caixa de entrada → Controladoria > Caixa de entrada" },
-  { ethos: "/alertas", evolution: "controladoria", description: "Alertas → Controladoria > Alertas" },
-  { ethos: "/atendimento", evolution: "atendimento", description: "Chat / WhatsApp → Atendimento > Conversas" },
-  { ethos: "/atendimento/configuracoes", evolution: "atendimento", description: "Configuração do Chat → Atendimento > Configurar o Chat" },
-  { ethos: "/clientes", evolution: "atendimento", description: "Clientes → Atendimento > Clientes" },
-  { ethos: "/copiloto", evolution: "atendimento", description: "Copiloto → Atendimento > Copiloto" },
-  { ethos: "/crm", evolution: "comercial", description: "CRM → Comercial > CRM / Leads" },
-  { ethos: "/portal", evolution: "external", description: "Portal autenticado do cliente; permanece fora da navegação interna" },
-  { ethos: "/portal-equipe", evolution: "comercial", description: "Mensagens do portal → Comercial > Mensagens do portal" },
-  { ethos: "/financeiro", evolution: "financeiro", description: "Financeiro → Financeiro > Lançamentos" },
-  { ethos: "/indicadores", evolution: "administracao", description: "Indicadores → Administração > Indicadores" },
-  { ethos: "/equipe", evolution: "administracao", description: "Equipe → Administração > Equipe" },
-  { ethos: "/integracoes", evolution: "administracao", description: "Integrações → Administração > Integrações" },
-  { ethos: "/automacoes", evolution: "administracao", description: "Automações → Administração > Automações" },
-  { ethos: "/configuracoes", evolution: "administracao", description: "Configurações → Administração > Configurações" },
-  { ethos: "/relatorios", evolution: "administracao", description: "Relatórios → Administração > Indicadores" },
-  { ethos: "/rute", evolution: "administracao", description: "RUTE → Administração > RUTE (IA)" },
-];

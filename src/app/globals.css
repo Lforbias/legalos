@@ -74,46 +74,6 @@
   --wa-tick: #2a9fd6;
 }
 
-/* Identidade própria do LegalOS Func. */
-[data-space="func"] {
-  --primary: #7C8CFF;
-  --primary-hover: #98a4ff;
-  --primary-fg: #0A0C13;
-  --primary-text: #a6b0ff;
-  --accent: #FF3B4E;
-  --accent-text: #ff8490;
-  --ring: #7C8CFF;
-}
-:root[data-theme="light"] [data-space="func"] {
-  --primary: #4F5DE0;
-  --primary-hover: #414ec4;
-  --primary-fg: #ffffff;
-  --primary-text: #414ec4;
-  --accent: #E5243B;
-  --accent-text: #b91f32;
-  --ring: #4F5DE0;
-}
-
-/* Espaço "Box" (caixa de intimações): mesma interface, identidade verde-água para o usuário saber onde está. */
-[data-space="box"] {
-  --primary: #2DD4BF;
-  --primary-hover: #5de0d0;
-  --primary-fg: #0A0C13;
-  --primary-text: #65e4d4;
-  --accent: #FF3B4E;
-  --accent-text: #ff8490;
-  --ring: #2dd4bf;
-}
-:root[data-theme="light"] [data-space="box"] {
-  --primary: #0F9F8F;
-  --primary-hover: #0b8377;
-  --primary-fg: #0A0C13;
-  --primary-text: #0F8175;
-  --accent: #E5243B;
-  --accent-text: #b91f32;
-  --ring: #0F9F8F;
-}
-
 /* Os arquivos de marca têm versões próprias para fundos claros e escuros. */
 .brand-theme-dark,
 .brand-theme-light { display: none; }
@@ -212,27 +172,6 @@ textarea { font: inherit; }
   animation: lo-fade-in 120ms ease-out;
 }
 
-/* Espaço "Chat" (atendimento por WhatsApp): identidade amarela. O texto sobre o amarelo é escuro para manter o contraste. */
-[data-space="chat"] {
-  --primary: #facc15;
-  --primary-hover: #fde047;
-  --primary-fg: #1c1500;
-  --primary-text: #fde047;
-  --accent: #f59e0b;
-  --accent-text: #fcd34d;
-  --ring: #facc15;
-}
-:root[data-theme="light"] [data-space="chat"] {
-  --primary: #C79A00;
-  --primary-hover: #a98200;
-  --primary-fg: #1c1500;
-  --primary-text: #8e6c00;
-  --accent: #E5243B;
-  --accent-text: #b91f32;
-  --ring: #C79A00;
-}
-
-
 /* LegalOS Chat: fundo da conversa e balões no estilo do WhatsApp. */
 .wa-wallpaper {
   background-color: var(--wa-bg);
@@ -324,6 +263,6 @@ textarea { font: inherit; }
 }
 
 /* Keep the assistant launcher out of the desktop conversation controls. */
-:is([data-space="chat"], [data-space="evolution"]):has([data-chat-info-panel]) .rute-launcher-chat {
+[data-space="evolution"]:has([data-chat-info-panel]) .rute-launcher-chat {
   right: calc(320px + 1.25rem);
 }

@@ -12,10 +12,10 @@ describe("Box retirado: flags antigas não reativam o módulo", () => {
   it("remove navegação das duas versões e mantém Func e Chat", () => {
     for (const flag of [true, false]) {
       const visible = NAV_ITEMS.filter(n => navItemInBoxVersion(n, flag));
-      expect(visible.some(n => n.space === "box")).toBe(false);
+      expect(visible.some(n => Boolean(n.box))).toBe(false);
       expect(visible.some(n => n.key === "overview")).toBe(true);
       expect(visible.some(n => n.key === "whatsapp")).toBe(true);
-      expect(visible.some(n => n.key === "integrations" && n.space === "func")).toBe(true);
+      expect(visible.some(n => n.key === "integrations")).toBe(true);
     }
   });
 });

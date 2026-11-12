@@ -34,13 +34,13 @@
 - O botão da RUTE se afasta das ações da conversa quando o painel lateral está aberto no desktop.
 - Os testes de IA, importação, tarefas, prospecção e páginas públicas acompanham os rótulos e as regras da versão atual.
 
-Para reproduzir, use `npm run build` e `npm run test:e2e` com `DATABASE_URL` e `TEST_DATABASE_URL` apontando para um PostgreSQL isolado de teste. O projeto Chromium ativa a Evolution e o teste `src/tests/e2e/evolution.spec.ts` grava as 12 capturas em `test-results/`.
+Para reproduzir, use `npm run build` e `npm run test:e2e` com `DATABASE_URL` e `TEST_DATABASE_URL` apontando para um PostgreSQL isolado de teste. O teste `src/tests/e2e/evolution.spec.ts` grava as 12 capturas em `test-results/`.
 
 Nenhum merge ou deploy foi executado.
 
 ## Interface única e cobertura funcional
 
-A Evolution usa a mesma estrutura de navegação nas páginas departamentais e nos módulos internos, inclusive quando uma URL operacional é aberta diretamente. O resumo do escritório permanece acessível pelo menu da Evolution. O Portal externo e o LegalOS Desktop têm seus próprios layouts.
+A Evolution é carregada em todas as instalações e usa a mesma estrutura de navegação nas páginas departamentais e nos módulos internos, inclusive quando uma URL operacional é aberta diretamente. O resumo do escritório permanece acessível pelo menu da Evolution. O Portal externo e o LegalOS Desktop têm seus próprios layouts. O seletor de versões e os componentes da interface antiga foram removidos.
 
 A conferência abaixo compara o escopo dos seis departamentos com as telas e serviços encontrados no repositório. A coluna de cobertura identifica implementação existente. O aceite de cada fluxo depende de teste funcional.
 

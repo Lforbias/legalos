@@ -83,8 +83,8 @@ export default function ProdutoHome() {
 
       {/* ESPAÇOS */}
       <section className="mx-auto max-w-7xl px-4 pb-24">
-        <SectionTitle center eyebrow="Três espaços, um só sistema" title="Cada rotina no seu lugar. Tudo ligado." />
-        <div className="mt-14 grid gap-5 md:grid-cols-3">
+        <SectionTitle center eyebrow="LegalOS Evolution" title="Cada rotina no seu lugar. Tudo ligado." />
+        <div className="mt-14 grid gap-5 md:grid-cols-2">
           {SPACES.map((s, i) => (
             <Reveal key={s.name} delay={i * 100}>
               <article className="group relative h-full overflow-hidden rounded-3xl border border-border bg-surface p-7 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/10">

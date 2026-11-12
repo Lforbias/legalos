@@ -321,20 +321,16 @@ test("WhatsApp: o menu mostra Atendimento e quem não tem permissão não entra 
   await page.getByLabel("Nome do escritório").fill(`Banca menu ${id}`);
   await page.getByRole("button", { name: "Criar escritório" }).click();
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
-  // O atendimento é o lugar próprio "LegalOS Chat", fora do menu do Func.
-  await expect(page.getByTestId("space-chat").first()).toBeVisible();
-  await expect(page.getByRole("navigation", { name: "Navegação Func" }).first().getByRole("link", { name: /Conversas/ })).toHaveCount(0);
-  await page.getByTestId("space-chat").first().click();
+  const nav = page.getByRole("navigation", { name: "Navegação Evolution" });
+  await nav.getByRole("button", { name: "Atendimento", exact: true }).click();
+  await nav.getByRole("link", { name: "Conversas", exact: true }).click();
   await expect(page).toHaveURL(/\/atendimento$/);
-  await expect(page.locator("[data-space]").first()).toHaveAttribute("data-space", "chat");
-  const chatNav = page.getByRole("navigation", { name: "Navegação Chat" }).first();
-  await expect(chatNav.getByRole("link", { name: /Conversas/ })).toBeVisible();
-  await expect(chatNav.getByRole("link", { name: /Configurar o Chat/ })).toBeVisible();
-  await expect(chatNav.getByRole("link", { name: /^Processos/ })).toHaveCount(0);
-  await chatNav.getByRole("link", { name: /Configurar o Chat/ }).click();
+  await expect(page.locator("[data-space]").first()).toHaveAttribute("data-space", "evolution");
+  await expect(nav.getByRole("link", { name: "Conversas", exact: true })).toHaveAttribute("aria-current", "page");
+  await nav.getByRole("link", { name: "Configurar o Chat" }).click();
   await expect(page.getByTestId("wa-config")).toBeVisible();
-  await expect(page.locator("[data-space]").first()).toHaveAttribute("data-space", "chat");
-  await page.getByTestId("space-func").first().click();
+  await expect(nav).toBeVisible();
+  await nav.getByRole("link", { name: "Resumo do escritório" }).click();
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 });
 
