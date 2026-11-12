@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-test("Navegação organizada, configurações por assunto e RUTE no painel", async ({ page }) => {
+test("Navegação organizada, configurações por assunto e RUTE desativada", async ({ page }) => {
   const id = Math.random().toString(36).slice(2, 9);
   await page.goto("/register");
   await page.getByLabel("Nome completo").fill(`Pessoa UX ${id}`);
@@ -33,48 +33,16 @@ test("Navegação organizada, configurações por assunto e RUTE no painel", asy
   await expect(page.getByTestId("plan-card")).toBeVisible();
   await page.goto("/configuracoes");
   await page.screenshot({ path: "/tmp/legalos-ux-settings.png", fullPage: true });
-  const before = page.url();
-  const launcher = page.getByRole("button", { name: "Abrir RUTE", exact: true });
-  await launcher.click();
-  const panel = page.getByRole("dialog", { name: /^RUTE/ });
-  await expect(panel).toBeVisible();
-  await expect(panel.getByRole("heading", { name: /Um novo ritmo/ })).toBeVisible();
-  await expect(page).toHaveURL(before);
-  await page.screenshot({ path: "/tmp/legalos-ux-rute.png", fullPage: true });
-  await page.keyboard.press("Escape");
-  await expect(panel).toBeHidden();
-  await expect(launcher).toBeFocused();
-  // Provedor fictício apenas para disponibilizar o compositor; nenhuma mensagem é enviada à IA.
-  const { Client } = await import("pg");
-  const { encryptSecret } = await import("../../lib/security/totp");
-  const databaseUrl = process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test";
-  if (!/test/i.test(new URL(databaseUrl).pathname)) throw Error("Fixture exige banco de testes");
-  const database = new Client({ connectionString: databaseUrl }); await database.connect();
-  try {
-    const { rows } = await database.query('SELECT m.organization_id FROM memberships m JOIN users u ON u.id = m.user_id WHERE u.email = $1', [`ux-${id}@example.test`]);
-    const org = rows[0].organization_id;
-    await database.query('UPDATE organizations SET ai_enabled = true WHERE id = $1', [org]);
-    await database.query('INSERT INTO rute_settings (id, organization_id, assistant_enabled, api_key_enc) VALUES ($1,$2,true,$3) ON CONFLICT (organization_id) DO UPDATE SET assistant_enabled = true, api_key_enc = EXCLUDED.api_key_enc', [crypto.randomUUID(), org, encryptSecret("provedor-ficticio-nao-enviar", Buffer.alloc(32, 5))]);
-  } finally { await database.end(); }
-  await launcher.click();
-  const message = panel.getByRole("textbox", { name: "Mensagem para a RUTE", exact: true });
-  await expect(message).toBeVisible(); await message.fill("Meu rascunho de pergunta");
-  await page.keyboard.press("Escape"); await launcher.click();
-  await expect(message).toHaveValue("Meu rascunho de pergunta");
-  await expect(page).toHaveURL(before);
-  await page.screenshot({ path: "/tmp/legalos-ux-rute-chat.png", fullPage: true });
+  await expect(page.getByRole("button", { name: "Abrir RUTE", exact: true })).toHaveCount(0);
+  await page.goto("/rute");
+  await expect(page.getByRole("heading", { name: "RUTE desativada" })).toBeVisible();
+  await page.goto("/configuracoes");
+  await expect(page.getByRole("link", { name: /RUTE e inteligência artificial/ })).toHaveCount(0);
   await nav.getByRole("button", { name: "Jurídico", exact: true }).click();
   await nav.getByRole("link", { name: "Processos", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Processos e casos", exact: true })).toBeVisible();
-  await expect(panel).toBeVisible(); await expect(message).toHaveValue("Meu rascunho de pergunta");
-  await panel.getByRole("button", { name: "Fechar RUTE", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
-  await launcher.click();
-  await expect(panel).toBeVisible();
-  const bounds = await panel.boundingBox();
-  expect(bounds!.width).toBeLessThanOrEqual(390);
-  expect(bounds!.x).toBeGreaterThanOrEqual(0);
-  await panel.getByRole("button", { name: "Fechar RUTE", exact: true }).click();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu", exact: true });
   await expect(menu.getByRole("link", { name: "Processos", exact: true })).toBeVisible();

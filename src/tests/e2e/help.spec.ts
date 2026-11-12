@@ -20,8 +20,9 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await expect(page.getByRole("heading", { name: /Tratar uma intimação/ })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /Preparar o escritório/ })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("");
-  await page.getByRole("button", { name: "RUTE", exact: true }).click();
-  await expect(page.getByRole("status")).toHaveText(`${HELP_GUIDES.filter(g => g.area === "RUTE").length} guias encontrados`);
+  await expect(page.getByRole("button", { name: "RUTE", exact: true })).toHaveCount(0);
+  await page.getByRole("button", { name: "Chat", exact: true }).click();
+  await expect(page.getByRole("status")).toHaveText(`${HELP_GUIDES.filter(g => g.area === "Chat").length} guias encontrados`);
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("zzzinexistente");
   await expect(page.getByText("Nenhum guia encontrado", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Limpar busca e filtros" }).click();
