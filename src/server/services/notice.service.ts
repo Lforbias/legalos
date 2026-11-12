@@ -108,7 +108,7 @@ export async function listNotices(ctx: TenantContext, f: NoticeFilters = {}) {
  * Mantém o recorte por escritório e sigilo e não depende de abrir a caixa geral do Box.
  */
 export async function listCaseNoticesForFunc(ctx: TenantContext, caseId: string) {
-  const canReadPilot = canReadLegalMailInFunc(ctx);
+  const canReadPilot = await canReadLegalMailInFunc(ctx);
   const canReadLegacy = can(ctx, "inbox:read");
   if (!canReadLegacy && !canReadPilot) throw new ForbiddenError();
   await assertCaseVisible(ctx, caseId);
@@ -204,7 +204,7 @@ export type CaptureMeta = {
 
 export async function createNotice(ctx: TenantContext, raw: NoticeInput, opts: { source?: "IMPORTED"; externalKey?: string; capture?: CaptureMeta; integrationImport?: boolean } = {}) {
   if (opts.integrationImport) {
-    if (!canImportLegalMail(ctx)) throw new ForbiddenError();
+    if (!(await canImportLegalMail(ctx))) throw new ForbiddenError();
   } else {
     assertCan(ctx, "inbox:write");
   }
@@ -380,7 +380,7 @@ export async function deleteNotice(ctx: TenantContext, id: string) {
 export async function resolveSourceNotice(ctx: TenantContext, id: string | undefined, surface: "legacy" | "v3" | "func" = "legacy") {
   if (!id) return undefined;
   if (surface === "func") {
-    if (!canReadLegalMailInFunc(ctx)) throw new ForbiddenError();
+    if (!(await canReadLegalMailInFunc(ctx))) throw new ForbiddenError();
     const notice = await db.courtNotice.findFirst({
       where: { id, organizationId: ctx.organizationId, deletedAt: null, sourceSystem: "LEGALMAIL", status: { not: "DISCARDED" }, case: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } },
       select: { id: true, title: true, caseId: true, content: true },

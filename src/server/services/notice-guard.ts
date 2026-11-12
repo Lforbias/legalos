@@ -8,7 +8,7 @@ import { caseVisibility } from "./case.service";
 /** A intimação de origem precisa existir NESTE escritório e estar visível a quem cria a tarefa/prazo. */
 export async function assertNoticeUsable(ctx: TenantContext, noticeId: string, surface: "legacy" | "v3" | "func" = "legacy", caseId?: string) {
   if (surface === "func") {
-    if (!canReadLegalMailInFunc(ctx)) throw new ForbiddenError();
+    if (!(await canReadLegalMailInFunc(ctx))) throw new ForbiddenError();
   } else if (surface === "v3") {
     if (!boxV3PreviewEnabled() || !ctx.permissions.has("inbox:read")) throw new ForbiddenError();
   } else assertCan(ctx, "inbox:read");

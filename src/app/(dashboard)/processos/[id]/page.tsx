@@ -109,7 +109,7 @@ export default async function CaseDetailPage({
   const canDocs = can(ctx, "documents:read");
   const canDeadlines = can(ctx, "deadlines:read");
   const canTasks = can(ctx, "tasks:read");
-  const canNotices = can(ctx, "inbox:read") || canReadLegalMailInFunc(ctx);
+  const canNotices = can(ctx, "inbox:read") || await canReadLegalMailInFunc(ctx);
   const canPetitions = can(ctx, "petitions:read");
   const tabs = [
     { key: "resumo", label: "Resumo" },

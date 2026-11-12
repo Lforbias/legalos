@@ -66,7 +66,7 @@ async function issueApiKey(ctx: TenantContext, input: ApiKeyInput) {
   if (name.length < 3 || name.length > 80) throw new ValidationError("Nome inválido.", { name: ["Informe um nome de 3 a 80 caracteres."] });
   const scopes = [...new Set(input.scopes)];
   if (scopes.length === 0 || scopes.some((s) => !Object.hasOwn(API_SCOPES, s))) throw new ValidationError("Escolha ao menos um acesso válido.", { scopes: ["Escolha ao menos um acesso."] });
-  if (scopes.includes("legalmail:ingest") && (scopes.length !== 1 || !canImportLegalMail(ctx))) {
+  if (scopes.includes("legalmail:ingest") && (scopes.length !== 1 || !(await canImportLegalMail(ctx)))) {
     throw new ConflictError("Use uma chave exclusiva do LegalMail no escritório autorizado.");
   }
   for (const s of scopes) {
@@ -100,7 +100,8 @@ export async function listApiKeys(ctx: TenantContext) {
     select: { id: true, name: true, prefix: true, scopes: true, expiresAt: true, lastUsedAt: true, revokedAt: true, createdAt: true },
   });
   const now = new Date();
-  return rows.map((r) => ({ ...r, status: r.revokedAt ? ("REVOKED" as const) : r.expiresAt && r.expiresAt <= now ? ("EXPIRED" as const) : r.scopes.every(s => s === "legalmail:ingest" ? !canImportLegalMail(ctx) : !BOX_AVAILABLE && (s.startsWith("pje:") || (API_SCOPES[s as ApiScope] && isBoxPermission(API_SCOPES[s as ApiScope].permission)))) ? ("SUSPENDED" as const) : ("ACTIVE" as const) }));
+  const legalMailAllowed = rows.some((row) => row.scopes.includes("legalmail:ingest")) && await canImportLegalMail(ctx);
+  return rows.map((r) => ({ ...r, status: r.revokedAt ? ("REVOKED" as const) : r.expiresAt && r.expiresAt <= now ? ("EXPIRED" as const) : r.scopes.every(s => s === "legalmail:ingest" ? !legalMailAllowed : !BOX_AVAILABLE && (s.startsWith("pje:") || (API_SCOPES[s as ApiScope] && isBoxPermission(API_SCOPES[s as ApiScope].permission)))) ? ("SUSPENDED" as const) : ("ACTIVE" as const) }));
 }
 
 export async function revokeApiKey(ctx: TenantContext, id: string) {
@@ -131,7 +132,7 @@ export async function authenticateApiKey(token: string, meta: RequestMeta = {}):
   if (!ctx) return null;
   const scopes = new Set<ApiScope>();
   for (const s of key.scopes) {
-    if (s === "legalmail:ingest" && (key.scopes.length !== 1 || !canImportLegalMail(ctx))) continue;
+    if (s === "legalmail:ingest" && (key.scopes.length !== 1 || !(await canImportLegalMail(ctx)))) continue;
     const def = API_SCOPES[s as ApiScope];
     if (def && (BOX_AVAILABLE || (!s.startsWith("pje:") && !isBoxPermission(def.permission))) && can(ctx, def.permission)) scopes.add(s as ApiScope);
   }

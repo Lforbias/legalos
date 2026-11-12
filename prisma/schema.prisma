@@ -113,7 +113,17 @@ model EmailToken {
   @@map("email_tokens")
 }
 
+model LegalMailPilot {
+  singleton      Boolean      @id @default(true)
+  organizationId String       @map("organization_id") @db.Uuid
+  apiKeyEnc      String?      @map("api_key_enc")
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("legalmail_pilot")
+}
+
 model Organization {
+  legalMailPilots LegalMailPilot[]
   courtOtpAuthenticators CourtOtpAuthenticator[]
   pjeDiscoveries PjeDiscovery[]
   portalAccesses PortalAccess[]

@@ -20,7 +20,7 @@ export default async function NewTaskPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const [members, cases] = await Promise.all([listActiveMembers(ctx), can(ctx, "cases:read") ? listCaseOptions(ctx) : Promise.resolve([])]);
   const fromFunc = sp.origem === "func";
-  const canReadNotice = fromFunc ? canReadLegalMailInFunc(ctx) : can(ctx, "inbox:read") || (boxV3PreviewEnabled() && ctx.permissions.has("inbox:read"));
+  const canReadNotice = fromFunc ? await canReadLegalMailInFunc(ctx) : can(ctx, "inbox:read") || (boxV3PreviewEnabled() && ctx.permissions.has("inbox:read"));
   const surface = fromFunc ? "func" : boxV3PreviewEnabled() ? "v3" : "legacy";
   const notice = /^[0-9a-f-]{36}$/i.test(sp.intimacao ?? "") && canReadNotice
     ? await resolveSourceNotice(ctx, sp.intimacao, surface).catch((e) => (e instanceof NotFoundError ? undefined : Promise.reject(e)))

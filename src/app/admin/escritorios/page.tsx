@@ -6,6 +6,8 @@ import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/form";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
 import { CreditsControl, OrgSuspendControl, SubscriptionControl } from "@/modules/platform/admin-controls";
+import { LegalMailPilotButton } from "@/modules/legalmail/setup";
+import { legalMailOfficeId } from "@/server/legalmail-access";
 import { requirePlatform } from "@/server/platform";
 import { platformCreditsSnapshot } from "@/server/services/credit.service";
 import { listOrganizations, listPlans } from "@/server/services/platform.service";
@@ -17,7 +19,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   const { pc } = await requirePlatform();
   const sp = await searchParams;
   const status = sp.situacao === "suspensos" ? "suspended" : sp.situacao === "ativos" ? "active" : undefined;
-  const [r, plans] = await Promise.all([listOrganizations(pc, { q: sp.q, status }), listPlans(pc)]);
+  const [r, plans, legalMailOffice] = await Promise.all([listOrganizations(pc, { q: sp.q, status }), listPlans(pc), legalMailOfficeId()]);
   const credits = await platformCreditsSnapshot(pc, r.items.map((o) => o.id));
   const STATUS: Record<string, string> = { TRIALING: "Em teste", ACTIVE: "Ativa", PAST_DUE: "Em atraso", CANCELED: "Cancelada" };
   return (
@@ -78,6 +80,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
                   </td>
                   <td className="px-3 py-2.5 text-xs text-muted">
                     {[o.aiEnabled ? "IA" : null, o.datajudEnabled ? "DataJud" : null, o.djenMonitors ? `DJEN ${o.djenMonitors}` : null, o.courtConnections ? `PJe ${o.courtConnections}` : null].filter(Boolean).join(", ") || "—"}
+                    {legalMailOffice === o.id ? <p className="mt-2 font-medium">LegalMail liberado</p> : !legalMailOffice && !o.suspendedAt ? <LegalMailPilotButton officeId={o.id} officeName={o.name} /> : null}
                   </td>
                   <td className="px-3 py-2.5 text-muted">{o.lastActivity ? formatDateTime(o.lastActivity) : "—"}</td>
                   <td className="px-3 py-2.5">

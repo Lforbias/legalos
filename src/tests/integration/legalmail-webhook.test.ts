@@ -61,5 +61,10 @@ describe("LegalMail inbound webhook", () => {
     expect(await retry.json()).toMatchObject({ imported: 0, duplicates: 1 });
     vi.stubEnv("LEGALMAIL_ORGANIZATION_ID", "");
     expect((await send(token)).status).toBe(401);
+
+    await db.$executeRaw`INSERT INTO legalmail_pilot (organization_id) VALUES (${office.org.id}::uuid)`;
+    expect((await send(token)).status).toBe(200);
+    expect((await send(otherToken)).status).toBe(401);
+    await expect(db.$executeRaw`INSERT INTO legalmail_pilot (organization_id) VALUES (${otherOffice.org.id}::uuid)`).rejects.toThrow();
   });
 });
