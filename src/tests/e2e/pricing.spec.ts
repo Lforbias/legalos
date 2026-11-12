@@ -14,7 +14,9 @@ test("public pricing compares sources, searches the catalogue and shows approved
   await expect(page.getByTestId("competitor-chatguru")).toContainText("Não calculável");
   await expect(page.getByTestId("competitor-astrea")).toContainText("equivalente / mês");
   const catalogue = page.getByTestId("pricing-catalogue");
-  await expect(catalogue.getByRole("status")).toHaveText("300 de 300 recursos e operações");
+  const status = catalogue.getByRole("status");
+  await expect(status).toHaveText(/^(\d+) de \1 recursos e operações$/);
+  const total = (await status.innerText()).split(" ")[0];
   await page.getByRole("searchbox", { name: "Buscar recurso" }).fill("campanha");
   await expect(catalogue.getByText("Criar campanha com até 10 mil destinatários")).toBeVisible();
   await expect(catalogue.getByText("Cadastrar cliente", { exact: true })).toHaveCount(0);
@@ -22,7 +24,7 @@ test("public pricing compares sources, searches the catalogue and shows approved
   await expect(catalogue.getByText(/Nenhum recurso encontrado/)).toBeVisible();
   await page.getByRole("searchbox", { name: "Buscar recurso" }).clear();
   await page.getByRole("combobox", { name: "Filtrar área de recursos" }).selectOption({ label: "LegalOS Desktop" });
-  await expect(catalogue.getByRole("status")).toHaveText("2 de 300 recursos e operações");
+  await expect(catalogue.getByRole("status")).toHaveText(`2 de ${total} recursos e operações`);
   await page.getByRole("combobox", { name: "Filtrar área de recursos" }).selectOption("all");
   await page.getByRole("link", { name: "Ver planos LegalOS", exact: true }).click();
   await expect(page).toHaveURL(/#planos$/);

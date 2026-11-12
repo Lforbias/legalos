@@ -21,13 +21,14 @@ test("IA sem chave configurada: avisa com clareza, não simula resposta e está 
   await page.getByRole("button", { name: "Mais ações do processo" }).click();
   await page.getByRole("menuitem", { name: "Perguntar à IA sobre este processo" }).click();
   await expect(page.getByRole("heading", { name: "Assistente de IA" })).toBeVisible();
-  await expect(page.getByText(/falta a chave do provedor/)).toBeVisible();
+  await expect(page.getByText(/Configure o provedor e a chave/)).toBeVisible();
   await expect(page.getByRole("button", { name: "Perguntar" })).toHaveCount(0);
   await expect(page.getByTestId("ai-usage")).toContainText("0 de 500.000 tokens");
   await expect(page.getByText(/não ficam gravadas|não fica gravada|A pergunta e a resposta não ficam gravadas/)).toBeVisible();
 
   const nav = page.getByRole("navigation", { name: "Navegação Func" });
-  await nav.getByRole("button", { name: "Ferramentas", exact: true }).click();
+  const tools = nav.getByRole("button", { name: "Ferramentas", exact: true });
+  if (await tools.getAttribute("aria-expanded") !== "true") await tools.click();
   await nav.getByRole("link", { name: /Inteligência artificial/ }).click();
   await expect(page.getByRole("heading", { name: "Assistente de IA" })).toBeVisible();
 });

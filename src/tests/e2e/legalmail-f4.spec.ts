@@ -28,8 +28,8 @@ test("3.0-F4: importar processos por número, com inválidos e repetidos anotado
   await page.getByRole("button", { name: "Mais ações de processos" }).click();
   await page.getByRole("menuitem", { name: "Importar por número" }).click();
   await expect(page.getByRole("heading", { name: "Importar processos" })).toBeVisible();
-  // DataJud exige configuração e o MNI retirado não aparece
-  await expect(page.getByLabel(/Buscar os andamentos públicos/)).toBeDisabled();
+  // Opções de integração indisponíveis não aparecem
+  await expect(page.getByLabel(/Buscar os andamentos públicos/)).toHaveCount(0);
   await expect(page.getByLabel(/Baixar os autos pelo MNI/)).toHaveCount(0);
   await page.getByLabel("Números CNJ").fill(`${n1}\n${n2}\n${n1}\n123\n0000001-99.2024.8.05.0001`);
   await page.getByRole("button", { name: "Importar processos" }).click();

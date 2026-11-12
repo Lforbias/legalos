@@ -51,9 +51,9 @@ test("3.0-F2: tipo com pontuação, etiqueta, anexo, menção e histórico numa 
   await expect(page.getByTestId("task-attachment")).toContainText("pauta.pdf");
 
   // menção (inserida pelo seletor) e comentário
-  await page.getByLabel("Comentário").fill("Atenção ao prazo.");
+  await page.getByRole("textbox", { name: "Comentário", exact: true }).fill("Atenção ao prazo.");
   await page.getByLabel("Mencionar alguém").selectOption({ index: 1 });
-  await expect(page.getByLabel("Comentário")).toHaveValue(/@Pessoa l3f2/);
+  await expect(page.getByRole("textbox", { name: "Comentário", exact: true })).toHaveValue(/@Pessoa l3f2/);
   await page.getByRole("button", { name: "Comentar" }).click();
   await expect(page.getByText("Atenção ao prazo.")).toBeVisible();
 

@@ -4,7 +4,7 @@ import { certKey, sealBytes } from "@/lib/security/pfx";
 import { getPhoneInfo, listTemplates, waConfigFromEnv, WhatsappApiError } from "@/lib/whatsapp/client";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { requireMfa } from "./certificate.service";
+import { assertMfaEnabled } from "./mfa.service";
 import { loadAuth, requireCertKey } from "./whatsapp-auth";
 import { startQrSession, stopQrSession } from "./whatsapp-qr.service";
 
@@ -42,7 +42,7 @@ export async function connectAccount(ctx: TenantContext, input: ConnectInput) {
   assertCan(ctx, "whatsapp:manage");
   assertCan(ctx, "integrations:manage");
   const key = requireKey();
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const label = input.label.trim();
   if (!label || label.length > 80) throw new ValidationError("Informe um nome de até 80 caracteres.", { label: ["Nome obrigatório."] });
   const phoneNumberId = input.phoneNumberId.trim();
@@ -89,7 +89,7 @@ export async function setAccountEnabled(ctx: TenantContext, enabled: boolean) {
 /** Remove o número, o token e TODAS as conversas (irreversível). Exige 2FA. */
 export async function removeAccount(ctx: TenantContext) {
   assertCan(ctx, "whatsapp:manage");
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const acc = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true } });
   if (!acc) throw new NotFoundError("O WhatsApp não está conectado.");
   if (acc.provider === "QR") await stopQrSession(acc.id, { logout: true });

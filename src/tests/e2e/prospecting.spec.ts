@@ -45,13 +45,13 @@ test('prospecção: acesso protegido, mapa, filtros e acompanhamento persistente
     await page.getByRole('link', { name: 'Escritório fictício — demonstração', exact: true }).click();
     await page.getByRole('combobox', { name: 'Etapa', exact: true }).selectOption('QUALIFIED');
     await page.getByLabel('Não contatar este escritório').check();
-    await page.getByLabel('Anotações', { exact: true }).fill('Solicitou não receber contatos.');
+    await page.getByRole('textbox', { name: 'Anotações', exact: true }).fill('Solicitou não receber contatos.');
     await page.getByRole('button', { name: 'Salvar acompanhamento' }).click();
     await expect(page.getByRole('status')).toHaveText('Cadastro salvo.');
     await page.reload();
     await expect(page.getByLabel('Não contatar este escritório')).toBeChecked();
     await expect(page.getByLabel('Próximo retorno')).toBeDisabled();
-    await expect(page.getByLabel('Anotações', { exact: true })).toHaveValue('Solicitou não receber contatos.');
+    await expect(page.getByRole('textbox', { name: 'Anotações', exact: true })).toHaveValue('Solicitou não receber contatos.');
     for (const width of [390, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

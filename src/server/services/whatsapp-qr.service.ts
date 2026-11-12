@@ -9,7 +9,7 @@ import { liveSessions } from "@/lib/whatsapp/qr/live";
 import type { AuthKv, QrEvent, QrInbound } from "@/lib/whatsapp/qr/types";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { requireMfa } from "./certificate.service";
+import { assertMfaEnabled } from "./mfa.service";
 import { applyStatusUpdate, ingestMessage } from "./whatsapp-ingest.service";
 import { requireCertKey } from "./whatsapp-auth";
 import { qrMessageId } from "./whatsapp-transport";
@@ -156,7 +156,7 @@ export async function connectQr(ctx: TenantContext, input: { label: string; risk
   assertCan(ctx, "whatsapp:manage");
   assertCan(ctx, "integrations:manage");
   requireCertKey();
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   if (input.riskAck !== true) throw new ValidationError("Confirme que entendeu os riscos.", { riskAck: ["É preciso confirmar que você entendeu os riscos desta conexão."] });
   const label = input.label.trim();
   if (!label || label.length > 80) throw new ValidationError("Informe um nome de até 80 caracteres.", { label: ["Nome obrigatório."] });
@@ -197,7 +197,7 @@ export async function restartQr(ctx: TenantContext) {
   const a = await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true }, select: { id: true, provider: true, enabled: true } });
   if (!a || a.provider !== "QR") throw new NotFoundError("A conexão por QR-Code não está configurada.");
   if (!a.enabled) throw new ConflictError("O atendimento está desligado. Ligue-o antes de gerar o QR-Code.");
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   await db.whatsappCampaign.updateMany({where:{accountId:a.id,organizationId:ctx.organizationId,status:{in:["APPROVED","SENDING"]}},data:{status:"PAUSED"}});
   await stopQrSession(a.id, { logout: true });
   await startQrSession(a.id);

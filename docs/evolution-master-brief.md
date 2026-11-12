@@ -40,3 +40,9 @@
 - Superadmin confirmado em rota protegida e Box validado como retirado. Correções de navegação, permissões e revisão visual registradas no [checklist de aceite](evolution-release-checklist.md).
 - Dois E2E completos de 73 cenários. Resultado final no banco isolado: 63 aprovados e 10 falhas. Os 60 cenários que faltavam foram executados. Build, tipos, lint, 31 testes unitários focados e o E2E dos seis departamentos passaram.
 - Decisão de aceite: **NÃO APTO PARA HOMOLOGAÇÃO**. Permanecem falhas na suíte E2E e verificações de CI. A cadeia #17–#30 foi conferida.
+
+## Revisão do WhatsApp por QR
+
+- O Baileys recebeu um QR real do WhatsApp Web. O E2E com driver de teste confirmou pareamento, troca e desconexão. A leitura do QR com o número do escritório fica para homologação.
+- Corrigidos o bloqueio de 2FA do Box no WhatsApp, o desaparecimento dos códigos de recuperação, o fuso da sessão PostgreSQL e a sobreposição da RUTE no Chat.
+- Build, lint e 1.368 testes Vitest passaram. E2E: 72 passaram na suíte completa e o cenário restante passou em nova execução após validar o registro persistido. Veja o [checklist de aceite](evolution-release-checklist.md).
