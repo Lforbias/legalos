@@ -5,7 +5,7 @@
 - PR #18: Central de Atendimento (aberto para revisão)
 - PR #19: Cliente 360° e Processo 360° (aberto para revisão)
 - PR #20: Controladoria (aberto para revisão)
-- PR #21: Jurídico completo (em implementação)
+- PR #21: Jurídico completo (aberto para revisão)
 - PR #22: Comercial do escritório
 - PR #23: Financeiro & Contábil
 - PR #24: Administração & Gestão
@@ -24,5 +24,5 @@
 - PR #19: aberto como [#19](https://github.com/Lforbias/legalos/pull/19), branch `feature/evolution-1.2-360`, baseado no #18; 24 testes unitários focados e typecheck/ESLint passaram.
 - PR #20: aberto como [#20](https://github.com/Lforbias/legalos/pull/20), branch `feature/evolution-1.3-controladoria`, baseado no #19; typecheck, ESLint focado, 24 testes unitários e 31 testes de integração passaram.
 - PR #20 entregue: pendências por área com contadores reais, sem incluir aniversários; Box permanece desativado.
-- PR #21: em implementação na `feature/evolution-2.1-juridico`; lista de processos ativos reais no painel, respeitando sigilo e permissões. Typecheck, ESLint focado, 24 testes unitários e 25 testes de integração de casos passaram.
-- Próximo: abrir #21 e seguir para Comercial (#22). CI e conferência visual/por perfil continuam pendentes para os PRs anteriores.
+- PR #21: aberto como [#21](https://github.com/Lforbias/legalos/pull/21), branch `feature/evolution-2.1-juridico`, baseado no #20; lista processos ativos reais respeitando sigilo e permissões. Typecheck, ESLint focado, 24 testes unitários e 25 testes de integração passaram.
+- Próximo: Comercial (#22). CI e conferência visual/por perfil continuam pendentes para os PRs anteriores.
