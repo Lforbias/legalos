@@ -324,6 +324,6 @@ textarea { font: inherit; }
 }
 
 /* Keep the assistant launcher out of the desktop conversation controls. */
-[data-space="chat"]:has([data-chat-info-panel]) .rute-launcher-chat {
+:is([data-space="chat"], [data-space="evolution"]):has([data-chat-info-panel]) .rute-launcher-chat {
   right: calc(320px + 1.25rem);
 }

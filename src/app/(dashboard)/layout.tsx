@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/layout/app-shell";
+import { EVOLUTION_NAV } from "@/config/evolution-navigation";
 import { NAV_ITEMS, navItemInBoxVersion } from "@/config/navigation";
 import { boxV2Enabled } from "@/lib/features";
 import { evolutionEnabled } from "@/lib/evolution";
@@ -40,6 +41,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     return (n.key !== "prototypes" || prototypesEnabled()) && navItemInBoxVersion(n, boxV2) && permitted;
   }).map((n) => n.key);
 
+  const evolutionKeys = evolutionEnabled() ? EVOLUTION_NAV.filter((item) =>
+    item.permissionAny ? item.permissionAny.some((permission) => can(ctx, permission)) : !item.permission || can(ctx, item.permission),
+  ).map((item) => item.key) : undefined;
+
   return (
     <AppShell
       user={{ name: session.user.name, email: session.user.email }}
@@ -48,7 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       visibleKeys={visibleKeys}
       boxBadge={boxBadge}
       chatBadge={chatBadge}
-      evolutionEnabled={evolutionEnabled()}
+      evolutionKeys={evolutionKeys}
       canInvite={can(ctx, "members:invite")}
       canCreateClient={can(ctx, "clients:write")}
       canCreateCase={can(ctx, "cases:write")}

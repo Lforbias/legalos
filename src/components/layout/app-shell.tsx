@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import * as React from "react";
+import { EvolutionSidebar } from "@/components/evolution/evolution-sidebar";
 import { spaceOfPath } from "@/config/navigation";
 import { AssistantLauncher } from "@/modules/rute/assistant-launcher";
 import { Sidebar } from "./sidebar";
@@ -14,7 +15,7 @@ export function AppShell(props: {
   visibleKeys: string[];
   boxBadge: number;
   chatBadge: number;
-  evolutionEnabled?: boolean;
+  evolutionKeys?: string[];
   canInvite: boolean;
   canCreateClient: boolean;
   canCreateCase: boolean;
@@ -24,7 +25,7 @@ export function AppShell(props: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const space = spaceOfPath(pathname);
+  const space = props.evolutionKeys ? "evolution" : spaceOfPath(pathname);
   const fullBleed = pathname === "/atendimento"; // o Chat ocupa a tela inteira, como um aplicativo de mensagens
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const close = React.useCallback(() => setMobileOpen(false), []);
@@ -33,7 +34,11 @@ export function AppShell(props: {
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-fg">
         Pular para o conteúdo
       </a>
-      <Sidebar visibleKeys={props.visibleKeys} boxBadge={props.boxBadge} chatBadge={props.chatBadge} mobileOpen={mobileOpen} onCloseMobile={close} evolutionEnabled={props.evolutionEnabled} />
+      {props.evolutionKeys ? (
+        <EvolutionSidebar visibleKeys={props.evolutionKeys} menuKeys={props.visibleKeys} mobileOpen={mobileOpen} onCloseMobile={close} />
+      ) : (
+        <Sidebar visibleKeys={props.visibleKeys} boxBadge={props.boxBadge} chatBadge={props.chatBadge} mobileOpen={mobileOpen} onCloseMobile={close} />
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           user={props.user}
@@ -45,6 +50,7 @@ export function AppShell(props: {
           canCreateCase={props.canCreateCase}
           canCreateTask={props.canCreateTask}
           notifications={props.notifications}
+          wrapOnMobile={Boolean(props.evolutionKeys)}
           onOpenMobile={() => setMobileOpen(true)}
         />
         {props.banner}

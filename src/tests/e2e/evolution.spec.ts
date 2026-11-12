@@ -15,7 +15,7 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
 
   await page.setViewportSize({ width: 390, height: 900 });
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
-  await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("link", { name: "Abrir Meu Escritório na Evolution" }).click();
+  await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("link", { name: "Lobby", exact: true }).click();
   await expect(page).toHaveURL(/\/evolution$/);
 
   const departments = [
@@ -40,11 +40,14 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
       const header = page.getByRole("banner");
       expect(await header.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
       await page.screenshot({ path: testInfo.outputPath(`${slug}-${width}.png`) });
-      if (width === 1440) {
-        await main.locator(`a[href="${target}"]`).first().click();
-        await expect(page).toHaveURL(url => url.pathname === target);
-        await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
-      }
+      await main.locator(`a[href="${target}"]`).first().click();
+      await expect(page).toHaveURL(url => url.pathname === target);
+      await expect(page.getByRole("main").getByRole("heading", { level: 1 })).toBeVisible();
+      if (width === 390) await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
+      await expect(page.locator("[data-space]").first()).toHaveAttribute("data-space", "evolution");
+      const menu = page.getByRole("navigation", { name: "Navegação Evolution" });
+      await expect(menu).toBeVisible();
+      await expect(menu.locator(`a[href="${target}"]`)).toHaveAttribute("aria-current", "page");
     }
   }
 
@@ -53,8 +56,10 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
   await expect(page.getByRole("link", { name: "Abrir LegalOS Desktop" })).toHaveAttribute("href", "/area-de-trabalho");
   await page.getByRole("searchbox", { name: "Busca global" }).fill("Processos");
   await expect(page.getByRole("link", { name: "Processos e casos", exact: true })).toBeVisible();
-  await page.getByRole("link", { name: "Voltar para Ethos" }).click();
+  await expect(page.getByRole("link", { name: "Voltar para Ethos" })).toHaveCount(0);
+  await page.getByRole("link", { name: "Resumo do escritório" }).click();
   await expect(page).toHaveURL(/\/dashboard$/);
+  await expect(page.getByRole("navigation", { name: "Navegação Evolution" })).toBeVisible();
 
   const db = new Client({ connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test" });
   await db.connect();
