@@ -14,7 +14,7 @@
 - PR #27: APIs e integrações (em validação)
 - PR #28: Paridade total Ethos → Evolution (em validação)
 - PR #29: Testes e homologação (em validação)
-- PR #30: Fechamento e preparação para lançamento
+- PR #30: Fechamento e preparação para lançamento (em validação)
 
 ## Current checkpoint
 - Pré-checagem #17–#20: todas as branches têm commits salvos e os PRs estão abertos/mergeáveis. #17 tem 24 testes unitários focados registrados, porém 2 jobs de CI falharam; o diagnóstico mostra falhas E2E de navegação, WhatsApp/QR e rotas Box antigas, além de tentativas de conectar ao banco `legalos`, inexistente no job. #18–#20 tinham verificações de CI em andamento na última consulta.
@@ -33,4 +33,4 @@
 - PR #27: branch `feature/evolution-2.7-apis-integracoes`, baseada no #26. Arquivos: `src/app/(evolution)/evolution/administracao/page.tsx`, `src/app/(dashboard)/integracoes/page.tsx`, `docs/api.md` e este brief. Consolida o acesso, esclarece o endpoint OpenAPI autenticado e remove contagens estáticas que divergiam do catálogo versionado. Typecheck, ESLint focado, 24 testes de navegação/flag e 6 testes de integração da API passaram.
 - PR #28: branch `feature/evolution-2.8-ethos-parity`, baseada no #27. Arquivos: `src/config/evolution-navigation.ts`, `src/tests/unit/evolution-navigation.test.ts` e este brief. Preenche lacunas de navegação em recursos Ethos existentes e cria verificação automática de paridade; o portal autenticado do cliente permanece fora do menu interno. Typecheck, ESLint focado e 26 testes de navegação/flag passaram.
 - PR #29 checkpoint: branch `feature/evolution-2.9-homologacao`, baseada no #28. Arquivos: `src/tests/e2e/workspace-ux.spec.ts` e este brief. `npm run typecheck`, `npm run lint`, `npm test` com o banco `legalos_test` e `npm run build` passaram; Vitest: 188 arquivos / 1.368 testes. Corrigi as expectativas UX desatualizadas (nome atual “Processos e casos”, estado desativado dos certificados do Box e texto/ARIA do painel RUTE); E2E focados de workspace e workspace-ux passaram. A execução E2E completa foi interrompida após 7 falhas (6 em fluxos antigos do Box e 1 redirecionamento do superadmin) e 1 teste interrompido; 60 não rodaram. Pendente: revisar/corrigir os E2E do Box sem reativar o produto, investigar a falha do superadmin e completar o E2E por perfil/visual. Não declarar pronto para homologação ainda.
-- Próximo: Fechamento e preparação para lançamento (#30), mantendo as pendências críticas explícitas.
+- PR #30 checkpoint: branch `feature/evolution-2.10-fechamento`, baseada no #29. Arquivos: `docs/evolution-release-checklist.md` e este brief. Os PRs #17–#29 estão abertos e mergeáveis na consulta atual. O handoff registra 188 arquivos/1.368 testes Vitest aprovados, build aprovado, 2 E2E focados aprovados e a suíte E2E completa incompleta com pendências críticas documentadas. Nenhum merge/deploy foi feito. Validação e abertura do PR em andamento.
