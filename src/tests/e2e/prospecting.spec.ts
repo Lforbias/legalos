@@ -35,10 +35,10 @@ test('prospecção: acesso protegido, mapa, filtros e acompanhamento persistente
     await page.goto('/admin/comercial/prospeccao');
     await expect(page.getByRole('heading', { name: 'Escritórios em São Paulo.' })).toBeVisible();
     await expect(page.locator('.leaflet-container')).toBeVisible();
-    await expect(page.locator('.leaflet-interactive')).toHaveCount(1);
     await page.getByLabel('Nome, CNPJ ou CEP').fill(cnpj);
     await page.getByRole('button', { name: 'Filtrar', exact: true }).click();
     await expect(page.getByRole('link', { name: 'Escritório fictício — demonstração', exact: true })).toBeVisible();
+    await expect(page.locator('.leaflet-interactive')).toHaveCount(1);
     await page.setViewportSize({ width: 1440, height: 1100 });
     await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible({ timeout: 20000 });
     await page.screenshot({ path: '/tmp/legalos-prospeccao-preview.png', fullPage: true });
