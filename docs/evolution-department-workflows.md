@@ -18,9 +18,21 @@ Arquivos principais: `tasks-workspace.tsx`, páginas de tarefas e Controladoria,
 
 Links de inscrição de autenticação são ocultados nas prévias retornadas pelo serviço de conversas e antes de gravar novas prévias. O conteúdo original da mensagem é preservado. Dois testes unitários aprovados.
 
+## Comercial — conversão em cadastro existente
+
+A conversão agora oferece escolha explícita de cliente ativo do próprio escritório, mantendo os dados originais. A seleção exige leitura de clientes e as permissões anteriores de conversão. Tipo de pessoa e escritório são conferidos; falhas desfazem a operação. 25 testes focados do CRM aprovados.
+
+## Validação conjunta
+
+- 1.353 testes de código aprovados (188 arquivos).
+- Seis testes de revisão repetidos com o Box desativado, aprovados.
+- Compilação final aprovada após a mudança do Comercial.
+- Primeira execução completa de interface: 72/73 aprovados. O cenário da Controladoria recarregava antes de aguardar a resposta da gravação; espera ajustada; os seis E2E finais de departamentos, documentos e CRM passaram no build final, incluindo o novo cenário de cliente existente. A gravação foi conferida após recarregar a página.
+- PR #33: https://github.com/Lforbias/legalos/pull/33.
+
 ## Aceite restante
 
-- Executar validação final conjunta após as mudanças da Controladoria e prévias.
+- Aguardar CI do PR #33. Validação local final concluída para os blocos deste PR.
 - Concluir comparação funcional e lacunas dos seis departamentos; este checkpoint não representa conclusão da Evolution.
 - Comercial: repasse da contratação ao Jurídico/Financeiro ainda exige implementação ou comprovação.
 - Gestão por departamento e rentabilidade departamental permanecem pendentes.

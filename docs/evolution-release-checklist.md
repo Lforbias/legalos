@@ -1,5 +1,21 @@
 # LegalOS Evolution 1.0 — checklist de aceite
 
+## Checkpoint atual — operações departamentais (PR #33)
+
+- Revisão editorial de documentos implementada independentemente do Box: pedido, aprovação por outra pessoa, ajustes, histórico por versão e auditoria.
+- Mesa operacional de tarefas integrada à Controladoria, com filtros, lista/quadro e alteração de situação persistente.
+- Comercial permite selecionar cliente existente durante a conversão sem sobrescrever seu cadastro.
+- Prévias do chat ocultam links de inscrição de autenticação.
+- Validação: 1.353 testes de código aprovados; 25 testes focados do CRM e seis de revisão com Box desativado aprovados. Compilação final aprovada.
+- Interface: primeira execução completa 72/73; o teste da Controladoria recarregava antes da resposta de gravação. Após ajustar a espera, os seis cenários finais de documentos, departamentos e CRM passaram, incluindo a persistência após recarga e o novo caso de conversão para cliente existente.
+- Revisão visual da mesa de controle e navegação desktop/móvel realizada em escritório de teste. Sem validação de provedores externos reais.
+- Alterações salvas no PR https://github.com/Lforbias/legalos/pull/33; ainda não publicadas em produção.
+- **Evolution completa: NÃO APTA PARA HOMOLOGAÇÃO INTEGRAL.** Restam conferência/escalonamento formal, repasse Comercial→Jurídico/Financeiro, gestão por departamento e confirmação de toda a lista funcional. O aceite destes blocos não representa aceite integral.
+
+Detalhes: `docs/evolution-department-workflows.md`.
+
+## Histórico de validações anteriores
+
 **WhatsApp por QR pronto para testar com o aparelho do escritório.** A liberação depende da verificação do CI e da leitura do QR em homologação.
 
 | Verificação | Evidência |
