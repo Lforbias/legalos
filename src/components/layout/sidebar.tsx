@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen, ChevronDown, Layers3, Wrench, MessagesSquare, Plug, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, ChevronDown, Layers3, Wrench, MessagesSquare, Plug, X, Building2 } from "lucide-react";
 import * as React from "react";
 import { NAV_ITEMS, SPACES, spaceOfPath, type Space } from "@/config/navigation";
 import { useLocalStorageValue } from "@/lib/hooks/use-local-storage";
@@ -23,6 +23,7 @@ export function Sidebar({
   chatBadge,
   mobileOpen,
   onCloseMobile,
+  evolutionEnabled = false,
 }: {
   visibleKeys: string[];
   /** Intimações novas aguardando distribuição (aparece no alternador do Box). */
@@ -31,6 +32,8 @@ export function Sidebar({
   chatBadge: number;
   mobileOpen: boolean;
   onCloseMobile: () => void;
+  /** When true, shows a link to the Evolution experience. */
+  evolutionEnabled?: boolean;
 }) {
   const pathname = usePathname();
   const [stored, setStored] = useLocalStorageValue("lo-sidebar", "open");
@@ -119,6 +122,18 @@ export function Sidebar({
     </nav>
   );
 
+  const evolutionLink = (isCollapsed: boolean) => evolutionEnabled && (
+    <Link
+      href="/evolution"
+      aria-label="Abrir Meu Escritório na Evolution"
+      title={isCollapsed ? "Abrir Meu Escritório na Evolution" : undefined}
+      className={cn("flex h-9 items-center gap-3 rounded-md px-2.5 text-[13px] font-medium text-primary hover:bg-primary/10", isCollapsed && "justify-center px-0")}
+    >
+      <Building2 className="h-[18px] w-[18px]" aria-hidden />
+      {!isCollapsed && <span>Meu Escritório →</span>}
+    </Link>
+  );
+
   return (
     <>
       <aside
@@ -136,6 +151,7 @@ export function Sidebar({
         {nav(collapsed)}
         <div className="border-t border-border p-2">
           <nav aria-label="Ajustes do sistema">{links(footer, collapsed)}</nav>
+          {evolutionLink(collapsed)}
           <button
             type="button"
             onClick={toggle}
@@ -160,7 +176,10 @@ export function Sidebar({
             </div>
             {switcher(false)}
             {nav(false, true)}
-            <div className="border-t border-border p-2">{links(footer, false)}</div>
+            <div className="border-t border-border p-2">
+              {links(footer, false)}
+              {evolutionLink(false)}
+            </div>
           </aside>
         </div>
       ) : null}

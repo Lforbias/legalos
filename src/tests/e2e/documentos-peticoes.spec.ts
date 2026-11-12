@@ -1,3 +1,4 @@
+import { expectRetired } from "./box-retired-checks";
 import { expect, test, type Page } from "@playwright/test";
 
 const password = "SenhaForte123";
@@ -16,7 +17,7 @@ async function signUpWithOffice(page: Page, label: string) {
   return id;
 }
 
-test("modelos, geração de .docx, versões e fluxo de peticionamento (demonstração)", async ({ page }) => {
+test("modelos, geração de .docx e versões com peticionamento retirado", async ({ page }) => {
   const id = await signUpWithOffice(page, "d");
 
   await page.goto("/processos/novo");
@@ -55,7 +56,6 @@ test("modelos, geração de .docx, versões e fluxo de peticionamento (demonstra
   await expect(page.getByRole("heading", { name: "Histórico de versões" })).toBeVisible();
   await expect(page.getByText("atual", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Baixar versão 1" })).toBeVisible();
-  const docUrl = page.url().split("?")[0]!;
 
   // arquivo inválido é recusado
   await page.getByLabel("Arquivo da nova versão").setInputFiles({ name: "falso.pdf", mimeType: "application/pdf", buffer: Buffer.from("MZ não é pdf") });
@@ -66,34 +66,10 @@ test("modelos, geração de .docx, versões e fluxo de peticionamento (demonstra
   await page.goto("/documentos?q=procura");
   await expect(page.getByRole("link", { name: `Procuração ${id}.docx` })).toBeVisible();
 
-  // ---- petição ----
-  await page.goto("/peticoes");
-  await expect(page.getByText(/Modo de demonstração/)).toBeVisible();
-  await page.getByRole("link", { name: "Nova petição" }).first().click();
-  await page.getByLabel("Processo").selectOption({ label: `Caso ${id}` });
-  await page.getByRole("button", { name: "Continuar" }).click();
-  await page.getByLabel("Título da petição").fill(`Contestação ${id}`);
-  await page.getByRole("button", { name: "Criar petição" }).click();
-  await expect(page.getByText("Escolha o documento da petição.")).toBeVisible();
-  await page.getByLabel("Documento", { exact: true }).selectOption({ index: 1 });
-  await page.getByRole("button", { name: "Criar petição" }).click();
-  await expect(page.getByRole("heading", { name: `Contestação ${id}` })).toBeVisible();
-  await expect(page.getByText(/Adaptador de demonstração/)).toBeVisible();
-
-  await page.getByRole("button", { name: "Enviar para revisão" }).click();
-  await expect(page.getByRole("button", { name: "Aprovar" })).toBeVisible();
-  await page.getByRole("button", { name: "Aprovar" }).click();
-  await page.getByRole("button", { name: "Enviar (demonstração)" }).click();
-  // o aviso "Envio SIMULADO concluído" é transitório (some no refresh); o protocolo e o recibo de demonstração são o resultado persistido
-  await expect(page.getByText(/DEMO-/).first()).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/RECIBO DE DEMONSTRAÇÃO/)).toBeVisible();
-
-  // aparece no processo e no documento
-  await page.goto(docUrl);
-  await expect(page.getByRole("link", { name: `Contestação ${id}` })).toBeVisible();
+  await expectRetired(page.request, ["/peticoes", "/peticoes/nova"]);
 });
 
-test("isolamento: outro escritório não vê documentos, modelos nem petições", async ({ browser }) => {
+test("isolamento: outro escritório não vê documentos nem modelos", async ({ browser }) => {
   const a = await browser.newPage();
   const idA = await signUpWithOffice(a, "iso1");
   await a.goto("/documentos/modelos/novo");
@@ -115,7 +91,7 @@ test("isolamento: outro escritório não vê documentos, modelos nem petições"
   await b.close();
 });
 
-test("autotextos no modelo e anexos classificados na petição", async ({ page }) => {
+test("autotextos no modelo e documentos do processo", async ({ page }) => {
   const id = await signUpWithOffice(page, "at");
   await page.goto("/processos/novo");
   await page.getByLabel("Título do caso ou processo").fill(`Caso ${id}`);
@@ -155,28 +131,5 @@ test("autotextos no modelo e anexos classificados na petição", async ({ page }
     await expect(page.getByRole("heading", { name: `${title}.docx` })).toBeVisible();
   }
 
-  // ---- petição com anexo classificado ----
-  await page.goto("/peticoes/nova");
-  await page.getByLabel("Processo").selectOption({ label: `Caso ${id}` });
-  await page.getByRole("button", { name: "Continuar" }).click();
-  await page.getByLabel("Título da petição").fill(`Petição ${id}`);
-  await page.getByLabel("Documento", { exact: true }).selectOption({ label: `Principal ${id}.docx (v1)` });
-  await page.getByRole("button", { name: "Criar petição" }).click();
-  await expect(page.getByRole("heading", { name: `Petição ${id}` })).toBeVisible();
-  await expect(page.getByText("Nenhum anexo.")).toBeVisible();
-  await page.getByLabel("Documento do processo").selectOption({ label: `Procuração ${id}.docx` });
-  await page.getByLabel("Classificação", { exact: true }).selectOption({ label: "Procuração" });
-  await page.getByRole("button", { name: "Anexar" }).click();
-  await expect(page.getByRole("link", { name: `Procuração ${id}.docx` }).first()).toBeVisible();
-  await expect(page.getByLabel(`Classificação de Procuração ${id}.docx`)).toHaveValue("PROCURACAO");
-
-  await page.getByRole("button", { name: "Enviar para revisão" }).click();
-  await expect(page.getByRole("button", { name: "Aprovar" })).toBeVisible();
-  await page.getByRole("button", { name: "Aprovar" }).click();
-  await page.getByRole("button", { name: "Enviar (demonstração)" }).click();
-  await expect(page.getByText(/RECIBO DE DEMONSTRAÇÃO/)).toBeVisible({ timeout: 15_000 });
-  await expect(page.getByText(/Anexos \(1\):/)).toBeVisible();
-  await expect(page.getByText(/\[PROCURACAO\] Procuração .*\.docx/)).toBeVisible();
-  // depois de enviada, os anexos não são mais editáveis
-  await expect(page.getByRole("button", { name: "Anexar" })).toHaveCount(0);
+  await expectRetired(page.request, ["/peticoes/nova"]);
 });

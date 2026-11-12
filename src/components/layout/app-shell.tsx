@@ -14,6 +14,7 @@ export function AppShell(props: {
   visibleKeys: string[];
   boxBadge: number;
   chatBadge: number;
+  evolutionEnabled?: boolean;
   canInvite: boolean;
   canCreateClient: boolean;
   canCreateCase: boolean;
@@ -32,7 +33,7 @@ export function AppShell(props: {
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-fg">
         Pular para o conteúdo
       </a>
-      <Sidebar visibleKeys={props.visibleKeys} boxBadge={props.boxBadge} chatBadge={props.chatBadge} mobileOpen={mobileOpen} onCloseMobile={close} />
+      <Sidebar visibleKeys={props.visibleKeys} boxBadge={props.boxBadge} chatBadge={props.chatBadge} mobileOpen={mobileOpen} onCloseMobile={close} evolutionEnabled={props.evolutionEnabled} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           user={props.user}

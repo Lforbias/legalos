@@ -16,6 +16,13 @@ test.afterAll(async () => {
 
 test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, anotar e atribuir", async ({ page, request }) => {
   const id = uid();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const openInfo = async () => {
+    const button = page.getByRole("button", { name: /^(Ocultar informações|Informações)$/ });
+    await expect(button).toBeVisible();
+    if (await button.getAttribute("aria-expanded") !== "true") await button.click();
+    await expect(page.getByTestId("wa-side")).toBeVisible();
+  };
   const pnid = `7${Date.now().toString().slice(-9)}`;
   await page.goto("/register");
   await page.getByLabel("Nome completo").fill(`Dona zap${id}`);
@@ -94,6 +101,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   expect(r2.status()).toBe(200);
   await expect(page.getByTestId("wa-msg-in").getByText("Chegou sozinha na tela")).toBeVisible({ timeout: 10_000 });
 
+  await openInfo();
   // Interligação: tarefa e lead nascem da conversa e aparecem nos outros módulos.
   await page.getByTestId("wa-links").getByRole("button", { name: "Criar tarefa", exact: true }).first().click();
   await page.getByLabel("Título da tarefa").fill("Ligar para a Maria sobre o processo");
@@ -140,12 +148,14 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await expect(qp.getByText(/1 conversa\(s\) distribuída\(s\)/)).toBeVisible({ timeout: 10_000 });
   await page.goto("/atendimento");
   await page.locator("summary", { hasText: "Filtros" }).click();
+  if (!(await page.getByTestId("wa-queue-filter").isVisible())) await page.locator("summary", { hasText: "Filtros" }).click();
   await expect(page.getByTestId("wa-queue-filter").getByRole("link", { name: /Previdenciário/ })).toBeVisible();
   await page.getByTestId("wa-queue-filter").getByRole("link", { name: /Previdenciário/ }).click();
   await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toBeVisible();
   await expect(page.getByTestId("wa-list").getByText(/Previdenciário/)).toBeVisible();
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
   await expect(page.getByTestId("wa-msg-note").getByText(/Distribuída automaticamente para/)).toBeVisible();
+  await openInfo();
   await expect(page.getByTestId("wa-queue-select")).toHaveValue(/.+/);
   await page.getByTestId("wa-availability").click();
   await expect(page.getByTestId("wa-availability")).toHaveText("Em pausa", { timeout: 10_000 });
@@ -164,6 +174,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await expect(page.getByTestId("fields-panel").getByText(/Número do benefício/).first()).toBeVisible({ timeout: 10_000 });
   await page.goto("/atendimento");
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
+  await openInfo();
   await page.getByTestId("wa-labels").getByRole("button", { name: /Urgente/ }).click();
   await expect(page.getByTestId("wa-msg-note").getByText(/Etiquetas: adicionou “Urgente”/)).toBeVisible({ timeout: 10_000 });
   await page.getByRole("button", { name: /Campos \(0\/1 preenchidos\)/ }).click();
@@ -178,7 +189,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await page.goto("/atendimento?q=123.456.789");
   await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toBeVisible();
   await page.goto("/atendimento?q=999.999.999");
-  await expect(page.getByText("Nenhuma conversa.")).toBeVisible();
+  await expect(page.getByText("Nenhuma conversa encontrada", { exact: true })).toBeVisible();
   await page.goto("/atendimento");
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
 
@@ -274,17 +285,19 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await page.goto("/atendimento");
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
 
+  await openInfo();
   // Atribuir a mim e filtrar "Minhas".
   await page.getByLabel("Responsável", { exact: true }).selectOption({ label: `Dona zap${id} (eu)` });
   await expect(page.getByTestId("wa-list").locator("li", { hasText: "Maria Teste" }).getByText(`Dona zap${id}`)).toBeVisible();
   await page.getByRole("link", { name: "Minhas" }).click();
   await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toBeVisible();
   await page.getByRole("link", { name: "Sem responsável" }).click();
-  await expect(page.getByText("Nenhuma conversa.")).toBeVisible();
+  await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toHaveCount(0);
 
   // Encerrar.
   await page.getByRole("link", { name: "Abertas" }).click();
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
+  await openInfo();
   await page.getByLabel("Situação do atendimento",{exact:true}).selectOption("WAITING");
   await expect(page.getByTestId("wa-status")).toHaveText("Aguardando");
   await page.getByText("Registrar ligação",{exact:true}).click();

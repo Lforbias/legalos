@@ -17,7 +17,7 @@ test('prospecção: acesso protegido, mapa, filtros e acompanhamento persistente
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await page.getByLabel('Nome do escritório').fill(`Teste Prospecção ${id}`);
   await page.getByRole('button', { name: 'Criar escritório' }).click();
-  await expect(page.getByRole('link', { name: 'Visão geral do Func', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible();
   expect((await page.goto('/admin/comercial/prospeccao'))?.status()).toBe(404);
   const db = new Client({ connectionString: DB });
   await db.connect();
@@ -35,23 +35,23 @@ test('prospecção: acesso protegido, mapa, filtros e acompanhamento persistente
     await page.goto('/admin/comercial/prospeccao');
     await expect(page.getByRole('heading', { name: 'Escritórios em São Paulo.' })).toBeVisible();
     await expect(page.locator('.leaflet-container')).toBeVisible();
-    await expect(page.locator('.leaflet-interactive')).toHaveCount(1);
     await page.getByLabel('Nome, CNPJ ou CEP').fill(cnpj);
     await page.getByRole('button', { name: 'Filtrar', exact: true }).click();
     await expect(page.getByRole('link', { name: 'Escritório fictício — demonstração', exact: true })).toBeVisible();
+    await expect(page.locator('.leaflet-interactive')).toHaveCount(1);
     await page.setViewportSize({ width: 1440, height: 1100 });
     await expect(page.locator('.leaflet-tile-loaded').first()).toBeVisible({ timeout: 20000 });
     await page.screenshot({ path: '/tmp/legalos-prospeccao-preview.png', fullPage: true });
     await page.getByRole('link', { name: 'Escritório fictício — demonstração', exact: true }).click();
     await page.getByRole('combobox', { name: 'Etapa', exact: true }).selectOption('QUALIFIED');
     await page.getByLabel('Não contatar este escritório').check();
-    await page.getByLabel('Anotações', { exact: true }).fill('Solicitou não receber contatos.');
+    await page.getByRole('textbox', { name: 'Anotações', exact: true }).fill('Solicitou não receber contatos.');
     await page.getByRole('button', { name: 'Salvar acompanhamento' }).click();
     await expect(page.getByRole('status')).toHaveText('Cadastro salvo.');
     await page.reload();
     await expect(page.getByLabel('Não contatar este escritório')).toBeChecked();
     await expect(page.getByLabel('Próximo retorno')).toBeDisabled();
-    await expect(page.getByLabel('Anotações', { exact: true })).toHaveValue('Solicitou não receber contatos.');
+    await expect(page.getByRole('textbox', { name: 'Anotações', exact: true })).toHaveValue('Solicitou não receber contatos.');
     for (const width of [390, 768, 1440]) {
       await page.setViewportSize({ width, height: 1000 });
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

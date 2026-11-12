@@ -19,12 +19,14 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   // visitante na raiz vê a página pública (sem dados do sistema) e entra pelo botão; rota protegida vai ao login
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: /O escritório inteiro/ })).toBeVisible();
+  await page.goto("/inicio");
   await expect(page.getByRole("heading", { name: /Advocacia com atenção/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Áreas de atuação" })).toBeVisible();
   await expect(page.getByText(/não constituem consulta jurídica/)).toBeVisible();
   await page.goto("/clientes");
   await expect(page).toHaveURL(/\/login/);
-  await page.goto("/");
+  await page.goto("/inicio");
   await page.getByTestId("landing-login").click();
   await expect(page).toHaveURL(/\/login/);
 

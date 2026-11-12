@@ -126,6 +126,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           <CardHeader title="API do LegalOS — chaves de acesso" action={apiKeys.some((k) => k.status === "ACTIVE") ? <Badge tone="success">Em uso</Badge> : <Badge tone="warning">Sem chaves</Badge>} />
           <CardBody className="space-y-4 text-sm">
             <p>Permite que outros sistemas (planilhas, automações, o site do escritório) leiam processos, clientes e prazos. A chave age com as mesmas permissões e regras de sigilo de quem a criou, limitada aos acessos marcados, e para de funcionar se essa pessoa sair do escritório. Guarde a chave como uma senha. Documentação: docs/api.md.</p>
+            <p className="text-xs text-muted">Contrato OpenAPI atualizado e filtrado pelos acessos da chave: <code>GET /api/v1/openapi</code>. Consulte os escopos e exemplos em docs/api.md.</p>
             <ApiKeyList items={apiKeys.map((k) => ({ ...k, expiresAt: k.expiresAt ? k.expiresAt.toISOString() : null, lastUsedAt: k.lastUsedAt ? k.lastUsedAt.toISOString() : null, createdAt: k.createdAt.toISOString() }))} scopeLabels={scopeLabels} />
             <ApiKeyForm scopes={scopeOptions} />
           </CardBody>

@@ -26,7 +26,8 @@ test("indicadores e central de alertas: abrem para o dono, abas navegam e o escr
 
   await page.getByRole("link", { name: "Central de alertas" }).first().click();
   await expect(page.getByTestId("alerts-page")).toBeVisible();
-  await expect(page.getByTestId("alerts-empty")).toContainText("Nenhuma publicação nova");
+  await expect(page.getByRole("navigation", { name: "Seções" }).getByRole("link", { name: /^Publicações/ })).toHaveCount(0);
+  await expect(page.getByTestId("alerts-empty")).toContainText("Nenhum andamento novo");
   await page.getByRole("navigation", { name: "Seções" }).getByRole("link", { name: /^Tarefas/ }).click();
   await expect(page).toHaveURL(/aba=tarefas/);
   await expect(page.getByTestId("alerts-empty")).toContainText("Nenhuma tarefa atrasada");
@@ -34,5 +35,5 @@ test("indicadores e central de alertas: abrem para o dono, abas navegam e o escr
   await expect(page.getByTestId("alerts-empty")).toContainText("Nenhum lançamento vencido");
   // Aba inexistente cai na primeira permitida, sem erro.
   await page.goto("/alertas?aba=naoexiste");
-  await expect(page.getByTestId("alerts-empty")).toContainText("Nenhuma publicação nova");
+  await expect(page.getByTestId("alerts-empty")).toContainText("Nenhum andamento novo");
 });

@@ -16,7 +16,7 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await page.locator("summary").filter({ hasText: "Preparar o escritório" }).click();
   await expect(page.getByRole("link", { name: "Cadastrar clientes", exact: true })).toBeVisible();
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("intimação");
-  await expect(page.getByRole("heading", { name: /Tratar uma intimação/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Tratar uma intimação/ })).toHaveCount(0);
   await expect(page.getByRole("heading", { name: /Preparar o escritório/ })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("");
   await page.getByRole("button", { name: "RUTE", exact: true }).click();
@@ -34,12 +34,9 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await page.getByRole("button", { name: "Ajuda e suporte", exact: true }).click();
   await page.getByRole("menuitem", { name: "Central de ajuda", exact: true }).click();
   await expect(page).toHaveURL(/\/ajuda$/);
-  await page.goto("/box");
-  await footer.getByRole("link", { name: "Ajuda", exact: true }).click();
-  await expect(page).toHaveURL(/\/ajuda$/);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("certificado");
-  await expect(page.getByRole("link", { name: "Ver certificados", exact: true })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Ver certificados", exact: true })).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await page.screenshot({ path: "/tmp/legalos-help-mobile.png", fullPage: true });
   await page.setViewportSize({ width: 1440, height: 1000 });

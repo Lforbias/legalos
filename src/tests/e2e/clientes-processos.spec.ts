@@ -51,6 +51,7 @@ test("clientes e processos: validação, cadastro, linha do tempo, documento e i
   // ---- processo: número CNJ inválido, depois válido, vinculado ao cliente ----
   await page.goto("/processos/novo");
   await page.getByLabel("Título do caso ou processo").fill(`Ação ${id}`);
+  await page.getByLabel("Natureza").selectOption("JUDICIAL");
   await page.getByLabel("Número CNJ").fill("0000001-00.2024.8.26.0100");
   await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
   await expect(page.getByText(/Número CNJ inválido/)).toBeVisible();
@@ -74,7 +75,7 @@ test("clientes e processos: validação, cadastro, linha do tempo, documento e i
   await page.getByRole("button", { name: "Registrar anotação" }).click();
   await expect(page.getByText("Cliente enviou os documentos pelo WhatsApp.")).toBeVisible();
   await expect(page.getByText("Registro interno").first()).toBeVisible();
-  await expect(page.getByText("Processo cadastrado no sistema")).toBeVisible();
+  await expect(page.getByText("Processo judicial cadastrado no sistema")).toBeVisible();
   await page.goto(`${caseUrl}`);
   await page.getByLabel("Situação do processo").selectOption("SUSPENDED");
   await page.getByRole("link", { name: "Linha do tempo" }).click();

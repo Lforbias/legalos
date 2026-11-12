@@ -346,7 +346,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
         ) : null}
       </div>
       {side && (wide ? showSide : true) ? (
-        wide ? <div id={infoId} className="h-full min-h-0 w-[320px] shrink-0">
+        wide ? <div id={infoId} data-chat-info-panel className="h-full min-h-0 w-[320px] shrink-0">
           {informationPanel}
         </div> : <dialog ref={infoDialog} id={infoId} aria-label="Informações da conversa" onClose={() => { setShowSide(false); infoTrigger.current?.focus(); }} className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-none w-[min(400px,100vw)] max-w-none border-l border-border bg-surface p-0 text-fg shadow-2xl backdrop:bg-black/40">
         <div className="flex h-full flex-col">

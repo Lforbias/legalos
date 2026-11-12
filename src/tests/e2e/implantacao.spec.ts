@@ -19,7 +19,8 @@ test("implantação mostra as três etapas e os novos gatilhos de automação", 
   await page.getByRole("link", { name: "Abrir automações entre módulos", exact: true }).click();
   await expect(page).toHaveURL(/\/automacoes$/);
   await page.goto("/automacoes/nova");
-  await expect(page.getByLabel("Gatilho").locator("option")).toContainText(["Quando um processo for cadastrado", "Quando um prazo for validado", "Quando uma intimação for registrada", "Quando um lead virar cliente", "Quando uma tarefa for concluída", "Quando um documento for enviado"]);
+  await expect(page.getByLabel("Gatilho").locator("option")).toContainText(["Quando um processo for cadastrado", "Quando um prazo for validado", "Quando um lead virar cliente", "Quando uma tarefa for concluída", "Quando um documento for enviado"]);
+  await expect(page.getByLabel("Gatilho").locator("option").filter({ hasText: "Quando uma intimação for registrada" })).toHaveCount(0);
   await page.goto("/ajuda");
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("Instalar o aplicativo");
   await expect(page.getByRole("heading", { name: /Instalar o aplicativo no celular/ })).toBeVisible();

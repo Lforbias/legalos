@@ -322,3 +322,8 @@ textarea { font: inherit; }
 @media (min-width: 1280px) {
   .chat-inbox-column { width: 350px; }
 }
+
+/* Keep the assistant launcher out of the desktop conversation controls. */
+[data-space="chat"]:has([data-chat-info-panel]) .rute-launcher-chat {
+  right: calc(320px + 1.25rem);
+}

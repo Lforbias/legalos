@@ -17,14 +17,15 @@ test("Relatórios: abas por permissão, período inválido é explicado e a plan
   await page.goto("/relatorios");
   await expect(page.getByRole("heading", { name: "Relatórios e BI" })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Relatórios" });
-  for (const aba of ["Prazos", "Intimações", "Processos", "Equipe", "Financeiro"]) {
+  await expect(nav.getByRole("link", { name: "Intimações" })).toHaveCount(0);
+  for (const aba of ["Prazos", "Processos", "Equipe", "Financeiro"]) {
     await expect(nav.getByRole("link", { name: aba })).toBeVisible();
   }
 
   await nav.getByRole("link", { name: "Financeiro" }).click();
   await expect(page).toHaveURL(/aba=financeiro/);
   await expect(page.getByText("Clientes que mais pagaram")).toBeVisible();
-  for (const aba of ["Prazos", "Intimações", "Processos", "Equipe"]) {
+  for (const aba of ["Prazos", "Processos", "Equipe"]) {
     await nav.getByRole("link", { name: aba }).click();
     await expect(page.getByRole("heading", { name: "Relatórios e BI" })).toBeVisible();
   }

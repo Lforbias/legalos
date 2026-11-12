@@ -25,6 +25,7 @@ export function Topbar({
   canCreateTask,
   notifications,
   onOpenMobile,
+  wrapOnMobile = false,
 }: {
   user: { name: string; email: string };
   organizations: Org[];
@@ -36,6 +37,7 @@ export function Topbar({
   canCreateTask: boolean;
   notifications: { unread: number; items: { id: string; title: string; body: string | null; link: string | null; read: boolean }[] };
   onOpenMobile: () => void;
+  wrapOnMobile?: boolean;
 }) {
   const router = useRouter();
   const [, startTransition] = React.useTransition();
@@ -50,7 +52,7 @@ export function Topbar({
 
   return (
     <>
-    <header className="sticky top-0 z-20 flex h-16 shrink-0 items-center gap-2 border-b border-border/80 bg-surface/95 px-3 backdrop-blur-xl md:px-5">
+    <header className={`sticky top-0 z-20 flex shrink-0 items-center border-b border-border/80 bg-surface/95 backdrop-blur-xl md:px-5 ${wrapOnMobile ? "min-h-16 flex-wrap gap-1 px-2 py-1 sm:h-16 sm:flex-nowrap sm:gap-2 sm:px-3 sm:py-0" : "h-16 gap-2 px-3"}`}>
       <button type="button" aria-label="Abrir menu" onClick={onOpenMobile} className="cursor-pointer rounded-md p-2 text-muted hover:bg-surface-2 md:hidden">
         <MenuIcon className="h-5 w-5" aria-hidden />
       </button>
@@ -115,7 +117,7 @@ export function Topbar({
         <Search className="h-4 w-4" aria-hidden />
       </button>
 
-      {visibleKeys.includes("workspace") ? <Link href="/area-de-trabalho" aria-label="Abrir LegalOS Desktop" title="Abrir LegalOS Desktop" className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium transition hover:bg-surface-2"><Command className="h-4 w-4" /><span>Desktop</span></Link> : null}
+      {visibleKeys.includes("workspace") ? <Link href="/area-de-trabalho" aria-label="Abrir LegalOS Desktop" title="Abrir LegalOS Desktop" className="inline-flex h-9 items-center gap-2 rounded-lg border border-border px-3 text-xs font-medium transition hover:bg-surface-2"><Command className="h-4 w-4" /><span className={wrapOnMobile ? "hidden sm:inline" : undefined}>Desktop</span></Link> : null}
 
       <Menu
         label="Criação rápida"

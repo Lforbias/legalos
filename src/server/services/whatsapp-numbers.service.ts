@@ -5,7 +5,7 @@ import { sealBytes } from "@/lib/security/pfx";
 import { getPhoneInfo, waConfigFromEnv, WhatsappApiError } from "@/lib/whatsapp/client";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { requireMfa } from "./certificate.service";
+import { assertMfaEnabled } from "./mfa.service";
 import { isUniqueViolation } from "./db-errors";
 import { requireCertKey } from "./whatsapp-auth";
 import { startQrSession, stopQrSession } from "./whatsapp-qr.service";
@@ -43,7 +43,7 @@ export async function addMetaNumber(ctx: TenantContext, input: { label: string; 
   assertCan(ctx, "whatsapp:manage");
   assertCan(ctx, "integrations:manage");
   const key = requireCertKey();
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   await assertRoom(ctx);
   const label = cleanLabel(input.label);
   const phoneNumberId = input.phoneNumberId.trim();
@@ -77,7 +77,7 @@ export async function addQrNumber(ctx: TenantContext, input: { label: string; ri
   assertCan(ctx, "whatsapp:manage");
   assertCan(ctx, "integrations:manage");
   requireCertKey();
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   await assertRoom(ctx);
   if (input.riskAck !== true) throw new ValidationError("Confirme que entendeu os riscos.", { riskAck: ["É preciso confirmar que você entendeu os riscos desta conexão."] });
   const label = cleanLabel(input.label);
@@ -113,7 +113,7 @@ export async function renameNumber(ctx: TenantContext, id: string, label: string
 /** Remove um número adicional e as conversas dele (irreversível). Exige 2FA e a confirmação por escrito do nome. */
 export async function removeNumber(ctx: TenantContext, id: string, confirmLabel: string) {
   assertCan(ctx, "whatsapp:manage");
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const a = await secondary(ctx, id);
   if (a.isPrimary) throw new ConflictError("O número principal é removido na tela de configuração do Chat.");
   const full = await db.whatsappAccount.findUniqueOrThrow({ where: { id }, select: { label: true } });
@@ -137,7 +137,7 @@ export async function restartNumberQr(ctx: TenantContext, id: string) {
   const a = await secondary(ctx, id);
   if (a.provider !== "QR") throw new NotFoundError("Este número não usa QR-Code.");
   if (!a.enabled) throw new ConflictError("O número está desligado. Ligue-o antes de gerar o QR-Code.");
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   await db.whatsappCampaign.updateMany({where:{accountId:id,organizationId:ctx.organizationId,status:{in:["APPROVED","SENDING"]}},data:{status:"PAUSED"}});
   await stopQrSession(id, { logout: true });
   await startQrSession(id);

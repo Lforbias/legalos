@@ -70,14 +70,16 @@ test("painel do developer: dono com 2FA vê as quatro áreas, testa o banco e ro
   await expect(ann).toBeVisible();
   await ann.getByLabel("Para quem").selectOption("USER");
   await ann.getByLabel("E-mail da pessoa").fill(email);
-  await ann.getByLabel(/^Título/).fill("Teste de comunicado");
+  const title = `Teste de comunicado ${email.split("@")[0]}`;
+  await ann.getByLabel(/^Título/).fill(title);
   await ann.getByLabel(/^Mensagem/).fill("Mensagem de teste do developer.");
   await ann.getByLabel("Aviso no celular").uncheck();
   await ann.getByTestId("ann-check").click();
   await expect(ann.getByTestId("ann-preview")).toContainText("1 pessoa");
   await ann.getByTestId("ann-send").click();
-  await expect(ann.getByText(/Enviado a 1 pessoa/)).toBeVisible();
-  await expect(page.getByTestId("ann-history")).toContainText("Teste de comunicado");
+  const sent = page.getByTestId("ann-history").getByRole("row").filter({ hasText: title });
+  await expect(sent.getByRole("cell").nth(4)).toHaveText("1");
+  await expect(sent.getByRole("cell").nth(5)).toHaveText("1");
 
   await page.getByRole("link", { name: "Novidades e andamento" }).click();
   await expect(page.getByRole("heading", { name: "Já feito (mais recente primeiro)" })).toBeVisible();

@@ -10,7 +10,7 @@ test("Navegação organizada, configurações por assunto e RUTE no painel", asy
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Navegação Func", exact: true });
-  await expect(nav.getByRole("link", { name: "Processos", exact: true })).toBeVisible();
+  await expect(nav.getByRole("link", { name: "Processos e casos", exact: true })).toBeVisible();
   await expect(nav.getByRole("link", { name: "RUTE (IA)", exact: true })).toHaveCount(0);
   await expect(nav.getByRole("link", { name: "Relatórios e BI", exact: true })).toBeHidden();
   await nav.getByRole("button", { name: "Gestão do escritório", exact: true }).click();
@@ -22,7 +22,7 @@ test("Navegação organizada, configurações por assunto e RUTE no painel", asy
   await expect(page.getByRole("heading", { name: "Rotina de trabalho", exact: true })).toBeVisible();
   await expect(page.getByLabel("Nome do escritório", { exact: true })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Buscar configurações", exact: true }).fill("certificado");
-  await expect(page.getByRole("link", { name: /Certificados digitais/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Certificados digitais/ })).toHaveCount(0);
   await expect(page.getByRole("link", { name: /^Dados do escritório/ })).toHaveCount(0);
   await page.getByRole("searchbox", { name: "Buscar configurações", exact: true }).fill("dados");
   await page.getByRole("link", { name: /^Dados do escritório/ }).click();
@@ -35,9 +35,9 @@ test("Navegação organizada, configurações por assunto e RUTE no painel", asy
   const before = page.url();
   const launcher = page.getByRole("button", { name: "Abrir RUTE", exact: true });
   await launcher.click();
-  const panel = page.getByRole("dialog", { name: "RUTE", exact: true });
+  const panel = page.getByRole("dialog", { name: /^RUTE/ });
   await expect(panel).toBeVisible();
-  await expect(panel.getByText("Vamos preparar sua assistente", { exact: true })).toBeVisible();
+  await expect(panel.getByRole("heading", { name: /Um novo ritmo/ })).toBeVisible();
   await expect(page).toHaveURL(before);
   await page.screenshot({ path: "/tmp/legalos-ux-rute.png", fullPage: true });
   await page.keyboard.press("Escape");
@@ -62,8 +62,8 @@ test("Navegação organizada, configurações por assunto e RUTE no painel", asy
   await expect(message).toHaveValue("Meu rascunho de pergunta");
   await expect(page).toHaveURL(before);
   await page.screenshot({ path: "/tmp/legalos-ux-rute-chat.png", fullPage: true });
-  await nav.getByRole("link", { name: "Processos", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Processos", exact: true })).toBeVisible();
+  await nav.getByRole("link", { name: "Processos e casos", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Processos e casos", exact: true })).toBeVisible();
   await expect(panel).toBeVisible(); await expect(message).toHaveValue("Meu rascunho de pergunta");
   await panel.getByRole("button", { name: "Fechar RUTE", exact: true }).click();
   await page.setViewportSize({ width: 390, height: 844 });
@@ -75,7 +75,7 @@ test("Navegação organizada, configurações por assunto e RUTE no painel", asy
   await panel.getByRole("button", { name: "Fechar RUTE", exact: true }).click();
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   const menu = page.getByRole("dialog", { name: "Menu", exact: true });
-  await expect(menu.getByRole("link", { name: "Processos", exact: true })).toBeVisible();
+  await expect(menu.getByRole("link", { name: "Processos e casos", exact: true })).toBeVisible();
   await menu.getByRole("button", { name: "Ferramentas", exact: true }).click();
   await expect(menu.getByRole("link", { name: "Cálculos", exact: true })).toBeVisible();
   await page.screenshot({ path: "/tmp/legalos-ux-mobile.png", fullPage: true });
