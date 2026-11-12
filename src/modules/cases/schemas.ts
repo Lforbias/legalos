@@ -112,6 +112,7 @@ export const EVENT_KIND_LABEL: Record<string, string> = {
   CASE_UPDATED: "Dados atualizados",
   STATUS_CHANGED: "Situação alterada",
   NOTE: "Anotação",
+  LEGALMAIL_MOVEMENT: "Andamento (LegalMail)",
   DATAJUD_MOVEMENT: "Andamento (DataJud/CNJ)",
   ANDAMENTO: "Andamento (Astrea)",
   CUSTOM_FIELDS: "Campos personalizados",

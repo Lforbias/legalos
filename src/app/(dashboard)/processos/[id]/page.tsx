@@ -14,7 +14,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { TabsNav } from "@/components/ui/tabs-nav";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
 import { NotFoundError } from "@/lib/permissions/check";
-import { formatCnj, CNJ_SEGMENTS, parseCnj } from "@/lib/validation/br-documents";
+import { formatCnj, CNJ_SEGMENTS, isValidCnj, parseCnj } from "@/lib/validation/br-documents";
 import { uuidSchema } from "@/lib/validation/common";
 import { formatMoneyBR } from "@/lib/validation/money";
 import { ArchiveCaseButton, MembersPanel, NoteForm, PartiesPanel, StatusControl } from "@/modules/cases/case-panels";
@@ -27,7 +27,8 @@ import { CaseShareToggle } from "@/modules/portal/share-toggle";
 import { listPetitions } from "@/server/services/petition.service";
 import { PETITION_STATUS_LABEL, PETITION_STATUS_TONE, type PetitionStatusKey } from "@/modules/petitions/schemas";
 import { NOTICE_KIND_LABEL, NOTICE_STATUS_LABEL } from "@/modules/inbox/schemas";
-import { canReadLegalMailInFunc } from "@/server/legalmail-access";
+import { LegalMailHistoryButton } from "@/modules/legalmail/history-button";
+import { canImportLegalMail, canReadLegalMailInFunc } from "@/server/legalmail-access";
 import { listCaseNoticesForFunc } from "@/server/services/notice.service";
 import { listTasksForCase } from "@/server/services/task.service";
 import { dateToYmd, formatYmd } from "@/lib/dates/ymd";
@@ -109,6 +110,7 @@ export default async function CaseDetailPage({
   const canDocs = can(ctx, "documents:read");
   const canDeadlines = can(ctx, "deadlines:read");
   const canTasks = can(ctx, "tasks:read");
+  const canSyncLegalMail = canWrite && Boolean(c.number && isValidCnj(c.number)) && await canImportLegalMail(ctx);
   const canNotices = can(ctx, "inbox:read") || await canReadLegalMailInFunc(ctx);
   const canPetitions = can(ctx, "petitions:read");
   const tabs = [
@@ -172,6 +174,7 @@ export default async function CaseDetailPage({
                 { href: `/rute?aba=assistente&caso=${c.id}`, label: "Abrir RUTE neste processo" },
               ]} />
             ) : null}
+            {canSyncLegalMail ? <LegalMailHistoryButton caseId={c.id} /> : null}
             {showDatajud ? <DatajudSyncButton caseId={c.id} /> : null}
             {mni ? <MniConsultButton caseId={c.id} label={mni.label} /> : null}
             {mni && can(ctx, "documents:write") ? <MniAutosButton caseId={c.id} label={mni.label} /> : null}
@@ -604,7 +607,7 @@ async function Timeline({ caseId, ctx, tz, source, canWrite }: { caseId: string;
         </Card>
       ) : null}
       <Card>
-        <CardHeader title="Linha do tempo" description="Andamentos importados de tribunais serão exibidos aqui quando a integração for implementada (Fases 4 e 8); hoje só há registros internos e automáticos." />
+        <CardHeader title="Linha do tempo" description="Andamentos importados, registros internos e ações automáticas deste processo." />
         <CardBody>
           <div className="mb-4 flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por origem">
             {filters.map((f) => (
