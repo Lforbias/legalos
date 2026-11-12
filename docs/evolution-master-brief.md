@@ -3,8 +3,8 @@
 ## PR Sequence
 - PR #17: Fundação e correções (concluído na branch; PR aberto para revisão)
 - PR #18: Central de Atendimento (aberto para revisão)
-- PR #19: Cliente 360° e Processo 360° (em implementação)
-- PR #20: Controladoria
+- PR #19: Cliente 360° e Processo 360° (aberto para revisão)
+- PR #20: Controladoria (em implementação)
 - PR #21: Jurídico completo
 - PR #22: Comercial do escritório
 - PR #23: Financeiro & Contábil
@@ -20,5 +20,6 @@
 - PR #17: commit `271912e` em `feature/evolution-1.0`; PR aberto; 24 testes unitários focados passaram.
 - PR #18: aberto como [#18](https://github.com/Lforbias/legalos/pull/18), branch `feature/evolution-1.1-central-atendimento`, baseado no #17.
 - PR #18 entregue: fila e conversas reais, disponibilidade e canais; sem alterar dados ou simular integrações. Typecheck, ESLint focado e 24 testes passaram.
-- PR #19: branch `feature/evolution-1.2-360`, baseado no #18; ligando conversas às fichas 360° existentes com permissões preservadas.
-- Próximo: validar e abrir o #19; em seguida iniciar Controladoria (#20).
+- PR #19: aberto como [#19](https://github.com/Lforbias/legalos/pull/19), branch `feature/evolution-1.2-360`, baseado no #18; 24 testes unitários focados e typecheck/ESLint passaram.
+- PR #20: em implementação na `feature/evolution-1.3-controladoria`; lista pendências reais por área, exclui aniversários de alertas e mantém o Box desativado.
+- Próximo: validar e abrir o #20; depois seguir a sequência do brief.

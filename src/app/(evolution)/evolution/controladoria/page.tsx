@@ -6,38 +6,53 @@ import { StatCard } from "@/components/evolution/stat-card";
 import { DataError } from "@/components/evolution/data-error";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
-import { alertCounts } from "@/server/services/insights.service";
-import { countNewNotices } from "@/server/services/box.service";
+import { alertCounts, availableAlertTabs } from "@/server/services/insights.service";
 import { BOX_AVAILABLE } from "@/lib/box-retirement";
 
 export default async function ControladoriaPage() {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.controladoria;
-  const [alerts, alertsErr] = await alertCounts(ctx).then((r) => [r, false] as const).catch(() => [{} as Record<string, number>, true] as const);
-  const totalAlerts = Object.values(alerts).reduce((a, b) => a + b, 0);
-  const [noticeCount, noticeErr] = can(ctx, "inbox:read") && BOX_AVAILABLE
-    ? await countNewNotices(ctx).then((r) => [r, false] as const).catch(() => [0, true] as const)
-    : [0, false] as const;
+  const attentionTabs = availableAlertTabs(ctx).filter((tab) => tab.key !== "aniversarios" && (BOX_AVAILABLE || tab.key !== "publicacoes"));
+  const [alerts, alertsErr] = await alertCounts(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
+  const totalAlerts = alerts
+    ? attentionTabs.reduce((total, tab) => total + (alerts[tab.key] ?? 0), 0)
+    : null;
 
   return (
     <>
       <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
 
-      {(alertsErr || noticeErr) && <DataError message="Não foi possível carregar alguns indicadores da Controladoria" />}
+      {alertsErr && <DataError message="Não foi possível carregar os indicadores da Controladoria" />}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <StatCard icon={Bell} label="Alertas pendentes" value={alertsErr ? "—" : totalAlerts} color={dept.color} />
-        {BOX_AVAILABLE && <StatCard icon={Inbox} label="Intimações novas" value={noticeErr ? "—" : noticeCount} color="#f59e0b" />}
+        <StatCard icon={Bell} label="Pendências operacionais" value={alertsErr ? "—" : totalAlerts ?? 0} detail="nos módulos disponíveis para seu perfil" color={dept.color} />
       </div>
+
+      <h2 className="mt-8 mb-3 text-base font-semibold">Atenção por área</h2>
+      <p className="mb-4 text-sm text-muted">Cada contador usa dados do escritório e abre a lista correspondente para tratamento.</p>
+      {attentionTabs.length > 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {attentionTabs.map((tab) => (
+            <Link key={tab.key} href={`/alertas?aba=${tab.key}`} className="group flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4 transition hover:border-primary/40 hover:bg-surface-2">
+              <span className="text-sm font-medium group-hover:text-primary">{tab.label}</span>
+              <span className="text-xl font-semibold tabular-nums">{alertsErr ? "—" : alerts?.[tab.key] ?? 0}</span>
+            </Link>
+          ))}
+        </div>
+      ) : (
+        <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted">Seu perfil não tem módulos com pendências de controladoria disponíveis.</p>
+      )}
 
       <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link href="/alertas" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
-          <Bell className="h-5 w-5 text-muted" aria-hidden />
-          <div>
-            <p className="text-sm font-medium group-hover:text-primary">Central de alertas</p>
-            <p className="text-[12px] text-muted">Publicações, andamentos, processos parados e prazos</p>
-          </div>
-        </Link>
+        {attentionTabs.length > 0 && (
+          <Link href="/alertas" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:bg-surface-2">
+            <Bell className="h-5 w-5 text-muted" aria-hidden />
+            <div>
+              <p className="text-sm font-medium group-hover:text-primary">Central de alertas</p>
+              <p className="text-[12px] text-muted">Pendências com link direto para tratar cada item</p>
+            </div>
+          </Link>
+        )}
 
         {can(ctx, "inbox:read") && BOX_AVAILABLE ? (
           <Link href="/caixa-de-entrada" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
