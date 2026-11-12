@@ -55,8 +55,8 @@ export default async function AdministracaoPage() {
           <Link href="/integracoes" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
             <Plug className="h-5 w-5 text-muted" aria-hidden />
             <div>
-              <p className="text-sm font-medium group-hover:text-primary">Integrações</p>
-              <p className="text-[12px] text-muted">API, Google e integrações compartilhadas</p>
+            <p className="text-sm font-medium group-hover:text-primary">APIs e integrações</p>
+            <p className="text-[12px] text-muted">Chaves REST, webhooks e conectores do escritório</p>
             </div>
           </Link>
         )}

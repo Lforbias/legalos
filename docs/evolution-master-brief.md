@@ -11,7 +11,7 @@
 - PR #24: Administração & Gestão (em validação)
 - PR #25: Meu Escritório e Minha Mesa (aberto para revisão)
 - PR #26: Comunicação entre departamentos (em validação)
-- PR #27: APIs e integrações
+- PR #27: APIs e integrações (em validação)
 - PR #28: Paridade total Ethos → Evolution
 - PR #29: Testes e homologação
 - PR #30: Fechamento e preparação para lançamento
@@ -30,4 +30,5 @@
 - PR #24 checkpoint: branch `feature/evolution-2.4-administracao`, baseada no #23. Arquivos: `src/app/(evolution)/evolution/administracao/page.tsx` e este brief. Administração mostra indicadores reais permitidos pelo perfil e oculta o atalho de relatórios sem acesso. Typecheck, ESLint focado, 24 testes de navegação/flag e 6 testes de indicadores passaram; na suíte unitária ampla, 441 testes passaram e 4 suítes não carregaram por falta de `DATABASE_URL`. Pendentes: CI e revisão visual/por perfil.
 - PR #25: branch `feature/evolution-2.5-escritorio-mesa`, baseada no #24. Arquivos: `src/app/(evolution)/evolution/page.tsx`, `src/app/(evolution)/evolution/mesa/page.tsx` e este brief. Meu Escritório exibe resumo pessoal real de tarefas/prazos; Minha Mesa destaca prazos vencidos e publicações distribuídas pelo serviço existente. Typecheck, ESLint focado, 24 testes de navegação/flag e 6 testes de indicadores passaram.
 - PR #26: branch `feature/evolution-2.6-fluxos`, baseada no #25. Arquivos: `src/app/(evolution)/evolution/page.tsx` e este brief. Meu Escritório oferece atalhos condicionados por permissões entre Atendimento→Comercial, Comercial→Jurídico e Jurídico→Financeiro usando formulários reais. Typecheck, ESLint focado, 24 testes de navegação/flag e `git diff --check` passaram.
-- Próximo: APIs e integrações (#27).
+- PR #27: branch `feature/evolution-2.7-apis-integracoes`, baseada no #26. Arquivos: `src/app/(evolution)/evolution/administracao/page.tsx`, `src/app/(dashboard)/integracoes/page.tsx`, `docs/api.md` e este brief. Consolida o acesso, esclarece o endpoint OpenAPI autenticado e remove contagens estáticas que divergiam do catálogo versionado. Typecheck, ESLint focado, 24 testes de navegação/flag e 6 testes de integração da API passaram.
+- Próximo: Paridade Ethos → Evolution (#28).
