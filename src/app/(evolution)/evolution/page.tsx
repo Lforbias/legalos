@@ -1,14 +1,18 @@
 import Link from "next/link";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckSquare, Clock } from "lucide-react";
 import { DEPARTMENTS, departmentItems, type Department } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
+import { StatCard } from "@/components/evolution/stat-card";
+import { DataError } from "@/components/evolution/data-error";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
+import { getIndicators } from "@/server/services/insights.service";
 
 const DEPT_ORDER: Department[] = ["juridico", "controladoria", "atendimento", "comercial", "financeiro", "administracao"];
 
 export default async function EvolutionLobby() {
   const { ctx } = await requireTenant();
+  const [ind, indErr] = await getIndicators(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
   return (
     <>
       <DepartmentHeader
@@ -17,6 +21,26 @@ export default async function EvolutionLobby() {
         title="Meu Escritório"
         description="Bem-vindo ao LegalOS Evolution. Escolha um departamento para começar."
       />
+
+      <section className="mb-8 rounded-xl border border-border bg-surface p-5" aria-labelledby="my-desk-heading">
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <h2 id="my-desk-heading" className="text-base font-semibold">Minha Mesa hoje</h2>
+            <p className="mt-1 text-sm text-muted">Resumo pessoal de tarefas e prazos atribuídos a você.</p>
+          </div>
+          <Link href="/evolution/mesa" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
+            Abrir mesa <ArrowRight className="h-4 w-4" aria-hidden />
+          </Link>
+        </div>
+        {indErr && <DataError message="Não foi possível carregar o resumo pessoal" />}
+        {!indErr && (
+          <div className="grid gap-3 sm:grid-cols-3">
+            {ind?.mine.tasksOpen != null && <StatCard icon={CheckSquare} label="Tarefas pendentes" value={ind.mine.tasksOpen} detail={ind.mine.tasksOverdue ? `${ind.mine.tasksOverdue} em atraso` : undefined} color="#6366f1" />}
+            {ind?.mine.deadlinesNext7 != null && <StatCard icon={CalendarClock} label="Prazos nos próximos 7 dias" value={ind.mine.deadlinesNext7} color="#f59e0b" />}
+            {ind?.mine.deadlinesOverdue != null && <StatCard icon={Clock} label="Prazos vencidos" value={ind.mine.deadlinesOverdue} color="#ef4444" />}
+          </div>
+        )}
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {DEPT_ORDER.map((dept) => {

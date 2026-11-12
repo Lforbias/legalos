@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CheckSquare, CalendarClock, Clock, FolderKanban } from "lucide-react";
+import { CheckSquare, CalendarClock, Clock, FolderKanban, AlertTriangle } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
@@ -21,6 +21,8 @@ export default async function MesaPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {ind?.mine.tasksOpen != null && <StatCard icon={CheckSquare} label="Tarefas pendentes" value={ind.mine.tasksOpen} detail={ind.mine.tasksOverdue ? `${ind.mine.tasksOverdue} em atraso` : undefined} color="#6366f1" />}
         {ind?.mine.deadlinesOpen != null && <StatCard icon={Clock} label="Prazos abertos" value={ind.mine.deadlinesOpen} detail={ind.mine.deadlinesNext7 ? `${ind.mine.deadlinesNext7} nos próximos 7 dias` : undefined} color="#f59e0b" />}
+        {ind?.mine.deadlinesOverdue != null && <StatCard icon={AlertTriangle} label="Prazos vencidos" value={ind.mine.deadlinesOverdue} color="#ef4444" />}
+        {ind?.mine.notices != null && <StatCard icon={CalendarClock} label="Publicações distribuídas" value={ind.mine.notices} color="#8b5cf6" />}
         {ind?.mine.cases != null && <StatCard icon={FolderKanban} label="Processos ativos" value={ind.mine.cases} color="#10b981" />}
       </div>
 
