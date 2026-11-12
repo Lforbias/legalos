@@ -27,8 +27,8 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await expect(page.getByText("Nenhum guia encontrado", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Limpar busca e filtros" }).click();
   await expect(page.getByRole("status")).toHaveText(`${HELP_GUIDES.length} guias encontrados`);
-  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("salvar gemini");
-  await expect(page.getByRole("heading", { name: /Configurar Gemini/ })).toBeVisible();
+  await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("configuração IA desativada");
+  await expect(page.getByRole("heading", { name: /A configuração de IA está desativada/ })).toBeVisible();
   await page.getByRole("searchbox", { name: "Buscar na ajuda" }).fill("");
   await expect(page.getByRole("button", { name: /Mostrar mais guias/ })).toBeVisible();
   await page.getByRole("button", { name: /Mostrar mais guias/ }).click();
