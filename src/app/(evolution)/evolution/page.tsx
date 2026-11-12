@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, CalendarClock, CheckSquare, Clock } from "lucide-react";
+import { ArrowRight, CalendarClock, CheckSquare, Clock, MessageCircle, Briefcase, Scale, Wallet } from "lucide-react";
 import { DEPARTMENTS, departmentItems, type Department } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
@@ -40,6 +40,45 @@ export default async function EvolutionLobby() {
             {ind?.mine.deadlinesOverdue != null && <StatCard icon={Clock} label="Prazos vencidos" value={ind.mine.deadlinesOverdue} color="#ef4444" />}
           </div>
         )}
+      </section>
+
+      <section className="mb-8" aria-labelledby="department-flows-heading">
+        <div className="mb-3">
+          <h2 id="department-flows-heading" className="text-base font-semibold">Continue o fluxo entre áreas</h2>
+          <p className="mt-1 text-sm text-muted">Atalhos para registrar a próxima etapa nos módulos existentes.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {can(ctx, "whatsapp:read") && can(ctx, "crm:write") && (
+            <Link href="/crm/novo" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+              <MessageCircle className="h-5 w-5 text-muted" aria-hidden />
+              <div>
+                <p className="text-sm font-medium group-hover:text-primary">Atendimento → Comercial</p>
+                <p className="text-[12px] text-muted">Registrar uma oportunidade no CRM</p>
+              </div>
+              <ArrowRight className="ml-auto h-4 w-4 text-muted" aria-hidden />
+            </Link>
+          )}
+          {can(ctx, "crm:read") && can(ctx, "cases:write") && (
+            <Link href="/processos/novo" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+              <Briefcase className="h-5 w-5 text-muted" aria-hidden />
+              <div>
+                <p className="text-sm font-medium group-hover:text-primary">Comercial → Jurídico</p>
+                <p className="text-[12px] text-muted">Iniciar o cadastro de um processo</p>
+              </div>
+              <ArrowRight className="ml-auto h-4 w-4 text-muted" aria-hidden />
+            </Link>
+          )}
+          {can(ctx, "cases:read") && can(ctx, "finance:write") && (
+            <Link href="/financeiro/lancamentos/novo" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+              <Scale className="h-5 w-5 text-muted" aria-hidden />
+              <div>
+                <p className="text-sm font-medium group-hover:text-primary">Jurídico → Financeiro</p>
+                <p className="text-[12px] text-muted">Registrar honorários ou despesas</p>
+              </div>
+              <Wallet className="ml-auto h-4 w-4 text-muted" aria-hidden />
+            </Link>
+          )}
+        </div>
       </section>
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

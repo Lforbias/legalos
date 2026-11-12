@@ -10,7 +10,7 @@
 - PR #23: Financeiro & Contábil (aberto para revisão)
 - PR #24: Administração & Gestão (em validação)
 - PR #25: Meu Escritório e Minha Mesa (aberto para revisão)
-- PR #26: Comunicação entre departamentos
+- PR #26: Comunicação entre departamentos (em validação)
 - PR #27: APIs e integrações
 - PR #28: Paridade total Ethos → Evolution
 - PR #29: Testes e homologação
@@ -29,4 +29,5 @@
 - PR #23: aberto como [#23](https://github.com/Lforbias/legalos/pull/23), branch `feature/evolution-2.3-financeiro`, baseado no #22; saldos e fluxo de caixa reais. Typecheck, ESLint focado, 24 testes unitários e 14 testes de integração passaram.
 - PR #24 checkpoint: branch `feature/evolution-2.4-administracao`, baseada no #23. Arquivos: `src/app/(evolution)/evolution/administracao/page.tsx` e este brief. Administração mostra indicadores reais permitidos pelo perfil e oculta o atalho de relatórios sem acesso. Typecheck, ESLint focado, 24 testes de navegação/flag e 6 testes de indicadores passaram; na suíte unitária ampla, 441 testes passaram e 4 suítes não carregaram por falta de `DATABASE_URL`. Pendentes: CI e revisão visual/por perfil.
 - PR #25: branch `feature/evolution-2.5-escritorio-mesa`, baseada no #24. Arquivos: `src/app/(evolution)/evolution/page.tsx`, `src/app/(evolution)/evolution/mesa/page.tsx` e este brief. Meu Escritório exibe resumo pessoal real de tarefas/prazos; Minha Mesa destaca prazos vencidos e publicações distribuídas pelo serviço existente. Typecheck, ESLint focado, 24 testes de navegação/flag e 6 testes de indicadores passaram.
-- Próximo: Comunicação entre departamentos (#26).
+- PR #26: branch `feature/evolution-2.6-fluxos`, baseada no #25. Arquivos: `src/app/(evolution)/evolution/page.tsx` e este brief. Meu Escritório oferece atalhos condicionados por permissões entre Atendimento→Comercial, Comercial→Jurídico e Jurídico→Financeiro usando formulários reais. Typecheck, ESLint focado, 24 testes de navegação/flag e `git diff --check` passaram.
+- Próximo: APIs e integrações (#27).
