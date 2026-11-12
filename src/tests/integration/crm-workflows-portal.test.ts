@@ -41,6 +41,23 @@ describe("CRM, automações e portal (Fase 6)", () => {
   });
 
   describe("CRM", () => {
+    it("vincula lead a cliente existente sem duplicar ou sobrescrever cadastro", async () => {
+      const client = await createClient(A.ctx, clientInput("Cadastro preservado"));
+      const l = await createLead(A.ctx, lead("Nome do lead diferente"));
+      const before = await db.client.count({ where: { organizationId: A.org.id } });
+      expect(await convertLead(A.ctx, l.id, "", client.id)).toEqual({ clientId: client.id });
+      expect(await db.client.count({ where: { organizationId: A.org.id } })).toBe(before);
+      expect((await db.client.findUniqueOrThrow({ where: { id: client.id } })).name).toBe("Cadastro preservado");
+      expect((await getLead(A.ctx, l.id)).lead.stage).toBe("WON");
+    });
+    it("rejeita vínculo com cliente de outro escritório e preserva lead aberto", async () => {
+      const client = await createClient(B.ctx, clientInput("Cliente externo"));
+      const l = await createLead(A.ctx, lead("Sem vínculo indevido"));
+      await expect(convertLead(A.ctx, l.id, "", client.id)).rejects.toThrow("cliente ativo deste escritório");
+      expect((await getLead(A.ctx, l.id)).lead.stage).toBe("NEW");
+      expect((await getLead(A.ctx, l.id)).lead.clientId).toBeNull();
+    });
+
     it("ciclo do lead: etapas manuais, perdido com motivo, reabrir", async () => {
       const l = await createLead(lawyer.ctx, lead("Maria Lead"));
       expect(l.stage).toBe("NEW");
