@@ -9,6 +9,7 @@ import { runAction } from "@/server/action-helpers";
 import { canImportLegalMail, legalMailOfficeId } from "@/server/legalmail-access";
 import { requirePlatform } from "@/server/platform";
 import { requireTenant } from "@/server/session";
+import { syncLegalMailHistory } from "@/server/services/legalmail-history.service";
 import { createApiKey } from "@/server/services/apikey.service";
 import { audit } from "@/server/services/audit.service";
 
@@ -89,5 +90,15 @@ export async function createLegalMailWebhookKey() {
     });
     revalidatePath("/integracoes");
     return { token: key.token };
+  });
+}
+
+export async function syncLegalMailHistoryAction(input: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const caseId = z.uuid().parse(input);
+    const result = await syncLegalMailHistory(ctx, caseId);
+    revalidatePath(`/processos/${caseId}`);
+    return result;
   });
 }
