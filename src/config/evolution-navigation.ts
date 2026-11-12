@@ -104,7 +104,6 @@ export const EVOLUTION_NAV: EvolutionNavItem[] = [
   { key: "evo-admin-automacoes", department: "administracao", label: "Automações", href: "/automacoes", icon: Zap, permission: "workflows:manage" },
   { key: "evo-admin-config", department: "administracao", label: "Configurações", href: "/configuracoes", icon: LayoutDashboard },
   { key: "evo-admin-reports", department: "administracao", label: "Relatórios e BI", href: "/relatorios", icon: BarChart3, permission: "reports:read" },
-  { key: "evo-admin-rute", department: "administracao", label: "RUTE (IA)", href: "/rute", icon: Bot, permission: "ai:use" },
 ];
 
 export function departmentItems(dept: Department) {

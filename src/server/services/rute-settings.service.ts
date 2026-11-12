@@ -12,6 +12,7 @@ export const PROVIDERS = { ANTHROPIC: "Claude (Anthropic)", GEMINI: "Gemini (Goo
 export type ProviderKey = keyof typeof PROVIDERS;
 export const DEFAULT_MODELS: Record<ProviderKey, string> = { ANTHROPIC: "claude-sonnet-4-5", GEMINI: "gemini-2.5-flash", OPENAI: "gpt-4.1-mini" };
 
+export const RUTE_ENABLED = process.env.LEGALOS_RUTE_ENABLED === "1";
 export type RuteFeature = "mcp" | "proposals" | "assistant";
 const COL = { mcp: "mcpEnabled", proposals: "proposalsEnabled", assistant: "assistantEnabled" } as const;
 
@@ -45,6 +46,7 @@ export async function getRuteSettings(ctx: TenantContext) {
 
 /** Usado pelo servidor MCP, pelo assistente e pelas propostas antes de qualquer coisa. */
 export async function assertRuteOn(orgId: string, feature: RuteFeature, opts: { allowDuringStop?: boolean } = {}) {
+  if (!RUTE_ENABLED) throw new ConflictError("Os recursos da RUTE estão desativados no momento.");
   const r = await row(orgId);
   if (r?.emergencyStop && !opts.allowDuringStop) throw new ConflictError("A RUTE está em parada de emergência neste escritório. Quem administra as integrações precisa liberar.");
   if (!r || !r[COL[feature]]) {
@@ -55,6 +57,7 @@ export async function assertRuteOn(orgId: string, feature: RuteFeature, opts: { 
 }
 
 export async function setRuteFeature(ctx: TenantContext, feature: RuteFeature, on: boolean, opts: { consent?: boolean } = {}) {
+  if (!RUTE_ENABLED && on) throw new ConflictError("Os recursos da RUTE estão desativados no momento.");
   assertCan(ctx, "integrations:manage");
   const cur = await row(ctx.organizationId);
   if (on && feature === "mcp" && !opts.consent && !cur?.consentAt) throw new ValidationError("Para ligar, confirme que entende que o conteúdo consultado sai do LegalOS para a IA conectada.", { consent: ["Confirme o consentimento."] });
@@ -64,12 +67,14 @@ export async function setRuteFeature(ctx: TenantContext, feature: RuteFeature, o
 }
 
 export async function setEmergencyStop(ctx: TenantContext, on: boolean) {
+  if (!RUTE_ENABLED) throw new ConflictError("Os recursos da RUTE estão desativados no momento.");
   assertCan(ctx, "integrations:manage");
   await db.ruteSettings.upsert({ where: { organizationId: ctx.organizationId }, create: { organizationId: ctx.organizationId, emergencyStop: on }, update: { emergencyStop: on } });
   await audit({ action: on ? "rute.emergency_stop" : "rute.emergency_release", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "organization", resourceId: ctx.organizationId, meta: ctx.meta });
 }
 
 export async function setAssistantProvider(ctx: TenantContext, input: { provider: string; model?: string; apiKey?: string; clearKey?: boolean }) {
+  if (!RUTE_ENABLED) throw new ConflictError("Os recursos da RUTE estão desativados no momento.");
   assertCan(ctx, "integrations:manage");
   if (!Object.hasOwn(PROVIDERS, input.provider)) throw new ValidationError("Escolha o provedor.", { provider: ["Escolha o provedor."] });
   const model = input.model?.trim() || null;
@@ -91,6 +96,7 @@ export async function officeProviderKey(orgId: string): Promise<string | null> {
 }
 
 export async function setGovernance(ctx: TenantContext, input: { retentionDays?: number; monthlyTokenLimit?: number | null; roleLimits?: Record<string, number> }) {
+  if (!RUTE_ENABLED) throw new ConflictError("Os recursos da RUTE estão desativados no momento.");
   assertCan(ctx, "integrations:manage");
   const data: { retentionDays?: number; monthlyTokenLimit?: number | null; roleLimits?: Record<string, number> } = {};
   if (input.retentionDays !== undefined) {

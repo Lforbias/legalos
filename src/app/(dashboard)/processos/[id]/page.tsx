@@ -171,7 +171,6 @@ export default async function CaseDetailPage({
             {can(ctx, "ai:use") ? (
               <PageActionsMenu label="Mais ações do processo" items={[
                 { href: `/ia?processo=${c.id}`, label: "Perguntar à IA sobre este processo" },
-                { href: `/rute?aba=assistente&caso=${c.id}`, label: "Abrir RUTE neste processo" },
               ]} />
             ) : null}
             {canSyncLegalMail ? <LegalMailHistoryButton caseId={c.id} /> : null}
