@@ -1,3 +1,4 @@
+import { TasksWorkspace, type TaskSearchParams } from "@/modules/tasks/tasks-workspace";
 import Link from "next/link";
 import { Inbox, Bell } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
@@ -9,7 +10,7 @@ import { can } from "@/server/context";
 import { alertCounts, availableAlertTabs } from "@/server/services/insights.service";
 import { BOX_AVAILABLE } from "@/lib/box-retirement";
 
-export default async function ControladoriaPage() {
+export default async function ControladoriaPage({ searchParams }: { searchParams: Promise<TaskSearchParams> }) {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.controladoria;
   const attentionTabs = availableAlertTabs(ctx).filter((tab) => tab.key !== "aniversarios" && (BOX_AVAILABLE || tab.key !== "publicacoes"));
@@ -41,6 +42,8 @@ export default async function ControladoriaPage() {
       ) : (
         <p className="rounded-xl border border-dashed border-border p-5 text-sm text-muted">Seu perfil não tem módulos com pendências de controladoria disponíveis.</p>
       )}
+
+      {can(ctx, "tasks:read") && <section className="mt-8" aria-label="Mesa de controle operacional"><TasksWorkspace searchParams={searchParams} basePath="/evolution/controladoria" embedded /></section>}
 
       <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">

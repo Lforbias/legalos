@@ -61,6 +61,19 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("navigation", { name: "Navegação Evolution" })).toBeVisible();
 
+  await page.goto("/tarefas/nova");
+  await page.getByLabel("Título", { exact: true }).fill(`Conferência Evolution ${id}`);
+  await page.getByRole("button", { name: "Criar tarefa", exact: true }).click();
+  await expect(page.getByRole("heading", { name: `Conferência Evolution ${id}`, exact: true })).toBeVisible();
+  await page.goto(`/evolution/controladoria?q=${id}`);
+  const desk = page.getByRole("region", { name: "Mesa de controle operacional" });
+  await expect(desk.getByRole("link", { name: `Conferência Evolution ${id}`, exact: true })).toBeVisible();
+  await desk.getByRole("link", { name: "Quadro", exact: true }).click();
+  await expect(page).toHaveURL(url => url.pathname === "/evolution/controladoria" && url.searchParams.get("visao") === "quadro" && url.searchParams.get("q") === id);
+  await desk.getByLabel("Situação da tarefa", { exact: true }).selectOption("IN_PROGRESS");
+  await page.reload();
+  await expect(desk.getByLabel("Situação da tarefa", { exact: true })).toHaveValue("IN_PROGRESS");
+
   const db = new Client({ connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test" });
   await db.connect();
   try {
