@@ -39,7 +39,7 @@ test("RUTE permite revisar, executar e consultar o resultado sem sair da convers
     const { rows: clients } = await database.query('SELECT id FROM clients WHERE organization_id=$1 AND name=$2', [person.organization_id, "Cliente criado pela conversa"]);
     expect(clients).toHaveLength(1);
     await expect(card.getByRole("link", { name: "Abrir resultado", exact: true })).toHaveAttribute("href", `/clientes/${clients[0].id}`);
-    await expect(page).toHaveURL(/\/$/);
+    await expect(page).toHaveURL(/\/dashboard$/);
     await page.setViewportSize({ width: 1440, height: 1000 });
     await page.screenshot({ path: "/tmp/legalos-rute-acao-executada.png", fullPage: true });
   } finally { await database.end(); }

@@ -122,6 +122,18 @@ export function Sidebar({
     </nav>
   );
 
+  const evolutionLink = (isCollapsed: boolean) => evolutionEnabled && (
+    <Link
+      href="/evolution"
+      aria-label="Abrir Meu Escritório na Evolution"
+      title={isCollapsed ? "Abrir Meu Escritório na Evolution" : undefined}
+      className={cn("flex h-9 items-center gap-3 rounded-md px-2.5 text-[13px] font-medium text-primary hover:bg-primary/10", isCollapsed && "justify-center px-0")}
+    >
+      <Building2 className="h-[18px] w-[18px]" aria-hidden />
+      {!isCollapsed && <span>Meu Escritório →</span>}
+    </Link>
+  );
+
   return (
     <>
       <aside
@@ -139,16 +151,7 @@ export function Sidebar({
         {nav(collapsed)}
         <div className="border-t border-border p-2">
           <nav aria-label="Ajustes do sistema">{links(footer, collapsed)}</nav>
-          {evolutionEnabled && (
-            <Link
-              href="/evolution"
-              title={collapsed ? "Experimentar Evolution" : undefined}
-              className={cn("flex h-9 items-center gap-3 rounded-md px-2.5 text-[13px] font-medium text-primary hover:bg-primary/10", collapsed && "justify-center px-0")}
-            >
-              <Building2 className="h-[18px] w-[18px]" aria-hidden />
-              {collapsed ? null : <span>Meu Escritório →</span>}
-            </Link>
-          )}
+          {evolutionLink(collapsed)}
           <button
             type="button"
             onClick={toggle}
@@ -173,7 +176,10 @@ export function Sidebar({
             </div>
             {switcher(false)}
             {nav(false, true)}
-            <div className="border-t border-border p-2">{links(footer, false)}</div>
+            <div className="border-t border-border p-2">
+              {links(footer, false)}
+              {evolutionLink(false)}
+            </div>
           </aside>
         </div>
       ) : null}

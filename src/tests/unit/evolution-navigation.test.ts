@@ -76,9 +76,10 @@ describe("expandVisibleKeys", () => {
     expect(keys).toContain("cases");
   });
 
-  it("always includes workspace and overview", () => {
+  it("requires the visible Desktop shortcut but always includes overview", () => {
     const keys = expandVisibleKeys([]);
-    expect(keys).toContain("workspace");
+    expect(keys).not.toContain("workspace");
+    expect(expandVisibleKeys(["evo-mesa-workspace"])).toContain("workspace");
     expect(keys).toContain("overview");
   });
 

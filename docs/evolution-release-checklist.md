@@ -1,36 +1,31 @@
-# LegalOS Evolution 1.0 — preparação para homologação
+# LegalOS Evolution 1.0 — checklist de aceite
 
-## Situação
+**Decisão: NÃO APTO PARA HOMOLOGAÇÃO.** A suíte completa de navegador ainda tem falhas e o CI dos PRs empilhados ainda não está aprovado.
 
-**Ainda não liberada para homologação.** Os PRs #17–#30 estão abertos e marcados como mergeáveis no GitHub na data deste checkpoint. Nenhum foi integrado à `main`; nenhum deploy foi feito.
-
-## Evidências desta rodada
-
-| Verificação | Resultado |
+| Verificação | Evidência |
 |---|---|
-| TypeScript | Passou |
-| ESLint completo | Passou |
-| Vitest completo com banco `legalos_test` | 188 arquivos; 1.368 testes passaram |
-| Build de produção com `DATABASE_URL` de teste | Passou |
-| E2E de workspace e workspace UX | 2 testes passaram após alinhar expectativas à UI atual |
-| E2E completo | Incompleto: execução interrompida em 12/72; 7 falharam, 1 foi interrompido e 60 não rodaram |
+| Tipos, ESLint e build | Aprovados nesta rodada. |
+| Testes unitários focados | 31 aprovados em navegação, flag da Evolution e retirada do Box. A rodada anterior aprovou 1.368 testes no Vitest completo. |
+| Superadmin | Cenário aprovado. A raiz pública já era reescrita para `/produto` na `main`. O teste agora abre `/dashboard` e confirma bloqueio em `/suspenso` e retorno ao painel após reativação. |
+| Box retirado | Os seis cenários originais passaram com a nova expectativa. Os E2E verificam 404 nas páginas e 410 com `box_removed` nas APIs bloqueadas, sem cache, inclusive com a antiga flag do Box 2.0 ligada. Documentos, relatórios disponíveis e integrações públicas mantêm cobertura própria. |
+| Seis departamentos | Revisão no Chromium em 1440 e 390 px. Jurídico, Controladoria, Atendimento, Comercial, Financeiro e Administração abriram com títulos e ações esperados. Os seis atalhos principais foram seguidos até o destino. A revisão verificou entrada móvel, busca global, Desktop, retorno à Ethos e acesso com perfil financeiro restrito. Foi usado um escritório novo, sem dados de produção nem conectores reais. |
+| E2E completo | Primeira execução desta rodada: 73 executados, 52 aprovados e 21 falhas. Segunda execução no banco dedicado `legalos_stabilization_test`: 73 executados, 63 aprovados e 10 falhas. Nenhum cenário ficou por executar. |
+| Pilha de PRs | #17 tem base `main` e #18–#30 têm como base a branch do PR anterior. A ancestralidade dos commits publicados foi conferida e o GitHub marcou todos como mergeáveis. A consulta registrou falhas em `verify` em #17–#26 e verificações em andamento em #27–#30. |
 
-## Pendências que bloqueiam o aceite
+## Correções da Evolution
 
-1. Investigar a falha E2E de superadmin: após suspender um escritório, a navegação esperava `/suspenso` e permaneceu em `/`.
-2. Atualizar os E2E dos fluxos do Box retirado para validar a desativação atual sem reativar rotas ou integrações antigas. Seis falhas vieram desses fluxos.
-3. Executar novamente o conjunto E2E completo e resolver as falhas restantes; o resultado parcial não valida os 72 cenários.
-4. Fazer conferência visual e por perfil com `LEGALOS_EVOLUTION=1`: Desktop, busca global, acesso às áreas e sigilo/permissões.
-5. Confirmar os checks de CI dos PRs encadeados e resolver qualquer regressão antes de homologar.
-6. Validar conectores somente com credenciais e consentimento reais do escritório; nenhum conector simulado serve como evidência.
+- Desktop e busca respeitam a permissão da Área de Trabalho.
+- A visão geral de cada departamento fica disponível no menu mesmo quando o perfil não tem atalhos internos.
+- O menu móvel da Ethos oferece entrada para a Evolution. A barra superior da Evolution acomoda os controles sem cortá-los.
+- Atendimento filtra conversas vinculadas a processos que o perfil não pode consultar e respeita a permissão de leitura de clientes ao exibir nomes.
+- Administração e Comercial ganharam espaçamento entre as seções identificado na revisão móvel.
 
-## Guardrails mantidos
+## Bloqueios
 
-- Ethos continua acessível; a paridade automatizada cobre as rotas internas mapeadas.
-- O portal autenticado do cliente permanece fora da navegação interna da equipe.
-- Box antigo permanece desativado.
-- Não houve merge nem deploy.
+- A conexão Meta e o QR do WhatsApp chamam a verificação de 2FA do cofre de certificados, que exige o Box legado. O mesmo caminho está na `main`. Os testes preservam a exigência de 2FA e a retirada do Box.
+- Oito outros cenários falharam. São 2FA obrigatório (tela mudou antes de confirmar os códigos de recuperação), IA sem chave (texto esperado ausente), tarefa LegalMail (campo de comentário ambíguo), importação LegalMail (opção DataJud esperada ausente), preços (contagem do catálogo), duas verificações de vitrine pública e prospecção (campo de anotações após recarregar). Esses resultados não demonstraram uma regressão causada pela Evolution.
+- O CI dos PRs empilhados continua pendente de aprovação. A situação de mergeabilidade indica ausência de conflito Git.
 
-## Critério para mudar o status
+Para reproduzir, use `npm run build` e `npm run test:e2e` com `DATABASE_URL` e `TEST_DATABASE_URL` apontando para um PostgreSQL isolado de teste. O projeto Chromium ativa a Evolution e o teste `src/tests/e2e/evolution.spec.ts` grava as 12 capturas em `test-results/`.
 
-Marcar como pronta para homologação somente após fechar as seis pendências acima, repetir a suíte completa e registrar evidência visual/perfil e CI. Até lá, este documento é o checkpoint de handoff, não uma aprovação de lançamento.
+Nenhum merge ou deploy foi executado.

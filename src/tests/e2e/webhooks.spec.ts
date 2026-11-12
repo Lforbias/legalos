@@ -16,9 +16,10 @@ test("Webhooks: exige 2FA, recusa endereço inseguro, mostra o segredo uma vez, 
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");
-  await page.getByLabel("Nome (para que serve)").fill("Planilha de intimações");
+  await expect(page.getByLabel("Intimação registrada")).toHaveCount(0);
+  await page.getByLabel("Nome (para que serve)").fill("Planilha de processos");
   await page.getByLabel("Endereço que receberá os avisos (https://…)").fill("https://exemplo.invalid/legalos");
-  await page.getByLabel("Intimação registrada").check();
+  await page.getByLabel("Processo cadastrado").check();
   await page.getByRole("button", { name: "Criar webhook" }).click();
   await expect(page.getByText(/verificação em duas etapas/i).first()).toBeVisible();
 
@@ -30,9 +31,9 @@ test("Webhooks: exige 2FA, recusa endereço inseguro, mostra o segredo uma vez, 
   await page.getByRole("button", { name: "Já guardei os códigos" }).click();
 
   await page.goto("/integracoes");
-  await page.getByLabel("Nome (para que serve)").fill("Planilha de intimações");
+  await page.getByLabel("Nome (para que serve)").fill("Planilha de processos");
   await page.getByLabel("Endereço que receberá os avisos (https://…)").fill("http://exemplo.com.br/legalos");
-  await page.getByLabel("Intimação registrada").check();
+  await page.getByLabel("Processo cadastrado").check();
   await page.getByRole("button", { name: "Criar webhook" }).click();
   await expect(page.getByText(/deve começar com https/)).toBeVisible();
 
@@ -43,7 +44,7 @@ test("Webhooks: exige 2FA, recusa endereço inseguro, mostra o segredo uma vez, 
 
   await page.reload();
   await expect(page.getByTestId("new-webhook-secret")).toHaveCount(0);
-  await expect(page.getByText("Planilha de intimações")).toBeVisible();
+  await expect(page.getByText("Planilha de processos")).toBeVisible();
 
   await page.getByRole("button", { name: "Enviar teste" }).click();
   await expect(page.getByText(/Teste falhou/)).toBeVisible();

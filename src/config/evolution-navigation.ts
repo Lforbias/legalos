@@ -148,7 +148,7 @@ const ETHOS_KEY_MAP: Record<string, string> = {
 
 /**
  * Expands Evolution visible keys to include the corresponding Ethos keys,
- * plus always-available keys like "workspace" (for the Desktop shortcut).
+ * preserving the permissions checked before calling this function.
  */
 export function expandVisibleKeys(evoKeys: string[]): string[] {
   const expanded = new Set(evoKeys);
@@ -156,7 +156,6 @@ export function expandVisibleKeys(evoKeys: string[]): string[] {
     const ethos = ETHOS_KEY_MAP[k];
     if (ethos) expanded.add(ethos);
   }
-  expanded.add("workspace");
   expanded.add("overview");
   return Array.from(expanded);
 }

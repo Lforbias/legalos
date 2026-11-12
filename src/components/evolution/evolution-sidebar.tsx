@@ -31,7 +31,8 @@ export function EvolutionSidebar({
   const toggle = () => setStored(collapsed ? "open" : "collapsed");
   const activeDept = deptOfPath(pathname);
 
-  const [openDept, setOpenDept] = React.useState<Department | null>(null);
+  const [selection, setSelection] = React.useState<{ pathname: string; department: Department | null }>();
+  const openDept = selection?.pathname === pathname ? selection.department : activeDept;
   React.useEffect(() => onCloseMobile(), [pathname, onCloseMobile]);
 
   const departments = (["mesa", "juridico", "controladoria", "atendimento", "comercial", "financeiro", "administracao"] as Department[]);
@@ -53,28 +54,13 @@ export function EvolutionSidebar({
         {isCollapsed ? <span className="sr-only">Lobby</span> : <span className="truncate">Lobby</span>}
       </Link>
 
-      {/* Minha Mesa */}
-      <Link
-        href="/evolution/mesa"
-        aria-current={activeDept === "mesa" ? "page" : undefined}
-        title={isCollapsed ? "Minha Mesa" : undefined}
-        className={cn(
-          "group relative flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] transition-colors",
-          activeDept === "mesa" ? "bg-surface-2 font-medium text-fg before:absolute before:bottom-2 before:left-0 before:top-2 before:w-0.5 before:rounded-full before:bg-primary" : "text-muted hover:bg-surface-2 hover:text-fg",
-          isCollapsed && "justify-center px-0",
-        )}
-      >
-        {React.createElement(DEPARTMENTS.mesa.icon, { className: cn("h-[18px] w-[18px] shrink-0", activeDept === "mesa" ? "text-primary-text" : "text-muted group-hover:text-fg"), "aria-hidden": true })}
-        {isCollapsed ? <span className="sr-only">Minha Mesa</span> : <span className="truncate">Minha Mesa</span>}
-      </Link>
-
       {!isCollapsed && <div className="!mt-4 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted/70">Departamentos</div>}
 
       {departments.map((dept) => {
         const info = DEPARTMENTS[dept];
         const isActive = activeDept === dept;
         const subs = EVOLUTION_NAV.filter((n) => n.department === dept && n.key !== `evo-${dept}` && visibleKeys.includes(n.key));
-        const isOpen = !isCollapsed && (openDept === dept || isActive);
+        const isOpen = !isCollapsed && openDept === dept;
         const Icon = info.icon;
         return (
           <div key={dept}>
@@ -82,7 +68,7 @@ export function EvolutionSidebar({
               type="button"
               onClick={() => {
                 if (isCollapsed) setStored("open");
-                setOpenDept(isOpen ? null : dept);
+                setSelection({ pathname, department: isOpen ? null : dept });
               }}
               title={isCollapsed ? info.name : undefined}
               aria-expanded={isOpen}
@@ -100,15 +86,16 @@ export function EvolutionSidebar({
               ) : (
                 <>
                   <span className="flex-1 truncate text-left">{info.name}</span>
-                  {subs.length > 0 && <ChevronDown aria-hidden className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")} />}
+                  <ChevronDown aria-hidden className={cn("h-3.5 w-3.5 transition-transform", isOpen && "rotate-180")} />
                 </>
               )}
             </button>
 
-            {isOpen && subs.length > 0 && (
+            {isOpen && (
               <div className="ml-4 space-y-0.5 border-l border-border pl-2 pt-1">
                 <Link
                   href={`/evolution/${dept}`}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex h-9 items-center gap-3 rounded-lg px-3 text-[12px] transition-colors",
                     pathname === `/evolution/${dept}` ? "bg-surface-2 font-medium text-fg" : "text-muted hover:bg-surface-2 hover:text-fg",

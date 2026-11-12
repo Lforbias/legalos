@@ -10,6 +10,8 @@ import { can } from "@/server/context";
 import { unreadTotal, listConversations } from "@/server/services/whatsapp.service";
 import { getAccount } from "@/server/services/whatsapp-account.service";
 import { listQueues, myAvailability } from "@/server/services/chat-queue.service";
+import { caseVisibility } from "@/server/services/case.service";
+import { db } from "@/lib/db/client";
 import { formatWaId } from "@/lib/whatsapp/phone";
 
 function messageTime(value: Date | null, timezone: string) {
@@ -42,9 +44,17 @@ export default async function AtendimentoPage() {
         { value: null, error: false },
       ];
 
-  const hasError = [accountResult, unreadResult, queuesResult, conversationsResult, availabilityResult].some((result) => result.error);
+  const caseIds = (conversationsResult.value ?? []).flatMap(({ case: linkedCase }) => linkedCase ? [linkedCase.id] : []);
+  const visibleCases = hasCases && caseIds.length > 0
+    ? await db.case.findMany({
+        where: { id: { in: caseIds }, organizationId: ctx.organizationId, deletedAt: null, AND: [caseVisibility(ctx)] },
+        select: { id: true },
+      }).catch(() => null)
+    : [];
+  const visibleCaseIds = new Set(visibleCases?.map(({ id }) => id));
+  const hasError = visibleCases === null || [accountResult, unreadResult, queuesResult, conversationsResult, availabilityResult].some((result) => result.error);
   const queues = queuesResult.value ?? [];
-  const conversations = conversationsResult.value ?? [];
+  const conversations = (conversationsResult.value ?? []).filter(({ case: linkedCase }) => !linkedCase || visibleCaseIds.has(linkedCase.id));
   const activeQueues = queues.filter((queue) => queue.active);
   const totalWaiting = activeQueues.reduce((sum, queue) => sum + queue.waiting, 0);
 
@@ -121,7 +131,7 @@ export default async function AtendimentoPage() {
                 {conversations.slice(0, 6).map((conversation) => (
                   <div key={conversation.id} className="flex flex-wrap items-center justify-between gap-3 p-4 transition hover:bg-surface-2">
                     <Link href={`/atendimento?c=${encodeURIComponent(conversation.id)}`} className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium hover:text-primary">{conversation.client?.name ?? conversation.contactName ?? formatWaId(conversation.waId)}</p>
+                      <p className="truncate text-sm font-medium hover:text-primary">{(hasClients ? conversation.client?.name : null) ?? conversation.contactName ?? formatWaId(conversation.waId)}</p>
                       <p className="mt-1 truncate text-xs text-muted">{conversation.lastPreview || "Conversa sem prévia de mensagem"}</p>
                     </Link>
                     <div className="flex shrink-0 items-center gap-3 text-xs text-muted">

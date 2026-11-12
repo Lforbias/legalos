@@ -17,7 +17,7 @@ test('prospecção: acesso protegido, mapa, filtros e acompanhamento persistente
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await page.getByLabel('Nome do escritório').fill(`Teste Prospecção ${id}`);
   await page.getByRole('button', { name: 'Criar escritório' }).click();
-  await expect(page.getByRole('link', { name: 'Visão geral do Func', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible();
   expect((await page.goto('/admin/comercial/prospeccao'))?.status()).toBe(404);
   const db = new Client({ connectionString: DB });
   await db.connect();

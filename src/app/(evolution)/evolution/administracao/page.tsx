@@ -33,7 +33,7 @@ export default async function AdministracaoPage() {
         {overduePayable && <StatCard icon={Wallet} label="A pagar vencido" value={formatMoneyBR(overduePayable.amount ?? 0)} color="#ef4444" />}
       </div>
 
-      <h2 className="mb-4 text-base font-semibold">Estações de trabalho</h2>
+      <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <Link href="/indicadores" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
           <BarChart3 className="h-5 w-5 text-muted" aria-hidden />

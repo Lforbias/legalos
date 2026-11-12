@@ -41,7 +41,7 @@ test("3.0-F2: tipo com pontuação, etiqueta, anexo, menção e histórico numa 
 
   // classificar
   await page.getByLabel("Tipo (pontuação)").selectOption({ label: `Audiência ${id} (5 pt)` });
-  await page.getByRole("checkbox").check();
+  await page.getByRole("checkbox", { name: /Prioridade/ }).check();
   await page.getByRole("button", { name: "Salvar classificação" }).click();
   await expect(page.getByText("Salvo.")).toBeVisible();
 

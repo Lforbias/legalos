@@ -37,6 +37,7 @@ export function EvolutionShell(props: {
           canCreateTask={props.canCreateTask}
           notifications={props.notifications}
           onOpenMobile={() => setMobileOpen(true)}
+          wrapOnMobile
         />
         {props.banner}
         <main id="conteudo" tabIndex={-1} className="min-h-0 flex-1 overflow-y-auto p-4 md:p-7 xl:p-8">

@@ -79,7 +79,7 @@ export default async function ComercialPage() {
         </>
       )}
 
-      <h2 className="mb-4 text-base font-semibold">Estações de trabalho</h2>
+      <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {hasCrm && (
           <Link href="/crm" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
