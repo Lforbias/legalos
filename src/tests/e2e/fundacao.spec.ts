@@ -41,7 +41,7 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   await expect(page.getByRole("heading", { name: "O que precisa da sua atenção" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Financeiro do escritório" })).toBeVisible();
   // todos os módulos do menu estão implementados: Relatórios abre a tela real
-  await page.getByRole("button", { name: "Gestão do escritório", exact: true }).click();
+  await page.getByRole("button", { name: "Administração & Gestão", exact: true }).click();
   await page.getByRole("link", { name: /Relatórios e BI/ }).first().click();
   await expect(page.getByRole("heading", { name: "Relatórios e BI" })).toBeVisible();
 

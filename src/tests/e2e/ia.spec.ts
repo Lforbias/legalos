@@ -26,8 +26,8 @@ test("IA sem chave configurada: avisa com clareza, não simula resposta e está 
   await expect(page.getByTestId("ai-usage")).toContainText("0 de 500.000 tokens");
   await expect(page.getByText(/não ficam gravadas|não fica gravada|A pergunta e a resposta não ficam gravadas/)).toBeVisible();
 
-  const nav = page.getByRole("navigation", { name: "Navegação Func" });
-  const tools = nav.getByRole("button", { name: "Ferramentas", exact: true });
+  const nav = page.getByRole("navigation", { name: "Navegação Evolution" });
+  const tools = nav.getByRole("button", { name: "Jurídico", exact: true });
   if (await tools.getAttribute("aria-expanded") !== "true") await tools.click();
   await nav.getByRole("link", { name: /Inteligência artificial/ }).click();
   await expect(page.getByRole("heading", { name: "Assistente de IA" })).toBeVisible();

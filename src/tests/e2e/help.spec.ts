@@ -10,7 +10,8 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
   await page.getByLabel("Nome do escritório").fill(`Escritório Ajuda ${id}`);
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
-  const footer = page.getByRole("navigation", { name: "Ajustes do sistema" });
+  const footer = page.getByRole("navigation", { name: "Navegação Evolution" });
+  await footer.getByRole("button", { name: "Administração & Gestão", exact: true }).click();
   await footer.getByRole("link", { name: "Ajuda", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Como podemos ajudar?" })).toBeVisible();
   await page.locator("summary").filter({ hasText: "Preparar o escritório" }).click();

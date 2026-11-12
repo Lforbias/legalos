@@ -13,7 +13,7 @@ test('Comercial: amostra entra no funil, mapa e ficha sem duplicar', async ({ pa
   await page.getByRole('button', { name: 'Criar conta' }).click();
   await page.getByLabel('Nome do escritório').fill('Escritório de teste comercial');
   await page.getByRole('button', { name: 'Criar escritório' }).click();
-  await expect(page.getByRole('link', { name: 'Dashboard', exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Resumo do escritório', exact: true })).toBeVisible();
   expect((await page.goto('/comercial'))?.status()).toBe(404);
   const db = new Client({ connectionString: DB }); await db.connect();
   const cnpj = '98765432000279';

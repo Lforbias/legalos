@@ -4,7 +4,7 @@ import { expect, test } from "@playwright/test";
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
 
-test("Func mantém navegação de trabalho sem atalhos do Box retirado", async ({ page }) => {
+test("Evolution mantém navegação de trabalho sem atalhos do Box retirado", async ({ page }) => {
   const id = uid();
   await page.goto("/register");
   await page.getByLabel("Nome completo").fill(`Dona box${id}`);
@@ -15,11 +15,13 @@ test("Func mantém navegação de trabalho sem atalhos do Box retirado", async (
   await page.getByRole("button", { name: "Criar escritório" }).click();
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
-  // Func: menu de gestão, sem os itens do Box
+  // Menu da Evolution sem os atalhos do Box retirado
   const shell = page.locator("[data-space]").first();
-  await expect(shell).toHaveAttribute("data-space", "func");
-  const funcNav = page.getByRole("navigation", { name: "Navegação Func" }).first();
+  await expect(shell).toHaveAttribute("data-space", "evolution");
+  const funcNav = page.getByRole("navigation", { name: "Navegação Evolution" });
+  await funcNav.getByRole("button", { name: "Jurídico", exact: true }).click();
   await expect(funcNav.getByRole("link", { name: /^Processos/ })).toBeVisible();
+  await funcNav.getByRole("button", { name: "Controladoria", exact: true }).click();
   await expect(funcNav.getByRole("link", { name: /Caixa de entrada/ })).toHaveCount(0);
   await expect(funcNav.getByRole("link", { name: /Certificados/ })).toHaveCount(0);
   await expect(page.getByTestId("func-to-box")).toHaveCount(0);

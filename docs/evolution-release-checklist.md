@@ -34,6 +34,21 @@
 - O botão da RUTE se afasta das ações da conversa quando o painel lateral está aberto no desktop.
 - Os testes de IA, importação, tarefas, prospecção e páginas públicas acompanham os rótulos e as regras da versão atual.
 
-Para reproduzir, use `npm run build` e `npm run test:e2e` com `DATABASE_URL` e `TEST_DATABASE_URL` apontando para um PostgreSQL isolado de teste. O projeto Chromium ativa a Evolution e o teste `src/tests/e2e/evolution.spec.ts` grava as 12 capturas em `test-results/`.
+Para reproduzir, use `npm run build` e `npm run test:e2e` com `DATABASE_URL` e `TEST_DATABASE_URL` apontando para um PostgreSQL isolado de teste. O teste `src/tests/e2e/evolution.spec.ts` grava as 12 capturas em `test-results/`.
 
 Nenhum merge ou deploy foi executado.
+
+## Interface única e cobertura funcional
+
+A Evolution é carregada em todas as instalações e usa a mesma estrutura de navegação nas páginas departamentais e nos módulos internos, inclusive quando uma URL operacional é aberta diretamente. O resumo do escritório permanece acessível pelo menu da Evolution. O Portal externo e o LegalOS Desktop têm seus próprios layouts. O seletor de versões e os componentes da interface antiga foram removidos.
+
+A conferência abaixo compara o escopo dos seis departamentos com as telas e serviços encontrados no repositório. A coluna de cobertura identifica implementação existente. O aceite de cada fluxo depende de teste funcional.
+
+| Departamento | Cobertura encontrada | Pendências de aceite |
+|---|---|---|
+| Jurídico | Carteira com filtros por responsável, natureza e acervo. Ficha com partes, equipe, sigilo, linha do tempo, documentos e cálculos. Modelos, autotextos, timbrados e importação têm telas próprias. O serviço permite mudar a natureza de um caso para judicial no mesmo registro. | Validar a conversão de um caso com documentos e tarefas e conferir quais ferramentas estão acessíveis dentro da ficha. A área de preparação, revisão e aprovação de peças também está bloqueada pela retirada do Box. |
+| Controladoria | Visão de pendências e Central de Alertas. Tarefas, prazos com validação e audiências existem nos módulos operacionais. | Conferência de conclusão, escalonamento e histórico como uma rotina integrada de Controladoria. Operação judicial permanece em reconstrução. |
+| Atendimento | Conversas, filas, atribuições, etiquetas, notas, modelos, SLA, relatórios e painel com cliente, lead, processo, agenda e financeiro. Ações no chat criam lead, tarefa, prazo e compromisso e salvam anexos em Documentos, conforme as permissões. | Conferir o envio e recebimento com aparelho real e validar o fluxo completo de documentos, encaminhamento e aprovação de respostas entre áreas. |
+| Comercial | Leads, funil, reuniões e retornos, propostas e conversão em cliente. | Registrar uma proposta como enviada atualiza o CRM. Entrega ao cliente e repasse da contratação ao Jurídico e Financeiro exigem validação própria. |
+| Financeiro & Contábil | Lançamentos, parcelas, baixas, centros de custo, fluxo de caixa, honorários de êxito, faturas e cobrança. | Homologar a cobrança com o provedor configurado e validar rentabilidade por cliente, processo e departamento. Escrituração contábil completa está fora da cobertura atual. |
+| Administração & Gestão | Membros, convites, perfis, 2FA, auditoria, equipe, metas, relatórios, automações e configurações de IA. | Validar supervisão, regras e indicadores consolidados por departamento com dados e perfis de homologação. |

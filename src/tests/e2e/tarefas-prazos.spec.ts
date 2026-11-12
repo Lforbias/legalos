@@ -28,7 +28,9 @@ test("tarefas, prazos (validação humana), agenda e notificações", async ({ p
   const caseUrl = page.url();
 
   // ---- tarefa: validação, criação, quadro e mudança de situação ----
-  await page.getByRole("link", { name: /^Tarefas/ }).first().click();
+  const nav = page.getByRole("navigation", { name: "Navegação Evolution" });
+  await nav.getByRole("button", { name: "Minha Mesa", exact: true }).click();
+  await nav.getByRole("link", { name: "Tarefas", exact: true }).click();
   await expect(page.getByText("Nenhuma tarefa cadastrada ainda.")).toBeVisible();
   await page.getByRole("link", { name: "Nova tarefa" }).first().click();
   await page.getByLabel("Título").fill("ab");
@@ -119,8 +121,8 @@ test("equipe e produtividade: carga por responsável e registro de horas", async
   await page.getByRole("button", { name: "Criar tarefa" }).click();
   await expect(page.getByRole("heading", { name: `Tarefa de carga ${id}` })).toBeVisible();
 
-  await page.getByRole("button", { name: "Gestão do escritório", exact:true }).click();
-  await page.getByRole("link", { name: /^Equipe e produtividade/ }).first().click();
+  await page.getByRole("button", { name: "Administração & Gestão", exact:true }).click();
+  await page.getByRole("link", { name: "Equipe", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Equipe e produtividade" })).toBeVisible();
   const row = page.getByRole("row", { name: new RegExp(`Dona eq${id}`) });
   await expect(row).toBeVisible();
