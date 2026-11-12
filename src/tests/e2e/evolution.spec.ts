@@ -70,9 +70,14 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
   await expect(desk.getByRole("link", { name: `Conferência Evolution ${id}`, exact: true })).toBeVisible();
   await desk.getByRole("link", { name: "Quadro", exact: true }).click();
   await expect(page).toHaveURL(url => url.pathname === "/evolution/controladoria" && url.searchParams.get("visao") === "quadro" && url.searchParams.get("q") === id);
+  const saved = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === "/evolution/controladoria");
   await desk.getByLabel("Situação da tarefa", { exact: true }).selectOption("IN_PROGRESS");
+  await saved;
+  await expect(desk.getByLabel("Situação da tarefa", { exact: true })).toBeEnabled();
   await page.reload();
   await expect(desk.getByLabel("Situação da tarefa", { exact: true })).toHaveValue("IN_PROGRESS");
+  await desk.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: testInfo.outputPath("controladoria-operacao.png") });
 
   const db = new Client({ connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test" });
   await db.connect();

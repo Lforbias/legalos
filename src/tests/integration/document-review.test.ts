@@ -1,4 +1,4 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it, vi } from "vitest";
 import { db } from "@/lib/db/client";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { createCaseSchema } from "@/modules/cases/schemas";
@@ -6,6 +6,8 @@ import { createCase } from "@/server/services/case.service";
 import { uploadDocument, addDocumentVersion } from "@/server/services/document.service";
 import { requestDocumentReview, decideDocumentReview, listDocumentReviews } from "@/server/services/document-review.service";
 import { addMember, makeOrgWithOwner } from "./helpers";
+
+vi.unmock("@/lib/box-retirement");
 
 const base = createCaseSchema.parse({ number: "", legacyNumber: "", title: "Revisão jurídica", area: "Cível", court: "", courtUnit: "", courtState: "", subject: "", claimValue: "", status: "ACTIVE", phase: "", distributedAt: "", confidential: false, notes: "", responsibleId: "", clientId: "", clientRole: "PLAINTIFF" });
 describe("revisão editorial independente do Box", () => {
