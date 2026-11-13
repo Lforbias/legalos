@@ -30,11 +30,21 @@ A conversão agora oferece escolha explícita de cliente ativo do próprio escri
 - Primeira execução completa de interface: 72/73 aprovados. O cenário da Controladoria recarregava antes de aguardar a resposta da gravação; espera ajustada; os seis E2E finais de departamentos, documentos e CRM passaram no build final, incluindo o novo cenário de cliente existente. A gravação foi conferida após recarregar a página.
 - PR #33: https://github.com/Lforbias/legalos/pull/33.
 
-## Aceite restante
+## Registro histórico — aceite restante no PR #33
 
-- Aguardar CI do PR #33. Validação local final concluída para os blocos deste PR.
+- CI e publicação do PR #33 foram concluídos em seguida.
 - Concluir comparação funcional e lacunas dos seis departamentos; este checkpoint não representa conclusão da Evolution.
 - Comercial: repasse da contratação ao Jurídico/Financeiro ainda exige implementação ou comprovação.
 - Gestão por departamento e rentabilidade departamental permanecem pendentes.
 - Integrações externas exigem homologação real; testes locais não comprovam envio/recebimento com provedores.
-- Estas alterações ainda não foram publicadas em produção.
+- Estas alterações foram incorporadas e publicadas com o PR #33.
+
+## Estado atual após o PR #34
+
+- O CI do commit publicado `1a03702` passou em tipos, lint, testes, build e E2E completo (74 testes). O endpoint de prontidão em produção confirmou banco, migrações e armazenamento ativos.
+- Jurídico e Comercial: revisão editorial, conversão com cliente existente e proposta enviada estão cobertas pelo código/testes; falta homologar dados/fluxo real e comprovar repasse transacional entre áreas.
+- Controladoria: mesa de tarefas e alertas operam com dados reais; ainda não existe rotina formal própria de conclusão/escalonamento/auditoria.
+- Financeiro e Administração: há indicadores e controles existentes por permissão; falta sessão com dados e perfis representativos, além do aceite de rentabilidade departamental.
+- Atendimento: QR e webhooks têm cobertura automatizada, mas o número real do escritório e um provedor de cobrança precisam ser validados pelo cliente durante a homologação.
+- BOX e protocolo judicial permanecem desativados. Não fazem parte do caminho de aceite enquanto reconstruídos.
+- As PRs #18–#30 já estão em `main` e foram fechadas como supersedidas. O status e a decisão de aceite estão em `evolution-release-checklist.md`.

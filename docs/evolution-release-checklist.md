@@ -1,6 +1,15 @@
 # LegalOS Evolution 1.0 — checklist de aceite
 
-## Checkpoint atual — operações departamentais (PR #33)
+## Checkpoint atual — estabilização publicada (PR #34)
+
+- Main: `1a03702` (`feat(evolution): fixar painel do chat e desativar RUTE`). PR #34 integrado e publicado pelo deploy `43325427272`.
+- CI desse commit: tipos, lint, Vitest, build e suíte E2E completos aprovados; Playwright reportou **74 testes aprovados em 4,1 min**, incluindo os 60 cenários anteriormente não executados. Execução: [CI 43325406791](https://github.com/Lforbias/legalos/actions/runs/43325406791).
+- Prontidão em produção conferida em `https://www.legalossync.tech/api/ready`: banco, migrações e armazenamento retornaram `true`.
+- As PRs #18–#30 foram conferidas como incorporadas ao `main` e fechadas como supersedidas; não reaplicar nem integrar a pilha antiga. PRs #19, #20, #26 e #28 já estavam fechadas.
+- Alterações de interface e desativação da RUTE registradas abaixo. BOX continua desativado e suas rotas antigas seguem bloqueadas.
+- **Decisão: APTO PARA HOMOLOGAÇÃO CONTROLADA; NÃO ACEITO COMO HOMOLOGAÇÃO INTEGRAL.** A equipe pode iniciar os testes práticos; aceite integral ainda depende dos itens manuais e funcionais listados abaixo.
+
+## Histórico de operações departamentais (PR #33)
 
 - Revisão editorial de documentos implementada independentemente do Box: pedido, aprovação por outra pessoa, ajustes, histórico por versão e auditoria.
 - Mesa operacional de tarefas integrada à Controladoria, com filtros, lista/quadro e alteração de situação persistente.
@@ -10,7 +19,7 @@
 - Interface: primeira execução completa 72/73; o teste da Controladoria recarregava antes da resposta de gravação. Após ajustar a espera, os seis cenários finais de documentos, departamentos e CRM passaram, incluindo a persistência após recarga e o novo caso de conversão para cliente existente.
 - Revisão visual da mesa de controle e navegação desktop/móvel realizada em escritório de teste. Sem validação de provedores externos reais.
 - PR #33 foi integrado no commit `da2f796` e publicado pelo deploy `43310690679`; `/api/ready` confirmou banco, migrações e armazenamento ativos.
-- **Evolution completa: NÃO APTA PARA HOMOLOGAÇÃO INTEGRAL.** Restam conferência/escalonamento formal, repasse Comercial→Jurídico/Financeiro, gestão por departamento e confirmação de toda a lista funcional. O aceite destes blocos não representa aceite integral.
+- Este checkpoint documenta a entrega do PR #33. As pendências de aceite atuais estão consolidadas na tabela funcional ao final e continuam abertas quando dependem de validação manual ou fluxo que ainda não foi demonstrado.
 
 Detalhes: `docs/evolution-department-workflows.md`.
 
@@ -20,7 +29,7 @@ Detalhes: `docs/evolution-department-workflows.md`.
 - A navegação na ficha do processo agora agrupa as seções em seis categorias; a revisão visual em tela desktop confirmou nomes legíveis, destaques e acesso às abas sem rolagem horizontal.
 - Removidos o botão flutuante e os atalhos da RUTE, incluindo o acionador de copiloto/macros/dados, configurações, ajuda e fichas de processo/cliente. A tela de provedor exibe o aviso de indisponibilidade e não permite alterações. O Copiloto independente permanece disponível. Serviços e exportações da RUTE ficam bloqueados por padrão.
 - Build, tipos, ESLint, teste unitário da ajuda, 18 testes de integração e nove E2E focados passaram, incluindo os fluxos atualizados de configuração desativada e navegação agrupada.
-- O CI do PR #34 está sendo repetido com o estado atualizado. A integração e o deploy dessa atualização ainda não foram feitos.
+- PR #34 integrado e publicado. CI completo aprovado; ver checkpoint atual no início deste documento.
 
 ## Histórico de validações anteriores
 
@@ -33,8 +42,8 @@ Detalhes: `docs/evolution-department-workflows.md`.
 | Superadmin | Cenário aprovado. A raiz pública já era reescrita para `/produto` na `main`. O teste agora abre `/dashboard` e confirma bloqueio em `/suspenso` e retorno ao painel após reativação. |
 | Box retirado | Os seis cenários originais passaram com a nova expectativa. Os E2E verificam 404 nas páginas e 410 com `box_removed` nas APIs bloqueadas, sem cache, inclusive com a antiga flag do Box 2.0 ligada. Documentos, relatórios disponíveis e integrações públicas mantêm cobertura própria. |
 | Seis departamentos | Revisão no Chromium em 1440 e 390 px. Jurídico, Controladoria, Atendimento, Comercial, Financeiro e Administração abriram com títulos e ações esperados. Os seis atalhos principais foram seguidos até o destino. A revisão verificou entrada móvel, busca global, Desktop, retorno à Ethos e acesso com perfil financeiro restrito. Foi usado um escritório novo, sem dados de produção nem conectores reais. |
-| E2E completo | Revisão do QR: 72 de 73 passaram na execução completa com o build final. O teste restante verificava uma mensagem transitória do painel de administração. Após trocar a asserção pelo registro persistido e pela contagem de destinatários, os dois testes desse painel passaram no mesmo build. |
-| Pilha de PRs | #17 tem base `main` e #18–#30 têm como base a branch do PR anterior. A ancestralidade dos commits publicados foi conferida e o GitHub marcou todos como mergeáveis. Os resultados de CI anteriores à revisão do QR não validam o novo commit. |
+| E2E completo | Histórico da revisão do QR: 72/73, com o cenário remanescente corrigido em execução focalizada. A suíte do commit atual foi executada depois e passou com 74/74. |
+| Pilha de PRs | #17 e #18–#30 estão incorporadas no `main`; PRs #18–#30 foram fechadas como supersedidas. A confirmação de ancestralidade foi feita contra `origin/main`. |
 
 ## Correções da Evolution
 
@@ -60,7 +69,7 @@ Detalhes: `docs/evolution-department-workflows.md`.
 
 Para reproduzir, use `npm run build` e `npm run test:e2e` com `DATABASE_URL` e `TEST_DATABASE_URL` apontando para um PostgreSQL isolado de teste. O teste `src/tests/e2e/evolution.spec.ts` grava as 12 capturas em `test-results/`.
 
-Nenhum merge ou deploy foi executado.
+O merge e deploy da versão corrente ocorreram antes deste checkpoint (PR #34, commit `1a03702`, deploy `43325427272`). Não houve novo merge ou deploy durante a atualização deste checklist.
 
 ## Interface única e cobertura funcional
 
@@ -70,9 +79,18 @@ A conferência abaixo compara o escopo dos seis departamentos com as telas e ser
 
 | Departamento | Cobertura encontrada | Pendências de aceite |
 |---|---|---|
-| Jurídico | Carteira com filtros por responsável, natureza e acervo. Ficha com partes, equipe, sigilo, linha do tempo, documentos e cálculos. Modelos, autotextos, timbrados e importação têm telas próprias. O serviço permite mudar a natureza de um caso para judicial no mesmo registro. | Validar a conversão de um caso com documentos e tarefas e conferir quais ferramentas estão acessíveis dentro da ficha. A área de preparação, revisão e aprovação de peças também está bloqueada pela retirada do Box. |
-| Controladoria | Visão de pendências e Central de Alertas. Tarefas, prazos com validação e audiências existem nos módulos operacionais. | Conferência de conclusão, escalonamento e histórico como uma rotina integrada de Controladoria. Operação judicial permanece em reconstrução. |
-| Atendimento | Conversas, filas, atribuições, etiquetas, notas, modelos, SLA, relatórios e painel com cliente, lead, processo, agenda e financeiro. Ações no chat criam lead, tarefa, prazo e compromisso e salvam anexos em Documentos, conforme as permissões. | Conferir o envio e recebimento com aparelho real e validar o fluxo completo de documentos, encaminhamento e aprovação de respostas entre áreas. |
-| Comercial | Leads, funil, reuniões e retornos, propostas e conversão em cliente. | Registrar uma proposta como enviada atualiza o CRM. Entrega ao cliente e repasse da contratação ao Jurídico e Financeiro exigem validação própria. |
-| Financeiro & Contábil | Lançamentos, parcelas, baixas, centros de custo, fluxo de caixa, honorários de êxito, faturas e cobrança. | Homologar a cobrança com o provedor configurado e validar rentabilidade por cliente, processo e departamento. Escrituração contábil completa está fora da cobertura atual. |
-| Administração & Gestão | Membros, convites, perfis, 2FA, auditoria, equipe, metas, relatórios, automações e configurações de IA. | Validar supervisão, regras e indicadores consolidados por departamento com dados e perfis de homologação. |
+| Jurídico | Carteira por responsável, natureza e acervo; ficha com partes, equipe, sigilo, linha do tempo, documentos e cálculos; modelos, autotextos, timbrados, importação e revisão editorial com aprovação por outra pessoa. O Box e o protocolo judicial permanecem desativados. | Homologar em dados de teste a conversão de caso com documentos/tarefas e a revisão entre duas pessoas. Não usar Box nem presumir protocolo judicial disponível. |
+| Controladoria | Central de Alertas e mesa operacional com filtros, lista/quadro e atualização persistente de tarefas; prazos e audiências ficam nos módulos existentes. | A rotina formal de conferência, conclusão, escalonamento e histórico não está integrada como fluxo próprio. |
+| Atendimento | Conversas, filas, atribuições, etiquetas, notas, modelos, SLA, relatórios e painel contextual. Ações criam lead, tarefa, prazo e compromisso; anexos usam Documentos conforme permissões. A RUTE está desativada. | Testar aparelho real (QR) e fluxo real de documentos/encaminhamento/aprovação. Automação de pareamento usa driver de teste; ainda não prova envio/recebimento com número do escritório. |
+| Comercial | Leads, funil, reuniões/retornos, propostas, mudança do lead para etapa de proposta quando enviada e conversão com escolha de cliente existente. | Testar entrega da proposta e registrar o repasse da contratação a Jurídico/Financeiro; os atalhos atuais abrem formulários reais, mas não comprovam handoff transacional entre departamentos. |
+| Financeiro & Contábil | Lançamentos, parcelas, baixas, centros de custo, fluxo de caixa, honorários de êxito, faturas e cobrança. | Homologar cobrança com provedor real e conferir rentabilidade por cliente, processo e departamento. Escrituração contábil completa está fora da cobertura atual. |
+| Administração & Gestão | Membros, convites, perfis, 2FA, auditoria, equipe, metas, relatórios, automações e configurações; indicadores respeitam permissões. | Validar regras de supervisão e indicadores departamentais com perfis/dados de homologação. |
+
+### Pendências objetivas para fechar aceite integral
+
+- Sessão prática por departamento, com perfis distintos e dados fictícios; registrar resultado e evidência no escritório de homologação.
+- WhatsApp: ler QR com aparelho do escritório e verificar envio/recebimento. A produção está pronta, mas o aparelho não foi vinculado durante os testes automatizados.
+- Financeiro: validar o provedor de cobrança configurado com uma operação de teste.
+- Jurídico/Comercial/Financeiro: comprovar o repasse de uma contratação no fluxo real; hoje os atalhos levam aos módulos existentes.
+- Controladoria: concluir, escalar e auditar uma pendência como fluxo formal. Gestão departamental e rentabilidade precisam de aceite com dados representativos.
+- BOX e protocolo judicial ficam deliberadamente fora do aceite enquanto desativados; não habilitar para contornar as pendências.
