@@ -1,6 +1,17 @@
 # Evolution 1.0 — Master Brief (checkpoint reference)
 
-## PR Sequence
+## Checkpoint atual — 12 nov 2026
+
+- PRs #17–#30 estão incorporadas ao `main`; as PRs #18–#30 foram fechadas como supersedidas, sem reaplicar sua pilha.
+- PR #34 está integrado no commit `1a03702` e publicado pelo deploy `43325427272`.
+- CI do commit publicado passou em tipos, lint, testes, build e suíte E2E completa: **74/74**. `/api/ready` confirmou banco, migrações e armazenamento ativos.
+- Decisão: **apto para homologação controlada; não aceito como homologação integral**. A sessão prática ainda precisa verificar WhatsApp com aparelho real, provedor de cobrança, repasse entre departamentos e indicadores/rotina de Controladoria com dados e perfis de teste.
+- BOX e protocolo judicial permanecem desativados deliberadamente.
+- Fonte de aceite e pendências detalhadas: [checklist de release](evolution-release-checklist.md) e [fluxos departamentais](evolution-department-workflows.md).
+
+Os registros abaixo são checkpoints históricos feitos durante a implementação; não representam o estado atual quando divergem deste checkpoint.
+
+## PR Sequence — plano histórico
 - PR #17: Fundação e correções (concluído na branch; PR aberto para revisão)
 - PR #18: Central de Atendimento (aberto para revisão)
 - PR #19: Cliente 360° e Processo 360° (aberto para revisão)
