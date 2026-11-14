@@ -79,7 +79,8 @@ describe("painel de administração da plataforma", () => {
     await expect(setOrganizationSuspended(pc, A.org.id, "x")).rejects.toBeInstanceOf(ValidationError);
     await expect(setOrganizationSuspended(pc, randomUUID(), "inadimplência")).rejects.toBeInstanceOf(NotFoundError);
     await expect(setOrganizationSuspended(pc, A.org.id, null)).rejects.toBeInstanceOf(ConflictError);
-    await createMonitor(A.ctx, { label: "Teste", oabNumber: "99999", oabUf: "BA" });
+    const monitor = await createMonitor(A.ctx, { label: "Teste", oabNumber: "99999", oabUf: "BA" });
+    const beforeMonitor = await db.djenMonitor.findUniqueOrThrow({ where: { id: monitor.id } });
     expect(await listUserOrganizations(A.owner.id)).toHaveLength(1);
 
     await setOrganizationSuspended(pc, A.org.id, "inadimplência de teste");
@@ -89,9 +90,10 @@ describe("painel de administração da plataforma", () => {
     expect(await resolveTenantContext(B.owner.id, B.org.id, META)).not.toBeNull(); // outro escritório intacto
     const susp = (await listOrganizations(pc, { status: "suspended", q: "plat-A" })).items[0]!;
     expect(susp.suspendedReason).toBe("inadimplência de teste");
-    let called = 0;
-    await runDjenAll({ http: async () => (called++, { status: 200, body: JSON.stringify({ items: [] }) }), pauseMs: 0 });
-    expect(called).toBe(0);
+    // Other integration tests may leave enabled monitors in the shared test database.
+    // The invariant here is that this suspended office is not synchronized or mutated.
+    await runDjenAll({ http: async () => ({ status: 200, body: JSON.stringify({ items: [] }) }), pauseMs: 0 });
+    expect(await db.djenMonitor.findUniqueOrThrow({ where: { id: monitor.id } })).toEqual(beforeMonitor);
     expect(await db.courtNotice.count({ where: { organizationId: A.org.id } })).toBe(0);
 
     await setOrganizationSuspended(pc, A.org.id, null);

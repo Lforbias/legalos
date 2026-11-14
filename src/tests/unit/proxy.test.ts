@@ -19,8 +19,9 @@ describe("Acesso público aos arquivos de marca", () => {
   });
 });
 
-it("encaminha o webhook do LegalMail para autenticação pela própria rota", () => {
+it("bloqueia o webhook judicial antigo do LegalMail", () => {
   const response = proxy(new NextRequest("https://legalos.example/api/webhooks/legalmail", { method: "POST" }));
-  expect(response.status).toBe(200);
+  expect(response.status).toBe(410);
+  expect(response.headers.get("cache-control")).toBe("no-store");
   expect(response.headers.get("location")).toBeNull();
 });

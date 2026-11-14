@@ -125,7 +125,7 @@ Fechamento da 2.0. Migrações novas: `20261208000000_f3_kanban`, `2026120900000
 - Correção: `rotate-keys` agora também re-cifra credenciais de tribunais (3.0) e o cofre de clientes.
 
 ## 3.0.0 (em construção)
-Ver `docs/roadmap-3.0.0.md` (comparação com o LegalMail).
+O plano 3.0 de captura e protocolo judicial foi retirado junto com esse módulo.
 
 - **3.0-F1 Partes únicas, campos personalizados, acervo e notas** (migração `20261126000000_legalmail_f1`: `party_registry`, `custom_field_defs`, `case_notes`, `cases.archived_at`, `cases.custom_fields`, `case_parties.registry_id`): cadastro único de partes reaproveitável (`/partes`, busca, edição propaga o nome, exclusão lógica); campos personalizados de processo (Configurações → Campos personalizados; texto, número, data e lista; só administradores definem; desativar preserva valores); acervo (mover/devolver, filtro na lista, registro na linha do tempo); aba Notas com fixar no topo e nota em lote (até 50 processos, tudo ou nada, respeita sigilo e isolamento). Fica para a 3.0-F2: anexos e histórico de alterações das notas.
 

@@ -2,7 +2,7 @@
 
 Versão alvo: **2.0.0**. Hoje o sistema está em 1.x (package.json 0.1.0). A versão vira 2.0.0 quando todas as fases abaixo estiverem concluídas e verificadas (tsc, eslint, testes, `next build`, E2E). Cada fase fecha com pacote entregue, documentação e `CHANGELOG.md` atualizados.
 
-A 3.0.0 vem depois e está em `docs/roadmap-3.0.0.md` (comparação com o LegalMail).
+O antigo plano 3.0 de captura e protocolo judicial foi retirado e não faz parte desta versão.
 
 Regras: sem dado, integração ou IA falsos; nada enviado ao cliente sem autorização humana; toda automação com botão ligar/desligar; IA só liga com chave real configurada e sempre com aprovação de uma pessoa.
 

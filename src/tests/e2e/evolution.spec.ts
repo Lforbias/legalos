@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { Client } from "pg";
 
-test("Evolution: seis departamentos, navegação, Desktop e permissões", async ({ page }, testInfo) => {
+test("Evolution: cinco departamentos com Jurídico integrado, navegação, Desktop e permissões", async ({ page }, testInfo) => {
   const id = crypto.randomUUID().slice(0, 8);
   const email = `evolution-${id}@example.test`;
   await page.goto("/register");
@@ -20,7 +20,6 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
 
   const departments = [
     ["juridico", "Jurídico", "/processos"],
-    ["controladoria", "Controladoria", "/alertas"],
     ["atendimento", "Atendimento", "/atendimento"],
     ["comercial", "Comercial", "/crm"],
     ["financeiro", "Financeiro & Contábil", "/financeiro"],
@@ -65,19 +64,19 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
   await page.getByLabel("Título", { exact: true }).fill(`Conferência Evolution ${id}`);
   await page.getByRole("button", { name: "Criar tarefa", exact: true }).click();
   await expect(page.getByRole("heading", { name: `Conferência Evolution ${id}`, exact: true })).toBeVisible();
-  await page.goto(`/evolution/controladoria?q=${id}`);
+  await page.goto(`/evolution/juridico?q=${id}`);
   const desk = page.getByRole("region", { name: "Mesa de controle operacional" });
   await expect(desk.getByRole("link", { name: `Conferência Evolution ${id}`, exact: true })).toBeVisible();
   await desk.getByRole("link", { name: "Quadro", exact: true }).click();
-  await expect(page).toHaveURL(url => url.pathname === "/evolution/controladoria" && url.searchParams.get("visao") === "quadro" && url.searchParams.get("q") === id);
-  const saved = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === "/evolution/controladoria");
+  await expect(page).toHaveURL(url => url.pathname === "/evolution/juridico" && url.searchParams.get("visao") === "quadro" && url.searchParams.get("q") === id);
+  const saved = page.waitForResponse(response => response.request().method() === "POST" && new URL(response.url()).pathname === "/evolution/juridico");
   await desk.getByLabel("Situação da tarefa", { exact: true }).selectOption("IN_PROGRESS");
   await saved;
   await expect(desk.getByLabel("Situação da tarefa", { exact: true })).toBeEnabled();
   await page.reload();
   await expect(desk.getByLabel("Situação da tarefa", { exact: true })).toHaveValue("IN_PROGRESS");
   await desk.scrollIntoViewIfNeeded();
-  await page.screenshot({ path: testInfo.outputPath("controladoria-operacao.png") });
+  await page.screenshot({ path: testInfo.outputPath("juridico-operacao.png") });
 
   const db = new Client({ connectionString: process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test" });
   await db.connect();
@@ -101,8 +100,8 @@ test("Evolution: seis departamentos, navegação, Desktop e permissões", async 
   await page.goto("/evolution");
   await expect(page.getByRole("link", { name: "Abrir LegalOS Desktop" })).toHaveCount(0);
   const nav = page.getByRole("navigation", { name: "Navegação Evolution" });
-  await nav.getByRole("button", { name: "Controladoria", exact: true }).click();
+  await nav.getByRole("button", { name: "Jurídico", exact: true }).click();
   await nav.getByRole("link", { name: "Visão geral", exact: true }).click();
-  await expect(page).toHaveURL(/\/evolution\/controladoria$/);
+  await expect(page).toHaveURL(/\/evolution\/juridico$/);
   await expect(page.getByRole("link", { name: "Caixa de entrada", exact: true })).toHaveCount(0);
 });

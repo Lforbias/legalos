@@ -1,4 +1,3 @@
-import { BOX_AVAILABLE } from "@/lib/box-retirement";
 /**
  * Conteúdo da página pública /produto. REGRA: só o que existe e foi verificado; nada de cliente, depoimento, preço ou número inventado.
  * Os números abaixo foram conferidos no código e nos testes em 2026-10-22 (atualizar a cada entrega, junto com src/lib/updates.ts).
@@ -19,12 +18,6 @@ const ALL_MODULES: ModuleShot[] = [
     title: "Cada processo, com tudo o que importa num lugar só",
     text: "Dados, partes, linha do tempo, prazos, tarefas e documentos, ligados ao cliente e à conversa de WhatsApp daquele caso.",
     points: ["Número CNJ validado pelo dígito verificador", "Registro de andamentos do processo", "Compartilhamento opcional com o portal do cliente, só do que você marcar", "Processos sigilosos visíveis apenas a quem tem acesso"],
-  },
-  {
-    id: "caixa", label: "Intimações", image: "/produto/caixa.webp", alt: "Caixa de entrada jurídica com intimações novas e contadores do dia",
-    title: "Intimações que chegam, são distribuídas e viram prazo",
-    text: "Uma caixa central para publicações e intimações, com contadores do dia, distribuição para quem vai tratar e transformação em tarefa ou prazo em poucos cliques.",
-    points: ["Captura do DJEN por OAB, com aviso quando um nome monitorado para de ser verificado", "Cada monitoramento pode enviar direto para um membro ou uma equipe", "Aviso de possíveis duplicadas", "Sugestão de providência por IA, opcional, que só sugere: nada é criado sem uma pessoa conferir"],
   },
   {
     id: "chat", label: "LegalOS Chat", image: "/produto/atendimento.webp", alt: "Atendimento por WhatsApp em três colunas, com painel do cliente e processo vinculados",
@@ -106,9 +99,8 @@ const ALL_MODULES: ModuleShot[] = [
   },
 ];
 
-const ALL_SPACES = [
+export const SPACES = [
   { name: "Gestão do escritório", tone: "#7C8CFF", text: "A gestão do escritório: clientes, processos, tarefas, prazos, agenda, documentos, financeiro, CRM e relatórios.", items: ["Clientes e processos", "Tarefas, prazos e agenda", "Financeiro e relatórios", "Portal do cliente"] },
-  { name: "LegalOS Box", tone: "#0f8f83", text: "A caixa de intimações e o peticionamento: captura, distribuição, certificados digitais e integrações com tribunais.", items: ["Caixa de entrada jurídica", "DJEN e DataJud", "Cofre de certificados A1", "Petições e conector PJe/MNI"] },
   { name: "Atendimento", tone: "#e0a800", text: "WhatsApp ligado à rotina jurídica e caixa de e-mail compartilhada, com configuração por escritório.", items: ["Filas, etiquetas, macros e listas salvas", "Copiloto com revisão humana", "Campanhas com aprovação e agendamento", "E-mail IMAP/SMTP e respostas em texto"] },
 ] as const;
 
@@ -125,7 +117,7 @@ export const COMING_SOON = [
   "Conversa por voz contínua, com interrupção e confirmação falada",
   "RUTE faz tarefas pequenas sozinha, com interruptor por ação",
   "Resumo da manhã de cada pessoa",
-  "Preparar audiência e conferir peça antes de protocolar",
+  "Preparar audiência e conferir peças jurídicas",
   "Assinatura de contrato e procuração no sistema",
   "Pedido de documentos ao cliente por link",
   "Previsão de caixa e repasse de valores ao cliente",
@@ -147,9 +139,9 @@ export const HONESTY = [
   { title: "IA só com chave real e supervisão", text: "Os recursos de IA ficam desligados até o escritório configurar a chave do provedor. Mascaram CPF e CNPJ e só sugerem: uma pessoa decide." },
 ] as const;
 
-const ALL_INTEGRATIONS: { name: string; note?: string }[] = [
-  { name: "DJEN" }, { name: "DataJud (CNJ)" }, { name: "WhatsApp Meta e QR-Code" }, { name: "Asaas" },
-  { name: "PJe / MNI", note: "conector pronto, em validação" }, { name: "SMTP (e-mail)" }, { name: "API pública v1" }, { name: "Webhooks assinados" },
+export const INTEGRATIONS: { name: string; note?: string }[] = [
+  { name: "DataJud (CNJ)" }, { name: "WhatsApp Meta e QR-Code" }, { name: "Asaas" },
+  { name: "SMTP (e-mail)" }, { name: "API pública v1" }, { name: "Webhooks assinados" },
 ];
 
 /** App no celular (PWA). Só o que já existe e foi verificado; os avisos no celular (push) ainda NÃO existem e ficam em "próximas entregas". */
@@ -165,10 +157,4 @@ export const PWA = {
   ],
 } as const;
 
-export const MODULES = ALL_MODULES.filter(m => BOX_AVAILABLE || m.id !== "caixa");
-export const SPACES = ALL_SPACES.filter(s => BOX_AVAILABLE || s.name !== "LegalOS Box");
-
-// Box 3.0: DJEN e DataJud (CNJ) são fontes públicas (sem certificado, sem sessão de tribunal) e funcionam
-// mesmo com o Box autenticado retirado — só "PJe / MNI" (sessão/certificado) continua fora da vitrine pública
-// enquanto BOX_AVAILABLE for falso, para nunca prometer uma integração que o escritório ainda não pode usar.
-export const INTEGRATIONS = ALL_INTEGRATIONS.filter(i => BOX_AVAILABLE || i.name !== "PJe / MNI");
+export const MODULES = ALL_MODULES;

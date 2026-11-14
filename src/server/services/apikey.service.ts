@@ -10,14 +10,10 @@ import { resolveTenantContext } from "./tenant.service";
 
 /** Escopos da API pública. Cada escopo exige, além disso, a permissão equivalente de quem criou a chave. */
 export const API_SCOPES = {
-  "pje:discover": { label: "PJe: registrar números observados para conferência (sem criar processos)", permission: "cases:write" },
   "chat:send": { label: "Chat: enviar mensagem aprovada por pessoa", permission: "whatsapp:write" },
   "cases:read": { label: "Ler processos", permission: "cases:read" },
   "clients:read": { label: "Ler clientes", permission: "clients:read" },
   "deadlines:read": { label: "Ler prazos", permission: "deadlines:read" },
-  "notices:read": { label: "Ler intimações", permission: "inbox:read" },
-  "legalmail:ingest": { label: "Receber eventos do LegalMail", permission: "integrations:manage" },
-  "notices:write": { label: "Registrar intimações", permission: "inbox:write" },
   "tools:read": { label: "Ferramentas via API: consultar dados", permission: "ai:use" },
   "tools:execute": { label: "Ferramentas via API: criar e alterar diretamente (sem aprovação posterior)", permission: "ai:use" },
   "mcp:execute": { label: "MCP: criar e alterar diretamente (sem aprovação posterior)", permission: "ai:use" },

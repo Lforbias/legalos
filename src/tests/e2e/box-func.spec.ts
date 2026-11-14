@@ -21,7 +21,8 @@ test("Evolution mantém navegação de trabalho sem atalhos do Box retirado", as
   const funcNav = page.getByRole("navigation", { name: "Navegação Evolution" });
   await funcNav.getByRole("button", { name: "Jurídico", exact: true }).click();
   await expect(funcNav.getByRole("link", { name: /^Processos/ })).toBeVisible();
-  await funcNav.getByRole("button", { name: "Controladoria", exact: true }).click();
+  await page.goto("/evolution/controladoria");
+  await expect(page).toHaveURL(/\/evolution\/juridico$/);
   await expect(funcNav.getByRole("link", { name: /Caixa de entrada/ })).toHaveCount(0);
   await expect(funcNav.getByRole("link", { name: /Certificados/ })).toHaveCount(0);
   await expect(page.getByTestId("func-to-box")).toHaveCount(0);

@@ -8,7 +8,7 @@ import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
 import { getIndicators } from "@/server/services/insights.service";
 
-const DEPT_ORDER: Department[] = ["juridico", "controladoria", "atendimento", "comercial", "financeiro", "administracao"];
+const DEPT_ORDER: Department[] = ["juridico", "atendimento", "comercial", "financeiro", "administracao"];
 
 export default async function EvolutionLobby() {
   const { ctx } = await requireTenant();

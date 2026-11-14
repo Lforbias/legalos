@@ -32,7 +32,6 @@ export type Department =
   | "lobby"
   | "mesa"
   | "juridico"
-  | "controladoria"
   | "atendimento"
   | "comercial"
   | "financeiro"
@@ -41,8 +40,7 @@ export type Department =
 export const DEPARTMENTS: Record<Department, { name: string; color: string; icon: LucideIcon; summary: string }> = {
   lobby: { name: "Meu Escritório", color: "#FF3B4E", icon: Home, summary: "Visão geral do escritório e atalhos rápidos." },
   mesa: { name: "Minha Mesa", color: "#FF3B4E", icon: Monitor, summary: "Suas tarefas, agenda e atividades pessoais." },
-  juridico: { name: "Jurídico", color: "#6366f1", icon: Scale, summary: "Processos, prazos, documentos e cálculos." },
-  controladoria: { name: "Controladoria", color: "#0ea5e9", icon: ShieldCheck, summary: "Distribuição de tarefas, prazos, agenda e pendências operacionais." },
+  juridico: { name: "Jurídico", color: "#6366f1", icon: Scale, summary: "Processos, prazos, tarefas, alertas, documentos e cálculos." },
   atendimento: { name: "Atendimento", color: "#10b981", icon: HeadphonesIcon, summary: "Conversas, clientes e copiloto de atendimento." },
   comercial: { name: "Comercial", color: "#f59e0b", icon: TrendingUp, summary: "CRM, leads e funil de conversão." },
   financeiro: { name: "Financeiro & Contábil", color: "#8b5cf6", icon: Wallet, summary: "Lançamentos, faturas e fluxo de caixa." },
@@ -75,10 +73,7 @@ export const EVOLUTION_NAV: EvolutionNavItem[] = [
   { key: "evo-juridico-calculos", department: "juridico", label: "Cálculos", href: "/calculos", icon: Calculator, permission: "cases:read" },
   { key: "evo-juridico-ia", department: "juridico", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use" },
 
-  // Controladoria
-  { key: "evo-controladoria", department: "controladoria", label: "Controladoria", href: "/evolution/controladoria", icon: ShieldCheck },
-  { key: "evo-controladoria-caixa", department: "controladoria", label: "Caixa de entrada", href: "/caixa-de-entrada", icon: FolderOpen, permission: "inbox:read" },
-  { key: "evo-controladoria-alertas", department: "controladoria", label: "Central de alertas", href: "/alertas", icon: ShieldCheck },
+  { key: "evo-juridico-alertas", department: "juridico", label: "Central de alertas", href: "/alertas", icon: ShieldCheck },
 
   // Atendimento
   { key: "evo-atendimento", department: "atendimento", label: "Atendimento", href: "/evolution/atendimento", icon: HeadphonesIcon },

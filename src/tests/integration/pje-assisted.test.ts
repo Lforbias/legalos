@@ -4,15 +4,13 @@ import { base32Encode, totpCode, totpStep, verifyTotp } from "@/lib/security/tot
 import { computeCnjCheck } from "@/lib/validation/br-documents";
 import { createCaseSchema } from "@/modules/cases/schemas";
 import { EMPTY_TASK } from "@/modules/tasks/schemas";
-import { ForbiddenError, NotFoundError } from "@/lib/permissions/check";
+import { NotFoundError } from "@/lib/permissions/check";
 import { confirmEnrollment, startEnrollment } from "@/server/services/mfa.service";
 import { saveCourtOtp, listCourtOtps, revealCourtOtp, revokeCourtOtp } from "@/server/services/court-otp.service";
 import { receivePjeDiscoveries, listPjeDiscoveries, linkPjeDiscovery } from "@/server/services/pje-discovery.service";
-import { createPersonalPjeKey, listPersonalPjeKeys, revokePersonalPjeKey } from "@/server/services/apikey.service";
 import { createCase, getCase } from "@/server/services/case.service";
 import { createTask, getTask } from "@/server/services/task.service";
 import { GET, POST } from "@/app/api/v1/pje/discoveries/route";
-import { GET as readCases } from "@/app/api/v1/cases/route";
 import { META, addMember, makeOrgWithOwner } from "./helpers";
 const secret = base32Encode(Buffer.from("12345678901234567890"));
 const cnj = (sequence: string) => { const p = { sequence, year: "2026", segment: "8", court: "05", origin: "0001" }; return `${sequence}-${computeCnjCheck(p)}.2026.8.05.0001`; };
@@ -91,17 +89,12 @@ describe("PJe: OTP pessoal, captura restrita e vínculo confirmado", () => {
     const row = (await listPjeDiscoveries(colleague.ctx))[0]!;
     await expect(linkPjeDiscovery(colleague.ctx, { id: row.id })).rejects.toThrow(/Não foi possível vincular/);
   });
-  it("emite conexão pessoal de advogado só para captura, revogável sem administrar integrações", async () => {
-    const key = await createPersonalPjeKey(colleague.ctx);
-    expect((await listPersonalPjeKeys(colleague.ctx)).map(k => k.id)).toContain(key.id);
-    const call = (fn: typeof GET, method: string, body?: unknown) => fn(new Request("https://www.legalossync.tech/api/v1/pje/discoveries", { method, headers: { Authorization: `Bearer ${key.token}`, "Content-Type": "application/json" }, ...(body ? { body: JSON.stringify(body) } : {}) }), { params: Promise.resolve({}) });
-    const identity = await call(GET, "GET"); expect(identity.status).toBe(200); expect(await identity.json()).toMatchObject({ organizationName: a.org.name });
-    expect((await call(POST, "POST", { sourceOrigin: "https://pje.tjba.jus.br", numbers: [cnj("0000004")] })).status).toBe(200);
-    expect((await call(readCases, "GET")).status).toBe(403);
-    await expect(revokePersonalPjeKey(a.ctx, key.id)).rejects.toBeInstanceOf(NotFoundError);
-    await revokePersonalPjeKey(colleague.ctx, key.id);
-    expect((await call(GET, "GET")).status).toBe(401);
-    const assistant = await addMember(a.org.id, "ASSISTANT", "pje-sem-escrita");
-    await expect(createPersonalPjeKey(assistant.ctx)).rejects.toBeInstanceOf(ForbiddenError);
+  it("mantém as rotas antigas de descoberta PJe permanentemente removidas", async () => {
+    const get = await GET();
+    const post = await POST();
+    expect(get.status).toBe(410);
+    expect(post.status).toBe(410);
+    expect(await get.json()).toMatchObject({ error: "box_removed" });
+    expect(await post.json()).toMatchObject({ error: "box_removed" });
   });
 });

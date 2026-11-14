@@ -6,24 +6,11 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { MonitorForm, MonitorList } from "@/modules/djen/djen-ui";
-import { listMonitors } from "@/server/services/djen.service";
-import { listActiveMembers } from "@/server/services/members";
-import { listTeams } from "@/server/services/inbox-flow.service";
-import { UFS } from "@/lib/mni/tribunals";
-import { OfficialTargetsForm, ConnectionForm, ConnectionList } from "@/modules/mni/mni-ui";
-import { listTribunals } from "@/lib/mni/tribunals";
-import { listCertificates, vaultAvailable } from "@/server/services/certificate.service";
-import { listConnections } from "@/server/services/mni.service";
 import { DatajudKeyForm, DatajudToggle } from "@/modules/organizations/datajud-toggle";
 import { ApiKeyForm, ApiKeyList } from "@/modules/api-keys/api-keys-ui";
 import { API_SCOPES, listApiKeys } from "@/server/services/apikey.service";
 import { WebhookForm, WebhookList } from "@/modules/webhooks/webhooks-ui";
 import { listWebhooks, recentDeliveries, webhooksAvailable, WEBHOOK_EVENTS } from "@/server/services/webhook.service";
-import { db } from "@/lib/db/client";
-import { LegalMailKeyForm, LegalMailWebhookKeyButton } from "@/modules/legalmail/setup";
-import { appUrl } from "@/server/services/auth.service";
-import { canImportLegalMail, isLegalMailOffice } from "@/server/legalmail-access";
 import { can } from "@/server/context";
 import { datajudStatus } from "@/server/services/datajud.service";
 import { DriveSettingsPanel } from "@/modules/google/google-ui";
@@ -38,25 +25,8 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
   const sp = await searchParams;
   const drive = await getDriveSettings(ctx);
   const s = await datajudStatus(ctx);
-  // Box 3.0: DJEN é fonte pública (consulta por OAB/UF), independente do Box autenticado retirado (BOX_AVAILABLE).
-  const monitors = await listMonitors(ctx);
-  // A área de integrações também mantém DataJud/DJEN públicos quando o Box está retirado.
-  // As opções de distribuição pertencem à Entrada, cujas permissões são bloqueadas com o Box;
-  // não chame listTeams (que exige inbox:read) nem carregue destinatários nessa situação.
-  const [rcvMembers, rcvTeams] = BOX_AVAILABLE ? await Promise.all([listActiveMembers(ctx), listTeams(ctx)]) : [[], []];
-  const tribunals = listTribunals();
-  const names = new Map(tribunals.map((t) => [t.jtr, t.label]));
-  const vault = vaultAvailable();
-  const [conns, certs] = await Promise.all([BOX_AVAILABLE ? listConnections(ctx) : Promise.resolve([]), BOX_AVAILABLE && vault && can(ctx, "certificates:manage") ? listCertificates(ctx) : Promise.resolve([])]);
-  const usableCerts = certs.filter((c) => c.status === "ACTIVE" || c.status === "EXPIRING").map((c) => ({ id: c.id, label: c.label }));
   const apiKeys = await listApiKeys(ctx);
   const scopeLabels = Object.fromEntries(Object.entries(API_SCOPES).map(([k, v]) => [k, v.label]));
-  const legalMailOffice = await isLegalMailOffice(ctx.organizationId);
-  const legalMailAllowed = legalMailOffice && await canImportLegalMail(ctx);
-  const [legalMailStatus] = legalMailAllowed ? await db.$queryRaw<{ configured: boolean }[]>`
-    SELECT api_key_enc IS NOT NULL AS configured FROM legalmail_pilot
-    WHERE singleton AND organization_id = ${ctx.organizationId}::uuid
-  ` : [];
   const scopeOptions = Object.entries(API_SCOPES).filter(([key, v]) => key !== "legalmail:ingest" && (BOX_AVAILABLE || (!key.startsWith("pje:") && !isBoxPermission(v.permission)))).map(([key, v]) => ({ key, label: v.label, allowed: can(ctx, v.permission) }));
   const [hooks, deliveries] = await Promise.all([listWebhooks(ctx), recentDeliveries(ctx)]);
   const eventLabels: Record<string, string> = { ...WEBHOOK_EVENTS, ping: "Teste" };
@@ -76,52 +46,17 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="DataJud (CNJ) · Box 3.0" action={active ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Desligada</Badge>} />
+          <CardHeader title="DataJud (CNJ)" action={active ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-3 text-sm">
             <p>Importa os andamentos públicos de um processo a partir do número CNJ (Justiça Estadual, Federal, do Trabalho, Eleitoral, STJ e TST). Só o número do processo é enviado ao CNJ; processos sigilosos nunca são consultados. Cada andamento é importado uma única vez.</p>
             {!s.keyConfigured ? <Alert tone="warning">Cadastre a chave pública do DataJud abaixo para habilitar a consulta.</Alert> : null}
-            <p className="text-xs text-muted">Fonte: Conselho Nacional de Justiça (CNJ), Base Nacional de Dados do Poder Judiciário (DataJud). Habilitar a consulta não confirma a disponibilidade do CNJ. Esta consulta pública é independente do Box retirado: funciona mesmo com o Box desligado.</p>
+            <p className="text-xs text-muted">Fonte: Conselho Nacional de Justiça (CNJ), Base Nacional de Dados do Poder Judiciário (DataJud). Habilitar a consulta não confirma a disponibilidade do CNJ.</p>
             <p className="text-xs" role="status">{s.lastTest ? `Último teste: ${formatDateTime(s.lastTest.at, ctx.timezone)} — ${s.lastTest.ok ? "autenticação aceita pelo CNJ" : ({ TIMEOUT: "tempo de resposta esgotado", NETWORK: "falha de conexão", AUTH: "acesso recusado (chave ou permissão)", RATE_LIMIT: "limite de consultas atingido", UNAVAILABLE: "serviço indisponível ou resposta incompleta", INVALID_RESPONSE: "resposta inválida" }[s.lastTest.reason ?? ""] ?? "não concluído")}.` : "Conexão ainda não testada com a chave atual."}</p>
             <DatajudKeyForm ownKey={s.ownKey} vaultAvailable={s.vaultAvailable} configured={s.keyConfigured} />
             {s.keyConfigured ? <DatajudToggle enabled={s.orgEnabled} /> : null}
           </CardBody>
         </Card>
-        <Card>
-          <CardHeader title="DJEN — publicações por OAB · Box 3.0" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
-          <CardBody className="space-y-4 text-sm">
-            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado e coloca as publicações na caixa de entrada, sem repetir. Não precisa de certificado nem de senha. A verificação automática depende de um agendador chamar o sistema (variável CRON_SECRET); sem isso, use “Verificar agora”. Esta consulta pública não tem documentação oficial estável: se o CNJ mudar o formato, o sistema avisa em vez de importar dados incorretos. Relatos indicam que o DJEN recusa servidores fora do Brasil. Esta consulta pública é independente do Box autenticado retirado: funciona mesmo com ele desligado.</p>
-            <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} recipients={{ members: rcvMembers.map((u) => ({ id: u.id, name: u.name })), teams: rcvTeams.map((t) => ({ id: t.id, name: t.name })) }} />
-            <MonitorForm ufs={UFS} />
-          </CardBody>
-        </Card>
-        {BOX_AVAILABLE ? <>
-        <details className="rounded-xl border border-border p-4">
-          <summary className="cursor-pointer text-sm font-medium">Avançado: conexão oficial MNI (exige autorização do tribunal e liberação de IP)</summary>
-          <div className="mt-4">
-        <Card>
-          <CardHeader title="Conexões de tribunais — MNI 2.2.2" action={conns.some((c) => c.enabled) ? <Badge tone="info">Habilitada (acesso não confirmado)</Badge> : <Badge tone="warning">Desligada</Badge>} />
-          <CardBody className="space-y-4 text-sm">
-            <p>Conexões de PJe, eproc, e-SAJ e PROJUDI que disponibilizem MNI 2.2.2. MNI 3.0 e webservices proprietários ainda exigem adaptadores específicos. Lista os avisos pendentes sem abrir o teor (abrir geraria ciência e abriria o prazo) e consulta movimentos de um processo. Ainda não foi validado contra um tribunal real: use primeiro um tribunal que tenha ambiente de homologação e confirme com ele o endereço e a forma de autenticação.</p>
-            {!vault ? <Alert tone="warning">Falta a chave do cofre (CERT_ENCRYPTION_KEY): cadastro de conexões fica indisponível.</Alert> : null}
-            {vault ? <OfficialTargetsForm certificates={usableCerts} /> : null}
-            <ConnectionList items={conns.map((c) => ({ wsdlUrl: c.wsdlUrl, authProfile: c.authProfile, system: c.system, environment: c.environment, wsdlStatus: c.wsdlStatus, wsdlCheckedAt: c.wsdlCheckedAt?.toISOString() ?? null, wsdlOperations: c.wsdlOperations, id: c.id, label: c.label, jtr: c.jtr, tribunal: names.get(c.jtr) ?? c.jtr, endpointUrl: c.endpointUrl, authMode: c.authMode, certificateLabel: c.certificateLabel, enabled: c.enabled, lastSyncAt: c.lastSyncAt ? c.lastSyncAt.toISOString() : null, lastStatus: c.lastStatus, lastMessage: c.lastMessage, petitionTypes: c.petitionTypes }))} />
-            {vault ? <ConnectionForm tribunals={tribunals.map((t) => ({ jtr: t.jtr, label: t.label }))} certificates={usableCerts} /> : null}
-          </CardBody>
-        </Card>
-          </div>
-        </details>
-        </> : null}
         <Alert tone="info">Google Agenda, Gmail e envio de e-mail ficam para uma próxima etapa.</Alert>
-        {legalMailOffice ? <Card>
-          <CardHeader title="LegalMail → FUNC — intimações e movimentações" action={<Badge tone="info">Entrada somente</Badge>} />
-          <CardBody className="space-y-3 text-sm">
-            {legalMailAllowed ? <LegalMailKeyForm configured={legalMailStatus?.configured ?? false} /> : null}
-            <p className="break-all">URL do webhook: <code>{appUrl("/api/webhooks/legalmail")}</code></p>
-            <p>No painel LegalMail, cadastre a URL acima em <strong>Webhooks</strong> e selecione “Intimações e movimentações”. A chave de API acima valida o acesso à sua conta. A chave do webhook abaixo autentica as entregas ao LegalOS.</p>
-            {legalMailAllowed ? <LegalMailWebhookKeyButton /> : null}
-            <p className="text-xs text-muted">As comunicações em texto aparecem na ficha do processo pelo CNJ. A importação de PDFs ainda está pendente.</p>
-          </CardBody>
-        </Card> : null}
         <Card>
           <CardHeader title="API do LegalOS — chaves de acesso" action={apiKeys.some((k) => k.status === "ACTIVE") ? <Badge tone="success">Em uso</Badge> : <Badge tone="warning">Sem chaves</Badge>} />
           <CardBody className="space-y-4 text-sm">

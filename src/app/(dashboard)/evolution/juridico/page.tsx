@@ -1,6 +1,6 @@
 import { listDocumentReviews } from "@/server/services/document-review.service";
 import Link from "next/link";
-import { ArrowUpRight, FolderOpen, Hourglass, FileText, Calculator, Bot, Plus } from "lucide-react";
+import { ArrowUpRight, FolderOpen, Hourglass, FileText, Calculator, Bot, Plus, Bell } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
@@ -10,20 +10,27 @@ import { can } from "@/server/context";
 import { getIndicators } from "@/server/services/insights.service";
 import { listCases } from "@/server/services/case.service";
 import { DataError } from "@/components/evolution/data-error";
+import { TasksWorkspace, type TaskSearchParams } from "@/modules/tasks/tasks-workspace";
+import { alertCounts, availableAlertTabs } from "@/server/services/insights.service";
 
 type CaseListResult = Awaited<ReturnType<typeof listCases>>;
 
-export default async function JuridicoPage() {
+export default async function JuridicoPage({ searchParams }: { searchParams: Promise<TaskSearchParams> }) {
   const { ctx } = await requireTenant();
   const dept = DEPARTMENTS.juridico;
   const [ind, indErr] = await getIndicators(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
   const reviews = can(ctx, "documents:read") ? await listDocumentReviews(ctx, undefined, true).then(items => ({ items, error: false })).catch(() => ({ items: [], error: true })) : null;
   const hasCases = can(ctx, "cases:read");
+  const hasTasks = can(ctx, "tasks:read");
+  const attentionTabs = availableAlertTabs(ctx).filter((tab) => tab.key !== "aniversarios");
+  const [alerts, alertsErr] = attentionTabs.length
+    ? await alertCounts(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const)
+    : [null, false] as const;
   const [cases, casesErr] = hasCases
     ? await listCases(ctx, { page: 1, status: "ACTIVE" }).then((r) => [r, false] as const).catch(() => [{ items: [] as CaseListResult["items"], total: 0 }, true] as const)
     : [{ items: [] as CaseListResult["items"], total: 0 }, false] as const;
 
-  if (!hasCases) {
+  if (!hasCases && !hasTasks && !attentionTabs.length) {
     return (
       <>
         <DepartmentHeader icon={dept.icon} color={dept.color} title={dept.name} description={dept.summary} />
@@ -48,7 +55,18 @@ export default async function JuridicoPage() {
         {staleCases !== null && staleCases > 0 && <StatCard icon={FolderOpen} label="Processos parados" value={staleCases} detail="sem movimentação recente" color="#64748b" />}
       </div>
 
-      <section className="mt-8">
+      {attentionTabs.length > 0 && <section className="mt-8" aria-label="Pendências jurídicas e operacionais">
+        <div className="mb-3"><h2 className="text-base font-semibold">Pendências jurídicas e operacionais</h2><p className="mt-1 text-sm text-muted">Alertas, prazos e tarefas reunidos na mesma área.</p></div>
+        {alertsErr && <DataError message="Não foi possível carregar os alertas" />}
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {attentionTabs.map((tab) => <Link key={tab.key} href={`/alertas?aba=${tab.key}`} className="group flex items-center justify-between gap-4 rounded-xl border border-border bg-surface p-4 hover:bg-surface-2"><span className="flex items-center gap-2 text-sm font-medium group-hover:text-primary"><Bell className="h-4 w-4" aria-hidden />{tab.label}</span><span className="text-xl font-semibold tabular-nums">{alertsErr ? "—" : alerts?.[tab.key] ?? 0}</span></Link>)}
+          <Link href="/alertas" className="rounded-xl border border-border bg-surface p-4 text-sm font-medium text-primary hover:bg-surface-2">Abrir central de alertas</Link>
+        </div>
+      </section>}
+
+      {hasTasks && <section className="mt-8" aria-label="Mesa de controle operacional"><h2 className="mb-3 text-base font-semibold">Operação jurídica · tarefas</h2><TasksWorkspace searchParams={searchParams} basePath="/evolution/juridico" embedded /></section>}
+
+      {hasCases && <section className="mt-8">
         <div className="mb-3 flex flex-wrap items-end justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold">Processos ativos recentes</h2>
@@ -79,7 +97,7 @@ export default async function JuridicoPage() {
           </div>
         ) : <p className="rounded-xl border border-dashed border-border p-6 text-sm text-muted">Nenhum processo ativo visível nesta carteira.</p>}
         {casesErr && <p className="mt-3 text-sm text-muted">A lista de processos recentes não pôde ser carregada.</p>}
-      </section>
+      </section>}
 
       {reviews && <section className="mt-8" aria-label="Fila de revisão jurídica">
         <h2 className="mb-3 text-base font-semibold">Produção jurídica · revisão de documentos</h2>
@@ -95,13 +113,14 @@ export default async function JuridicoPage() {
 
       <h2 className="mt-8 mb-4 text-base font-semibold">Estações de trabalho</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Link href="/processos" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+        {hasCases && <Link href="/processos" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
           <FolderOpen className="h-5 w-5 text-muted" aria-hidden />
           <div>
             <p className="text-sm font-medium group-hover:text-primary">Processos</p>
             <p className="text-[12px] text-muted">Cadastro, partes, linha do tempo e carteira</p>
           </div>
-        </Link>
+        </Link>}
+        {attentionTabs.length > 0 && <Link href="/alertas" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md"><Bell className="h-5 w-5 text-muted" aria-hidden /><div><p className="text-sm font-medium group-hover:text-primary">Central de alertas</p><p className="text-[12px] text-muted">Pendências jurídicas e operacionais</p></div></Link>}
         {can(ctx, "deadlines:read") && (
           <Link href="/prazos" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
             <Hourglass className="h-5 w-5 text-muted" aria-hidden />
