@@ -4,10 +4,12 @@
 
 - Interface, navegação, rotas de captura/protocolo, atalhos, opções de integração, documentação operacional e escopos públicos do Box removidos. Rotas antigas respondem como removidas; flags antigas não reativam o módulo. DataJud permanece separado para consulta pública.
 - Controladoria foi incorporada ao Jurídico; a rota antiga redireciona para Jurídico.
-- Migração `20270111000000_purge_removed_box_data` remove registros exclusivos de captura, credenciais, certificados, robôs, protocolo e histórico de Box, revoga chaves exclusivas e remove escopos de chaves mistas. Preserva clientes, processos, documentos gerais, tarefas, prazos, dados financeiros, conversas e eventos DataJud. Validada em banco local descartável; nenhum banco de produção foi alterado nesta etapa.
+- Migração `20270111000000_purge_removed_box_data` remove registros exclusivos de captura, credenciais, certificados, robôs, protocolo e histórico de Box, revoga chaves exclusivas e remove escopos de chaves mistas. Preserva clientes, processos, documentos gerais, tarefas, prazos, dados financeiros, conversas e eventos DataJud. Validada em banco local descartável e aplicada no deploy de 14/11/2026.
 - `npm run typecheck`, `npm run lint`, Vitest (188 arquivos / 1.353 testes) e `npm run build` passaram. E2E completo: **74 cenários aprovados** em banco isolado, incluindo rotas antigas, permissões, DataJud, WhatsApp e QR.
 - Revisão visual limitada à navegação departamental coberta pelos E2E; não inclui homologação com provedores reais.
-- Integração/publicação dependem dos E2E finais e do CI do PR de remoção. O PR #8 de funcionalidades Box será encerrado ao integrar a retirada. Nenhum merge/deploy realizado neste checkpoint.
+- PR #36 foi integrado por squash no commit `9a362a1`; os checks do PR e da `main` passaram. O PR #8, que reintroduziria o Box, foi encerrado.
+- Deploy manual `43570458932` concluído com sucesso. `/api/ready` respondeu `ready` com banco, migrações e armazenamento saudáveis; smoke check confirmou 404 nas páginas antigas e 410 nas APIs antigas.
+- A migração de produção removeu os dados exclusivos do Box conforme autorização. Não foi feita contagem nominal de registros de produção antes/depois; o resultado confirmado é a aplicação das migrações e a disponibilidade do serviço.
 
 ## Checkpoint atual — operações departamentais (PR #33)
 
