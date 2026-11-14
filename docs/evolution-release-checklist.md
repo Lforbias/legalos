@@ -1,5 +1,14 @@
 # LegalOS Evolution 1.0 — checklist de aceite
 
+## Checkpoint — retirada definitiva do Box e unificação Jurídico/Controladoria
+
+- Interface, navegação, rotas de captura/protocolo, atalhos, opções de integração, documentação operacional e escopos públicos do Box removidos. Rotas antigas respondem como removidas; flags antigas não reativam o módulo. DataJud permanece separado para consulta pública.
+- Controladoria foi incorporada ao Jurídico; a rota antiga redireciona para Jurídico.
+- Migração `20270111000000_purge_removed_box_data` remove registros exclusivos de captura, credenciais, certificados, robôs, protocolo e histórico de Box, revoga chaves exclusivas e remove escopos de chaves mistas. Preserva clientes, processos, documentos gerais, tarefas, prazos, dados financeiros, conversas e eventos DataJud. Validada em banco local descartável; nenhum banco de produção foi alterado nesta etapa.
+- `npm run typecheck`, `npm run lint`, Vitest (188 arquivos / 1.353 testes) e `npm run build` passaram. E2E completo: **74 cenários aprovados** em banco isolado, incluindo rotas antigas, permissões, DataJud, WhatsApp e QR.
+- Revisão visual limitada à navegação departamental coberta pelos E2E; não inclui homologação com provedores reais.
+- Integração/publicação dependem dos E2E finais e do CI do PR de remoção. O PR #8 de funcionalidades Box será encerrado ao integrar a retirada. Nenhum merge/deploy realizado neste checkpoint.
+
 ## Checkpoint atual — operações departamentais (PR #33)
 
 - Revisão editorial de documentos implementada independentemente do Box: pedido, aprovação por outra pessoa, ajustes, histórico por versão e auditoria.

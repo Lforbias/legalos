@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { NAV_ITEMS, navItemInBoxVersion } from "@/config/navigation";
+import { NAV_ITEMS } from "@/config/navigation";
 import {
   DEPARTMENTS,
   EVOLUTION_NAV,
@@ -8,9 +8,9 @@ import {
 } from "@/config/evolution-navigation";
 
 describe("evolution navigation config", () => {
-  const allDepts: Department[] = ["lobby", "mesa", "juridico", "controladoria", "atendimento", "comercial", "financeiro", "administracao"];
+  const allDepts: Department[] = ["lobby", "mesa", "juridico", "atendimento", "comercial", "financeiro", "administracao"];
 
-  it("defines all eight departments with name, color, icon and summary", () => {
+  it("defines all seven departments with name, color, icon and summary", () => {
     for (const dept of allDepts) {
       const d = DEPARTMENTS[dept];
       expect(d.name).toBeTruthy();
@@ -58,7 +58,7 @@ it("links the office modules from Evolution navigation", () => {
   const separateLinks = ["overview", "portal", "prototypes", "help"];
   const routes = new Set(EVOLUTION_NAV.map((item) => item.href));
   for (const item of NAV_ITEMS) {
-    if (navItemInBoxVersion(item, false) && !item.box && !separateLinks.includes(item.key)) {
+    if (!separateLinks.includes(item.key)) {
       expect(routes, item.key).toContain(item.href);
     }
   }

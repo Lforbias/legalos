@@ -12,7 +12,6 @@ import { Brand } from "@/components/layout/brand";
 
 function deptOfPath(pathname: string): Department | null {
   if (pathname === "/evolution") return "lobby";
-  if (pathname === "/box-v3" || pathname.startsWith("/box-v3/")) return "controladoria";
   if (pathname === "/ajuda" || pathname === "/prototipos") return "administracao";
   return EVOLUTION_NAV.find(({ href }) => pathname === href || pathname.startsWith(`${href}/`))?.department ?? null;
 }
@@ -36,14 +35,14 @@ export function EvolutionSidebar({
   const toggle = () => setStored(collapsed ? "open" : "collapsed");
   const activeDept = deptOfPath(pathname);
   const additionalItems = NAV_ITEMS.filter((item) => menuKeys.includes(item.key) &&
-    ["overview", "help", "prototypes", "box-v3-preview"].includes(item.key),
+    ["overview", "help", "prototypes"].includes(item.key),
   );
 
   const [selection, setSelection] = React.useState<{ pathname: string; department: Department | null }>();
   const openDept = selection?.pathname === pathname ? selection.department : activeDept;
   React.useEffect(() => onCloseMobile(), [pathname, onCloseMobile]);
 
-  const departments = (["mesa", "juridico", "controladoria", "atendimento", "comercial", "financeiro", "administracao"] as Department[]);
+  const departments = (["mesa", "juridico", "atendimento", "comercial", "financeiro", "administracao"] as Department[]);
 
   const deptNav = (isCollapsed: boolean) => (
     <nav aria-label="Navegação Evolution" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">

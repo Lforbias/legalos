@@ -2,7 +2,7 @@
 
 Plataforma SaaS jurídica multiempresa para escritórios de advocacia brasileiros (nome provisório — altere em `src/config/product.ts`).
 
-**Status:** Fases 1 a 7, 8a (assistente de IA), 8b (OCR e busca no conteúdo) 8c (consulta DataJud/CNJ) 9a (segurança: 2FA, bloqueio, CSP) 9b (backups e guia de produção) concluídas e o motor de tribunais iniciado (etapa 0: cofre de certificados; etapa 1: conector PJe/MNI; etapa 2a: captura de publicações do DJEN; caixas de trabalho (equipes, devolver, adormecer, notas, etiquetas); painel de administração da plataforma (/admin); ambos ainda não validados contra serviços reais) (fundação, clientes e processos, tarefas/prazos/agenda, intimações, documentos/modelos/peticionamento em modo demonstração, CRM/automações/portal do cliente, financeiro). Veja [`docs/implementation-status.md`](docs/implementation-status.md) para o que é operacional e o que ainda é pendente, e [`docs/roadmap.md`](docs/roadmap.md) para as próximas fases.
+**Status:** Gestão de clientes e processos, tarefas, prazos, documentos, atendimento, CRM, financeiro, segurança e automações seguem no produto. O módulo de captura judicial, certificados e protocolo foi retirado; a migração `20270111000000_purge_removed_box_data` elimina os dados específicos do módulo quando aplicada. Veja [`docs/roadmap.md`](docs/roadmap.md) para próximas etapas.
 
 ## Requisitos
 
