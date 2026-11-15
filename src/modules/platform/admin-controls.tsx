@@ -58,13 +58,12 @@ export function OrgArchiveControl({ orgId, name, suspended }: { orgId: string; n
   const { run, pending, error } = useRun();
   const [asking, setAsking] = React.useState(false);
   const [typedName, setTypedName] = React.useState("");
-  if (!suspended) return <p className="mt-2 max-w-56 text-xs text-muted">Suspenda o escritório antes de excluí-lo.</p>;
   return (
     <div className="mt-2 space-y-2">
       {error ? <Alert tone="error">{error}</Alert> : null}
       {asking ? (
         <div className="max-w-72 space-y-2 rounded-md border border-danger/40 p-2">
-          <p className="text-xs text-muted">O escritório sairá do sistema e seus membros perderão o acesso. O histórico e os dados serão mantidos no banco, registrados como excluídos. Digite o nome exato para confirmar.</p>
+          <p className="text-xs text-muted">{suspended ? "O escritório sairá do sistema e seus membros perderão o acesso." : "O escritório será suspenso e sairá do sistema; seus membros perderão o acesso."} O histórico e os dados serão mantidos no banco, registrados como excluídos. Digite o nome exato para confirmar.</p>
           <label htmlFor={`archive-office-${orgId}`} className="block text-xs text-muted">Nome do escritório</label>
           <Input id={`archive-office-${orgId}`} value={typedName} onChange={(e) => setTypedName(e.target.value)} autoComplete="off" />
           <div className="flex gap-2">
