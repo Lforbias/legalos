@@ -5,7 +5,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input, Select } from "@/components/ui/form";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
-import { CreditsControl, OrgSuspendControl, SubscriptionControl } from "@/modules/platform/admin-controls";
+import { CreditsControl, OrgArchiveControl, OrgSuspendControl, SubscriptionControl } from "@/modules/platform/admin-controls";
 import { LegalMailPilotButton } from "@/modules/legalmail/setup";
 import { legalMailOfficeId } from "@/server/legalmail-access";
 import { requirePlatform } from "@/server/platform";
@@ -24,7 +24,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
   const STATUS: Record<string, string> = { TRIALING: "Em teste", ACTIVE: "Ativa", PAST_DUE: "Em atraso", CANCELED: "Cancelada" };
   return (
     <div>
-      <PageHeader title="Escritórios" description="Suspender bloqueia o acesso de todos os membros e para as rotinas automáticas, mas preserva os dados. Fica registrado na auditoria." />
+      <PageHeader title="Escritórios" description="Suspender bloqueia o acesso de todos os membros e para as rotinas automáticas. Excluir remove o escritório da plataforma e preserva os dados no banco, com registro de auditoria." />
       <form method="get" className="mb-4 flex flex-wrap gap-2" role="search" aria-label="Filtrar escritórios">
         <label htmlFor="q" className="sr-only">Buscar</label>
         <Input id="q" name="q" defaultValue={sp.q ?? ""} placeholder="Nome ou identificador" className="w-64" />
@@ -93,6 +93,7 @@ export default async function OrgsPage({ searchParams }: { searchParams: Promise
                       <Badge tone="success">Ativo</Badge>
                     )}
                     <div className="mt-2"><OrgSuspendControl orgId={o.id} suspended={Boolean(o.suspendedAt)} /></div>
+                    <OrgArchiveControl orgId={o.id} name={o.name} suspended={Boolean(o.suspendedAt)} />
                   </td>
                 </tr>
               ))}

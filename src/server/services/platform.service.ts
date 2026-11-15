@@ -133,6 +133,26 @@ export async function setOrganizationSuspended(pc: PlatformCtx, orgId: string, r
   });
 }
 
+/** Exclui logicamente um escritório já suspenso; conserva os registros e grava evidência de auditoria. */
+export async function archiveOrganization(pc: PlatformCtx, orgId: string, confirmationName: string) {
+  await assertPlatform(pc);
+  await db.$transaction(async (tx) => {
+    const org = await tx.organization.findFirst({ where: { id: orgId, deletedAt: null }, select: { id: true, name: true, suspendedAt: true } });
+    if (!org) throw new NotFoundError("Escritório não encontrado.");
+    if (org.name !== confirmationName.trim()) throw new ValidationError("O nome digitado não confere com o escritório.");
+    if (!org.suspendedAt) throw new ConflictError("Suspenda o escritório antes de excluí-lo.");
+
+    const [members, cases, openNotices] = await Promise.all([
+      tx.membership.count({ where: { organizationId: orgId, status: "ACTIVE" } }),
+      tx.case.count({ where: { organizationId: orgId, deletedAt: null } }),
+      tx.courtNotice.count({ where: { organizationId: orgId, deletedAt: null, status: { in: ["NEW", "DISTRIBUTED"] } } }),
+    ]);
+    const updated = await tx.organization.updateMany({ where: { id: orgId, name: org.name, deletedAt: null, suspendedAt: { not: null } }, data: { deletedAt: new Date() } });
+    if (updated.count !== 1) throw new ConflictError("O escritório mudou durante a exclusão. Atualize a página e tente novamente.");
+    await audit({ action: "platform.org_archive", organizationId: orgId, userId: pc.userId, resourceType: "organization", resourceId: orgId, metadata: { name: org.name, members, cases, openNotices, recordsRetained: true }, meta: pc.meta }, tx);
+  });
+}
+
 export type PlatformUserRow = { id: string; name: string; email: string; createdAt: Date; lastLoginAt: Date | null; disabledAt: Date | null; locked: boolean; mfa: boolean; isPlatformAdmin: boolean; organizations: { id: string; name: string; role: string; suspended: boolean }[] };
 
 export async function listPlatformUsers(pc: PlatformCtx, f: { q?: string } = {}): Promise<{ total: number; items: PlatformUserRow[] }> {
