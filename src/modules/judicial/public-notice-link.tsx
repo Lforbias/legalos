@@ -4,15 +4,16 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { linkPublicDjenNoticeAction } from "./public-notice-link-actions";
+import { linkPublicDjenNoticeAction, processPublicDjenNoticeAction } from "./public-notice-link-actions";
 
-export function PublicNoticeLink({ noticeId, cases }: { noticeId: string; cases: { id: string; title: string; number: string | null }[] }) {
+export function PublicNoticeLink({ noticeId, cases, onProcess, linkEnabled = true }: { noticeId: string; cases: { id: string; title: string; number: string | null }[]; onProcess?: () => void; linkEnabled?: boolean }) {
   const router = useRouter();
   const [caseId, setCaseId] = React.useState("");
   const [message, setMessage] = React.useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, start] = React.useTransition();
   return (
     <div className="flex flex-wrap items-center gap-2">
+      {linkEnabled && cases.length ? <>
       <label className="sr-only" htmlFor={`public-notice-case-${noticeId}`}>Vincular publicação a processo</label>
       <select id={`public-notice-case-${noticeId}`} value={caseId} onChange={(event) => setCaseId(event.target.value)} className="min-w-56 rounded-lg border border-border bg-surface px-3 py-2 text-sm">
         <option value="">Escolha o processo</option>
@@ -27,7 +28,9 @@ export function PublicNoticeLink({ noticeId, cases }: { noticeId: string; cases:
           router.refresh();
         }
       })}>Vincular</Button>
+      </> : null}
       {message ? <Alert tone={message.tone} className="basis-full">{message.text}</Alert> : null}
+      {onProcess ? <Button size="sm" variant="ghost" disabled={pending} loading={pending} onClick={() => start(async () => { const result = await processPublicDjenNoticeAction(noticeId); if (!result.ok) setMessage({ tone: "error", text: result.message ?? "Não foi possível concluir." }); else { setMessage({ tone: "success", text: "Publicação marcada como tratada." }); onProcess(); router.refresh(); } })}>Marcar como tratada</Button> : null}
     </div>
   );
 }

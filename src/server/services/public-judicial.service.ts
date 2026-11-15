@@ -3,7 +3,7 @@ import { db } from "@/lib/db/client";
 import { assertCan, type TenantContext } from "@/server/context";
 import { assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service";
 import { audit } from "./audit.service";
-import { NotFoundError, ValidationError } from "@/lib/permissions/check";
+import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 
 const PUBLIC_DJEN_NOTICE = {
   source: "IMPORTED",
@@ -92,5 +92,19 @@ export async function linkPublicDjenNoticeToCase(ctx: TenantContext, noticeId: s
     if (updated.count !== 1) throw new ValidationError("A publicação foi alterada. Atualize a página e tente novamente.");
     await logCaseEvent(tx, ctx, caseId, { kind: "NOTICE_LINKED", title: `Publicação do DJEN vinculada: ${notice.title}`, description: "Vínculo revisado manualmente pela equipe." });
     await audit({ action: "public_djen.link_case", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: noticeId, metadata: { caseId }, meta: ctx.meta }, tx);
+  });
+}
+
+/** Encerramento manual da publicação pública dentro da Central Judicial. */
+export async function markPublicDjenNoticeProcessed(ctx: TenantContext, noticeId: string) {
+  assertCan(ctx, "cases:write");
+  const notice = await db.courtNotice.findFirst({ where: { id: noticeId, organizationId: ctx.organizationId, deletedAt: null, ...PUBLIC_DJEN_NOTICE }, select: { id: true, title: true, status: true, caseId: true } });
+  if (!notice) throw new NotFoundError("Publicação não encontrada.");
+  if (notice.status === "PROCESSED" || notice.status === "DISCARDED") throw new ConflictError("Esta publicação já foi encerrada.");
+  await db.$transaction(async (tx) => {
+    const updated = await tx.courtNotice.updateMany({ where: { id: noticeId, organizationId: ctx.organizationId, status: notice.status, deletedAt: null, ...PUBLIC_DJEN_NOTICE }, data: { status: "PROCESSED", processedAt: new Date(), processedById: ctx.userId } });
+    if (updated.count !== 1) throw new ConflictError("A publicação foi alterada. Atualize a página e tente novamente.");
+    if (notice.caseId) await logCaseEvent(tx, ctx, notice.caseId, { kind: "NOTICE_PROCESSED", title: `Publicação do DJEN tratada: ${notice.title}` });
+    await audit({ action: "public_djen.process", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "court_notice", resourceId: noticeId, meta: ctx.meta }, tx);
   });
 }
