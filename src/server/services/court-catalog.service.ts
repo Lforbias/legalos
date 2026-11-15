@@ -9,9 +9,10 @@ import {
   INTEGRATION_STATUS_LABEL,
   type CourtBranch,
   type CourtEntry,
+  type CourtDegree,
   type IntegrationStatus,
 } from "@/lib/judicial/court-catalog";
-import { CONNECTION_STATE_LABEL, deriveConnection, type AuthorizationState, type ConnectionState, type DerivedConnection } from "@/lib/judicial/connection-state";
+import { deriveConnection, type AuthorizationState, type DerivedConnection } from "@/lib/judicial/connection-state";
 import { CONNECTORS } from "@/lib/judicial/catalog";
 import { MONITORING_CAPABILITIES, type Capability, type EvidenceEnvironment } from "@/lib/judicial/contracts";
 import type { EvidenceRow } from "@/lib/judicial/evidence";
@@ -23,10 +24,14 @@ export type CourtCatalogView = {
   branch: CourtBranch;
   branchLabel: string;
   ufs: string[];
+  degrees: CourtDegree[];
   engineLabel: string | null;
+  engineSource: string | null;
   integrationStatus: IntegrationStatus;
   integrationStatusLabel: string;
   portalUrl: string | null;
+  verifiedAt: string | null;
+  verifiedSource: string | null;
   connection: DerivedConnection | null;
   hasPortalAccess: boolean;
 };
@@ -87,7 +92,7 @@ export async function listCourtCatalog(ctx: TenantContext, filters?: { branch?: 
 
   const orgId = ctx.organizationId;
   const [portalAccesses, evidenceRows] = await Promise.all([
-    db.portalAccess.findMany({ where: { organizationId: orgId }, select: { target: true, status: true, enabled: true } }),
+    db.portalAccess.findMany({ where: { organizationId: orgId, system: "pje" }, orderBy: { updatedAt: "desc" }, select: { target: true, status: true, enabled: true } }),
     db.connectorEvidence.findMany({
       where: { OR: [{ organizationId: orgId }, { organizationId: null }] },
       orderBy: { checkedAt: "desc" },
@@ -95,12 +100,15 @@ export async function listCourtCatalog(ctx: TenantContext, filters?: { branch?: 
     }),
   ]);
 
-  const accessByTarget = new Map<string, { status: string; enabled: boolean }>();
-  for (const pa of portalAccesses) accessByTarget.set(pa.target, { status: pa.status, enabled: pa.enabled });
+  const accessByCourt = new Map<string, { status: string; enabled: boolean }>();
+  for (const pa of portalAccesses) {
+    const code = pa.target.replace(/-(?:1g|2g)$/i, "").toUpperCase();
+    if (!accessByCourt.has(code)) accessByCourt.set(code, { status: pa.status, enabled: pa.enabled });
+  }
 
   const evidence: EvidenceRow[] = evidenceRows.map((e) => ({
     connectorKey: e.connectorKey,
-    courtCode: e.courtCode,
+    courtCode: e.courtCode === "*" ? "*" : e.courtCode.replace(/-(?:1g|2g)$/i, "").toUpperCase(),
     operation: e.operation as Capability,
     accessMethod: e.accessMethod,
     environment: e.environment as EvidenceEnvironment,
@@ -113,13 +121,13 @@ export async function listCourtCatalog(ctx: TenantContext, filters?: { branch?: 
   const now = new Date();
   return courts.map((entry) => {
     const connectorKey = engineForCourt(entry.code);
-    const pa = accessByTarget.get(entry.code.toLowerCase());
+    const pa = accessByCourt.get(entry.code);
     let authState: AuthorizationState = "MISSING";
     if (pa) {
       if (pa.status === "CONNECTED") authState = "GRANTED";
       else if (pa.status === "ERROR" || pa.status === "FAILED") authState = "REJECTED";
       else if (pa.status === "EXPIRED") authState = "EXPIRED";
-      else authState = "GRANTED";
+      else authState = "MISSING";
     }
 
     let connection: DerivedConnection | null = null;
@@ -143,10 +151,14 @@ export async function listCourtCatalog(ctx: TenantContext, filters?: { branch?: 
       branch: entry.branch,
       branchLabel: BRANCH_LABEL[entry.branch],
       ufs: entry.ufs,
+      degrees: entry.degrees,
       engineLabel: mapEngine(entry),
+      engineSource: entry.engineSource,
       integrationStatus: entry.integrationStatus,
       integrationStatusLabel: INTEGRATION_STATUS_LABEL[entry.integrationStatus],
       portalUrl: entry.portalUrl,
+      verifiedAt: entry.verifiedAt,
+      verifiedSource: entry.verifiedSource,
       connection,
       hasPortalAccess: !!pa,
     };

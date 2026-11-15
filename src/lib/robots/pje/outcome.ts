@@ -11,8 +11,8 @@ export type Mapped = {
 };
 
 /** Traduz o resultado do login em estado do acesso + estado do trabalho. Função pura (testável). */
-export function mapOutcome(outcome: LoginOutcome, attempts: number): Mapped {
-  if (outcome.ok) return { accessStatus: "CONNECTED", jobStatus: "DONE", message: "Conectado. O login no PJe funcionou." };
+export function mapOutcome(outcome: LoginOutcome, attempts: number, portal = "PJe"): Mapped {
+  if (outcome.ok) return { accessStatus: "CONNECTED", jobStatus: "DONE", message: `Conectado. O login no ${portal} funcionou.` };
   const { code, message, retryable } = outcome;
   if (retryable) {
     if (attempts < MAX_ATTEMPTS) return { accessStatus: "CONNECTING", jobStatus: "QUEUED", message: `${message} Nova tentativa automática em instantes.`, retry: true };

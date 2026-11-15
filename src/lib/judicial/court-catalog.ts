@@ -6,7 +6,7 @@
  * tem adaptador real, o que está apenas cadastrado e o que depende de acesso autorizado.
  *
  * Fontes:
- *  - Catálogo oficial do CNJ (Justiça em Números / sítio dos Tribunais).
+ *  - Catálogo oficial do CNJ: https://www.cnj.jus.br/poder-judiciario/tribunais/.
  *  - Os motores foram identificados pelos portais públicos; onde não foi possível confirmar,
  *    `engine` é null e `engineSource` explica.
  *
@@ -96,9 +96,9 @@ const ESTADUAIS: CourtEntry[] = [
 // ────────── Justiça Federal (6) ──────────
 
 const FEDERAIS: CourtEntry[] = [
-  { code: "TRF1", name: "Tribunal Regional Federal da 1ª Região", branch: "FEDERAL", ufs: ["AC", "AM", "AP", "BA", "DF", "GO", "MA", "MG", "MT", "PA", "PI", "RO", "RR", "TO"], degrees: ["1", "2"], portalUrl: "https://www.trf1.jus.br", engine: "PJE", engineSource: "Portal público do TRF1", integrationStatus: "CATALOG_ONLY", verifiedAt: "2026-11", verifiedSource: "CNJ / portal público" },
+  { code: "TRF1", name: "Tribunal Regional Federal da 1ª Região", branch: "FEDERAL", ufs: ["AC", "AM", "AP", "BA", "DF", "GO", "MA", "MT", "PA", "PI", "RO", "RR", "TO"], degrees: ["1", "2"], portalUrl: "https://www.trf1.jus.br", engine: "PJE", engineSource: "Portal público do TRF1", integrationStatus: "CATALOG_ONLY", verifiedAt: "2026-11", verifiedSource: "CNJ / portal público" },
   { code: "TRF2", name: "Tribunal Regional Federal da 2ª Região", branch: "FEDERAL", ufs: ["ES", "RJ"], degrees: ["1", "2"], portalUrl: "https://www.trf2.jus.br", engine: "EPROC", engineSource: "Portal público do TRF2 usa eproc", integrationStatus: "ADAPTER_WIP", verifiedAt: "2026-11", verifiedSource: "CNJ / portal público" },
-  { code: "TRF3", name: "Tribunal Regional Federal da 3ª Região", branch: "FEDERAL", ufs: ["MS", "SP"], degrees: ["1", "2"], portalUrl: "https://www.trf3.jus.br", engine: "PJE", engineSource: "Portal público do TRF3", integrationStatus: "PILOT", verifiedAt: "2026-11", verifiedSource: "Login piloto real validado" },
+  { code: "TRF3", name: "Tribunal Regional Federal da 3ª Região", branch: "FEDERAL", ufs: ["MS", "SP"], degrees: ["1", "2"], portalUrl: "https://www.trf3.jus.br", engine: "PJE", engineSource: "Portal público do TRF3", integrationStatus: "ADAPTER_WIP", verifiedAt: null, verifiedSource: "Login real ainda não homologado com acesso autorizado" },
   { code: "TRF4", name: "Tribunal Regional Federal da 4ª Região", branch: "FEDERAL", ufs: ["PR", "RS", "SC"], degrees: ["1", "2"], portalUrl: "https://www.trf4.jus.br", engine: "EPROC", engineSource: "Portal público do TRF4 usa eproc", integrationStatus: "ADAPTER_WIP", verifiedAt: "2026-11", verifiedSource: "CNJ / portal público" },
   { code: "TRF5", name: "Tribunal Regional Federal da 5ª Região", branch: "FEDERAL", ufs: ["AL", "CE", "PB", "PE", "RN", "SE"], degrees: ["1", "2"], portalUrl: "https://www.trf5.jus.br", engine: "PJE", engineSource: "Portal público do TRF5", integrationStatus: "CATALOG_ONLY", verifiedAt: "2026-11", verifiedSource: "CNJ / portal público" },
   { code: "TRF6", name: "Tribunal Regional Federal da 6ª Região", branch: "FEDERAL", ufs: ["MG"], degrees: ["1", "2"], portalUrl: "https://www.trf6.jus.br", engine: "PJE", engineSource: "Portal público do TRF6", integrationStatus: "CATALOG_ONLY", verifiedAt: "2026-11", verifiedSource: "CNJ / portal público" },

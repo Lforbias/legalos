@@ -85,6 +85,18 @@ function CourtRow({ court }: { court: CourtCatalogView }) {
               <p className="text-xs font-medium text-muted">UFs atendidas</p>
               <p className="text-sm">{court.ufs.length > 0 ? court.ufs.join(", ") : "Nacional"}</p>
             </div>
+            <div>
+              <p className="text-xs font-medium text-muted">Graus disponíveis</p>
+              <p className="text-sm">{court.degrees.length ? court.degrees.map((degree) => degree === "1" ? "1º grau" : degree === "2" ? "2º grau" : degree).join(", ") : "Não se aplica"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted">Fonte da identificação</p>
+              <p className="text-sm">{court.engineSource ?? "Motor não identificado"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-muted">Fonte/data do catálogo</p>
+              <p className="text-sm">{court.verifiedAt ?? "Sem verificação registrada"}{court.verifiedSource ? ` · ${court.verifiedSource}` : ""}</p>
+            </div>
           </div>
 
           {court.connection && (

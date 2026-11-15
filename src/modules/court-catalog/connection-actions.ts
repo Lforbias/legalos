@@ -1,12 +1,12 @@
 "use server";
-import { revalidatePath } from "next/cache";
-import { z } from "zod";
-import { parse, runAction } from "@/server/action-helpers";
+import { runAction } from "@/server/action-helpers";
 import { requireTenant } from "@/server/session";
-import { ensureAdapters, findAdapterForCourt, allSupportedTargets } from "@/lib/judicial/adapter-bootstrap";
-import type { CourtTarget, AuthMode } from "@/lib/judicial/adapter";
+import { ensureAdapters, allSupportedTargets } from "@/lib/judicial/adapter-bootstrap";
+import type { AuthMode } from "@/lib/judicial/adapter";
 import { AUTH_MODE_LABEL } from "@/lib/judicial/adapter";
 import { getCourtByCode, ENGINE_LABEL } from "@/lib/judicial/court-catalog";
+import { evolutionJudicialLoginEnabled, EVOLUTION_EPROC_SYSTEM, EVOLUTION_PJE_TARGET_KEY } from "@/lib/evolution-judicial-login";
+import { assertCan } from "@/server/context";
 
 export type AvailableTarget = {
   courtCode: string;
@@ -21,8 +21,11 @@ export type AvailableTarget = {
 
 export async function listAvailableTargetsAction() {
   return runAction(async () => {
+    const { ctx } = await requireTenant();
+    assertCan(ctx, "integrations:manage");
     ensureAdapters();
-    const all = allSupportedTargets();
+    const pilotEnabled = evolutionJudicialLoginEnabled();
+    const all = allSupportedTargets().filter(({ adapter, target }) => adapter.descriptor.key === "pje-portal" && target.courtCode === "TJMG" && target.degree === "1");
     const targets: AvailableTarget[] = all.map(({ adapter, target }) => {
       const court = getCourtByCode(target.courtCode);
       return {
@@ -33,10 +36,20 @@ export async function listAvailableTargetsAction() {
         adapterKey: adapter.descriptor.key,
         adapterLabel: adapter.descriptor.label,
         authModes: adapter.descriptor.supportedAuthModes.map((m) => ({ mode: m, label: AUTH_MODE_LABEL[m] })),
-        engineLabel: court?.engine ? ENGINE_LABEL[court.engine] ?? null : null,
+        engineLabel: target.courtCode === "TJMG" ? "PJe · acervo legado (não homologado)" : court?.engine ? ENGINE_LABEL[court.engine] ?? null : null,
       };
     });
-    return { targets };
+    targets.push({
+      courtCode: "TJMG",
+      courtName: getCourtByCode("TJMG")?.name ?? "Tribunal de Justiça de Minas Gerais",
+      degree: "1",
+      degreeLabel: "1º grau",
+      adapterKey: EVOLUTION_EPROC_SYSTEM,
+      adapterLabel: "eproc · login do portal",
+      authModes: [{ mode: "PASSWORD_OTP", label: AUTH_MODE_LABEL.PASSWORD_OTP }],
+      engineLabel: "eproc TJMG (implantação gradual) · não homologado",
+    });
+    return { targets, pilotEnabled };
   });
 }
 
@@ -53,9 +66,10 @@ export type ConnectionInfo = {
 export async function listConnectionsAction() {
   return runAction(async () => {
     const { ctx } = await requireTenant();
+    assertCan(ctx, "integrations:manage");
     const { db } = await import("@/lib/db/client");
     const accesses = await db.portalAccess.findMany({
-      where: { organizationId: ctx.organizationId, userId: ctx.userId },
+      where: { organizationId: ctx.organizationId, userId: ctx.userId, system: { in: ["pje", EVOLUTION_EPROC_SYSTEM] }, target: EVOLUTION_PJE_TARGET_KEY },
       select: { id: true, target: true, status: true, enabled: true, system: true },
     });
     const connections: ConnectionInfo[] = accesses.map((a) => {
@@ -64,7 +78,7 @@ export async function listConnectionsAction() {
         id: a.id,
         courtCode: (parts[0] ?? "").toUpperCase(),
         degree: parts[1] === "1g" ? "1" : "2",
-        adapterKey: a.system,
+        adapterKey: a.system === "pje" ? "pje-portal" : a.system,
         hasConnection: true,
         status: a.status,
         enabled: a.enabled,

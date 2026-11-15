@@ -12,6 +12,7 @@ import type {
   AdapterDescriptor,
   AdapterContext,
   AdapterOutcome,
+  AdapterFailureCode,
   CourtTarget,
 } from "@/lib/judicial/adapter";
 import type { EvidenceEnvironment } from "@/lib/judicial/contracts";
@@ -30,7 +31,11 @@ function pjeTargetToCourtTarget(t: PjeTarget): CourtTarget {
   };
 }
 
-const supportedTargets: readonly CourtTarget[] = PJE_TARGETS.map(pjeTargetToCourtTarget);
+// O fluxo privado da Evolution está limitado ao TJMG · 1º grau.
+// Os demais destinos conhecidos continuam fora do fluxo até homologação individual.
+const supportedTargets: readonly CourtTarget[] = PJE_TARGETS
+  .filter((target) => target.key === "tjmg-1g")
+  .map(pjeTargetToCourtTarget);
 
 const descriptor: AdapterDescriptor = {
   key: "pje-portal",
@@ -94,7 +99,7 @@ async function validateCredentials(
     };
   }
 
-  const codeMap: Record<string, AdapterOutcome<never>["code"]> = {
+  const codeMap: Record<string, AdapterFailureCode> = {
     BAD_CREDENTIALS: "BAD_CREDENTIALS",
     ACCOUNT_BLOCKED: "ACCOUNT_BLOCKED",
     OTP_NOT_CONFIGURED: "OTP_REQUIRED",

@@ -51,13 +51,14 @@ import { recordEvidence } from "@/server/judicial/evidence.service";
 import { audit } from "@/server/services/audit.service";
 import { runAdapterJob } from "@/server/robots/adapter-runner";
 import type { TribunalAdapter, AdapterOutcome } from "@/lib/judicial/adapter";
+import type { CourtDegree } from "@/lib/judicial/court-catalog";
 import type { EvidenceEnvironment } from "@/lib/judicial/contracts";
 
 function makeFakeAdapter(opts?: {
   key?: string;
   engineFamily?: string;
   validateResult?: AdapterOutcome<{ evidenceEnvironment: EvidenceEnvironment }>;
-  targets?: { courtCode: string; degree: string; label: string }[];
+  targets?: { courtCode: string; degree: CourtDegree; label: string }[];
 }): TribunalAdapter {
   return {
     descriptor: {

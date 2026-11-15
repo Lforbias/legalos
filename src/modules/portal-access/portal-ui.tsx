@@ -179,7 +179,7 @@ function PortalAccessRow({ r, surface }: { r: PortalRowView; surface: PortalAcce
     <div className="space-y-2 rounded-xl border border-border p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-medium">PJe — {r.targetLabel}</p>
+          <p className="font-medium">{surface === "evolution-eproc" ? "eproc TJMG" : "PJe"} — {r.targetLabel}</p>
           <p className="text-xs text-muted">{r.documentHint}{r.hasOtp ? " · 2º fator cadastrado" : ""}{r.lastLogin ? ` · último acesso ${r.lastLogin}` : ""}</p>
         </div>
         {statusBadge(r)}
@@ -204,7 +204,7 @@ function PortalAccessRow({ r, surface }: { r: PortalRowView; surface: PortalAcce
 export function PjeConnectCard({ targets, rows, surface = "legacy" }: { targets: { key: string; label: string }[]; rows: PortalRowView[]; surface?: PortalAccessSurface }) {
   return (
     <Card>
-      <CardHeader title={surface === "evolution" ? "Login piloto · TRF3 1º grau" : "Conectar o PJe"} description={surface === "evolution" ? "Teste controlado do login autorizado. A senha é cifrada no cofre e o resultado vem do portal real." : "Informe o seu login do PJe uma vez. O LegalOS entra por você, confere o acesso e mostra aqui o resultado."} />
+      <CardHeader title={surface === "evolution" ? "Login piloto · TJMG PJe legado" : surface === "evolution-eproc" ? "Login piloto · TJMG eproc" : "Conectar o PJe"} description={surface !== "legacy" ? "Teste controlado do login autorizado. A senha e a chave de dois fatores ficam cifradas no cofre; o resultado vem do portal real." : "Informe o seu login do PJe uma vez. O LegalOS entra por você, confere o acesso e mostra aqui o resultado."} />
       <CardBody className="space-y-4">
         <PortalAccessList rows={rows} surface={surface} />
         <PjeConnectForm targets={targets} hasAccess={rows.length > 0} surface={surface} />

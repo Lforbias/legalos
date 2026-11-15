@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmAction } from "@/components/ui/confirm-action";
-import { Plug, CheckCircle2, Clock, AlertTriangle, XCircle, Shield, Plus } from "lucide-react";
+import { Plug, CheckCircle2, Clock, AlertTriangle, XCircle, Plus } from "lucide-react";
 import { listAvailableTargetsAction, listConnectionsAction, type AvailableTarget, type ConnectionInfo } from "./connection-actions";
 import { testConnectionAction, toggleConnectionAction, deleteConnectionAction } from "./connect-adapter-actions";
 import { ConnectAdapterForm } from "./connect-form";
@@ -14,7 +14,7 @@ import { ConnectAdapterForm } from "./connect-form";
 function statusBadge(status: string | null, enabled: boolean) {
   if (!enabled) return <Badge tone="neutral">Desligado</Badge>;
   switch (status) {
-    case "CONNECTED": return <Badge tone="success">Conectado</Badge>;
+    case "CONNECTED": return <Badge tone="success">Login validado</Badge>;
     case "PENDING":
     case "CONNECTING": return <Badge tone="info">Conectando…</Badge>;
     case "NEEDS_ACTION": return <Badge tone="warning">Ação necessária</Badge>;
@@ -35,11 +35,12 @@ function statusIcon(status: string | null, enabled: boolean) {
 
 const BUSY = new Set(["PENDING", "CONNECTING"]);
 
-function ConnectionRow({ target, conn }: { target: AvailableTarget; conn: ConnectionInfo }) {
+function ConnectionRow({ target, conn, pilotEnabled }: { target: AvailableTarget; conn: ConnectionInfo; pilotEnabled: boolean }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string>();
   const working = conn.enabled && BUSY.has(conn.status ?? "");
+  const surface = target.adapterKey === "eproc-portal" ? "evolution-eproc" : "evolution";
 
   const act = (fn: () => Promise<{ ok: boolean; message?: string }>) => {
     setError(undefined);
@@ -64,28 +65,30 @@ function ConnectionRow({ target, conn }: { target: AvailableTarget; conn: Connec
       </div>
       {error ? <Alert tone="error">{error}</Alert> : null}
       <div className="flex flex-wrap items-start gap-2">
-        <Button
-          size="sm"
-          variant="secondary"
-          loading={pending}
-          disabled={!conn.enabled || working}
-          onClick={() => act(() => testConnectionAction(conn.id!))}
-        >
-          Testar de novo
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          disabled={pending}
-          onClick={() => act(() => toggleConnectionAction(conn.id!, !conn.enabled))}
-        >
-          {conn.enabled ? "Desligar" : "Ligar"}
-        </Button>
+        {pilotEnabled && <>
+          <Button
+            size="sm"
+            variant="secondary"
+            loading={pending}
+            disabled={!conn.enabled || working}
+            onClick={() => act(() => testConnectionAction(conn.id!, surface))}
+          >
+            Testar de novo
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={pending}
+            onClick={() => act(() => toggleConnectionAction(conn.id!, !conn.enabled, surface))}
+          >
+            {conn.enabled ? "Desligar" : "Ligar"}
+          </Button>
+        </>}
         <ConfirmAction
           label="Remover"
           confirmLabel="Sim, remover"
           description="Apaga as credenciais guardadas. Você pode cadastrar de novo quando quiser."
-          action={() => deleteConnectionAction(conn.id!)}
+          action={() => deleteConnectionAction(conn.id!, surface)}
           onDone={() => router.refresh()}
         />
       </div>
@@ -95,16 +98,19 @@ function ConnectionRow({ target, conn }: { target: AvailableTarget; conn: Connec
 
 export function ConnectionPanel() {
   const [targets, setTargets] = useState<AvailableTarget[]>([]);
+  const [pilotEnabled, setPilotEnabled] = useState(false);
   const [connections, setConnections] = useState<ConnectionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [showForm, setShowForm] = useState(false);
-  const router = useRouter();
 
   const reload = () => {
     Promise.all([listAvailableTargetsAction(), listConnectionsAction()])
       .then(([tRes, cRes]) => {
-        if (tRes.ok && tRes.data) setTargets(tRes.data.targets);
+        if (tRes.ok && tRes.data) {
+          setTargets(tRes.data.targets);
+          setPilotEnabled(tRes.data.pilotEnabled);
+        }
         if (cRes.ok && cRes.data) setConnections(cRes.data.connections);
       })
       .catch(() => setError("Não foi possível carregar os dados de conexão."))
@@ -140,35 +146,44 @@ export function ConnectionPanel() {
     );
   }
 
-  const getConnection = (courtCode: string, degree: string) =>
-    connections.find((c) => c.courtCode === courtCode && c.degree === degree);
+  const getConnection = (courtCode: string, degree: string, adapterKey: string) =>
+    connections.find((c) => c.courtCode === courtCode && c.degree === degree && c.adapterKey === adapterKey);
 
   const connected = targets.filter((t) => {
-    const conn = getConnection(t.courtCode, t.degree);
+    const conn = getConnection(t.courtCode, t.degree, t.adapterKey);
     return conn?.hasConnection;
   });
 
   const available = targets.filter((t) => {
-    const conn = getConnection(t.courtCode, t.degree);
-    return !conn?.hasConnection;
+    const conn = getConnection(t.courtCode, t.degree, t.adapterKey);
+    return pilotEnabled && !conn?.hasConnection;
   });
 
   return (
     <div className="space-y-6">
+      {!pilotEnabled && (
+        <Card>
+          <CardBody>
+            <p className="text-sm font-medium">Acesso privado desativado neste ambiente</p>
+            <p className="mt-1 text-sm text-muted">Os logins TJMG · PJe legado e eproc só recebem credenciais quando a configuração explícita da Evolution estiver habilitada. O acesso não está homologado e não libera consulta de processos.</p>
+          </CardBody>
+        </Card>
+      )}
       {connected.length > 0 && (
         <Card>
           <CardHeader
             title="Conexões do escritório"
-            description={`${connected.length} tribunal(is) com conexão cadastrada`}
+            description={`${connected.length} acesso(s) cadastrado(s)`}
           />
           <CardBody className="divide-y divide-border">
             {connected.map((t) => {
-              const conn = getConnection(t.courtCode, t.degree)!;
+              const conn = getConnection(t.courtCode, t.degree, t.adapterKey)!;
               return (
                 <ConnectionRow
                   key={`${t.courtCode}-${t.degree}`}
                   target={t}
                   conn={conn}
+                  pilotEnabled={pilotEnabled}
                 />
               );
             })}
@@ -180,7 +195,7 @@ export function ConnectionPanel() {
         <Card>
           <CardHeader
             title="Tribunais disponíveis"
-            description="Estes tribunais já têm adaptador. Cadastre as credenciais para conectar."
+            description="Destino TJMG · PJe legado disponível para teste de login. O acesso ainda não foi homologado e não ativa consulta de processos."
           />
           <CardBody className="space-y-4">
             {!showForm && (

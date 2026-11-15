@@ -72,7 +72,7 @@ export async function listBoxV3Connections(ctx: TenantContext, now = new Date())
 
   for (const access of accesses) {
     const latestLogin = access.jobs[0]?.summary as { origin?: string } | undefined;
-    if (latestLogin?.origin === "EVOLUTION_PJE_LOGIN") continue;
+    if (latestLogin?.origin === "EVOLUTION_PJE_LOGIN" || latestLogin?.origin === "EVOLUTION_TJMG_PJE_LOGIN" || latestLogin?.origin === "EVOLUTION_TJMG_EPROC_LOGIN") continue;
     const key = "pje-portal";
     const scoped = evidence.filter((item) => item.connectorKey === key && (item.sourceId === access.id || item.sourceId == null) && (item.courtCode === access.target || item.courtCode === "*"));
     cards.push({ id: access.id, kind: "PORTAL", connectorKey: key, title: access.label, subtitle: `Acesso de portal · ${access.target}`, courtCode: access.target, enabled: access.enabled, state: "OFF", stateLabel: access.enabled ? "Ligado no cadastro antigo" : "Desligado no cadastro antigo", headline: "Histórico preservado; sem validação do Box 3.0.", nextAction: null, coverage: null, coverageLabel: null, lastSuccessAt: access.lastLoginAt, lastCaptureAt: null, lastEvidenceAt: latestEvidenceAt(scoped), capabilities: capabilityViews(key, scoped), limitations: plainLimitations(getConnector(key)?.limitations ?? []), professional: null, technical: null });

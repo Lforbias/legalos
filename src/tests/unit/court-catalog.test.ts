@@ -10,7 +10,6 @@ import {
   BRANCH_LABEL,
   DEGREE_LABEL,
   ENGINE_LABEL,
-  type CourtBranch,
 } from "@/lib/judicial/court-catalog";
 
 describe("court catalog", () => {
@@ -62,7 +61,7 @@ describe("court catalog", () => {
     expect(trf3).not.toBeNull();
     expect(trf3!.name).toContain("3ª Região");
     expect(trf3!.branch).toBe("FEDERAL");
-    expect(trf3!.integrationStatus).toBe("PILOT");
+    expect(trf3!.integrationStatus).toBe("ADAPTER_WIP");
   });
 
   it("getCourtByCode returns null for unknown codes", () => {
@@ -102,10 +101,11 @@ describe("court catalog", () => {
     expect(operational.length).toBe(0);
   });
 
-  it("TRF3 is the only PILOT court (current state)", () => {
-    const pilots = JURISDICTIONAL_COURTS.filter((c) => c.integrationStatus === "PILOT");
-    expect(pilots.length).toBe(1);
-    expect(pilots[0].code).toBe("TRF3");
+  it("does not mark TRF3 validated before an authorized real login", () => {
+    const trf3 = getCourtByCode("TRF3");
+    expect(trf3?.integrationStatus).toBe("ADAPTER_WIP");
+    expect(trf3?.verifiedAt).toBeNull();
+    expect(trf3?.verifiedSource).toMatch(/não homologado/i);
   });
 
   it("BRANCH_LABEL covers all branches used in the catalog", () => {

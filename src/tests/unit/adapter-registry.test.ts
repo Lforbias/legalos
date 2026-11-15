@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it } from "vitest";
 
 /**
  * Testa o registry de adaptadores em isolamento.
@@ -8,7 +8,7 @@ describe("adapter-registry", () => {
   // Use dynamic imports to get fresh modules
   it("registers and retrieves an adapter", async () => {
     // Test via the bootstrap which registers pje-portal
-    const { ensureAdapters, getAdapter, listAdapters, findAdapterForCourt } = await import("@/lib/judicial/adapter-bootstrap");
+    const { ensureAdapters, getAdapter } = await import("@/lib/judicial/adapter-bootstrap");
     ensureAdapters();
 
     const pje = getAdapter("pje-portal");
@@ -26,13 +26,21 @@ describe("adapter-registry", () => {
     expect(all.some((a) => a.descriptor.key === "pje-portal")).toBe(true);
   });
 
-  it("findAdapterForCourt finds PJe adapter for TRF3", async () => {
+  it("findAdapterForCourt finds PJe adapter for TJMG", async () => {
     const { ensureAdapters, findAdapterForCourt } = await import("@/lib/judicial/adapter-bootstrap");
     ensureAdapters();
 
-    const adapter = findAdapterForCourt("TRF3", "1");
+    const adapter = findAdapterForCourt("TJMG", "1");
     expect(adapter).not.toBeNull();
     expect(adapter!.descriptor.key).toBe("pje-portal");
+  });
+
+  it("does not expose other PJe courts in the Evolution adapter target list", async () => {
+    const { ensureAdapters, getAdapter } = await import("@/lib/judicial/adapter-bootstrap");
+    ensureAdapters();
+
+    const pje = getAdapter("pje-portal")!;
+    expect(pje.descriptor.supportedTargets.map((target) => target.courtCode)).toEqual(["TJMG"]);
   });
 
   it("findAdapterForCourt returns null for unsupported court", async () => {

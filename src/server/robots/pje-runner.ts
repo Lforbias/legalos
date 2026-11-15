@@ -1,9 +1,16 @@
 import type { Page } from "playwright-core";
 import { BOX_AVAILABLE } from "@/lib/box-retirement";
-import { evolutionJudicialLoginEnabled } from "@/lib/evolution-judicial-login";
+import {
+  evolutionJudicialLoginEnabled,
+  EVOLUTION_PJE_JOB_ORIGIN,
+  EVOLUTION_PJE_TARGET_KEY,
+  EVOLUTION_EPROC_JOB_ORIGIN,
+  EVOLUTION_EPROC_SYSTEM,
+} from "@/lib/evolution-judicial-login";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { loginPje, type LoginOutcome } from "@/lib/robots/pje/login";
+import { loginEprocTjmg } from "@/lib/robots/eproc/login";
 import { MAX_ATTEMPTS, backoffMs, mapOutcome } from "@/lib/robots/pje/outcome";
 import { failureCodeForLogin } from "@/lib/judicial/robot-evidence";
 import { recordEvidence } from "@/server/judicial/evidence.service";
@@ -50,7 +57,7 @@ export async function claimNextJob(now: Date = new Date()): Promise<Claimed | nu
   if (!BOX_AVAILABLE && !loginOnly) return null;
   const rows = await db.$queryRaw<Claimed[]>`
     UPDATE robot_jobs SET status = 'RUNNING', started_at = ${now}, attempts = attempts + 1
-    WHERE id = (SELECT id FROM robot_jobs WHERE status = 'QUEUED' AND run_after <= ${now} AND (${loginOnly} = false OR (kind = 'LOGIN_TEST' AND summary ->> 'origin' = 'EVOLUTION_PJE_LOGIN' AND access_id IN (SELECT id FROM portal_accesses WHERE system = 'pje' AND target = 'trf3-1g'))) ORDER BY run_after, created_at FOR UPDATE SKIP LOCKED LIMIT 1)
+    WHERE id = (SELECT id FROM robot_jobs WHERE status = 'QUEUED' AND run_after <= ${now} AND (${loginOnly} = false OR (kind = 'LOGIN_TEST' AND ((summary ->> 'origin' = ${EVOLUTION_PJE_JOB_ORIGIN} AND access_id IN (SELECT id FROM portal_accesses WHERE system = 'pje' AND target = ${EVOLUTION_PJE_TARGET_KEY})) OR (summary ->> 'origin' = ${EVOLUTION_EPROC_JOB_ORIGIN} AND access_id IN (SELECT id FROM portal_accesses WHERE system = ${EVOLUTION_EPROC_SYSTEM} AND target = ${EVOLUTION_PJE_TARGET_KEY}))))) ORDER BY run_after, created_at FOR UPDATE SKIP LOCKED LIMIT 1)
     RETURNING id`;
   return rows[0] ?? null;
 }
@@ -69,8 +76,11 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     include: { access: { include: { user: { select: { id: true, name: true } } } } },
   });
   if (!job || job.status !== "RUNNING") return { status: "SKIPPED" };
-  const isEvolutionPilot = (job.summary as { origin?: string } | null)?.origin === "EVOLUTION_PJE_LOGIN";
-  if (!BOX_AVAILABLE && (job.kind !== "LOGIN_TEST" || !isEvolutionPilot || job.access.system !== "pje" || job.access.target !== "trf3-1g")) {
+  const origin = (job.summary as { origin?: string } | null)?.origin;
+  const isEvolutionPje = origin === EVOLUTION_PJE_JOB_ORIGIN && job.access.system === "pje" && job.access.target === EVOLUTION_PJE_TARGET_KEY;
+  const isEvolutionEproc = origin === EVOLUTION_EPROC_JOB_ORIGIN && job.access.system === EVOLUTION_EPROC_SYSTEM && job.access.target === EVOLUTION_PJE_TARGET_KEY;
+  const isEvolutionPilot = isEvolutionPje || isEvolutionEproc;
+  if ((job.access.system === EVOLUTION_EPROC_SYSTEM && (!isEvolutionEproc || job.kind !== "LOGIN_TEST")) || (!BOX_AVAILABLE && (job.kind !== "LOGIN_TEST" || !isEvolutionPilot))) {
     await db.robotJob.update({ where: { id: job.id }, data: { status: "FAILED", message: "Este trabalho não pertence ao piloto de login autorizado da Evolution.", finishedAt: now() } });
     return { status: "SKIPPED" };
   }
@@ -82,10 +92,10 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     await finishJob("FAILED", "Este acesso está desligado.");
     return { status: "FAILED" };
   }
-  const target = getPjeTarget(access.target);
+  const target = isEvolutionEproc ? null : getPjeTarget(access.target);
   const key = certKey();
-  if (!target || !key) {
-    const msg = !target ? "Tribunal não está mais na lista de destinos do sistema." : "O cofre não está configurado neste sistema.";
+  if ((!isEvolutionEproc && !target) || !key) {
+    const msg = !isEvolutionEproc && !target ? "Tribunal não está mais na lista de destinos do sistema." : "O cofre não está configurado neste sistema.";
     await finishJob("FAILED", msg);
     await db.portalAccess.update({ where: { id: access.id }, data: { status: "ERROR", statusMessage: msg, statusAt: now() } });
     return { status: "FAILED" };
@@ -109,8 +119,11 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     rp = await deps.openPage();
     const steps = usedOtpSteps.get(access.id) ?? new Set<number>();
     usedOtpSteps.set(access.id, steps);
-    outcome = await (deps.login ?? loginPje)(rp.page, target, { document: secret.document, password: secret.password, otpSecret: secret.otpSecret }, { names, usedOtpSteps: steps });
-    if (outcome.ok && job.kind === "SYNC_NOTICES") panel = await (deps.probe ?? probePjePanel)(rp.page, target, names);
+    const credentials = { document: secret.document, password: secret.password, otpSecret: secret.otpSecret };
+    outcome = isEvolutionEproc
+      ? await loginEprocTjmg(rp.page, credentials, { names, usedOtpSteps: steps })
+      : await (deps.login ?? loginPje)(rp.page, target!, credentials, { names, usedOtpSteps: steps });
+    if (outcome.ok && job.kind === "SYNC_NOTICES" && target) panel = await (deps.probe ?? probePjePanel)(rp.page, target, names);
   } catch (e) {
     logger.error("robot.job_crashed", { jobId, error: sanitizeError(e) });
     outcome = { ok: false, code: "NETWORK", message: "O navegador do robô falhou durante o teste.", retryable: true, signature: null, detail: String(sanitizeError(e)).slice(0, 240) };
@@ -118,13 +131,14 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     await rp?.close().catch(() => undefined);
   }
 
-  const m = mapOutcome(outcome, job.attempts);
+  const portalLabel = isEvolutionEproc ? "eproc" : "PJe";
+  const m = mapOutcome(outcome, job.attempts, portalLabel);
   // Evidência real do acesso (login): é isto — e não o cadastro do acesso — que sustenta o estado "conectado" na Central de Conexões.
   try {
     await recordEvidence({
       organizationId: access.organizationId,
       source: { kind: "PORTAL", id: access.id },
-      connectorKey: "pje-portal",
+      connectorKey: isEvolutionEproc ? "eproc-portal" : "pje-portal",
       courtCode: access.target,
       operation: "validateCredentials",
       accessMethod: "PORTAL_ROBOT",
@@ -137,7 +151,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   } catch (e) {
     logger.error("robot.evidence_failed", { jobId, error: sanitizeError(e) });
   }
-  const summary = { ...(isEvolutionPilot ? { origin: "EVOLUTION_PJE_LOGIN" } : {}), code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
+  const summary = { ...(isEvolutionPilot ? { origin: isEvolutionEproc ? EVOLUTION_EPROC_JOB_ORIGIN : EVOLUTION_PJE_JOB_ORIGIN } : {}), code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
   if (m.retry) {
     await db.robotJob.update({ where: { id: job.id }, data: { status: "QUEUED", runAfter: new Date(now().getTime() + backoffMs(job.attempts)), message: m.message.slice(0, 400), summary: summary as never } });
   } else {
