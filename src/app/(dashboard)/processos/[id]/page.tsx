@@ -178,6 +178,7 @@ export default async function CaseDetailPage({
             ) : null}
             {canSyncLegalMail ? <LegalMailHistoryButton caseId={c.id} /> : null}
             {showDatajud ? <DatajudSyncButton caseId={c.id} /> : null}
+            {c.datajudSyncedAt && (c.datajudClass || c.datajudCourtUnit) ? <p className="mt-2 text-xs text-muted">DataJud · {[c.datajudClass ? `Classe ${c.datajudClass}` : null, c.datajudCourtUnit].filter(Boolean).join(" · ")}</p> : null}
             {mni ? <MniConsultButton caseId={c.id} label={mni.label} /> : null}
             {mni && can(ctx, "documents:write") ? <MniAutosButton caseId={c.id} label={mni.label} /> : null}
             {canWrite ? (

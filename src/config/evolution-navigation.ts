@@ -75,7 +75,7 @@ export const EVOLUTION_NAV: EvolutionNavItem[] = [
   { key: "evo-juridico-ia", department: "juridico", label: "Inteligência artificial", href: "/ia", icon: Bot, permission: "ai:use" },
 
   { key: "evo-juridico-alertas", department: "juridico", label: "Central de alertas", href: "/alertas", icon: ShieldCheck },
-  { key: "evo-juridico-publicacoes", department: "juridico", label: "Publicações e movimentações", href: "/evolution/juridico/publicacoes", icon: Newspaper, permission: "cases:read" },
+  { key: "evo-juridico-publicacoes", department: "juridico", label: "Central Judicial", href: "/evolution/juridico/publicacoes", icon: Newspaper, permission: "cases:read" },
 
   // Atendimento
   { key: "evo-atendimento", department: "atendimento", label: "Atendimento", href: "/evolution/atendimento", icon: HeadphonesIcon },

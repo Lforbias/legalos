@@ -528,6 +528,8 @@ model Case {
   petitions             PetitionFiling[]
   sharedWithPortal      Boolean                @default(false) @map("shared_with_portal")
   datajudSyncedAt       DateTime?              @map("datajud_synced_at") @db.Timestamptz(3)
+  datajudClass          String?                @map("datajud_class")
+  datajudCourtUnit      String?                @map("datajud_court_unit")
   /// 3.0-F1: acervo (processo guardado fora da carteira ativa, sem exclusão).
   archivedAt            DateTime?              @map("archived_at") @db.Timestamptz(3)
   /// 3.0-F1: valores dos campos personalizados, chaveados por CustomFieldDef.key.

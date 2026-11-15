@@ -206,7 +206,7 @@ export async function createNotice(ctx: TenantContext, raw: NoticeInput, opts: {
   if (opts.integrationImport) {
     if (!(await canImportLegalMail(ctx))) throw new ForbiddenError();
   } else if (opts.capture?.originKind === "DJEN_PUBLICATION" && opts.capture.sourceSystem === "djen") {
-    // Captura pública do DJEN entra na Central Judicial e não usa a caixa antiga do BOX.
+    // Publicação do DJEN não usa a caixa antiga do BOX; basta permissão para atuar em processos.
     assertCan(ctx, "cases:write");
   } else {
     assertCan(ctx, "inbox:write");
