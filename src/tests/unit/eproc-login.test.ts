@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { chromium, type BrowserContext, type Page, type Route } from "playwright-core";
-import { loginEprocTjmg } from "@/lib/robots/eproc/login";
+import { loginEprocPortal, loginEprocTjmg } from "@/lib/robots/eproc/login";
+import { getEprocPortalTarget } from "@/lib/robots/eproc/targets";
 import { base32Encode, totpCode, totpStep, verifyTotp } from "@/lib/security/totp";
 
 const ORIGIN = "https://eproc1g.tjmg.jus.br";
@@ -57,6 +58,15 @@ describe.skipIf(!browser)("login eproc TJMG", () => {
   it("entra por certificado e exige o TOTP sem enviar usuário ou senha", async () => {
     await fixture(async (page, posts) => {
       const result = await loginEprocTjmg(page, { document: "", password: "", otpSecret: SECRET, certificateAuth: true }, { now: () => T0, sleep: async () => undefined, stepTimeoutMs: 8_000 });
+      expect(result).toMatchObject({ ok: true });
+      expect(posts).toEqual(["otp"]);
+    }, false, true);
+  });
+
+  it("reutiliza o fluxo certificado + TOTP para outro destino eproc fixo", async () => {
+    await fixture(async (page, posts) => {
+      const tjsp = getEprocPortalTarget("tjsp-1g")!;
+      const result = await loginEprocPortal(page, { ...tjsp, loginUrl: `${ORIGIN}/eproc/` }, { document: "", password: "", otpSecret: SECRET, certificateAuth: true }, { now: () => T0, sleep: async () => undefined, stepTimeoutMs: 8_000 });
       expect(result).toMatchObject({ ok: true });
       expect(posts).toEqual(["otp"]);
     }, false, true);

@@ -25,7 +25,7 @@ export type LoginOptions = {
   stepTimeoutMs?: number;
 };
 
-type PageState = { kind: "LOGIN_FORM" | "OTP" | "OTP_SETUP" | "CAPTCHA" | "APP" | "UNKNOWN"; host: string; errorText: string };
+type PageState = { kind: "PJE_HOME" | "LOGIN_FORM" | "OTP" | "OTP_SETUP" | "CAPTCHA" | "APP" | "UNKNOWN"; host: string; errorText: string };
 
 /** Roda DENTRO da página: classifica a tela atual. Sem referências externas (é serializada). */
 export const detectState = ({ ssoHost, appHost }: { ssoHost: string; appHost: string }): PageState => {
@@ -47,6 +47,7 @@ export const detectState = ({ ssoHost, appHost }: { ssoHost: string; appHost: st
   if (any("#kc-totp-secret-key, #kc-totp-secret-qr-code, input[name='totp'], input#totp")) return { kind: "OTP_SETUP", host, errorText };
   if (any("input[name='otp'], input#otp")) return { kind: "OTP", host, errorText };
   if (any("#username") && any("#password")) return { kind: "LOGIN_FORM", host, errorText };
+  if (host === appHost && any("#btnSsoPdpj, button[aria-label*='PDPJ'], button[title*='PDPJ']")) return { kind: "PJE_HOME", host, errorText };
   if (host === appHost) return { kind: "APP", host, errorText };
   if (host !== ssoHost) return { kind: "UNKNOWN", host, errorText };
   return { kind: "UNKNOWN", host, errorText };
@@ -113,8 +114,14 @@ export async function loginPje(page: Page, target: PjeTarget, creds: PjeCredenti
   let s = await waitFor(page, target, (x) => x.kind !== "UNKNOWN" || Boolean(x.errorText), 30_000, sleep);
   if (!s) return fail("TIMEOUT", "A tela de login do PJe não carregou a tempo.", true);
   if (s.kind === "CAPTCHA") return fail("NEEDS_PERSON", "O PJe pediu uma verificação de segurança (captcha). O LegalOS não resolve captcha: entre uma vez pelo navegador e tente de novo mais tarde.", false);
+  if (s.kind === "PJE_HOME") {
+    await page.locator("#btnSsoPdpj").click();
+    s = await waitFor(page, target, (x) => x.kind !== "UNKNOWN" || Boolean(x.errorText), timeout, sleep);
+    if (!s) return fail("TIMEOUT", "O PJe demorou para abrir a autenticação da PDPJ.", true);
+  }
   if (creds.certificateAuth && s.kind === "LOGIN_FORM") {
-    const certificateButton = page.getByText(/certificado\s+digital/i).first();
+    let certificateButton = page.getByRole("button", { name: /certificado\s+digital/i }).first();
+    if (!(await certificateButton.count())) certificateButton = page.locator("input[type='button'][value*='Certificado' i], button:has-text('Certificado Digital'), a:has-text('Certificado Digital')").first();
     if (!(await certificateButton.count())) return fail("CERTIFICATE_REQUIRED", "O PJe abriu a tela de senha sem oferecer entrada por certificado. O certificado foi apresentado pelo navegador, mas o portal não iniciou a autenticação.", false);
     await certificateButton.click();
     s = await waitFor(page, target, (x) => x.kind !== "LOGIN_FORM" || Boolean(x.errorText), timeout, sleep);

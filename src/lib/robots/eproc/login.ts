@@ -2,9 +2,9 @@ import type { Page } from "playwright-core";
 import { totpCode, totpStep, TOTP_PERIOD } from "@/lib/security/totp";
 import { sanitizeSignature, type PageSignature } from "../pje/signature";
 import type { LoginOutcome, PjeCredentials } from "../pje/login";
+import type { EprocPortalTarget } from "./targets";
 
 export const TJMG_EPROC_LOGIN_URL = "https://eproc1g.tjmg.jus.br/eproc/";
-const TJMG_EPROC_ORIGIN = new URL(TJMG_EPROC_LOGIN_URL).origin;
 const BLOCKED = /bloquead|excedeu|muitas tentativas|temporariamente|suspens/i;
 
 type EprocState = {
@@ -13,10 +13,13 @@ type EprocState = {
   errorText: string;
   otpSelector?: string;
   otpButton?: string;
+  userSelector?: string;
+  passwordSelector?: string;
+  submitSelector?: string;
 };
 
 /** Classifica apenas a tela e seletores do desafio; não coleta valores dos campos. */
-export const detectEprocState = (): EprocState => {
+export const detectEprocState = ({ targetHost, ssoHost }: { targetHost: string; ssoHost?: string }): EprocState => {
   const OTP = /token|c[oó]digo|codigo|otp|totp|2fa|autentica[cç][aã]o/i;
   const visible = (el: Element) => {
     const h = el as HTMLElement;
@@ -28,13 +31,14 @@ export const detectEprocState = (): EprocState => {
   const errorText = Array.from(document.querySelectorAll(".alert-danger, .alert-error, .invalid-feedback, [role='alert'], .text-danger"))
     .filter(visible).map(text).filter(Boolean).join(" | ").slice(0, 300);
   const host = location.host;
-  if (host !== new URL("https://eproc1g.tjmg.jus.br").host) return { kind: "UNKNOWN", host, errorText };
+  if (host !== targetHost && (!ssoHost || host !== ssoHost)) return { kind: "UNKNOWN", host, errorText };
   if (one("iframe[src*='recaptcha'], iframe[src*='hcaptcha'], .g-recaptcha, .h-captcha, [data-sitekey]")) return { kind: "CAPTCHA", host, errorText };
   const user = one("#txtUsuario[name='txtUsuario']");
   // TJMG eproc displays a name-less text field and keeps a hidden password input
   // with the submitted name; its official Submit('login') handler copies between them.
   const password = one("#pwdSenha");
-  if (user && password) return { kind: "LOGIN", host, errorText };
+  if (user && password) return { kind: "LOGIN", host, errorText, userSelector: "#txtUsuario", passwordSelector: "#pwdSenha", submitSelector: "#sbmEntrar" };
+  if (one("#username") && one("#password")) return { kind: "LOGIN", host, errorText, userSelector: "#username", passwordSelector: "#password", submitSelector: "#kc-login" };
 
   const otpInput = Array.from(document.querySelectorAll("input:not([type='hidden']):not([type='password'])"))
     .find((el) => {
@@ -63,7 +67,7 @@ export const detectEprocState = (): EprocState => {
 
 const sleepDefault = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
-export async function loginEprocTjmg(page: Page, creds: PjeCredentials, opts: {
+export async function loginEprocPortal(page: Page, target: EprocPortalTarget, creds: PjeCredentials, opts: {
   names?: string[];
   usedOtpSteps?: Set<number>;
   now?: () => number;
@@ -91,7 +95,12 @@ export async function loginEprocTjmg(page: Page, creds: PjeCredentials, opts: {
   };
   const fail = async (code: Extract<LoginOutcome, { ok: false }>['code'], message: string, retryable: boolean): Promise<LoginOutcome> => ({ ok: false, code, message, retryable, signature: await signature() });
   const readState = async () => {
-    try { return await page.evaluate(detectEprocState); } catch { return null; }
+    try {
+      return await page.evaluate(detectEprocState, {
+        targetHost: new URL(target.loginUrl).host,
+        ...(target.ssoOrigin ? { ssoHost: new URL(target.ssoOrigin).host } : {}),
+      });
+    } catch { return null; }
   };
   const waitUntil = async (done: (state: EprocState) => boolean) => {
     const end = Date.now() + timeout;
@@ -104,18 +113,19 @@ export async function loginEprocTjmg(page: Page, creds: PjeCredentials, opts: {
   };
 
   try {
-    await page.goto(TJMG_EPROC_LOGIN_URL, { waitUntil: "domcontentloaded", timeout: 45_000 });
+    await page.goto(target.loginUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
   } catch {
-    return fail("NETWORK", "Não foi possível abrir o eproc do TJMG agora.", true);
+    return fail("NETWORK", `Não foi possível abrir o eproc do ${target.courtCode} agora.`, true);
   }
   let s = await waitUntil((state) => state.kind !== "UNKNOWN" || Boolean(state.errorText));
-  if (!s) return fail("TIMEOUT", "A tela de acesso do eproc do TJMG não carregou a tempo.", true);
+  if (!s) return fail("TIMEOUT", `A tela de acesso do eproc do ${target.courtCode} não carregou a tempo.`, true);
   if (s.kind === "CAPTCHA") return fail("NEEDS_PERSON", "O eproc pediu uma verificação de segurança. O LegalOS parou para você concluir no portal oficial.", false);
   if (creds.certificateAuth && s.kind === "LOGIN") {
     // O eproc TJMG implementa esta ação como <input type="button" value="Certificado Digital">.
     // getByText não encontra o value do input, e a página ainda contém links de ajuda com o mesmo texto.
-    const certificateButton = page.getByRole("button", { name: /certificado\s+digital/i }).first();
-    if (!(await certificateButton.count())) return fail("NEEDS_PERSON", "O eproc abriu a tela de usuário e senha sem oferecer entrada por certificado.", false);
+    let certificateButton = page.getByRole("button", { name: /certificado\s+digital/i }).first();
+    if (!(await certificateButton.count())) certificateButton = page.locator("input[type='button'][value*='Certificado' i], button:has-text('Certificado Digital'), a:has-text('Certificado Digital')").first();
+    if (!(await certificateButton.count())) return fail("CERTIFICATE_REQUIRED", "O eproc não ofereceu autenticação por certificado no fluxo do navegador remoto.", false);
     await certificateButton.click();
     s = await waitUntil((state) => state.kind !== "LOGIN" || Boolean(state.errorText));
     if (!s) return fail("TIMEOUT", "O eproc demorou para iniciar o login por certificado.", true);
@@ -124,12 +134,12 @@ export async function loginEprocTjmg(page: Page, creds: PjeCredentials, opts: {
   if (s.kind !== "LOGIN" && !(creds.certificateAuth && (s.kind === "OTP" || s.kind === "OTP_SETUP"))) return fail("UNKNOWN_PAGE", "A tela de acesso do eproc mudou; o LegalOS parou sem enviar os dados.", false);
 
   if (!creds.certificateAuth) {
-    await page.fill("#txtUsuario", creds.document);
-    await page.fill("#pwdSenha", creds.password);
-    await page.click("#sbmEntrar");
+    await page.fill(s.userSelector!, creds.document);
+    await page.fill(s.passwordSelector!, creds.password);
+    await page.click(s.submitSelector!);
   }
   s = await waitUntil((state) => state.kind !== "LOGIN" || Boolean(state.errorText));
-  if (!s) return fail("TIMEOUT", "O eproc demorou demais para responder ao login.", true);
+  if (!s) return fail("TIMEOUT", `O eproc do ${target.courtCode} demorou demais para responder ao login.`, true);
   if (s.kind === "LOGIN") {
     if (BLOCKED.test(s.errorText)) return fail("ACCOUNT_BLOCKED", "O eproc informou bloqueio ou excesso de tentativas. O LegalOS parou para não agravar.", false);
     return fail("BAD_CREDENTIALS", "O eproc recusou o usuário ou a senha. Confira os dados no portal oficial; o LegalOS não repetirá senha errada automaticamente.", false);
@@ -154,7 +164,19 @@ export async function loginEprocTjmg(page: Page, creds: PjeCredentials, opts: {
     if (s.kind === "OTP") return fail("OTP_REJECTED", "O eproc recusou o código de dois fatores. Confira a chave cadastrada e o relógio do servidor.", false);
     if (s.kind === "CAPTCHA") return fail("NEEDS_PERSON", "O eproc pediu uma verificação de segurança. O LegalOS parou para você concluir no portal oficial.", false);
   }
-  if (s.kind !== "APP" || new URL(page.url()).origin !== TJMG_EPROC_ORIGIN) return fail("UNKNOWN_PAGE", "O eproc mostrou uma etapa inesperada depois do login; o LegalOS não considera o acesso validado.", false);
+  if (s.kind !== "APP" || new URL(page.url()).host !== new URL(target.loginUrl).host) return fail("UNKNOWN_PAGE", "O eproc mostrou uma etapa inesperada depois do login; o LegalOS não considera o acesso validado.", false);
   const final = await signature();
   return { ok: true, signature: final ?? { host: s.host, path: "", title: "", headings: [], fields: [], buttons: [] } };
+}
+
+export async function loginEprocTjmg(page: Page, creds: PjeCredentials, opts: Parameters<typeof loginEprocPortal>[3] = {}): Promise<LoginOutcome> {
+  const target: EprocPortalTarget = {
+    key: "tjmg-1g",
+    courtCode: "TJMG",
+    degree: "1",
+    label: "TJMG · 1º grau (eproc)",
+    loginUrl: TJMG_EPROC_LOGIN_URL,
+    source: "https://www.tjmg.jus.br",
+  };
+  return loginEprocPortal(page, target, creds, opts);
 }

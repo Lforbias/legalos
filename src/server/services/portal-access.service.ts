@@ -4,14 +4,14 @@ import {
   EVOLUTION_EPROC_JOB_ORIGIN,
   EVOLUTION_EPROC_SYSTEM,
   EVOLUTION_PJE_JOB_ORIGIN,
-  EVOLUTION_PJE_TARGET_KEY,
-  EVOLUTION_TJMG_TARGET_KEY,
 } from "@/lib/evolution-judicial-login";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { parseCourtOtpSecret } from "@/lib/pje/otp";
 import { PJE_TARGETS, getPjeTarget } from "@/lib/robots/pje/targets";
+import { REGIONAL_CONNECTOR_COURTS } from "@/lib/judicial/court-catalog";
+import { EPROC_PORTAL_TARGETS, getEprocPortalTarget } from "@/lib/robots/eproc/targets";
 import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
 import { assertCertificateUsable } from "@/server/services/certificate.service";
 import { isValidCnpj, isValidCpf, onlyDigits } from "@/lib/validation/br-documents";
@@ -19,7 +19,7 @@ import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 
 /**
- * Acesso do usuário a um portal de tribunal para o robô (piloto TJMG com certificado A1 + chave TOTP).
+ * Acesso do usuário aos portais regionais para o robô (certificado A1 + chave TOTP obrigatória).
  * Uma linha por usuário e tribunal/grau. O segredo (senha e chave do 2º fator) é cifrado com a mesma chave do cofre,
  * nunca volta para tela ou API e só é aberto pelo worker na hora de usar. O dono vê e remove só os próprios acessos.
  */
@@ -79,8 +79,13 @@ export type PortalAccessRow = {
 };
 
 export function pjeTargetOptions(surface: PortalAccessSurface = "legacy") {
-  const targets = surface === "evolution" || surface === "evolution-eproc" ? PJE_TARGETS.filter((t) => t.key === EVOLUTION_PJE_TARGET_KEY) : PJE_TARGETS;
+  const targets = surface === "evolution" ? PJE_TARGETS.filter(isRegionalPjeTarget) : surface === "evolution-eproc" ? [] : PJE_TARGETS;
   return targets.map((t) => ({ key: t.key, label: t.label }));
+}
+
+export function isRegionalPjeTarget(target: (typeof PJE_TARGETS)[number]): boolean {
+  const courtCode = target.key.split("-")[0]?.toUpperCase();
+  return REGIONAL_CONNECTOR_COURTS.some((court) => court.code === courtCode);
 }
 
 export async function listMyPortalAccesses(ctx: TenantContext, surface: PortalAccessSurface = "legacy"): Promise<PortalAccessRow[]> {
@@ -90,8 +95,8 @@ export async function listMyPortalAccesses(ctx: TenantContext, surface: PortalAc
     where: {
       organizationId: ctx.organizationId,
       userId: ctx.userId,
-      ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}),
-      ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}),
+      ...(surface === "evolution" ? { system: "pje", target: { in: PJE_TARGETS.filter(isRegionalPjeTarget).map((t) => t.key) } } : {}),
+      ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: { in: EPROC_PORTAL_TARGETS.map((t) => t.key) } } : {}),
     },
     orderBy: [{ system: "asc" }, { target: "asc" }],
     include: { jobs: { orderBy: { createdAt: "desc" }, take: 1 } },
@@ -109,7 +114,7 @@ export async function listMyPortalAccesses(ctx: TenantContext, surface: PortalAc
       id: r.id,
       system: r.system,
       target: r.target,
-      targetLabel: surface === "evolution-eproc" ? "TJMG · 1º grau (eproc)" : getPjeTarget(r.target)?.label ?? r.target,
+      targetLabel: surface === "evolution-eproc" ? getEprocPortalTarget(r.target)?.label ?? r.target : getPjeTarget(r.target)?.label ?? r.target,
       authMethod: r.authMethod,
       enabled: r.enabled,
       status: r.status,
@@ -153,8 +158,8 @@ export async function connectPje(ctx: TenantContext, raw: unknown, surface: Port
   await requireOwnMfa(ctx.userId);
   if (input.certificateId) await assertCertificateUsable(ctx, input.certificateId, certificatePilot ? "portal" : "legacy");
   const targets = [...new Set(input.targets)];
-  if (surface === "evolution" && (targets.length !== 1 || targets[0] !== EVOLUTION_PJE_TARGET_KEY)) {
-    throw new ValidationError("O piloto está limitado ao TJMG · 1º grau.", { targets: ["Escolha apenas TJMG · 1º grau."] });
+  if (surface === "evolution" && (targets.length !== 1 || !PJE_TARGETS.some((t) => t.key === targets[0] && isRegionalPjeTarget(t)))) {
+    throw new ValidationError("Escolha um destino PJe do Sul ou Sudeste.", { targets: ["Este conector só atende Justiça Estadual, Federal e do Trabalho no Sul e Sudeste."] });
   }
   const unknown = targets.filter((t) => !getPjeTarget(t));
   if (unknown.length) throw new ValidationError("Tribunal inválido.", { targets: ["Escolha tribunais da lista."] });
@@ -180,44 +185,53 @@ export async function connectPje(ctx: TenantContext, raw: unknown, surface: Port
   return { ids, jobId };
 }
 
-const connectEprocTjmgSchema = z.object({
+const connectEprocSchema = z.object({
+  targetKey: z.string().min(3).max(40),
   username: z.string().trim().max(30).optional(),
   password: z.string().max(40).optional(),
   certificateId: z.uuid(),
   otp: z.string().trim().max(2048).optional(),
 }).strict();
 
-/** Guarda e testa login do eproc TJMG 1º grau com certificado e segundo fator; não ativa consulta de processos. */
-export async function connectEprocTjmg(ctx: TenantContext, raw: unknown) {
+/** Guarda e testa login eproc por certificado nos portais fixos do recorte regional. */
+export async function connectEprocPortal(ctx: TenantContext, raw: unknown) {
   const surface: PortalAccessSurface = "evolution-eproc";
   assertPortalSurface(surface);
   assertPortalPermission(ctx, surface);
-  const input = connectEprocTjmgSchema.parse(raw);
+  const input = connectEprocSchema.parse(raw);
   if (!input.otp) throw new ValidationError("Informe a chave do autenticador do eproc.", { otp: ["A chave do autenticador é obrigatória."] });
   const key = requireKey();
   await requireOwnMfa(ctx.userId);
   await assertCertificateUsable(ctx, input.certificateId, "portal");
+  const target = getEprocPortalTarget(input.targetKey);
+  if (!target || !REGIONAL_CONNECTOR_COURTS.some((court) => court.code === target.courtCode)) {
+    throw new ValidationError("Escolha um destino eproc do Sul ou Sudeste, nos ramos Estadual, Federal ou do Trabalho.", { targetKey: ["Este destino está fora do escopo permitido."] });
+  }
   const otpSecret = parseCourtOtpSecret(input.otp);
   const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document: input.username ?? "", password: input.password ?? "", otpSecret } satisfies PortalSecret), "utf8"), key);
-  const target = EVOLUTION_TJMG_TARGET_KEY;
   const data = { authMethod: "CERTIFICATE", certificateId: input.certificateId, secretEnc, enabled: true, status: "PENDING", statusMessage: "Aguardando o primeiro teste de login por certificado no eproc.", statusAt: new Date() };
   const access = await db.portalAccess.upsert({
-    where: { organizationId_userId_system_target: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target } },
-    create: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target, label: "TJMG · 1º grau (eproc)", ...data },
+    where: { organizationId_userId_system_target: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target: target.key } },
+    create: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target: target.key, label: target.label, ...data },
     update: data,
     select: { id: true },
   });
   const jobId = await enqueue(ctx.organizationId, access.id, "LOGIN_TEST", EVOLUTION_EPROC_JOB_ORIGIN);
   await db.portalAccess.update({ where: { id: access.id }, data: { status: "CONNECTING", statusMessage: "Na fila para o teste de login no eproc.", statusAt: new Date() } });
-  await audit({ action: "portal_access.save", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: access.id, metadata: { system: EVOLUTION_EPROC_SYSTEM, target, withOtp: true }, meta: ctx.meta });
+  await audit({ action: "portal_access.save", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: access.id, metadata: { system: EVOLUTION_EPROC_SYSTEM, target: target.key, withOtp: true }, meta: ctx.meta });
   return { id: access.id, jobId };
+}
+
+export async function connectEprocTjmg(ctx: TenantContext, raw: unknown) {
+  const input = typeof raw === "object" && raw !== null ? raw as Record<string, unknown> : {};
+  return connectEprocPortal(ctx, { ...input, targetKey: "tjmg-1g" });
 }
 
 /** Enfileira um novo teste de login (no máximo um por minuto por acesso). */
 export async function testPortalAccess(ctx: TenantContext, id: string, surface: PortalAccessSurface = "legacy") {
   assertPortalSurface(surface);
   assertPortalPermission(ctx, surface);
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}) } });
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: { in: PJE_TARGETS.filter(isRegionalPjeTarget).map((t) => t.key) } } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: { in: EPROC_PORTAL_TARGETS.map((t) => t.key) } } : {}) } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
   if (!a.enabled) throw new ConflictError("Este acesso está desligado. Ligue-o antes de testar.");
   const last = await db.robotJob.findFirst({ where: { accessId: id }, orderBy: { createdAt: "desc" }, select: { createdAt: true, summary: true } });
@@ -235,7 +249,7 @@ export async function testPortalAccess(ctx: TenantContext, id: string, surface: 
 export async function setPortalAccessEnabled(ctx: TenantContext, id: string, enabled: boolean, surface: PortalAccessSurface = "legacy") {
   assertPortalSurface(surface);
   assertCan(ctx, "cases:read");
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}) }, select: { id: true } });
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: { in: PJE_TARGETS.filter(isRegionalPjeTarget).map((t) => t.key) } } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: { in: EPROC_PORTAL_TARGETS.map((t) => t.key) } } : {}) }, select: { id: true } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
   await db.portalAccess.update({ where: { id }, data: { enabled } });
   await audit({ action: enabled ? "portal_access.enable" : "portal_access.disable", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
@@ -246,7 +260,7 @@ export async function deletePortalAccess(ctx: TenantContext, id: string, surface
   // Revocation remains available while the Evolution pilot is off; deletion cannot
   // start a browser job or touch the retired BOX.
   if (surface === "legacy") assertBoxAvailable();
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, ...(can(ctx, "integrations:manage") ? {} : { userId: ctx.userId }), ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}) }, select: { id: true } });
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, ...(can(ctx, "integrations:manage") ? {} : { userId: ctx.userId }), ...(surface === "evolution" ? { system: "pje", target: { in: PJE_TARGETS.filter(isRegionalPjeTarget).map((t) => t.key) } } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: { in: EPROC_PORTAL_TARGETS.map((t) => t.key) } } : {}) }, select: { id: true } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
   await db.portalAccess.delete({ where: { id: a.id } });
   await audit({ action: "portal_access.delete", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });

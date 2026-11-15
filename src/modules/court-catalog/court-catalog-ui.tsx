@@ -47,7 +47,7 @@ function connectionBadge(state: ConnectionState) {
   }
 }
 
-const BRANCH_ORDER: CourtBranch[] = ["ESTADUAL", "FEDERAL", "TRABALHO", "ELEITORAL", "MILITAR_ESTADUAL", "SUPERIOR"];
+const BRANCH_ORDER: CourtBranch[] = ["ESTADUAL", "FEDERAL", "TRABALHO"];
 
 function CourtRow({ court }: { court: CourtCatalogView }) {
   const [expanded, setExpanded] = useState(false);
@@ -184,8 +184,8 @@ export function CourtCatalogList({ courts, summary }: { courts: CourtCatalogView
           <p className="text-xs text-muted">Usam PJe</p>
         </div>
         <div className="rounded-xl border border-border bg-surface p-4">
-          <p className="text-2xl font-semibold">{summary.referenceCount}</p>
-          <p className="text-xs text-muted">Instituições de referência</p>
+          <p className="text-2xl font-semibold">{summary.byEngine.find((e) => e.engine === "EPROC")?.count ?? 0}</p>
+          <p className="text-xs text-muted">Usam eproc</p>
         </div>
       </div>
 
@@ -221,9 +221,9 @@ export function CourtCatalogList({ courts, summary }: { courts: CourtCatalogView
 
       {/* Disclaimer */}
       <div className="rounded-xl border border-dashed border-border p-4 text-xs text-muted space-y-1">
-        <p>O catálogo lista os 91 órgãos jurisdicionais do inventário nacional, além de {summary.referenceCount} instituições de referência (STF, CNJ, CJF, CSJT).</p>
-        <p>Figurar no catálogo não significa que o LegalOS já acessa o portal. Login, consulta de autos e protocolo só são habilitados por adaptador quando o fluxo real estiver implementado, testado e autorizado pelo escritório.</p>
-        <p>Fonte: Catálogo oficial do CNJ e portais públicos dos tribunais.</p>
+        <p>Este recorte contém {summary.total} tribunais estaduais, federais e trabalhistas que atendem ES, MG, RJ, SP, PR, RS e SC.</p>
+        <p>O motor identificado é informativo; só considere um acesso conectado depois da validação real do certificado e do autenticador. Consulta de processos e protocolo exigem implementação e homologação próprias.</p>
+        <p>Fonte: Catálogo oficial do CNJ e portais oficiais dos tribunais.</p>
       </div>
     </div>
   );

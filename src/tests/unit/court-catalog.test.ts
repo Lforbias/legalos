@@ -3,6 +3,7 @@ import {
   COURT_CATALOG,
   JURISDICTIONAL_COURTS,
   REFERENCE_INSTITUTIONS,
+  REGIONAL_CONNECTOR_COURTS,
   getCourtByCode,
   courtsByBranch,
   courtsByEngine,
@@ -11,8 +12,17 @@ import {
   DEGREE_LABEL,
   ENGINE_LABEL,
 } from "@/lib/judicial/court-catalog";
+import { EPROC_PORTAL_TARGETS } from "@/lib/robots/eproc/targets";
+import { PJE_TARGETS } from "@/lib/robots/pje/targets";
 
 describe("court catalog", () => {
+  it("limits regional connector scope to 19 courts in the requested branches and states", () => {
+    expect(REGIONAL_CONNECTOR_COURTS).toHaveLength(19);
+    expect(REGIONAL_CONNECTOR_COURTS.every((court) => ["ESTADUAL", "FEDERAL", "TRABALHO"].includes(court.branch))).toBe(true);
+    expect(REGIONAL_CONNECTOR_COURTS.every((court) => court.ufs.some((uf) => ["ES", "MG", "RJ", "SP", "PR", "RS", "SC"].includes(uf)))).toBe(true);
+    expect(REGIONAL_CONNECTOR_COURTS.some((court) => court.branch === "ELEITORAL" || court.branch === "MILITAR_ESTADUAL")).toBe(false);
+  });
+
   it("has exactly 91 jurisdictional courts", () => {
     expect(JURISDICTIONAL_COURTS.length).toBe(91);
   });
@@ -106,6 +116,21 @@ describe("court catalog", () => {
     expect(trf3?.integrationStatus).toBe("ADAPTER_WIP");
     expect(trf3?.verifiedAt).toBeNull();
     expect(trf3?.verifiedSource).toMatch(/não homologado/i);
+  });
+
+  it("uses the currently deployed eproc engines for TJMG, TJRJ, TJSP, and TRF6", () => {
+    for (const code of ["TJMG", "TJRJ", "TJSP", "TRF6"]) {
+      expect(getCourtByCode(code)?.engine).toBe("EPROC");
+    }
+  });
+
+  it("keeps PJe and eproc portal targets inside the regional state, federal, and labor scope", () => {
+    const regionalCodes = new Set(REGIONAL_CONNECTOR_COURTS.map((court) => court.code));
+    expect(PJE_TARGETS.filter((target) => regionalCodes.has(target.key.split("-")[0]!.toUpperCase())).length).toBeGreaterThan(0);
+    expect(EPROC_PORTAL_TARGETS.length).toBeGreaterThan(0);
+    expect(EPROC_PORTAL_TARGETS.every((target) => regionalCodes.has(target.courtCode))).toBe(true);
+    expect(EPROC_PORTAL_TARGETS.every((target) => /^https:\/\//.test(target.loginUrl))).toBe(true);
+    expect(new Set(EPROC_PORTAL_TARGETS.map((target) => target.key)).size).toBe(EPROC_PORTAL_TARGETS.length);
   });
 
   it("BRANCH_LABEL covers all branches used in the catalog", () => {

@@ -6,14 +6,16 @@ import { uuidSchema } from "@/lib/validation/common";
 import { requireTenant } from "@/server/session";
 import { assertCan } from "@/server/context";
 import { ValidationError } from "@/lib/permissions/check";
-import { EVOLUTION_PJE_TARGET_KEY } from "@/lib/evolution-judicial-login";
 import {
   connectPje,
-  connectEprocTjmg,
+  connectEprocPortal,
   deletePortalAccess,
   setPortalAccessEnabled,
   testPortalAccess,
+  isRegionalPjeTarget,
 } from "@/server/services/portal-access.service";
+import { getPjeTarget } from "@/lib/robots/pje/targets";
+import { getEprocPortalTarget } from "@/lib/robots/eproc/targets";
 
 const touch = () => revalidatePath("/evolution/juridico/fontes");
 
@@ -21,6 +23,7 @@ const connectSchema = z.object({
   adapterKey: z.string().min(1).max(60),
   courtCode: z.string().min(2).max(20),
   degree: z.enum(["1", "2"]),
+  targetKey: z.string().min(3).max(40),
   document: z.string().trim().max(30).optional(),
   password: z.string().max(200).optional(),
   certificateId: z.uuid(),
@@ -30,7 +33,7 @@ const connectSchema = z.object({
 export type ConnectAdapterInput = z.infer<typeof connectSchema>;
 
 /**
- * Encaminha somente os logins PJe legado e eproc do TJMG ao piloto da Evolution.
+ * Encaminha os logins PJe/eproc autorizados dentro do recorte regional.
  */
 export async function connectAdapterAction(raw: unknown) {
   return runAction(async () => {
@@ -38,18 +41,21 @@ export async function connectAdapterAction(raw: unknown) {
     assertCan(ctx, "integrations:manage");
     const input = connectSchema.parse(raw);
     if (!input.otp) throw new ValidationError("Informe a chave do autenticador.", { otp: ["A chave do autenticador é obrigatória."] });
-    if (input.courtCode !== "TJMG" || input.degree !== "1" || !["pje-portal", "eproc-portal"].includes(input.adapterKey)) {
-      throw new ValidationError("Somente os logins TJMG · 1º grau (PJe legado e eproc) estão disponíveis.", { courtCode: ["Este destino ainda não foi homologado."] });
-    }
-
     if (input.adapterKey === "eproc-portal") {
-      const { id, jobId } = await connectEprocTjmg(ctx, { username: input.document, password: input.password, certificateId: input.certificateId, otp: input.otp });
+      const target = getEprocPortalTarget(input.targetKey);
+      if (!target || target.courtCode !== input.courtCode || target.degree !== input.degree) throw new ValidationError("Destino eproc inválido.", { targetKey: ["Escolha um destino da lista."] });
+      const { id, jobId } = await connectEprocPortal(ctx, { targetKey: target.key, username: input.document, password: input.password, certificateId: input.certificateId, otp: input.otp });
       touch();
       return { id, jobId };
     }
 
+    if (input.adapterKey !== "pje-portal") throw new ValidationError("Conector de tribunal inválido.");
+    const target = getPjeTarget(input.targetKey);
+    if (target?.key !== `${input.courtCode.toLowerCase()}-${input.degree}g`) throw new ValidationError("Destino PJe inválido.", { targetKey: ["Escolha um destino da lista."] });
+    if (!target || !isRegionalPjeTarget(target)) throw new ValidationError("Este destino ainda não está disponível para autenticação.", { courtCode: ["O destino não está na Justiça Estadual, Federal ou do Trabalho do Sul e Sudeste."] });
+
     const { ids, jobId } = await connectPje(ctx, {
-      targets: [EVOLUTION_PJE_TARGET_KEY],
+      targets: [target.key],
       document: input.document,
       password: input.password,
       certificateId: input.certificateId,

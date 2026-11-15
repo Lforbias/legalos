@@ -9,19 +9,18 @@ import { base32Encode, totpCode, totpStep, verifyTotp } from "@/lib/security/tot
  * internet. Precisa do Chromium do Playwright; sem ele o teste é pulado (rodamos no CI de E2E e no ambiente com navegador).
  */
 const SSO = "https://sso.cloud.pje.jus.br";
-const APP = "https://pje1g.trf1.jus.br";
 const SECRET = base32Encode(Buffer.from("12345678901234567890"));
 const T0 = Date.UTC(2027, 0, 1, 12, 0, 5); // 5 s depois do início de uma janela de 30 s
 
 const browser = await chromium.launch({ args: ["--no-sandbox"] }).catch(() => null);
 afterAll(async () => { await browser?.close(); });
 
-type Scenario = { password: string; otp?: boolean; block?: boolean; captcha?: boolean; certificate?: boolean };
+type Scenario = { password: string; otp?: boolean; block?: boolean; captcha?: boolean; certificate?: boolean; pdpjHome?: boolean };
 const page = (body: string) => `<!doctype html><html><head><title>Entrar</title></head><body>${body}</body></html>`;
 const loginPage = (err = "", certificate = false) => page(`<h1>Acesse sua conta</h1>${err ? `<span id="input-error" class="kc-feedback-text">${err}</span>` : ""}<form id="loginForm" method="post" action="${SSO}/auth/realms/pje/login-actions/authenticate?step=login"><input id="username" name="username" type="text"><input id="password" name="password" type="password"><input id="kc-login" type="submit" value="Entrar"></form>${certificate ? `<a href="${SSO}/certificate">Seu certificado digital</a>` : ""}`);
 const otpPage = (err = "") => page(`<h1>Código de verificação</h1>${err ? `<span class="kc-feedback-text">${err}</span>` : ""}<form method="post" action="${SSO}/auth/realms/pje/login-actions/authenticate?step=otp"><input id="otp" name="otp" type="text"><input id="kc-login" type="submit" value="Entrar"></form>`);
 
-async function withFixture<T>(sc: Scenario, fn: (page: Page, log: { posts: string[] }) => Promise<T>): Promise<T> {
+async function withFixture<T>(sc: Scenario, fn: (page: Page, log: { posts: string[] }) => Promise<T>, portalTarget = target): Promise<T> {
   const ctx: BrowserContext = await browser!.newContext();
   const log = { posts: [] as string[] };
   await ctx.route("**/*", async (route: Route) => {
@@ -30,17 +29,21 @@ async function withFixture<T>(sc: Scenario, fn: (page: Page, log: { posts: strin
     const html = (body: string) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body });
     // redirecionamento por página (o Chromium não passa 302 fabricado pela interceptação de novo; assim cada destino também é interceptado)
     const redirect = (to: string) => route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: `<!doctype html><title>Redirecionando</title><script>location.replace(${JSON.stringify(to)})</script>` });
-    if (url.origin === APP && url.pathname === "/pje/login.seam") return redirect(`${SSO}/auth/realms/pje/protocol/openid-connect/auth?client_id=pje-trf1-1g`);
-    if (url.origin === APP) return html(page("<h1>Painel do usuário</h1>"));
+    const appOrigin = portalTarget.origin;
+    if (url.origin === appOrigin && url.pathname === portalTarget.loginPath) {
+      if (sc.pdpjHome) return html(page(`<h1>Processo Judicial Eletrônico</h1><button id="btnSsoPdpj" onclick="location.href='${SSO}/auth/realms/pje/protocol/openid-connect/auth?client_id=${portalTarget.clientId}'">Entrar com PDPJ</button>`));
+      return redirect(`${SSO}/auth/realms/pje/protocol/openid-connect/auth?client_id=${portalTarget.clientId}`);
+    }
+    if (url.origin === appOrigin) return html(page("<h1>Painel do usuário</h1>"));
     if (url.origin !== SSO) return route.abort();
-    if (url.pathname === "/certificate") return sc.otp ? html(otpPage()) : redirect(`${APP}/pje/home.seam`);
+    if (url.pathname === "/certificate") return sc.otp ? html(otpPage()) : redirect(`${appOrigin}/pje/home.seam`);
     if (req.method() === "GET") return html(sc.captcha ? page(`<h1>Verificação</h1><div class="g-recaptcha" data-sitekey="x" style="width:300px;height:80px">captcha</div>`) : loginPage("", Boolean(sc.certificate)));
     const form = new URLSearchParams(req.postData() ?? "");
     log.posts.push(url.searchParams.get("step") ?? "?");
-    if (url.searchParams.get("step") === "otp") return verifyTotp(SECRET, form.get("otp") ?? "", clock.now) !== null ? redirect(`${APP}/pje/home.seam`) : html(otpPage("Código inválido."));
+    if (url.searchParams.get("step") === "otp") return verifyTotp(SECRET, form.get("otp") ?? "", clock.now) !== null ? redirect(`${appOrigin}/pje/home.seam`) : html(otpPage("Código inválido."));
     if (sc.block) return html(loginPage("Conta temporariamente bloqueada por excesso de tentativas."));
     if (form.get("password") !== sc.password) return html(loginPage("Usuário ou senha inválidos."));
-    return sc.otp ? html(otpPage()) : redirect(`${APP}/pje/home.seam`);
+    return sc.otp ? html(otpPage()) : redirect(`${appOrigin}/pje/home.seam`);
   });
   const p = await ctx.newPage();
   try {
@@ -54,7 +57,7 @@ const clock = { now: T0 };
 const sleep = async (ms: number) => { if (ms >= 1000) clock.now += ms; else await new Promise((r) => setTimeout(r, ms)); };
 const target = getPjeTarget("trf1-1g")!;
 const creds = (over: Partial<PjeCredentials> = {}): PjeCredentials => ({ document: "123.456.789-09", password: "segredo", otpSecret: null, ...over });
-const run = (p: Page, c: PjeCredentials, steps = new Set<number>()) => { clock.now = T0; return loginPje(p, target, c, { names: ["Talita"], usedOtpSteps: steps, now: () => clock.now, sleep, stepTimeoutMs: 8_000 }); };
+const run = (p: Page, c: PjeCredentials, steps = new Set<number>(), portalTarget = target) => { clock.now = T0; return loginPje(p, portalTarget, c, { names: ["Talita"], usedOtpSteps: steps, now: () => clock.now, sleep, stepTimeoutMs: 8_000 }); };
 
 describe.skipIf(!browser)("robô de login do PJe (réplica do SSO)", () => {
   it("entra com CPF e senha", async () => {
@@ -71,6 +74,15 @@ describe.skipIf(!browser)("robô de login do PJe (réplica do SSO)", () => {
       expect(r.ok).toBe(true);
       expect(log.posts).toEqual(["otp"]);
     });
+  });
+
+  it("abre o PDPJ a partir da página oficial do TRT antes de validar certificado e TOTP", async () => {
+    const trt2 = getPjeTarget("trt2-1g")!;
+    await withFixture({ password: "", otp: true, certificate: true, pdpjHome: true }, async (p, log) => {
+      const r = await run(p, creds({ document: "", password: "", otpSecret: SECRET, certificateAuth: true }), new Set(), trt2);
+      expect(r.ok).toBe(true);
+      expect(log.posts).toEqual(["otp"]);
+    }, trt2);
   });
 
   it("senha errada: para na primeira tentativa, sem repetir", async () => {
