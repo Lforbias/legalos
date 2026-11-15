@@ -13,6 +13,7 @@ import {
   FolderOpen,
   Hourglass,
   FileText,
+  Newspaper,
   Calculator,
   MessageCircle,
   Users,
@@ -31,7 +32,6 @@ export type Department =
   | "lobby"
   | "mesa"
   | "juridico"
-  | "controladoria"
   | "atendimento"
   | "comercial"
   | "financeiro"
@@ -41,7 +41,6 @@ export const DEPARTMENTS: Record<Department, { name: string; color: string; icon
   lobby: { name: "Meu Escritório", color: "#FF3B4E", icon: Home, summary: "Visão geral do escritório e atalhos rápidos." },
   mesa: { name: "Minha Mesa", color: "#FF3B4E", icon: Monitor, summary: "Suas tarefas, agenda e atividades pessoais." },
   juridico: { name: "Jurídico", color: "#6366f1", icon: Scale, summary: "Processos, prazos, documentos e cálculos." },
-  controladoria: { name: "Controladoria", color: "#0ea5e9", icon: ShieldCheck, summary: "Publicações, caixa de entrada e monitoramento judicial." },
   atendimento: { name: "Atendimento", color: "#10b981", icon: HeadphonesIcon, summary: "Conversas, clientes e copiloto de atendimento." },
   comercial: { name: "Comercial", color: "#f59e0b", icon: TrendingUp, summary: "CRM, leads e funil de conversão." },
   financeiro: { name: "Financeiro & Contábil", color: "#8b5cf6", icon: Wallet, summary: "Lançamentos, faturas e fluxo de caixa." },
@@ -74,10 +73,10 @@ export const EVOLUTION_NAV: EvolutionNavItem[] = [
   { key: "evo-juridico-documentos", department: "juridico", label: "Documentos", href: "/documentos", icon: FileText, permission: "documents:read", existingRoute: true },
   { key: "evo-juridico-calculos", department: "juridico", label: "Cálculos", href: "/calculos", icon: Calculator, permission: "cases:read", existingRoute: true },
 
-  // Controladoria
-  { key: "evo-controladoria", department: "controladoria", label: "Controladoria", href: "/evolution/controladoria", icon: ShieldCheck },
-  { key: "evo-controladoria-caixa", department: "controladoria", label: "Caixa de entrada", href: "/caixa-de-entrada", icon: FolderOpen, permission: "inbox:read", existingRoute: true },
-  { key: "evo-controladoria-alertas", department: "controladoria", label: "Central de alertas", href: "/alertas", icon: ShieldCheck, existingRoute: true },
+  // Jurídico e Controladoria
+  { key: "evo-juridico-alertas", department: "juridico", label: "Central de alertas", href: "/alertas", icon: ShieldCheck, existingRoute: true },
+  { key: "evo-juridico-publicacoes", department: "juridico", label: "Publicações e movimentações", href: "/evolution/juridico/publicacoes", icon: Newspaper, permission: "cases:read" },
+  { key: "evo-juridico-fontes", department: "juridico", label: "Fontes e conexões", href: "/evolution/juridico/fontes", icon: Globe, permission: "integrations:manage" },
 
   // Atendimento
   { key: "evo-atendimento", department: "atendimento", label: "Atendimento", href: "/evolution/atendimento", icon: HeadphonesIcon },
@@ -118,8 +117,7 @@ const ETHOS_KEY_MAP: Record<string, string> = {
   "evo-juridico-prazos": "deadlines",
   "evo-juridico-documentos": "documents",
   "evo-juridico-calculos": "calculations",
-  "evo-controladoria-caixa": "inbox",
-  "evo-controladoria-alertas": "alerts",
+  "evo-juridico-alertas": "alerts",
   "evo-atendimento-conversas": "whatsapp",
   "evo-atendimento-clientes": "clients",
   "evo-atendimento-copiloto": "copilot",
@@ -130,6 +128,7 @@ const ETHOS_KEY_MAP: Record<string, string> = {
   "evo-admin-equipe": "team",
   "evo-admin-integracoes": "integrations",
   "evo-admin-automacoes": "workflows",
+  "evo-juridico-fontes": "integrations",
   "evo-admin-config": "settings",
 };
 
@@ -157,8 +156,7 @@ export const ROUTE_MATRIX: { ethos: string; evolution: Department; description: 
   { ethos: "/prazos", evolution: "juridico", description: "Prazos → Jurídico > Prazos" },
   { ethos: "/documentos", evolution: "juridico", description: "Documentos → Jurídico > Documentos" },
   { ethos: "/calculos", evolution: "juridico", description: "Cálculos → Jurídico > Cálculos" },
-  { ethos: "/caixa-de-entrada", evolution: "controladoria", description: "Caixa de entrada → Controladoria > Caixa de entrada" },
-  { ethos: "/alertas", evolution: "controladoria", description: "Alertas → Controladoria > Alertas" },
+  { ethos: "/alertas", evolution: "juridico", description: "Alertas → Jurídico > Central de alertas" },
   { ethos: "/atendimento", evolution: "atendimento", description: "Chat / WhatsApp → Atendimento > Conversas" },
   { ethos: "/clientes", evolution: "atendimento", description: "Clientes → Atendimento > Clientes" },
   { ethos: "/copiloto", evolution: "atendimento", description: "Copiloto → Atendimento > Copiloto" },

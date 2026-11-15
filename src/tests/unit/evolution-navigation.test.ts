@@ -9,9 +9,9 @@ import {
 } from "@/config/evolution-navigation";
 
 describe("evolution navigation config", () => {
-  const allDepts: Department[] = ["lobby", "mesa", "juridico", "controladoria", "atendimento", "comercial", "financeiro", "administracao"];
+  const allDepts: Department[] = ["lobby", "mesa", "juridico", "atendimento", "comercial", "financeiro", "administracao"];
 
-  it("defines all eight departments with name, color, icon and summary", () => {
+  it("defines all seven departments with name, color, icon and summary", () => {
     for (const dept of allDepts) {
       const d = DEPARTMENTS[dept];
       expect(d.name).toBeTruthy();

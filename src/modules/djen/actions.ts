@@ -41,7 +41,8 @@ export async function syncDjenAction(id: string): Promise<ActionState<DjenSyncRe
     const { ctx } = await requireTenant();
     const r = await syncDjen(ctx, parse(uuidSchema, id));
     revalidatePath("/integracoes");
-    revalidatePath("/caixa-de-entrada");
+    revalidatePath("/evolution/juridico/publicacoes");
+    revalidatePath("/processos");
     return r;
   });
 }

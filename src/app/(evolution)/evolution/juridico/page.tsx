@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { FolderOpen, Hourglass, FileText, Calculator, Bot } from "lucide-react";
+import { FolderOpen, Hourglass, FileText, Calculator, Bot, Bell, Newspaper, Globe } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
@@ -53,6 +53,20 @@ export default async function JuridicoPage() {
             <p className="text-[12px] text-muted">Cadastro, partes, linha do tempo e carteira</p>
           </div>
         </Link>
+        <Link href="/alertas" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+          <Bell className="h-5 w-5 text-muted" aria-hidden />
+          <div>
+            <p className="text-sm font-medium group-hover:text-primary">Central de alertas</p>
+            <p className="text-[12px] text-muted">Prazos, tarefas e situações que exigem atenção</p>
+          </div>
+        </Link>
+        <Link href="/evolution/juridico/publicacoes" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+          <Newspaper className="h-5 w-5 text-muted" aria-hidden />
+          <div>
+            <p className="text-sm font-medium group-hover:text-primary">Publicações e movimentações</p>
+            <p className="text-[12px] text-muted">DJEN capturado e andamentos públicos por processo</p>
+          </div>
+        </Link>
         {can(ctx, "deadlines:read") && (
           <Link href="/prazos" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
             <Hourglass className="h-5 w-5 text-muted" aria-hidden />
@@ -78,6 +92,15 @@ export default async function JuridicoPage() {
             <p className="text-[12px] text-muted">Atrasados JF, débitos TJSP, verbas trabalhistas</p>
           </div>
         </Link>
+        {can(ctx, "integrations:manage") && (
+          <Link href="/evolution/juridico/fontes" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
+            <Globe className="h-5 w-5 text-muted" aria-hidden />
+            <div>
+              <p className="text-sm font-medium group-hover:text-primary">Fontes e conexões</p>
+              <p className="text-[12px] text-muted">Catálogo de tribunais e estado das integrações</p>
+            </div>
+          </Link>
+        )}
         {can(ctx, "ai:use") && (
           <Link href="/ia" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
             <Bot className="h-5 w-5 text-muted" aria-hidden />

@@ -34,8 +34,30 @@ export const metadata: Metadata = { title: "Integrações" };
 
 export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<{ google?: string; msg?: string }> }) {
   const { ctx } = await requireTenant();
-  if (!can(ctx, "integrations:manage")) return <AccessDenied />;
+  const canManageIntegrations = can(ctx, "integrations:manage");
+  const canManagePublications = canManageIntegrations || can(ctx, "cases:write");
+  if (!canManageIntegrations && !canManagePublications) return <AccessDenied />;
   const sp = await searchParams;
+  if (!canManageIntegrations) {
+    const [monitors, datajud] = await Promise.all([listMonitors(ctx), datajudStatus(ctx)]);
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <PageHeader title="Integrações" description="Configure as fontes públicas usadas nos processos do escritório." />
+        <Card>
+          <CardHeader title="DJEN — publicações por OAB" description="Cadastre a OAB do advogado para consultar publicações públicas." action={monitors.some((m) => m.enabled) ? <Badge tone="success">Monitoramento ativo</Badge> : <Badge tone="warning">Sem monitoramento ativo</Badge>} />
+          <CardBody className="space-y-4 text-sm">
+            <p>Informe o nome do advogado, o número da OAB e a seccional. O sistema consulta publicações públicas do Diário de Justiça Eletrônico Nacional; não precisa de senha nem certificado. Depois do cadastro, use “Verificar agora”. As publicações aparecem na Central Judicial e na ficha do processo correspondente.</p>
+            <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} />
+            <MonitorForm ufs={UFS} />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader title="DataJud (CNJ)" action={datajud.keyConfigured && datajud.orgEnabled ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Aguardando configuração</Badge>} />
+          <CardBody className="text-sm text-muted">O DataJud consulta andamentos pelo número CNJ de cada processo. A chave e a ativação são gerenciadas por um administrador em Integrações.</CardBody>
+        </Card>
+      </div>
+    );
+  }
   const drive = await getDriveSettings(ctx);
   const s = await datajudStatus(ctx);
   // Box 3.0: DJEN é fonte pública (consulta por OAB/UF), independente do Box autenticado retirado (BOX_AVAILABLE).
@@ -76,7 +98,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="DataJud (CNJ) · Box 3.0" action={active ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Desligada</Badge>} />
+          <CardHeader title="DataJud (CNJ)" action={active ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Desligada</Badge>} />
           <CardBody className="space-y-3 text-sm">
             <p>Importa os andamentos públicos de um processo a partir do número CNJ (Justiça Estadual, Federal, do Trabalho, Eleitoral, STJ e TST). Só o número do processo é enviado ao CNJ; processos sigilosos nunca são consultados. Cada andamento é importado uma única vez.</p>
             {!s.keyConfigured ? <Alert tone="warning">Cadastre a chave pública do DataJud abaixo para habilitar a consulta.</Alert> : null}
@@ -87,10 +109,10 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
           </CardBody>
         </Card>
         <Card>
-          <CardHeader title="DJEN — publicações por OAB · Box 3.0" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
+          <CardHeader title="DJEN — publicações por OAB" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
           <CardBody className="space-y-4 text-sm">
-            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado e coloca as publicações na caixa de entrada, sem repetir. Não precisa de certificado nem de senha. A verificação automática depende de um agendador chamar o sistema (variável CRON_SECRET); sem isso, use “Verificar agora”. Esta consulta pública não tem documentação oficial estável: se o CNJ mudar o formato, o sistema avisa em vez de importar dados incorretos. Relatos indicam que o DJEN recusa servidores fora do Brasil. Esta consulta pública é independente do Box autenticado retirado: funciona mesmo com ele desligado.</p>
-            <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} recipients={{ members: rcvMembers.map((u) => ({ id: u.id, name: u.name })), teams: rcvTeams.map((t) => ({ id: t.id, name: t.name })) }} />
+            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado e mostra as publicações na Central Judicial, sem repetir. Não precisa de certificado nem de senha. A verificação automática depende de um agendador chamar o sistema (variável CRON_SECRET); sem isso, use “Verificar agora”. Se o serviço público estiver indisponível, a tela informa a falha em vez de apresentar uma captura vazia como sucesso.</p>
+            <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} recipients={BOX_AVAILABLE ? { members: rcvMembers.map((u) => ({ id: u.id, name: u.name })), teams: rcvTeams.map((t) => ({ id: t.id, name: t.name })) } : undefined} />
             <MonitorForm ufs={UFS} />
           </CardBody>
         </Card>

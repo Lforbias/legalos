@@ -1,4 +1,5 @@
 import { assertBoxAvailable } from "@/server/box-guard";
+import { assertEvolutionJudicialLoginEnabled } from "@/lib/evolution-judicial-login";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -18,6 +19,12 @@ export type PortalSecret = { document: string; password: string; otpSecret: stri
 
 const MIN_RETEST_MS = 60_000;
 const MAX_TARGETS = 20;
+export type PortalAccessSurface = "legacy" | "evolution";
+
+function assertPortalSurface(surface: PortalAccessSurface) {
+  if (surface === "evolution") assertEvolutionJudicialLoginEnabled();
+  else assertBoxAvailable();
+}
 
 function requireKey(): Buffer {
   const k = certKey();
@@ -57,15 +64,16 @@ export type PortalAccessRow = {
   lastJob: { status: string; message: string | null; finishedAt: Date | null; createdAt: Date; summary: unknown } | null;
 };
 
-export function pjeTargetOptions() {
-  return PJE_TARGETS.map((t) => ({ key: t.key, label: t.label }));
+export function pjeTargetOptions(surface: PortalAccessSurface = "legacy") {
+  const targets = surface === "evolution" ? PJE_TARGETS.filter((t) => t.key === "trf3-1g") : PJE_TARGETS;
+  return targets.map((t) => ({ key: t.key, label: t.label }));
 }
 
-export async function listMyPortalAccesses(ctx: TenantContext): Promise<PortalAccessRow[]> {
-  assertBoxAvailable();
+export async function listMyPortalAccesses(ctx: TenantContext, surface: PortalAccessSurface = "legacy"): Promise<PortalAccessRow[]> {
+  assertPortalSurface(surface);
   assertCan(ctx, "cases:read");
   const rows = await db.portalAccess.findMany({
-    where: { organizationId: ctx.organizationId, userId: ctx.userId },
+    where: { organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: "trf3-1g" } : {}) },
     orderBy: [{ system: "asc" }, { target: "asc" }],
     include: { jobs: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
@@ -98,20 +106,23 @@ export async function listMyPortalAccesses(ctx: TenantContext): Promise<PortalAc
 }
 
 async function enqueue(organizationId: string, accessId: string, kind: "LOGIN_TEST" | "SYNC_NOTICES") {
-  const open = await db.robotJob.findFirst({ where: { accessId, status: { in: ["QUEUED", "RUNNING"] } }, select: { id: true } });
+  const open = await db.robotJob.findFirst({ where: { accessId, kind, status: { in: ["QUEUED", "RUNNING"] } }, select: { id: true } });
   if (open) return open.id;
   const job = await db.robotJob.create({ data: { organizationId, accessId, kind }, select: { id: true } });
   return job.id;
 }
 
 /** Cadastra (ou atualiza) o acesso aos tribunais escolhidos e enfileira o teste de login do primeiro. */
-export async function connectPje(ctx: TenantContext, raw: unknown) {
-  assertBoxAvailable();
+export async function connectPje(ctx: TenantContext, raw: unknown, surface: PortalAccessSurface = "legacy") {
+  assertPortalSurface(surface);
   assertCan(ctx, "cases:read");
   const input = connectPjeSchema.parse(raw);
   const key = requireKey();
   await requireOwnMfa(ctx.userId);
   const targets = [...new Set(input.targets)];
+  if (surface === "evolution" && (targets.length !== 1 || targets[0] !== "trf3-1g")) {
+    throw new ValidationError("O piloto está limitado ao TRF3 · 1º grau.", { targets: ["Escolha apenas TRF3 · 1º grau."] });
+  }
   const unknown = targets.filter((t) => !getPjeTarget(t));
   if (unknown.length) throw new ValidationError("Tribunal inválido.", { targets: ["Escolha tribunais da lista."] });
   const document = onlyDigits(input.document);
@@ -130,22 +141,17 @@ export async function connectPje(ctx: TenantContext, raw: unknown) {
     ids.push(row.id);
   }
   const jobId = await enqueue(ctx.organizationId, ids[0]!, "LOGIN_TEST");
+  if (surface === "evolution") await db.robotJob.update({ where: { id: jobId }, data: { summary: { origin: "EVOLUTION_PJE_LOGIN" } } });
   await db.portalAccess.update({ where: { id: ids[0]! }, data: { status: "CONNECTING", statusMessage: "Na fila para o teste de login.", statusAt: new Date() } });
   await audit({ action: "portal_access.save", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: ids[0], metadata: { system: "pje", targets, withOtp: Boolean(otpSecret) }, meta: ctx.meta });
   return { ids, jobId };
 }
 
-async function ownAccess(ctx: TenantContext, id: string) {
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, ...(can(ctx, "integrations:manage") ? {} : { userId: ctx.userId }) } });
-  if (!a) throw new NotFoundError("Acesso não encontrado.");
-  return a;
-}
-
 /** Enfileira um novo teste de login (no máximo um por minuto por acesso). */
-export async function testPortalAccess(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
+export async function testPortalAccess(ctx: TenantContext, id: string, surface: PortalAccessSurface = "legacy") {
+  assertPortalSurface(surface);
   assertCan(ctx, "cases:read");
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId } });
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: "trf3-1g" } : {}) } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
   if (!a.enabled) throw new ConflictError("Este acesso está desligado. Ligue-o antes de testar.");
   const last = await db.robotJob.findFirst({ where: { accessId: id }, orderBy: { createdAt: "desc" }, select: { createdAt: true, summary: true } });
@@ -154,25 +160,27 @@ export async function testPortalAccess(ctx: TenantContext, id: string) {
   const code = (last?.summary as { code?: string } | null)?.code;
   if (a.status === "NEEDS_ACTION" && (code === "BAD_CREDENTIALS" || code === "OTP_REJECTED")) throw new ConflictError("O PJe recusou os dados deste acesso. Corrija a senha ou o 2º fator em \"Atualizar senha\" antes de testar de novo.");
   const jobId = await enqueue(ctx.organizationId, id, "LOGIN_TEST");
+  if (surface === "evolution") await db.robotJob.update({ where: { id: jobId }, data: { summary: { origin: "EVOLUTION_PJE_LOGIN" } } });
   await db.portalAccess.update({ where: { id }, data: { status: "CONNECTING", statusMessage: "Na fila para o teste de login.", statusAt: new Date() } });
   await audit({ action: "portal_access.test", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
   return { jobId };
 }
 
-export async function setPortalAccessEnabled(ctx: TenantContext, id: string, enabled: boolean) {
-  assertBoxAvailable();
+export async function setPortalAccessEnabled(ctx: TenantContext, id: string, enabled: boolean, surface: PortalAccessSurface = "legacy") {
+  assertPortalSurface(surface);
   assertCan(ctx, "cases:read");
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId }, select: { id: true } });
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: "trf3-1g" } : {}) }, select: { id: true } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
   await db.portalAccess.update({ where: { id }, data: { enabled } });
   await audit({ action: enabled ? "portal_access.enable" : "portal_access.disable", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
 }
 
 /** O dono remove o próprio acesso; quem administra integrações remove o de qualquer pessoa (nunca lê o segredo). */
-export async function deletePortalAccess(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
-  await ownAccess(ctx, id);
-  await db.portalAccess.delete({ where: { id } });
+export async function deletePortalAccess(ctx: TenantContext, id: string, surface: PortalAccessSurface = "legacy") {
+  assertPortalSurface(surface);
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, ...(can(ctx, "integrations:manage") ? {} : { userId: ctx.userId }), ...(surface === "evolution" ? { system: "pje", target: "trf3-1g" } : {}) }, select: { id: true } });
+  if (!a) throw new NotFoundError("Acesso não encontrado.");
+  await db.portalAccess.delete({ where: { id: a.id } });
   await audit({ action: "portal_access.delete", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
 }
 

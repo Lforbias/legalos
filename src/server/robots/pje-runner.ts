@@ -1,5 +1,6 @@
 import type { Page } from "playwright-core";
 import { BOX_AVAILABLE } from "@/lib/box-retirement";
+import { evolutionJudicialLoginEnabled } from "@/lib/evolution-judicial-login";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { loginPje, type LoginOutcome } from "@/lib/robots/pje/login";
@@ -45,9 +46,11 @@ export async function recoverStuckJobs(now: Date = new Date()): Promise<number> 
 
 /** Reserva o próximo trabalho da fila. Dois workers nunca pegam o mesmo. */
 export async function claimNextJob(now: Date = new Date()): Promise<Claimed | null> {
+  const loginOnly = !BOX_AVAILABLE && evolutionJudicialLoginEnabled();
+  if (!BOX_AVAILABLE && !loginOnly) return null;
   const rows = await db.$queryRaw<Claimed[]>`
     UPDATE robot_jobs SET status = 'RUNNING', started_at = ${now}, attempts = attempts + 1
-    WHERE id = (SELECT id FROM robot_jobs WHERE status = 'QUEUED' AND run_after <= ${now} ORDER BY run_after, created_at FOR UPDATE SKIP LOCKED LIMIT 1)
+    WHERE id = (SELECT id FROM robot_jobs WHERE status = 'QUEUED' AND run_after <= ${now} AND (${loginOnly} = false OR (kind = 'LOGIN_TEST' AND summary ->> 'origin' = 'EVOLUTION_PJE_LOGIN' AND access_id IN (SELECT id FROM portal_accesses WHERE system = 'pje' AND target = 'trf3-1g'))) ORDER BY run_after, created_at FOR UPDATE SKIP LOCKED LIMIT 1)
     RETURNING id`;
   return rows[0] ?? null;
 }
@@ -59,13 +62,18 @@ function nameWords(name: string): string[] {
 }
 
 export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: string }> {
-  if (!BOX_AVAILABLE) return { status: "SKIPPED" };
+  if (!BOX_AVAILABLE && !evolutionJudicialLoginEnabled()) return { status: "SKIPPED" };
   const now = deps.now ?? (() => new Date());
   const job = await db.robotJob.findUnique({
     where: { id: jobId },
     include: { access: { include: { user: { select: { id: true, name: true } } } } },
   });
   if (!job || job.status !== "RUNNING") return { status: "SKIPPED" };
+  const isEvolutionPilot = (job.summary as { origin?: string } | null)?.origin === "EVOLUTION_PJE_LOGIN";
+  if (!BOX_AVAILABLE && (job.kind !== "LOGIN_TEST" || !isEvolutionPilot || job.access.system !== "pje" || job.access.target !== "trf3-1g")) {
+    await db.robotJob.update({ where: { id: job.id }, data: { status: "FAILED", message: "Este trabalho não pertence ao piloto de login autorizado da Evolution.", finishedAt: now() } });
+    return { status: "SKIPPED" };
+  }
   const access = job.access;
   const finishJob = (status: string, message: string, summary: object = {}) =>
     db.robotJob.update({ where: { id: job.id }, data: { status, message: message.slice(0, 400), finishedAt: status === "QUEUED" ? null : now(), summary: summary as never } });
@@ -129,7 +137,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   } catch (e) {
     logger.error("robot.evidence_failed", { jobId, error: sanitizeError(e) });
   }
-  const summary = { code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
+  const summary = { ...(isEvolutionPilot ? { origin: "EVOLUTION_PJE_LOGIN" } : {}), code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
   if (m.retry) {
     await db.robotJob.update({ where: { id: job.id }, data: { status: "QUEUED", runAfter: new Date(now().getTime() + backoffMs(job.attempts)), message: m.message.slice(0, 400), summary: summary as never } });
   } else {
@@ -145,7 +153,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
       ...(m.disable ? { enabled: false } : {}),
     },
   });
-  if (outcome.ok && job.kind === "LOGIN_TEST") {
+  if (outcome.ok && job.kind === "LOGIN_TEST" && !isEvolutionPilot) {
     // mesmo login aceito: testa, uma vez, os outros tribunais cadastrados junto (um de cada vez pela fila)
     const siblings = await db.portalAccess.findMany({ where: { organizationId: access.organizationId, userId: access.userId, system: access.system, enabled: true, status: "PENDING", id: { not: access.id } }, select: { id: true } });
     for (const sib of siblings) {
@@ -169,7 +177,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
 
 /** Processa a fila até esvaziar (ou até `maxJobs`). Devolve quantos trabalhos rodou. */
 export async function drainQueue(deps: RobotDeps, maxJobs = 10): Promise<number> {
-  if (!BOX_AVAILABLE) return 0;
+  if (!BOX_AVAILABLE && !evolutionJudicialLoginEnabled()) return 0;
   await recoverStuckJobs((deps.now ?? (() => new Date()))());
   let n = 0;
   while (n < maxJobs) {

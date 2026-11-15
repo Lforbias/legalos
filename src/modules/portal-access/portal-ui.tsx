@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmAction } from "@/components/ui/confirm-action";
 import { Field, Input } from "@/components/ui/form";
 import { connectPjeAction, deletePortalAccessAction, setPortalAccessEnabledAction, testPortalAccessAction } from "./actions";
+import type { PortalAccessSurface } from "@/server/services/portal-access.service";
 
 export type PortalRowView = {
   id: string;
@@ -53,7 +54,7 @@ async function readQr(file: File): Promise<string> {
   return found.data;
 }
 
-export function PjeConnectForm({ targets, hasAccess }: { targets: { key: string; label: string }[]; hasAccess: boolean }) {
+export function PjeConnectForm({ targets, hasAccess, surface = "legacy" }: { targets: { key: string; label: string }[]; hasAccess: boolean; surface?: PortalAccessSurface }) {
   const router = useRouter();
   const [open, setOpen] = useState(!hasAccess);
   const [chosen, setChosen] = useState<string[]>([]);
@@ -80,7 +81,7 @@ export function PjeConnectForm({ targets, hasAccess }: { targets: { key: string;
         setError(undefined);
         setDone(undefined);
         start(async () => {
-          const res = await connectPjeAction({ targets: chosen, document: document_, password, ...(otp.trim() ? { otp: otp.trim() } : {}) });
+          const res = await connectPjeAction({ targets: chosen, document: document_, password, ...(otp.trim() ? { otp: otp.trim() } : {}) }, surface);
           if (!res.ok) {
             setError(res.message ?? Object.values(res.fieldErrors ?? {}).flat()[0] ?? "Não foi possível salvar.");
             return;
@@ -89,7 +90,7 @@ export function PjeConnectForm({ targets, hasAccess }: { targets: { key: string;
           setOtp("");
           setOtpNote(undefined);
           setOtpMode("none");
-          setDone("Salvo. O LegalOS está entrando no PJe agora; o resultado aparece logo abaixo em cerca de um minuto.");
+          setDone("Salvo. O LegalOS colocou o teste de login na fila; o resultado aparece abaixo quando o worker processar a solicitação.");
           router.refresh();
         });
       }}
@@ -156,7 +157,7 @@ export function PjeConnectForm({ targets, hasAccess }: { targets: { key: string;
   );
 }
 
-export function PortalAccessList({ rows }: { rows: PortalRowView[] }) {
+export function PortalAccessList({ rows, surface = "legacy" }: { rows: PortalRowView[]; surface?: PortalAccessSurface }) {
   const router = useRouter();
   const busy = rows.some((r) => r.enabled && BUSY.has(r.status));
   useEffect(() => {
@@ -165,10 +166,10 @@ export function PortalAccessList({ rows }: { rows: PortalRowView[] }) {
     return () => clearInterval(t);
   }, [busy, router]);
   if (!rows.length) return null;
-  return <div className="space-y-3">{rows.map((r) => <PortalAccessRow key={r.id} r={r} />)}</div>;
+  return <div className="space-y-3">{rows.map((r) => <PortalAccessRow key={r.id} r={r} surface={surface} />)}</div>;
 }
 
-function PortalAccessRow({ r }: { r: PortalRowView }) {
+function PortalAccessRow({ r, surface }: { r: PortalRowView; surface: PortalAccessSurface }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string>();
@@ -186,9 +187,9 @@ function PortalAccessRow({ r }: { r: PortalRowView }) {
       {r.statusMessage ? <p className="text-sm" role="status">{r.statusMessage}</p> : null}
       {error ? <Alert tone="error">{error}</Alert> : null}
       <div className="flex flex-wrap items-start gap-2">
-        <Button size="sm" variant="secondary" loading={pending} disabled={!r.enabled || working} onClick={() => act(() => testPortalAccessAction(r.id))}>Testar de novo</Button>
-        <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(() => setPortalAccessEnabledAction(r.id, !r.enabled))}>{r.enabled ? "Desligar" : "Ligar"}</Button>
-        <ConfirmAction label="Remover" confirmLabel="Sim, remover" description="Apaga a senha guardada deste tribunal. Você pode cadastrar de novo quando quiser." action={() => deletePortalAccessAction(r.id)} onDone={() => router.refresh()} />
+        <Button size="sm" variant="secondary" loading={pending} disabled={!r.enabled || working} onClick={() => act(() => testPortalAccessAction(r.id, surface))}>Testar de novo</Button>
+        <Button size="sm" variant="ghost" disabled={pending} onClick={() => act(() => setPortalAccessEnabledAction(r.id, !r.enabled, surface))}>{r.enabled ? "Desligar" : "Ligar"}</Button>
+        <ConfirmAction label="Remover" confirmLabel="Sim, remover" description="Apaga a senha guardada deste tribunal. Você pode cadastrar de novo quando quiser." action={() => deletePortalAccessAction(r.id, surface)} onDone={() => router.refresh()} />
       </div>
       {r.technical ? (
         <details className="text-xs text-muted">
@@ -200,13 +201,13 @@ function PortalAccessRow({ r }: { r: PortalRowView }) {
   );
 }
 
-export function PjeConnectCard({ targets, rows }: { targets: { key: string; label: string }[]; rows: PortalRowView[] }) {
+export function PjeConnectCard({ targets, rows, surface = "legacy" }: { targets: { key: string; label: string }[]; rows: PortalRowView[]; surface?: PortalAccessSurface }) {
   return (
     <Card>
-      <CardHeader title="Conectar o PJe" description="Informe o seu login do PJe uma vez. O LegalOS entra por você, confere o acesso e mostra aqui o resultado." />
+      <CardHeader title={surface === "evolution" ? "Login piloto · TRF3 1º grau" : "Conectar o PJe"} description={surface === "evolution" ? "Teste controlado do login autorizado. A senha é cifrada no cofre e o resultado vem do portal real." : "Informe o seu login do PJe uma vez. O LegalOS entra por você, confere o acesso e mostra aqui o resultado."} />
       <CardBody className="space-y-4">
-        <PortalAccessList rows={rows} />
-        <PjeConnectForm targets={targets} hasAccess={rows.length > 0} />
+        <PortalAccessList rows={rows} surface={surface} />
+        <PjeConnectForm targets={targets} hasAccess={rows.length > 0} surface={surface} />
         <div className="rounded-xl border border-dashed border-border p-3 text-sm">
           <p className="font-medium">Entrar com certificado digital <Badge tone="warning">em validação</Badge></p>
           <p className="mt-1 text-xs text-muted">A maioria dos advogados entra no PJe com certificado. Estamos validando essa forma de entrada com um acesso real antes de liberar. Enquanto isso, se o seu login também funciona com CPF e senha, use o formulário acima.</p>

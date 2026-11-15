@@ -4,7 +4,6 @@ import Image from "next/image";
 import * as React from "react";
 import type { ModuleShot } from "@/config/showcase";
 
-/** Revela o conteúdo ao rolar (com "reduzir movimento" o CSS já mostra tudo). */
 export function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
   const ref = React.useRef<HTMLDivElement>(null);
   React.useEffect(() => {
@@ -22,11 +21,7 @@ export function Reveal({ children, className = "", delay = 0 }: { children: Reac
 
 export function BrowserFrame({ src, alt, priority = false, className = "" }: { src: string; alt: string; priority?: boolean; className?: string }) {
   return (
-    <div className={`overflow-hidden rounded-xl border border-white/10 bg-[#0a0c13] shadow-2xl shadow-black/40 ${className}`}>
-      <div className="flex items-center gap-1.5 border-b border-white/10 bg-[#11141e] px-4 py-2.5" aria-hidden>
-        <span className="h-2.5 w-2.5 rounded-full bg-[#ff5f57]" /><span className="h-2.5 w-2.5 rounded-full bg-[#febc2e]" /><span className="h-2.5 w-2.5 rounded-full bg-[#28c840]" />
-        <span className="ml-3 truncate rounded-md bg-white/5 px-3 py-0.5 text-[11px] text-white/50">legalossync.tech</span>
-      </div>
+    <div className={`overflow-hidden rounded-2xl border border-border/50 shadow-xl shadow-black/10 ${className}`}>
       <Image src={src} alt={alt} width={1800} height={1125} unoptimized priority={priority} className="block h-auto w-full" />
     </div>
   );
@@ -44,22 +39,22 @@ export function ModuleTabs({ modules }: { modules: ModuleShot[] }) {
   };
   return (
     <div>
-      <div role="tablist" aria-label="Módulos do LegalOS" className="mb-8 flex flex-wrap justify-center gap-2">
+      <div role="tablist" aria-label="Módulos do LegalOS" className="mb-10 flex flex-wrap justify-center gap-2">
         {modules.map((x, i) => (
           <button
             key={x.id} id={`tab-${x.id}`} role="tab" type="button" aria-selected={active === x.id} aria-controls={`panel-${x.id}`} tabIndex={active === x.id ? 0 : -1}
             onClick={() => setActive(x.id)} onKeyDown={(e) => onKey(e, i)}
-            className={`rounded-full border px-4 py-2 text-sm font-medium transition ${active === x.id ? "border-transparent bg-fg text-bg shadow-lg" : "border-border bg-surface text-muted hover:border-border-strong hover:text-fg"}`}
+            className={`rounded-full px-5 py-2.5 text-sm font-medium transition ${active === x.id ? "bg-fg text-bg shadow-lg" : "text-muted hover:text-fg"}`}
           >{x.label}</button>
         ))}
       </div>
-      <div id={`panel-${m.id}`} role="tabpanel" aria-labelledby={`tab-${m.id}`} className="grid items-center gap-10 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
+      <div id={`panel-${m.id}`} role="tabpanel" aria-labelledby={`tab-${m.id}`} className="grid items-center gap-12 lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)]">
         <div>
-          <h3 className="text-2xl font-semibold tracking-tight md:text-3xl">{m.title}</h3>
-          <p className="mt-3 text-base text-muted">{m.text}</p>
+          <h3 className="text-2xl font-bold tracking-tight md:text-3xl">{m.title}</h3>
+          <p className="mt-3 text-base leading-relaxed text-muted">{m.text}</p>
           <ul className="mt-6 space-y-3">
             {m.points.map((p) => (
-              <li key={p} className="flex gap-3 text-sm"><span aria-hidden className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" /><span>{p}</span></li>
+              <li key={p} className="flex gap-3 text-sm leading-relaxed"><span aria-hidden className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#ffe168]" /><span>{p}</span></li>
             ))}
           </ul>
         </div>

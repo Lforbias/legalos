@@ -34,7 +34,7 @@ export function EvolutionSidebar({
   const [openDept, setOpenDept] = React.useState<Department | null>(null);
   React.useEffect(() => onCloseMobile(), [pathname, onCloseMobile]);
 
-  const departments = (["mesa", "juridico", "controladoria", "atendimento", "comercial", "financeiro", "administracao"] as Department[]);
+  const departments = (["mesa", "juridico", "atendimento", "comercial", "financeiro", "administracao"] as Department[]);
 
   const deptNav = (isCollapsed: boolean) => (
     <nav aria-label="Navegação Evolution" className="flex-1 space-y-0.5 overflow-y-auto px-2 py-3">

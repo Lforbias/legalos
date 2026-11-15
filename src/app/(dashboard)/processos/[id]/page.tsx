@@ -59,6 +59,7 @@ import { indexCoverage } from "@/server/services/monetary-index.service";
 import { listCaseOptions } from "@/server/services/case.service";
 import { LinkedDocumentsCard } from "@/modules/documents/linked-ui";
 import { listLinkedDocuments } from "@/server/services/linked-document.service";
+import { listPublicDjenNoticesForCase } from "@/server/services/public-judicial.service";
 import { PlainUpdatesPanel } from "@/modules/portal/plus-ui";
 import { listPortalUpdatesForCase } from "@/server/services/portal-plus.service";
 import { listCalculations } from "@/server/services/calculation.service";
@@ -118,6 +119,7 @@ export default async function CaseDetailPage({
     { key: "partes", label: "Partes", count: c.parties.length },
     { key: "notas", label: "Notas" },
     { key: "andamentos", label: "Linha do tempo" },
+    { key: "publicacoes", label: "Publicações" },
     ...(canDeadlines ? [{ key: "prazos", label: "Prazos" }] : []),
     ...(canTasks ? [{ key: "tarefas", label: "Tarefas" }] : []),
     ...(canNotices ? [{ key: "intimacoes", label: "Intimações" }] : []),
@@ -136,6 +138,7 @@ export default async function CaseDetailPage({
   const cnj = c.number ? parseCnj(c.number) : null;
   const caseDeadlines = tab === "prazos" && canDeadlines ? await listDeadlinesForCase(ctx, c.id) : null;
   const caseNotices = tab === "intimacoes" && canNotices ? await listCaseNoticesForFunc(ctx, c.id) : null;
+  const publicNotices = tab === "publicacoes" ? await listPublicDjenNoticesForCase(ctx, c.id) : null;
   const caseTasks = tab === "tarefas" && canTasks ? await listTasksForCase(ctx, c.id) : null;
   const casePetitions = tab === "peticoes" && canPetitions ? await listPetitions(ctx, { caseId: c.id }) : null;
   const caseNotes = tab === "notas" ? await listCaseNotes(ctx, c.id) : null;
@@ -365,6 +368,22 @@ export default async function CaseDetailPage({
               <p className="text-sm text-muted">Nenhuma intimação vinculada a este processo.</p>
             )}
             {caseNotices && caseNotices.length === 50 ? <p className="text-xs text-muted">Exibindo as 50 comunicações mais recentes deste processo.</p> : null}
+          </CardBody>
+        </Card>
+      ) : null}
+
+      {tab === "publicacoes" && publicNotices ? (
+        <Card>
+          <CardHeader title="Publicações públicas" description="Capturadas do DJEN. O DataJud é exibido na linha do tempo. Esta área não consulta sessões privadas dos tribunais." />
+          <CardBody>
+            {publicNotices.length ? <ul className="divide-y divide-border">{publicNotices.map((notice) => (
+              <li key={notice.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center gap-2"><span className="font-medium">{notice.title}</span><Badge tone="info">{NOTICE_KIND_LABEL[notice.kind]}</Badge></div>
+                <p className="text-xs text-muted">{[notice.court, notice.caseNumber ? `Processo ${notice.caseNumber}` : null, notice.publishedAt ? `Publicada ${formatDate(notice.publishedAt, tz)}` : null, `Capturada ${formatDateTime(notice.receivedAt, tz)}`].filter(Boolean).join(" · ")}</p>
+                <details className="rounded-md border border-border bg-surface-2 px-3 py-2"><summary className="cursor-pointer text-sm text-primary-text">Ler publicação</summary><p className="mt-2 whitespace-pre-wrap text-sm">{notice.content}{notice.contentTruncated ? "\n\n[Texto exibido parcialmente]" : ""}</p></details>
+              </li>
+            ))}</ul> : <p className="text-sm text-muted">Nenhuma publicação do DJEN vinculada a este processo.</p>}
+            {publicNotices.length === 100 ? <p className="mt-3 text-xs text-muted">Exibindo as 100 publicações mais recentes.</p> : null}
           </CardBody>
         </Card>
       ) : null}
@@ -632,7 +651,7 @@ async function Timeline({ caseId, ctx, tz, source, canWrite }: { caseId: string;
                   </span>
                   <div className="flex flex-wrap items-center gap-2">
                     <p className="text-sm font-medium">{e.title}</p>
-                    <Badge tone={s.tone}>{s.label}</Badge>
+                    <Badge tone={s.tone}>{e.kind === "DATAJUD_MOVEMENT" ? "DataJud · CNJ" : s.label}</Badge>
                     {e.kind !== "NOTE" ? <span className="text-xs text-muted">{EVENT_KIND_LABEL[e.kind] ?? e.kind}</span> : null}
                   </div>
                   {e.description ? <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{e.description}</p> : null}
