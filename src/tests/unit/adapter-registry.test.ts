@@ -35,12 +35,16 @@ describe("adapter-registry", () => {
     expect(adapter!.descriptor.key).toBe("pje-portal");
   });
 
-  it("does not expose other PJe courts in the Evolution adapter target list", async () => {
+  it("exposes only PJe courts within the requested regional scope", async () => {
     const { ensureAdapters, getAdapter } = await import("@/lib/judicial/adapter-bootstrap");
+    const { REGIONAL_CONNECTOR_COURTS } = await import("@/lib/judicial/court-catalog");
     ensureAdapters();
 
     const pje = getAdapter("pje-portal")!;
-    expect(pje.descriptor.supportedTargets.map((target) => target.courtCode)).toEqual(["TJMG"]);
+    const allowed = new Set(REGIONAL_CONNECTOR_COURTS.map((court) => court.code));
+    expect(pje.descriptor.supportedTargets.length).toBeGreaterThan(1);
+    expect(pje.descriptor.supportedTargets.every((target) => allowed.has(target.courtCode))).toBe(true);
+    expect(pje.descriptor.supportedTargets.some((target) => target.courtCode === "TRT1")).toBe(true);
   });
 
   it("findAdapterForCourt returns null for unsupported court", async () => {

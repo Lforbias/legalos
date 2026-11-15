@@ -44,7 +44,7 @@ export const CONNECTORS: readonly ConnectorDescriptor[] = [
     accessMethod: "PORTAL_ROBOT",
     requiresAuthorization: true,
     capabilities: caps(
-      { validateCredentials: yes("Login do piloto TJMG por certificado A1 e chave do autenticador. O PJe pode exigir PJeOffice local; captcha e bloqueio param o robô.") },
+      { validateCredentials: yes("Teste de login por certificado A1 e chave obrigatória do autenticador nos destinos regionais PJe habilitados. O PJe pode exigir PJeOffice local; captcha e bloqueio param o robô.") },
       "O robô só confirma o login. A leitura de intimações, autos e protocolo pelo portal ainda não foi implementada.",
     ),
     limitations: [
@@ -71,6 +71,23 @@ export const CONNECTORS: readonly ConnectorDescriptor[] = [
       "O MNI exige habilitação do tribunal e, em geral, liberação do IP do servidor.",
       "Nenhum tribunal real foi homologado até agora: o código foi testado só contra um tribunal simulado.",
       "Compatibilidade de contrato (WSDL) não significa conexão funcional nem permissão concedida.",
+    ],
+  },
+  {
+    key: "eproc-portal",
+    version: "1.0.0",
+    family: "EPROC",
+    label: "eproc — acesso do advogado (portal)",
+    accessMethod: "PORTAL_ROBOT",
+    requiresAuthorization: true,
+    capabilities: caps(
+      { validateCredentials: yes("Teste de login por certificado A1 e chave do autenticador nos portais eproc regionais habilitados.") },
+      "O robô confirma apenas o login. Consulta de processos, publicações e protocolo pelo portal ainda não foi implementada.",
+    ),
+    limitations: [
+      "Cada tribunal precisa ser validado com certificado autorizado antes de ser considerado operacional.",
+      "Certificado A3 em token ou cartão físico requer um conector local; este portal remoto aceita somente certificado A1.",
+      "Captcha, bloqueio e etapas humanas interrompem o teste.",
     ],
   },
   {

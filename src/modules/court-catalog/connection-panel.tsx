@@ -107,7 +107,7 @@ export function ConnectionPanel() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [showForm, setShowForm] = useState(false);
-  const [editingTarget, setEditingTarget] = useState<string>();
+  const [editingTarget, setEditingTarget] = useState<{ adapterKey: string; targetKey: string }>();
 
   const reload = () => {
     Promise.all([listAvailableTargetsAction(), listConnectionsAction(), listPortalCertificatesAction()])
@@ -152,16 +152,16 @@ export function ConnectionPanel() {
     );
   }
 
-  const getConnection = (courtCode: string, degree: string, adapterKey: string) =>
-    connections.find((c) => c.courtCode === courtCode && c.degree === degree && c.adapterKey === adapterKey);
+  const getConnection = (targetKey: string, adapterKey: string) =>
+    connections.find((c) => c.targetKey === targetKey && c.adapterKey === adapterKey);
 
   const connected = targets.filter((t) => {
-    const conn = getConnection(t.courtCode, t.degree, t.adapterKey);
+    const conn = getConnection(t.targetKey, t.adapterKey);
     return conn?.hasConnection;
   });
 
   const available = targets.filter((t) => {
-    const conn = getConnection(t.courtCode, t.degree, t.adapterKey);
+    const conn = getConnection(t.targetKey, t.adapterKey);
     return pilotEnabled && !conn?.hasConnection;
   });
 
@@ -172,7 +172,7 @@ export function ConnectionPanel() {
         <Card>
           <CardBody>
             <p className="text-sm font-medium">Acesso privado desativado neste ambiente</p>
-            <p className="mt-1 text-sm text-muted">Os logins TJMG · PJe legado e eproc só recebem credenciais quando a configuração explícita da Evolution estiver habilitada. O acesso não está homologado e não libera consulta de processos.</p>
+            <p className="mt-1 text-sm text-muted">Os testes de login dos tribunais só recebem dados quando a configuração explícita da Evolution estiver habilitada. O acesso não está homologado e não libera consulta de processos.</p>
           </CardBody>
         </Card>
       )}
@@ -184,14 +184,14 @@ export function ConnectionPanel() {
           />
           <CardBody className="divide-y divide-border">
             {connected.map((t) => {
-              const conn = getConnection(t.courtCode, t.degree, t.adapterKey)!;
+              const conn = getConnection(t.targetKey, t.adapterKey)!;
               return (
                 <ConnectionRow
-                  key={`${t.courtCode}-${t.degree}`}
+                  key={`${t.targetKey}-${t.adapterKey}`}
                   target={t}
                   conn={conn}
                   pilotEnabled={pilotEnabled}
-                  onUpdate={() => { setEditingTarget(t.adapterKey); setShowForm(true); }}
+                  onUpdate={() => { setEditingTarget({ adapterKey: t.adapterKey, targetKey: t.targetKey }); setShowForm(true); }}
                 />
               );
             })}
@@ -204,7 +204,7 @@ export function ConnectionPanel() {
           <CardHeader title={editingTarget ? "Atualizar acesso ao tribunal" : "Conectar tribunal"} description="Selecione o certificado A1 e informe a chave obrigatória do autenticador." />
           <CardBody>
             <ConnectAdapterForm
-              targets={editingTarget ? targets.filter((t) => t.adapterKey === editingTarget) : available}
+              targets={editingTarget ? targets.filter((t) => t.adapterKey === editingTarget.adapterKey && t.targetKey === editingTarget.targetKey) : available}
               certificates={certificates}
               onDone={() => {
                 setShowForm(false);
@@ -220,13 +220,13 @@ export function ConnectionPanel() {
         <Card>
           <CardHeader
             title="Tribunais disponíveis"
-            description="Acessos ao TJMG por certificado digital com chave autenticadora obrigatória."
+            description="Acessos dos tribunais listados por certificado digital A1 e chave do autenticador obrigatória."
           />
           <CardBody className="space-y-4">
             {!showForm && (
               <div className="divide-y divide-border">
                 {available.map((t) => (
-                  <div key={`${t.courtCode}-${t.degree}`} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                  <div key={`${t.targetKey}-${t.adapterKey}`} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
                     <div className="flex items-center gap-3">
                       <Plug className="h-4 w-4 text-muted" />
                       <div>
@@ -264,7 +264,7 @@ export function ConnectionPanel() {
       )}
 
       <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted space-y-1">
-        <p>Os logins do piloto TJMG usam certificado A1 e chave do autenticador. Cada tribunal e sistema só poderá ser habilitado após adaptação específica do portal.</p>
+        <p>Uma conexão validada confirma apenas o acesso ao portal; consulta de processos e leitura de publicações dependem de integração adicional.</p>
         <p>O LegalOS cifra os dados do certificado e do autenticador no cofre. A3 em token/cartão físico não pode ser usado pelo navegador remoto.</p>
       </div>
     </div>

@@ -24,8 +24,11 @@ export function ConnectAdapterForm({
   const [done, setDone] = useState<string>();
   const [pending, start] = useTransition();
 
+  const selection = targets.length === 1
+    ? `${targets[0]!.adapterKey}|${targets[0]!.targetKey}`
+    : selectedTarget;
   const selected = targets.find(
-    (t) => `${t.adapterKey}|${t.courtCode}|${t.degree}` === selectedTarget,
+    (t) => `${t.adapterKey}|${t.targetKey}` === selection,
   );
 
   return (
@@ -41,6 +44,7 @@ export function ConnectAdapterForm({
             adapterKey: selected.adapterKey,
             courtCode: selected.courtCode,
             degree: selected.degree as "1" | "2",
+            targetKey: selected.targetKey,
             certificateId,
             otp,
           };
@@ -66,7 +70,7 @@ export function ConnectAdapterForm({
       <Field label="Tribunal e grau" htmlFor="adapter-target">
         <Select
           id="adapter-target"
-          value={selectedTarget}
+          value={selection}
           onChange={(e) => setSelectedTarget(e.target.value)}
           required
           disabled={pending}
@@ -74,8 +78,8 @@ export function ConnectAdapterForm({
           <option value="">Escolha o tribunal…</option>
           {targets.map((t) => (
             <option
-              key={`${t.adapterKey}|${t.courtCode}|${t.degree}`}
-              value={`${t.adapterKey}|${t.courtCode}|${t.degree}`}
+              key={`${t.adapterKey}|${t.targetKey}`}
+              value={`${t.adapterKey}|${t.targetKey}`}
             >
               {t.courtCode} · {t.degreeLabel} — {t.adapterLabel}
             </option>
@@ -131,7 +135,7 @@ export function ConnectAdapterForm({
         <Button
           type="submit"
           loading={pending}
-          disabled={!selectedTarget || !certificateId || !otp || (certificates.length === 0)}
+          disabled={!selection || !certificateId || !otp || (certificates.length === 0)}
         >
           Salvar e conectar
         </Button>

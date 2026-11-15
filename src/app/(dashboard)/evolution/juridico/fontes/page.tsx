@@ -29,10 +29,10 @@ export default async function FontesPage() {
         icon={Globe}
         color={dept.color}
         title="Fontes e conexões"
-        description="Catálogo dos 91 tribunais jurisdicionais do Brasil e estado das conexões do escritório. O login e a consulta de cada tribunal são habilitados por adaptador, um por vez."
+        description="Conectores da Justiça Estadual, Federal e do Trabalho nos estados do Sul e Sudeste. Login, consulta e protocolo são habilitados conforme validação de cada portal."
       />
       <ConnectionPanel />
-      <h2 className="mt-8 mb-4 text-base font-semibold">Catálogo nacional de tribunais</h2>
+      <h2 className="mt-8 mb-4 text-base font-semibold">Tribunais no escopo dos conectores</h2>
       <CourtCatalogList courts={courts} summary={summary} />
     </>
   );

@@ -55,7 +55,7 @@ describe("destinos do PJe", () => {
       expect(t.origin).toMatch(/^https:\/\/[a-z0-9.-]+\.jus\.br$/);
       expect(getPjeTarget(t.key)).toBe(t);
       expect(t.clientId).toBe(`pje-${t.key}`);
-      expect(pjeLoginUrl(t)).toBe(`${t.origin}/pje/login.seam`);
+      expect(pjeLoginUrl(t)).toBe(`${t.origin}${t.loginPath}`);
     }
     expect(getPjeTarget("http://evil.example")).toBeNull();
   });

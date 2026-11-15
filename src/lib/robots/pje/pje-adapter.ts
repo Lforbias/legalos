@@ -16,6 +16,7 @@ import type {
   CourtTarget,
 } from "@/lib/judicial/adapter";
 import type { EvidenceEnvironment } from "@/lib/judicial/contracts";
+import { REGIONAL_CONNECTOR_COURTS } from "@/lib/judicial/court-catalog";
 import { PJE_TARGETS, type PjeTarget } from "./targets";
 import { loginPje, type PjeCredentials } from "./login";
 
@@ -31,10 +32,8 @@ function pjeTargetToCourtTarget(t: PjeTarget): CourtTarget {
   };
 }
 
-// O fluxo privado da Evolution está limitado ao TJMG · 1º grau.
-// Os demais destinos conhecidos continuam fora do fluxo até homologação individual.
 const supportedTargets: readonly CourtTarget[] = PJE_TARGETS
-  .filter((target) => target.key === "tjmg-1g")
+  .filter((target) => REGIONAL_CONNECTOR_COURTS.some((court) => court.code === target.key.split("-")[0]!.toUpperCase()))
   .map(pjeTargetToCourtTarget);
 
 const descriptor: AdapterDescriptor = {
