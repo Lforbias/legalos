@@ -65,6 +65,7 @@ function ConnectionRow({ target, conn, pilotEnabled, onUpdate }: { target: Avail
         {statusBadge(conn.status, conn.enabled)}
       </div>
       {error ? <Alert tone="error">{error}</Alert> : null}
+      {conn.statusMessage && <p className="max-w-3xl text-xs text-muted">{conn.statusMessage}</p>}
       <div className="flex flex-wrap items-start gap-2">
         <Button size="sm" variant="secondary" disabled={pending} onClick={onUpdate}>Atualizar certificado e autenticador</Button>
         {pilotEnabled && <>
