@@ -94,6 +94,12 @@ mkdir -p "$REL_DIR"
 SNAP="$REL_DIR/antes-$SHA.tar.gz"
 tar -czf "$SNAP" -C "$APP_DIR" --exclude='./.env' --exclude='./.env.*' --exclude='./.storage' --exclude='./node_modules' --exclude='*.tar.gz' --exclude='*.log' .
 
+# Libera imagens de versões antigas que não estão ligadas a containers antes de baixar
+# a nova versão. Sem isso, o servidor precisa manter toda a imagem anterior e a nova
+# ao mesmo tempo, o que pode esgotar o disco durante o pull e impedir o rollback.
+log "limpando imagens Docker sem uso antes do download"
+docker image prune -af >/dev/null 2>&1 || true
+
 diagnose() {
   log "diagnóstico da falha (etapa: ${STAGE:-desconhecida})"
   curl -sS --max-time 4 http://127.0.0.1:3000/api/ready 2>&1 | head -c 400 || true
