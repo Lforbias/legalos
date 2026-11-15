@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { linkPublicDjenNoticeAction, processPublicDjenNoticeAction } from "./public-notice-link-actions";
 
-export function PublicNoticeLink({ noticeId, cases, onProcess, linkEnabled = true }: { noticeId: string; cases: { id: string; title: string; number: string | null }[]; onProcess?: () => void; linkEnabled?: boolean }) {
+export function PublicNoticeLink({ noticeId, cases, processEnabled = false, linkEnabled = true }: { noticeId: string; cases: { id: string; title: string; number: string | null }[]; processEnabled?: boolean; linkEnabled?: boolean }) {
   const router = useRouter();
   const [caseId, setCaseId] = React.useState("");
   const [message, setMessage] = React.useState<{ tone: "success" | "error"; text: string } | null>(null);
@@ -30,7 +30,7 @@ export function PublicNoticeLink({ noticeId, cases, onProcess, linkEnabled = tru
       })}>Vincular</Button>
       </> : null}
       {message ? <Alert tone={message.tone} className="basis-full">{message.text}</Alert> : null}
-      {onProcess ? <Button size="sm" variant="ghost" disabled={pending} loading={pending} onClick={() => start(async () => { const result = await processPublicDjenNoticeAction(noticeId); if (!result.ok) setMessage({ tone: "error", text: result.message ?? "Não foi possível concluir." }); else { setMessage({ tone: "success", text: "Publicação marcada como tratada." }); onProcess(); router.refresh(); } })}>Marcar como tratada</Button> : null}
+      {processEnabled ? <Button size="sm" variant="ghost" disabled={pending} loading={pending} onClick={() => start(async () => { const result = await processPublicDjenNoticeAction(noticeId); if (!result.ok) setMessage({ tone: "error", text: result.message ?? "Não foi possível concluir." }); else { setMessage({ tone: "success", text: "Publicação marcada como tratada." }); router.refresh(); } })}>Marcar como tratada</Button> : null}
     </div>
   );
 }

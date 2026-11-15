@@ -52,7 +52,7 @@ export default async function PublicacoesPage() {
                     <p className="mt-2 whitespace-pre-wrap text-sm text-muted">{item.content}{item.contentTruncated ? "\n\n[Texto exibido parcialmente]" : ""}</p>
                   </details>
                   {item.case ? <Link className="text-sm font-medium text-primary-text hover:underline" href={`/processos/${item.case.id}?aba=publicacoes`}>Abrir processo: {item.case.title}</Link> : <p className="text-xs text-muted">Ainda sem processo vinculado</p>}
-                  {can(ctx, "cases:write") && item.status !== "PROCESSED" && item.status !== "DISCARDED" ? <PublicNoticeLink noticeId={item.id} cases={cases} linkEnabled={!item.case} onProcess={() => {}} /> : null}
+                  {can(ctx, "cases:write") && item.status !== "PROCESSED" && item.status !== "DISCARDED" ? <PublicNoticeLink noticeId={item.id} cases={cases} linkEnabled={!item.case} processEnabled /> : null}
                 </li>
               ))}
             </ul>
