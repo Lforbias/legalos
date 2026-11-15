@@ -10,6 +10,7 @@ export const SETTINGS_GROUPS = [
 export type SettingsItem = { href: string; label: string; description: string; group: string; permission?: PermissionKey };
 const ALL_SETTINGS_ITEMS: SettingsItem[] = [
   { href: "/configuracoes/implantacao", label: "Implantação do escritório", description: "Acompanhe a preparação das três etapas e as conferências da equipe.", group: "office", permission: "organization:manage" },
+  { href: "/configuracoes/importar-astrea", label: "Importar backup do Astrea", description: "Envie um ZIP do backup, confira a simulação e traga os dados para este escritório.", group: "office", permission: "organization:manage" },
   { href: "/configuracoes/escritorio", label: "Dados do escritório", description: "Nome, identificação e fuso horário.", group: "office" },
   { href: "/configuracoes/equipe", label: "Equipe", description: "Membros, convites e acesso ao escritório.", group: "office", permission: "members:read" },
   { href: "/configuracoes/perfis", label: "Perfis de acesso", description: "Permissões de cada função.", group: "office", permission: "members:read" },
