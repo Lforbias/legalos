@@ -39,17 +39,21 @@ describe("adapter-registry", () => {
     const { ensureAdapters, findAdapterForCourt } = await import("@/lib/judicial/adapter-bootstrap");
     ensureAdapters();
 
-    const adapter = findAdapterForCourt("TJSP", "1");
+    const adapter = findAdapterForCourt("TJBA", "1");
     expect(adapter).toBeNull();
   });
 
-  it("allSupportedTargets lists all PJe targets", async () => {
+  it("allSupportedTargets lists targets from all adapters", async () => {
     const { ensureAdapters, allSupportedTargets } = await import("@/lib/judicial/adapter-bootstrap");
     ensureAdapters();
 
     const all = allSupportedTargets();
     expect(all.length).toBeGreaterThanOrEqual(5);
-    expect(all.every((t) => t.adapter.descriptor.key === "pje-portal")).toBe(true);
+    const keys = new Set(all.map((t) => t.adapter.descriptor.key));
+    expect(keys.has("pje-portal")).toBe(true);
+    expect(keys.has("eproc-mni")).toBe(true);
+    expect(keys.has("esaj-mni")).toBe(true);
+    expect(keys.has("projudi-mni")).toBe(true);
   });
 
   it("pje adapter descriptor has correct capabilities", async () => {

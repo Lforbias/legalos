@@ -12,6 +12,9 @@
 
 import { registerAdapter, listAdapters } from "./adapter-registry";
 import { pjeAdapter } from "@/lib/robots/pje/pje-adapter";
+import { eprocAdapter } from "@/lib/robots/eproc/eproc-adapter";
+import { esajAdapter } from "@/lib/robots/esaj/esaj-adapter";
+import { projudiAdapter } from "@/lib/robots/projudi/projudi-adapter";
 
 let initialized = false;
 
@@ -20,11 +23,9 @@ export function bootstrapAdapters(): void {
   initialized = true;
 
   registerAdapter(pjeAdapter);
-
-  // Futuros adaptadores:
-  // registerAdapter(eprocAdapter);
-  // registerAdapter(esajAdapter);
-  // registerAdapter(projudiAdapter);
+  registerAdapter(eprocAdapter);
+  registerAdapter(esajAdapter);
+  registerAdapter(projudiAdapter);
 }
 
 export function ensureAdapters(): void {
