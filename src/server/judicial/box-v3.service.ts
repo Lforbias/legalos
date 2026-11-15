@@ -42,7 +42,7 @@ export async function listBoxV3Connections(ctx: TenantContext, now = new Date())
   const [monitors, connections, accesses, evidence, professionals] = await Promise.all([
     db.djenMonitor.findMany({ where: { organizationId: org }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, oabNumber: true, oabUf: true, professionalId: true, enabled: true, lastSuccessAt: true, lastCaptureAt: true } }),
     db.courtConnection.findMany({ where: { organizationId: org }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, jtr: true, system: true, enabled: true, lastSyncAt: true, lastStatus: true } }),
-    db.portalAccess.findMany({ where: { organizationId: org }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, target: true, enabled: true, lastLoginAt: true } }),
+    db.portalAccess.findMany({ where: { organizationId: org }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, target: true, enabled: true, lastLoginAt: true, jobs: { where: { kind: "LOGIN_TEST" }, orderBy: { createdAt: "desc" }, take: 1, select: { summary: true } } } }),
     loadEvidence(org),
     db.professionalIdentity.findMany({ where: { organizationId: org }, select: { id: true, name: true } }),
   ]);
@@ -71,6 +71,8 @@ export async function listBoxV3Connections(ctx: TenantContext, now = new Date())
   }
 
   for (const access of accesses) {
+    const latestLogin = access.jobs[0]?.summary as { origin?: string } | undefined;
+    if (latestLogin?.origin === "EVOLUTION_PJE_LOGIN" || latestLogin?.origin === "EVOLUTION_TJMG_PJE_LOGIN" || latestLogin?.origin === "EVOLUTION_TJMG_EPROC_LOGIN") continue;
     const key = "pje-portal";
     const scoped = evidence.filter((item) => item.connectorKey === key && (item.sourceId === access.id || item.sourceId == null) && (item.courtCode === access.target || item.courtCode === "*"));
     cards.push({ id: access.id, kind: "PORTAL", connectorKey: key, title: access.label, subtitle: `Acesso de portal · ${access.target}`, courtCode: access.target, enabled: access.enabled, state: "OFF", stateLabel: access.enabled ? "Ligado no cadastro antigo" : "Desligado no cadastro antigo", headline: "Histórico preservado; sem validação do Box 3.0.", nextAction: null, coverage: null, coverageLabel: null, lastSuccessAt: access.lastLoginAt, lastCaptureAt: null, lastEvidenceAt: latestEvidenceAt(scoped), capabilities: capabilityViews(key, scoped), limitations: plainLimitations(getConnector(key)?.limitations ?? []), professional: null, technical: null });

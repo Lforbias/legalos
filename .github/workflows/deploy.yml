@@ -49,6 +49,7 @@ jobs:
           REPO="ghcr.io/${GITHUB_REPOSITORY,,}"
           echo "app=$REPO/app:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "migrate=$REPO/migrate:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+          echo "robot=$REPO/robot:${GITHUB_SHA}" >> "$GITHUB_OUTPUT"
           echo "cache=$REPO/cache" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
@@ -75,6 +76,16 @@ jobs:
           tags: ${{ steps.img.outputs.migrate }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=registry,ref=${{ steps.img.outputs.cache }}
+      - name: Construir imagem do worker judicial
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: robot
+          push: true
+          tags: ${{ steps.img.outputs.robot }}
+          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=registry,ref=${{ steps.img.outputs.cache }}
+          cache-to: type=registry,ref=${{ steps.img.outputs.cache }},mode=max
       - name: Enviar e publicar
         env:
           DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -84,7 +95,7 @@ jobs:
           SHA="$(git rev-parse HEAD)"
           # o servidor baixa as imagens prontas; o token vale só enquanto este job roda e vai dentro do pacote, não na linha de comando
           mkdir -p /tmp/meta
-          { echo "APP_IMAGE=${{ steps.img.outputs.app }}"; echo "MIGRATE_IMAGE=${{ steps.img.outputs.migrate }}"; echo "GHCR_USER=${{ github.actor }}"; echo "GHCR_TOKEN=${GHCR_TOKEN}"; } > /tmp/meta/.deploy-meta
+          { echo "APP_IMAGE=${{ steps.img.outputs.app }}"; echo "MIGRATE_IMAGE=${{ steps.img.outputs.migrate }}"; echo "ROBOT_IMAGE=${{ steps.img.outputs.robot }}"; echo "GHCR_USER=${{ github.actor }}"; echo "GHCR_TOKEN=${GHCR_TOKEN}"; } > /tmp/meta/.deploy-meta
           chmod 600 /tmp/meta/.deploy-meta
           git archive --format=tar HEAD > /tmp/src.tar
           tar -rf /tmp/src.tar -C /tmp/meta .deploy-meta

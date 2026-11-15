@@ -1,4 +1,12 @@
 import { assertBoxAvailable } from "@/server/box-guard";
+import {
+  assertEvolutionJudicialLoginEnabled,
+  EVOLUTION_EPROC_JOB_ORIGIN,
+  EVOLUTION_EPROC_SYSTEM,
+  EVOLUTION_PJE_JOB_ORIGIN,
+  EVOLUTION_PJE_TARGET_KEY,
+  EVOLUTION_TJMG_TARGET_KEY,
+} from "@/lib/evolution-judicial-login";
 import { z } from "zod";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -18,6 +26,16 @@ export type PortalSecret = { document: string; password: string; otpSecret: stri
 
 const MIN_RETEST_MS = 60_000;
 const MAX_TARGETS = 20;
+export type PortalAccessSurface = "legacy" | "evolution" | "evolution-eproc";
+
+function assertPortalSurface(surface: PortalAccessSurface) {
+  if (surface !== "legacy") assertEvolutionJudicialLoginEnabled();
+  else assertBoxAvailable();
+}
+
+function assertPortalPermission(ctx: TenantContext, surface: PortalAccessSurface) {
+  assertCan(ctx, surface !== "legacy" ? "integrations:manage" : "cases:read");
+}
 
 function requireKey(): Buffer {
   const k = certKey();
@@ -27,7 +45,7 @@ function requireKey(): Buffer {
 
 async function requireOwnMfa(userId: string) {
   const m = await db.userMfa.findUnique({ where: { userId }, select: { enabledAt: true } });
-  if (!m?.enabledAt) throw new ConflictError("Para guardar a senha do PJe, ative a verificação em duas etapas do LegalOS em Minha conta.");
+  if (!m?.enabledAt) throw new ConflictError("Para guardar credenciais de tribunal, ative a verificação em duas etapas do LegalOS em Minha conta.");
 }
 
 const hint = (doc: string) => (doc.length === 11 ? `CPF final ${doc.slice(-2)}` : `CNPJ final ${doc.slice(-4)}`);
@@ -57,15 +75,21 @@ export type PortalAccessRow = {
   lastJob: { status: string; message: string | null; finishedAt: Date | null; createdAt: Date; summary: unknown } | null;
 };
 
-export function pjeTargetOptions() {
-  return PJE_TARGETS.map((t) => ({ key: t.key, label: t.label }));
+export function pjeTargetOptions(surface: PortalAccessSurface = "legacy") {
+  const targets = surface === "evolution" || surface === "evolution-eproc" ? PJE_TARGETS.filter((t) => t.key === EVOLUTION_PJE_TARGET_KEY) : PJE_TARGETS;
+  return targets.map((t) => ({ key: t.key, label: t.label }));
 }
 
-export async function listMyPortalAccesses(ctx: TenantContext): Promise<PortalAccessRow[]> {
-  assertBoxAvailable();
-  assertCan(ctx, "cases:read");
+export async function listMyPortalAccesses(ctx: TenantContext, surface: PortalAccessSurface = "legacy"): Promise<PortalAccessRow[]> {
+  assertPortalSurface(surface);
+  assertPortalPermission(ctx, surface);
   const rows = await db.portalAccess.findMany({
-    where: { organizationId: ctx.organizationId, userId: ctx.userId },
+    where: {
+      organizationId: ctx.organizationId,
+      userId: ctx.userId,
+      ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}),
+      ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}),
+    },
     orderBy: [{ system: "asc" }, { target: "asc" }],
     include: { jobs: { orderBy: { createdAt: "desc" }, take: 1 } },
   });
@@ -82,7 +106,7 @@ export async function listMyPortalAccesses(ctx: TenantContext): Promise<PortalAc
       id: r.id,
       system: r.system,
       target: r.target,
-      targetLabel: getPjeTarget(r.target)?.label ?? r.target,
+      targetLabel: surface === "evolution-eproc" ? "TJMG · 1º grau (eproc)" : getPjeTarget(r.target)?.label ?? r.target,
       authMethod: r.authMethod,
       enabled: r.enabled,
       status: r.status,
@@ -90,28 +114,39 @@ export async function listMyPortalAccesses(ctx: TenantContext): Promise<PortalAc
       statusAt: r.statusAt,
       lastLoginAt: r.lastLoginAt,
       lastSyncAt: r.lastSyncAt,
-      documentHint: secret?.document ? hint(secret.document) : "—",
+      documentHint: secret?.document ? (surface === "evolution-eproc" ? "Usuário eproc cadastrado" : hint(secret.document)) : "—",
       hasOtp: Boolean(secret?.otpSecret),
       lastJob: j ? { status: j.status, message: j.message, finishedAt: j.finishedAt, createdAt: j.createdAt, summary: j.summary } : null,
     };
   });
 }
 
-async function enqueue(organizationId: string, accessId: string, kind: "LOGIN_TEST" | "SYNC_NOTICES") {
-  const open = await db.robotJob.findFirst({ where: { accessId, status: { in: ["QUEUED", "RUNNING"] } }, select: { id: true } });
+async function enqueue(organizationId: string, accessId: string, kind: "LOGIN_TEST" | "SYNC_NOTICES", origin?: string) {
+  const open = await db.robotJob.findFirst({
+    where: {
+      accessId,
+      kind,
+      status: { in: ["QUEUED", "RUNNING"] },
+      ...(origin ? { summary: { path: ["origin"], equals: origin } } : {}),
+    },
+    select: { id: true },
+  });
   if (open) return open.id;
-  const job = await db.robotJob.create({ data: { organizationId, accessId, kind }, select: { id: true } });
+  const job = await db.robotJob.create({ data: { organizationId, accessId, kind, ...(origin ? { summary: { origin } } : {}) }, select: { id: true } });
   return job.id;
 }
 
 /** Cadastra (ou atualiza) o acesso aos tribunais escolhidos e enfileira o teste de login do primeiro. */
-export async function connectPje(ctx: TenantContext, raw: unknown) {
-  assertBoxAvailable();
-  assertCan(ctx, "cases:read");
+export async function connectPje(ctx: TenantContext, raw: unknown, surface: PortalAccessSurface = "legacy") {
+  assertPortalSurface(surface);
+  assertPortalPermission(ctx, surface);
   const input = connectPjeSchema.parse(raw);
   const key = requireKey();
   await requireOwnMfa(ctx.userId);
   const targets = [...new Set(input.targets)];
+  if (surface === "evolution" && (targets.length !== 1 || targets[0] !== EVOLUTION_PJE_TARGET_KEY)) {
+    throw new ValidationError("O piloto está limitado ao TJMG · 1º grau.", { targets: ["Escolha apenas TJMG · 1º grau."] });
+  }
   const unknown = targets.filter((t) => !getPjeTarget(t));
   if (unknown.length) throw new ValidationError("Tribunal inválido.", { targets: ["Escolha tribunais da lista."] });
   const document = onlyDigits(input.document);
@@ -129,23 +164,47 @@ export async function connectPje(ctx: TenantContext, raw: unknown) {
     });
     ids.push(row.id);
   }
-  const jobId = await enqueue(ctx.organizationId, ids[0]!, "LOGIN_TEST");
+  const jobId = await enqueue(ctx.organizationId, ids[0]!, "LOGIN_TEST", surface === "evolution" ? EVOLUTION_PJE_JOB_ORIGIN : undefined);
   await db.portalAccess.update({ where: { id: ids[0]! }, data: { status: "CONNECTING", statusMessage: "Na fila para o teste de login.", statusAt: new Date() } });
   await audit({ action: "portal_access.save", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: ids[0], metadata: { system: "pje", targets, withOtp: Boolean(otpSecret) }, meta: ctx.meta });
   return { ids, jobId };
 }
 
-async function ownAccess(ctx: TenantContext, id: string) {
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, ...(can(ctx, "integrations:manage") ? {} : { userId: ctx.userId }) } });
-  if (!a) throw new NotFoundError("Acesso não encontrado.");
-  return a;
+const connectEprocTjmgSchema = z.object({
+  username: z.string().trim().min(1, "Informe o usuário do eproc.").max(30),
+  password: z.string().min(1, "Informe a senha do eproc.").max(40),
+  otp: z.string().trim().min(1, "Informe a chave do autenticador do eproc.").max(2048),
+}).strict();
+
+/** Guarda e testa login real do eproc TJMG 1º grau; não ativa consulta de processos. */
+export async function connectEprocTjmg(ctx: TenantContext, raw: unknown) {
+  const surface: PortalAccessSurface = "evolution-eproc";
+  assertPortalSurface(surface);
+  assertPortalPermission(ctx, surface);
+  const input = connectEprocTjmgSchema.parse(raw);
+  const key = requireKey();
+  await requireOwnMfa(ctx.userId);
+  const otpSecret = parseCourtOtpSecret(input.otp);
+  const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document: input.username, password: input.password, otpSecret } satisfies PortalSecret), "utf8"), key);
+  const target = EVOLUTION_TJMG_TARGET_KEY;
+  const data = { authMethod: "PASSWORD_OTP", certificateId: null, secretEnc, enabled: true, status: "PENDING", statusMessage: "Aguardando o primeiro teste de login no eproc.", statusAt: new Date() };
+  const access = await db.portalAccess.upsert({
+    where: { organizationId_userId_system_target: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target } },
+    create: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target, label: "TJMG · 1º grau (eproc)", ...data },
+    update: data,
+    select: { id: true },
+  });
+  const jobId = await enqueue(ctx.organizationId, access.id, "LOGIN_TEST", EVOLUTION_EPROC_JOB_ORIGIN);
+  await db.portalAccess.update({ where: { id: access.id }, data: { status: "CONNECTING", statusMessage: "Na fila para o teste de login no eproc.", statusAt: new Date() } });
+  await audit({ action: "portal_access.save", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: access.id, metadata: { system: EVOLUTION_EPROC_SYSTEM, target, withOtp: true }, meta: ctx.meta });
+  return { id: access.id, jobId };
 }
 
 /** Enfileira um novo teste de login (no máximo um por minuto por acesso). */
-export async function testPortalAccess(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
-  assertCan(ctx, "cases:read");
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId } });
+export async function testPortalAccess(ctx: TenantContext, id: string, surface: PortalAccessSurface = "legacy") {
+  assertPortalSurface(surface);
+  assertPortalPermission(ctx, surface);
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}) } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
   if (!a.enabled) throw new ConflictError("Este acesso está desligado. Ligue-o antes de testar.");
   const last = await db.robotJob.findFirst({ where: { accessId: id }, orderBy: { createdAt: "desc" }, select: { createdAt: true, summary: true } });
@@ -153,26 +212,30 @@ export async function testPortalAccess(ctx: TenantContext, id: string) {
   // senha recusada: repetir o mesmo login só agrava (pode bloquear a conta). A pessoa precisa corrigir os dados antes.
   const code = (last?.summary as { code?: string } | null)?.code;
   if (a.status === "NEEDS_ACTION" && (code === "BAD_CREDENTIALS" || code === "OTP_REJECTED")) throw new ConflictError("O PJe recusou os dados deste acesso. Corrija a senha ou o 2º fator em \"Atualizar senha\" antes de testar de novo.");
-  const jobId = await enqueue(ctx.organizationId, id, "LOGIN_TEST");
+  const origin = surface === "evolution" ? EVOLUTION_PJE_JOB_ORIGIN : surface === "evolution-eproc" ? EVOLUTION_EPROC_JOB_ORIGIN : undefined;
+  const jobId = await enqueue(ctx.organizationId, id, "LOGIN_TEST", origin);
   await db.portalAccess.update({ where: { id }, data: { status: "CONNECTING", statusMessage: "Na fila para o teste de login.", statusAt: new Date() } });
   await audit({ action: "portal_access.test", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
   return { jobId };
 }
 
-export async function setPortalAccessEnabled(ctx: TenantContext, id: string, enabled: boolean) {
-  assertBoxAvailable();
+export async function setPortalAccessEnabled(ctx: TenantContext, id: string, enabled: boolean, surface: PortalAccessSurface = "legacy") {
+  assertPortalSurface(surface);
   assertCan(ctx, "cases:read");
-  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId }, select: { id: true } });
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, userId: ctx.userId, ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}) }, select: { id: true } });
   if (!a) throw new NotFoundError("Acesso não encontrado.");
   await db.portalAccess.update({ where: { id }, data: { enabled } });
   await audit({ action: enabled ? "portal_access.enable" : "portal_access.disable", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
 }
 
 /** O dono remove o próprio acesso; quem administra integrações remove o de qualquer pessoa (nunca lê o segredo). */
-export async function deletePortalAccess(ctx: TenantContext, id: string) {
-  assertBoxAvailable();
-  await ownAccess(ctx, id);
-  await db.portalAccess.delete({ where: { id } });
+export async function deletePortalAccess(ctx: TenantContext, id: string, surface: PortalAccessSurface = "legacy") {
+  // Revocation remains available while the Evolution pilot is off; deletion cannot
+  // start a browser job or touch the retired BOX.
+  if (surface === "legacy") assertBoxAvailable();
+  const a = await db.portalAccess.findFirst({ where: { id, organizationId: ctx.organizationId, ...(can(ctx, "integrations:manage") ? {} : { userId: ctx.userId }), ...(surface === "evolution" ? { system: "pje", target: EVOLUTION_PJE_TARGET_KEY } : {}), ...(surface === "evolution-eproc" ? { system: EVOLUTION_EPROC_SYSTEM, target: EVOLUTION_TJMG_TARGET_KEY } : {}) }, select: { id: true } });
+  if (!a) throw new NotFoundError("Acesso não encontrado.");
+  await db.portalAccess.delete({ where: { id: a.id } });
   await audit({ action: "portal_access.delete", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "portal_access", resourceId: id, meta: ctx.meta });
 }
 

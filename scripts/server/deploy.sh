@@ -20,14 +20,17 @@ exec 9>/var/lock/legalos-deploy.lock
 flock -n 9 || die "já existe uma publicação em andamento"
 
 # modo rápido: o pacote traz .deploy-meta com os nomes das imagens já construídas no GitHub (e um token que só vale durante a publicação)
-FAST=0; APP_IMAGE=""; MIGRATE_IMAGE=""
+FAST=0; APP_IMAGE=""; MIGRATE_IMAGE=""; ROBOT_IMAGE=""
 if tar -xzf "$TAR" -O .deploy-meta >/tmp/.dm.$$ 2>/dev/null && [ -s /tmp/.dm.$$ ]; then
   APP_IMAGE="$(grep '^APP_IMAGE=' /tmp/.dm.$$ | cut -d= -f2-)"; MIGRATE_IMAGE="$(grep '^MIGRATE_IMAGE=' /tmp/.dm.$$ | cut -d= -f2-)"
+  ROBOT_IMAGE="$(grep '^ROBOT_IMAGE=' /tmp/.dm.$$ | cut -d= -f2-)"
   GHCR_USER="$(grep '^GHCR_USER=' /tmp/.dm.$$ | cut -d= -f2-)"; GHCR_TOKEN="$(grep '^GHCR_TOKEN=' /tmp/.dm.$$ | cut -d= -f2-)"
-  [ -n "$APP_IMAGE" ] && [ -n "$MIGRATE_IMAGE" ] && FAST=1
+  [ -n "$APP_IMAGE" ] && [ -n "$MIGRATE_IMAGE" ] && [ -n "$ROBOT_IMAGE" ] && FAST=1
 fi
 rm -f /tmp/.dm.$$ "$APP_DIR/.deploy-meta"
 PREV_IMAGES="$(cat "$APP_DIR/.deployed-image" 2>/dev/null || true)"
+PREV_ROBOT_IMAGE="$(printf '%s\n' "$PREV_IMAGES" | sed -n 's/.*ROBOT_IMAGE=\([^ ]*\).*/\1/p')"
+PREV_LOGIN_FLAG="$(env_get EVOLUTION_PJE_LOGIN_ENABLED)"
 
 PREV="$(cat "$APP_DIR/.deployed-sha" 2>/dev/null || echo desconhecida)"
 log "publicando $SHA (anterior: $PREV)"
@@ -44,10 +47,18 @@ install_tree() { # $1 = pacote
 rebuild_and_up() {
   if [ -n "$PREV_IMAGES" ]; then # volta com a imagem anterior, sem reconstruir nada
     ( eval "export $PREV_IMAGES"; compose up -d --no-build app )
+    if [ "$(env_get EVOLUTION_PJE_LOGIN_ENABLED)" = "1" ] && [ -n "$PREV_ROBOT_IMAGE" ]; then
+      export ROBOT_IMAGE="$PREV_ROBOT_IMAGE"
+      compose --profile robot up -d --no-build robot
+    else
+      compose --profile robot stop robot || true
+    fi
   else
-    unset APP_IMAGE MIGRATE_IMAGE # sem imagem anterior registrada: constrói a versão antiga aqui mesmo
+    unset APP_IMAGE MIGRATE_IMAGE ROBOT_IMAGE # sem imagem anterior registrada: constrói a versão antiga aqui mesmo
     compose build
+    if [ "$(env_get EVOLUTION_PJE_LOGIN_ENABLED)" = "1" ]; then compose --profile robot build robot; fi
     compose up -d app
+    if [ "$(env_get EVOLUTION_PJE_LOGIN_ENABLED)" = "1" ]; then compose --profile robot up -d robot; else compose --profile robot stop robot || true; fi
   fi
 }
 wait_ready() {
@@ -57,6 +68,21 @@ wait_ready() {
     sleep 2
   done
   return 1
+}
+set_env_value() {
+  local key="$1" value="$2" tmp="$ENV_FILE.tmp.$$"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { found = 0 }
+    index($0, key "=") == 1 {
+      if (!found) print key "=" value
+      found = 1
+      next
+    }
+    { print }
+    END { if (!found) print key "=" value }
+  ' "$ENV_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+  chmod --reference="$ENV_FILE" "$tmp"
+  mv "$tmp" "$ENV_FILE"
 }
 
 # 1) backup antes de mexer (se falhar, não publica)
@@ -80,6 +106,7 @@ rollback() {
   diagnose
   log "ERRO na publicação: voltando para a versão anterior ($PREV)"
   install_tree "$SNAP" || true
+  set_env_value EVOLUTION_PJE_LOGIN_ENABLED "$PREV_LOGIN_FLAG" || true
   if rebuild_and_up && wait_ready; then log "voltou para a versão anterior e está de pé"; else log "ATENÇÃO: a versão anterior também não subiu. Verifique: docker compose logs app"; fi
   exit 1
 }
@@ -87,11 +114,17 @@ rollback() {
 # 3) troca o código, baixa/constrói a imagem e migra
 STAGE="copiar código"; install_tree "$TAR" || rollback
 chmod +x "$APP_DIR"/scripts/server/*.sh
+if [ -n "$(env_get CERT_ENCRYPTION_KEY)" ]; then
+  set_env_value EVOLUTION_PJE_LOGIN_ENABLED 1 || rollback
+  log "piloto autenticado TJMG habilitado com cofre configurado"
+else
+  log "cofre ausente; piloto autenticado TJMG permanece desligado"
+fi
 if [ "$FAST" = 1 ]; then
   STAGE="baixar imagens"; log "baixando as imagens prontas"
-  export APP_IMAGE MIGRATE_IMAGE
+  export APP_IMAGE MIGRATE_IMAGE ROBOT_IMAGE
   { printf '%s' "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin >/dev/null; } || rollback
-  ( compose pull app && compose --profile tools pull migrate ) || rollback
+  ( compose pull app && compose --profile tools pull migrate && compose --profile robot pull robot ) || rollback
   docker logout ghcr.io >/dev/null 2>&1 || true
   unset GHCR_TOKEN
   BUILD_FLAG="--no-build"
@@ -109,11 +142,15 @@ STAGE="subir o app"
 compose up -d $BUILD_FLAG app || rollback
 STAGE="esperar /api/ready (90 s)"; wait_ready || rollback
 
-# Box retirado: não construir nem iniciar o robô antigo; parar instâncias existentes.
-log "Box retirado: parando o robô dos portais"
-compose --profile robot stop robot || log "AVISO: confira manualmente se o robô dos portais parou"
+if [ "$(env_get EVOLUTION_PJE_LOGIN_ENABLED)" = "1" ]; then
+  log "iniciando o worker limitado aos logins autorizados da Evolution"
+  compose --profile robot up -d $BUILD_FLAG robot || rollback
+else
+  log "piloto judicial desligado: parando o worker dos portais"
+  compose --profile robot stop robot || log "AVISO: confira manualmente se o worker dos portais parou"
+fi
 
-if [ "$FAST" = 1 ]; then printf 'APP_IMAGE=%s MIGRATE_IMAGE=%s\n' "$APP_IMAGE" "$MIGRATE_IMAGE" > "$APP_DIR/.deployed-image"; fi
+if [ "$FAST" = 1 ]; then printf 'APP_IMAGE=%s MIGRATE_IMAGE=%s ROBOT_IMAGE=%s\n' "$APP_IMAGE" "$MIGRATE_IMAGE" "$ROBOT_IMAGE" > "$APP_DIR/.deployed-image"; fi
 echo "$SHA" > "$APP_DIR/.deployed-sha"
 "$APP_DIR/scripts/server/install-cron.sh" >/dev/null || log "aviso: install-cron.sh falhou (rode à mão)"
 # guarda só as 6 últimas versões

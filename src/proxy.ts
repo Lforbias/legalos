@@ -59,7 +59,8 @@ export function proxy(request: NextRequest) {
     res.headers.set("content-security-policy", csp);
     return res;
   }
-  const isPublic = pathname === "/api/webhooks/legalmail" || PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const isLocalInboxPreview = process.env.NODE_ENV === "development" && pathname === "/preview/caixa-entrada";
+  const isPublic = isLocalInboxPreview || pathname === "/api/webhooks/legalmail" || PUBLIC_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`));
   if (!isPublic && !preview && !request.cookies.has(SESSION_COOKIE)) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
