@@ -69,6 +69,7 @@ export type ConnectionInfo = {
   adapterKey: string;
   hasConnection: boolean;
   status: string | null;
+  statusMessage: string | null;
   enabled: boolean;
 };
 
@@ -79,7 +80,7 @@ export async function listConnectionsAction() {
     const { db } = await import("@/lib/db/client");
     const accesses = await db.portalAccess.findMany({
       where: { organizationId: ctx.organizationId, userId: ctx.userId, system: { in: ["pje", EVOLUTION_EPROC_SYSTEM] }, target: EVOLUTION_PJE_TARGET_KEY },
-      select: { id: true, target: true, status: true, enabled: true, system: true },
+      select: { id: true, target: true, status: true, statusMessage: true, enabled: true, system: true },
     });
     const connections: ConnectionInfo[] = accesses.map((a) => {
       const parts = a.target.split("-");
@@ -90,6 +91,7 @@ export async function listConnectionsAction() {
         adapterKey: a.system === "pje" ? "pje-portal" : a.system,
         hasConnection: true,
         status: a.status,
+        statusMessage: a.statusMessage,
         enabled: a.enabled,
       };
     });

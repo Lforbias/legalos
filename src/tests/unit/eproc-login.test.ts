@@ -21,7 +21,7 @@ async function fixture(fn: (page: Page, posts: string[]) => Promise<void>, inval
     const url = new URL(request.url());
     if (url.origin !== ORIGIN) return route.abort();
     if (request.method() === "GET" && url.pathname.endsWith("/certificate")) return route.fulfill({ status: 200, contentType: "text/html", body: otpHtml() });
-    if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "text/html", body: certificateLogin ? loginHtml() + `<a href="${ORIGIN}/certificate">Certificado Digital</a>` : loginHtml() });
+    if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "text/html", body: certificateLogin ? loginHtml() + `<a href="#help">Problemas de acesso com certificado?</a><input type="button" value="Certificado Digital" onclick="window.location.href='${ORIGIN}/certificate'">` : loginHtml() });
     const body = new URLSearchParams(request.postData() ?? "");
     if (body.get("hdnAcao") === "login" || body.get("txtUsuario")) {
       posts.push("login");
