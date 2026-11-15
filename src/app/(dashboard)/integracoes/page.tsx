@@ -6,6 +6,9 @@ import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
+import { MonitorForm, MonitorList } from "@/modules/djen/djen-ui";
+import { UFS } from "@/lib/mni/tribunals";
+import { listMonitors } from "@/server/services/djen.service";
 import { DatajudKeyForm, DatajudToggle } from "@/modules/organizations/datajud-toggle";
 import { ApiKeyForm, ApiKeyList } from "@/modules/api-keys/api-keys-ui";
 import { API_SCOPES, listApiKeys } from "@/server/services/apikey.service";
@@ -21,10 +24,32 @@ export const metadata: Metadata = { title: "Integrações" };
 
 export default async function IntegrationsPage({ searchParams }: { searchParams: Promise<{ google?: string; msg?: string }> }) {
   const { ctx } = await requireTenant();
-  if (!can(ctx, "integrations:manage")) return <AccessDenied />;
+  const canManageIntegrations = can(ctx, "integrations:manage");
+  if (!canManageIntegrations && !can(ctx, "cases:write")) return <AccessDenied />;
   const sp = await searchParams;
+  if (!canManageIntegrations) {
+    const [monitors, datajud] = await Promise.all([listMonitors(ctx), datajudStatus(ctx)]);
+    return (
+      <div className="mx-auto max-w-3xl space-y-4">
+        <PageHeader title="Integrações" description="Configure fontes públicas que complementam os processos do escritório." />
+        <Card>
+          <CardHeader title="DJEN — publicações por OAB" description="Cadastre a OAB do advogado para consultar publicações públicas." action={monitors.some((m) => m.enabled) ? <Badge tone="success">Monitoramento ativo</Badge> : <Badge tone="warning">Sem monitoramento ativo</Badge>} />
+          <CardBody className="space-y-4 text-sm">
+            <p>Informe o nome, número da OAB e seccional. A consulta pública não precisa de senha nem certificado. Depois do cadastro, use “Verificar agora”; as publicações aparecem na Central Judicial e no processo correspondente.</p>
+            <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} />
+            <MonitorForm ufs={UFS} />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader title="DataJud (CNJ)" action={datajud.keyConfigured && datajud.orgEnabled ? <Badge tone="info">Consulta habilitada</Badge> : <Badge tone="warning">Aguardando configuração</Badge>} />
+          <CardBody className="text-sm text-muted">O DataJud consulta andamentos pelo número CNJ de cada processo. A chave e a ativação são gerenciadas por um administrador em Integrações.</CardBody>
+        </Card>
+      </div>
+    );
+  }
   const drive = await getDriveSettings(ctx);
   const s = await datajudStatus(ctx);
+  const monitors = await listMonitors(ctx);
   const apiKeys = await listApiKeys(ctx);
   const scopeLabels = Object.fromEntries(Object.entries(API_SCOPES).map(([k, v]) => [k, v.label]));
   const scopeOptions = Object.entries(API_SCOPES).filter(([key, v]) => key !== "legalmail:ingest" && (BOX_AVAILABLE || (!key.startsWith("pje:") && !isBoxPermission(v.permission)))).map(([key, v]) => ({ key, label: v.label, allowed: can(ctx, v.permission) }));
@@ -54,6 +79,14 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
             <p className="text-xs" role="status">{s.lastTest ? `Último teste: ${formatDateTime(s.lastTest.at, ctx.timezone)} — ${s.lastTest.ok ? "autenticação aceita pelo CNJ" : ({ TIMEOUT: "tempo de resposta esgotado", NETWORK: "falha de conexão", AUTH: "acesso recusado (chave ou permissão)", RATE_LIMIT: "limite de consultas atingido", UNAVAILABLE: "serviço indisponível ou resposta incompleta", INVALID_RESPONSE: "resposta inválida" }[s.lastTest.reason ?? ""] ?? "não concluído")}.` : "Conexão ainda não testada com a chave atual."}</p>
             <DatajudKeyForm ownKey={s.ownKey} vaultAvailable={s.vaultAvailable} configured={s.keyConfigured} />
             {s.keyConfigured ? <DatajudToggle enabled={s.orgEnabled} /> : null}
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader title="DJEN — publicações por OAB" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
+          <CardBody className="space-y-4 text-sm">
+            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado. Não precisa de senha nem certificado. Use “Verificar agora” para buscar; a consulta automática depende de agendador do ambiente.</p>
+            <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} />
+            <MonitorForm ufs={UFS} />
           </CardBody>
         </Card>
         <Alert tone="info">Google Agenda, Gmail e envio de e-mail ficam para uma próxima etapa.</Alert>

@@ -11,7 +11,7 @@ import { createMonitorAction, deleteMonitorAction, setMonitorEnabledAction, setM
 export type MonitorView = { id: string; label: string; oabNumber: string; oabUf: string; enabled: boolean; lastSyncAt: string | null; lastStatus: string | null; lastMessage: string | null; defaultAssigneeId: string | null; defaultTeamId: string | null };
 export type RecipientOptions = { members: { id: string; name: string }[]; teams: { id: string; name: string }[] };
 
-export function MonitorList({ items, recipients }: { items: MonitorView[]; recipients: RecipientOptions }) {
+export function MonitorList({ items, recipients }: { items: MonitorView[]; recipients?: RecipientOptions }) {
   const router = useRouter();
   const [msg, setMsg] = React.useState<{ tone: "success" | "error"; text: string } | null>(null);
   const [pending, start] = React.useTransition();
@@ -34,7 +34,7 @@ export function MonitorList({ items, recipients }: { items: MonitorView[]; recip
               {m.lastMessage ? `: ${m.lastMessage}` : ""}
             </p>
           ) : null}
-          <div className="mt-2 max-w-sm">
+          {recipients ? <div className="mt-2 max-w-sm">
             <label htmlFor={`rcv-${m.id}`} className="text-xs text-muted">Quem recebe as publicações novas</label>
             <Select
               id={`rcv-${m.id}`}
@@ -57,7 +57,7 @@ export function MonitorList({ items, recipients }: { items: MonitorView[]; recip
                 </optgroup>
               ) : null}
             </Select>
-          </div>
+          </div> : null}
           <div className="mt-2 flex flex-wrap gap-2">
             <Button
               variant="secondary"
@@ -66,7 +66,7 @@ export function MonitorList({ items, recipients }: { items: MonitorView[]; recip
                 start(async () => {
                   const r = await syncDjenAction(m.id);
                   if (!r.ok || !r.data) setMsg({ tone: "error", text: r.message ?? "Não foi possível consultar o DJEN." });
-                  else setMsg({ tone: "success", text: `${r.data.found} publicação(ões) de ${r.data.from} a ${r.data.to}: ${r.data.imported} nova(s) na caixa de entrada, ${r.data.alreadyKnown} já conhecida(s)${r.data.cancelled ? `, ${r.data.cancelled} cancelada(s) ignorada(s)` : ""}.` });
+                  else setMsg({ tone: "success", text: `${r.data.found} publicação(ões) de ${r.data.from} a ${r.data.to}: ${r.data.imported} nova(s) na Central Judicial, ${r.data.alreadyKnown} já conhecida(s)${r.data.cancelled ? `, ${r.data.cancelled} cancelada(s) ignorada(s)` : ""}.` });
                   router.refresh();
                 })
               }
@@ -90,7 +90,7 @@ export function MonitorList({ items, recipients }: { items: MonitorView[]; recip
               variant="danger"
               loading={pending}
               onClick={() => {
-                if (!window.confirm("Remover este monitoramento? As intimações já importadas continuam na caixa de entrada.")) return;
+                if (!window.confirm("Remover este monitoramento? As publicações já capturadas continuam no histórico do escritório.")) return;
                 start(async () => {
                   const r = await deleteMonitorAction(m.id);
                   setMsg(r.ok ? null : { tone: "error", text: r.message ?? "Não foi possível remover (exige 2FA ativo)." });

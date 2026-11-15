@@ -18,6 +18,7 @@ describe("monitoramento do DJEN (Etapa 2a) — respostas SIMULADAS só nos teste
   let A: Awaited<ReturnType<typeof makeOrgWithOwner>>;
   let B: Awaited<ReturnType<typeof makeOrgWithOwner>>;
   let lawyer: Awaited<ReturnType<typeof addMember>>;
+  let client: Awaited<ReturnType<typeof addMember>>;
   let monId = "";
 
   beforeAll(async () => {
@@ -25,13 +26,15 @@ describe("monitoramento do DJEN (Etapa 2a) — respostas SIMULADAS só nos teste
     A = await makeOrgWithOwner("djen-A");
     B = await makeOrgWithOwner("djen-B");
     lawyer = await addMember(A.org.id, "LAWYER", "djen-law");
+    client = await addMember(A.org.id, "CLIENT", "djen-client");
     const owner = await db.user.findUniqueOrThrow({ where: { id: A.ctx.userId } });
     const s = await startEnrollment(owner.id, owner.email);
     await confirmEnrollment(owner.id, totpCode(s.secret, totpStep()), META);
   });
 
   it("cadastro valida OAB/UF, impede duplicata e exige permissão", async () => {
-    await expect(createMonitor(lawyer.ctx, { label: "x", oabNumber: "1", oabUf: "BA" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(createMonitor(client.ctx, { label: "x", oabNumber: "1", oabUf: "BA" })).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(createMonitor(lawyer.ctx, { label: "x", oabNumber: "1", oabUf: "BA" })).rejects.toBeInstanceOf(ValidationError);
     await expect(createMonitor(A.ctx, { label: "Dra", oabNumber: "abc", oabUf: "BA" })).rejects.toBeInstanceOf(ValidationError);
     await expect(createMonitor(A.ctx, { label: "Dra", oabNumber: "12345", oabUf: "XX" })).rejects.toBeInstanceOf(ValidationError);
     const m = await createMonitor(A.ctx, { label: "Dra. Talita", oabNumber: "012345", oabUf: "ba" });
@@ -91,7 +94,8 @@ describe("monitoramento do DJEN (Etapa 2a) — respostas SIMULADAS só nos teste
   });
 
   it("remover exige 2FA e permissão; some só do próprio escritório", async () => {
-    await expect(deleteMonitor(lawyer.ctx, monId)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteMonitor(client.ctx, monId)).rejects.toBeInstanceOf(ForbiddenError);
+    await expect(deleteMonitor(lawyer.ctx, monId)).rejects.toBeInstanceOf(ConflictError);
     await deleteMonitor(A.ctx, monId);
     expect(await listMonitors(A.ctx)).toHaveLength(0);
   });
