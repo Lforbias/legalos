@@ -1,7 +1,7 @@
 import type { Page } from "playwright-core";
 import { totpCode, totpStep, TOTP_PERIOD } from "@/lib/security/totp";
 import { sanitizeSignature, type PageSignature } from "../pje/signature";
-import type { LoginOutcome, PjeCredentials } from "../pje/login";
+import type { LoginOutcome, LoginProgress, PjeCredentials } from "../pje/login";
 import type { EprocPortalTarget } from "./targets";
 
 export const TJMG_EPROC_LOGIN_URL = "https://eproc1g.tjmg.jus.br/eproc/";
@@ -73,6 +73,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
   stepTimeoutMs?: number;
+  onProgress?: LoginProgress;
 } = {}): Promise<LoginOutcome> {
   const sleep = opts.sleep ?? sleepDefault;
   const now = opts.now ?? Date.now;
@@ -93,7 +94,10 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
       return sanitizeSignature(s, opts.names ?? []);
     } catch { return null; }
   };
-  const fail = async (code: Extract<LoginOutcome, { ok: false }>['code'], message: string, retryable: boolean): Promise<LoginOutcome> => ({ ok: false, code, message, retryable, signature: await signature() });
+  const fail = async (code: Extract<LoginOutcome, { ok: false }>['code'], message: string, retryable: boolean): Promise<LoginOutcome> => {
+    await opts.onProgress?.(message, code === "NEEDS_PERSON" || code === "OTP_NOT_CONFIGURED" || code === "OTP_MISSING" ? "WARN" : "ERROR");
+    return { ok: false, code, message, retryable, signature: await signature() };
+  };
   const readState = async () => {
     try {
       return await page.evaluate(detectEprocState, {
@@ -113,10 +117,12 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   };
 
   try {
+    await opts.onProgress?.(`Abrindo o portal oficial do ${target.courtCode}, ${target.degree}º grau (eproc).`);
     await page.goto(target.loginUrl, { waitUntil: "domcontentloaded", timeout: 45_000 });
   } catch {
     return fail("NETWORK", `Não foi possível abrir o eproc do ${target.courtCode} agora.`, true);
   }
+  await opts.onProgress?.("Portal respondeu; identificando a etapa de autenticação.");
   let s = await waitUntil((state) => state.kind !== "UNKNOWN" || Boolean(state.errorText));
   if (!s) return fail("TIMEOUT", `A tela de acesso do eproc do ${target.courtCode} não carregou a tempo.`, true);
   if (s.kind === "CAPTCHA") return fail("NEEDS_PERSON", "O eproc pediu uma verificação de segurança. O LegalOS parou para você concluir no portal oficial.", false);
@@ -126,6 +132,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
     let certificateButton = page.getByRole("button", { name: /certificado\s+digital/i }).first();
     if (!(await certificateButton.count())) certificateButton = page.locator("input[type='button'][value*='Certificado' i], button:has-text('Certificado Digital'), a:has-text('Certificado Digital')").first();
     if (!(await certificateButton.count())) return fail("CERTIFICATE_REQUIRED", "O eproc não ofereceu autenticação por certificado no fluxo do navegador remoto.", false);
+    await opts.onProgress?.("Selecionando a opção de entrada por certificado digital.");
     await certificateButton.click();
     s = await waitUntil((state) => state.kind !== "LOGIN" || Boolean(state.errorText));
     if (!s) return fail("TIMEOUT", "O eproc demorou para iniciar o login por certificado.", true);
@@ -134,6 +141,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   if (s.kind !== "LOGIN" && !(creds.certificateAuth && (s.kind === "OTP" || s.kind === "OTP_SETUP"))) return fail("UNKNOWN_PAGE", "A tela de acesso do eproc mudou; o LegalOS parou sem enviar os dados.", false);
 
   if (!creds.certificateAuth) {
+    await opts.onProgress?.("Enviando a autenticação configurada; valores de acesso ficam ocultos.");
     await page.fill(s.userSelector!, creds.document);
     await page.fill(s.passwordSelector!, creds.password);
     await page.click(s.submitSelector!);
@@ -148,6 +156,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   if (s.kind === "OTP_SETUP") return fail("OTP_NOT_CONFIGURED", "O eproc exige ativar a autenticação em dois fatores no portal antes do primeiro acesso.", false);
   if (s.kind === "OTP") {
     if (!creds.otpSecret) return fail("OTP_MISSING", "O eproc pediu o código de dois fatores, mas a chave do autenticador não está cadastrada.", false);
+    await opts.onProgress?.("eproc solicitou o autenticador; gerando o código temporário. O código não aparece no terminal.");
     const used = opts.usedOtpSteps ?? new Set<number>();
     let step = totpStep(now());
     const remaining = (step + 1) * TOTP_PERIOD * 1000 - now();
@@ -156,9 +165,11 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
       step = totpStep(now());
     }
     used.add(step);
+    await opts.onProgress?.("Enviando o código temporário de forma protegida.");
     await page.fill(s.otpSelector!, totpCode(creds.otpSecret, step));
     if (s.otpButton) await page.click(s.otpButton);
     else await page.keyboard.press("Enter");
+    await opts.onProgress?.("Código enviado; aguardando validação do portal.");
     s = await waitUntil((state) => state.kind !== "OTP" || Boolean(state.errorText));
     if (!s) return fail("TIMEOUT", "O eproc demorou demais para validar o código de dois fatores.", true);
     if (s.kind === "OTP") return fail("OTP_REJECTED", "O eproc recusou o código de dois fatores. Confira a chave cadastrada e o relógio do servidor.", false);
@@ -166,6 +177,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   }
   if (s.kind !== "APP" || new URL(page.url()).host !== new URL(target.loginUrl).host) return fail("UNKNOWN_PAGE", "O eproc mostrou uma etapa inesperada depois do login; o LegalOS não considera o acesso validado.", false);
   const final = await signature();
+  await opts.onProgress?.("Login confirmado pelo portal; área autenticada detectada.", "SUCCESS");
   return { ok: true, signature: final ?? { host: s.host, path: "", title: "", headings: [], fields: [], buttons: [] } };
 }
 

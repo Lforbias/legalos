@@ -83,6 +83,11 @@ describe("robô dos portais: acessos, fila e resultado", () => {
     expect(await drainQueue(depsFor(ok))).toBe(1);
     expect((await db.portalAccess.findMany({ where: { organizationId: a.org.id } })).every((r) => r.status === "CONNECTED")).toBe(true);
     expect(await db.auditLog.count({ where: { organizationId: a.org.id, action: "portal_access.login_ok" } })).toBeGreaterThanOrEqual(2);
+    const completedJob = await db.robotJob.findFirstOrThrow({ where: { accessId: rows[0]!.id, kind: "LOGIN_TEST" }, orderBy: { createdAt: "asc" } });
+    const terminalEvents = (completedJob.summary as { terminalEvents?: { message: string }[] }).terminalEvents ?? [];
+    expect(terminalEvents.some((event) => event.message.includes("Navegador isolado pronto"))).toBe(true);
+    expect(terminalEvents.some((event) => event.message.includes("acesso confirmado"))).toBe(true);
+    expect(JSON.stringify(terminalEvents)).not.toContain(PASSWORD);
     // Box 2.0: o login vira evidência (simulada aqui, porque o login é injetado), com o tribunal e a operação
     const ev = await db.connectorEvidence.findMany({ where: { organizationId: a.org.id, sourceId: rows[0]!.id } });
     expect(ev).toHaveLength(1);

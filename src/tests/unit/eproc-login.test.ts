@@ -57,9 +57,15 @@ describe.skipIf(!browser)("login eproc TJMG", () => {
 
   it("entra por certificado e exige o TOTP sem enviar usuário ou senha", async () => {
     await fixture(async (page, posts) => {
-      const result = await loginEprocTjmg(page, { document: "", password: "", otpSecret: SECRET, certificateAuth: true }, { now: () => T0, sleep: async () => undefined, stepTimeoutMs: 8_000 });
+      const events: string[] = [];
+      const result = await loginEprocTjmg(page, { document: "", password: "", otpSecret: SECRET, certificateAuth: true }, { now: () => T0, sleep: async () => undefined, stepTimeoutMs: 8_000, onProgress: (message) => { events.push(message); } });
       expect(result).toMatchObject({ ok: true });
       expect(posts).toEqual(["otp"]);
+      expect(events).toContain("Selecionando a opção de entrada por certificado digital.");
+      expect(events.some((message) => message.includes("gerando o código temporário"))).toBe(true);
+      expect(events.at(-1)).toContain("Login confirmado pelo portal");
+      expect(events.join(" ")).not.toContain(totpCode(SECRET, totpStep(T0)));
+      expect(events.join(" ")).not.toContain(SECRET);
     }, false, true);
   });
 

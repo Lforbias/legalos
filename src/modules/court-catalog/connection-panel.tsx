@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,13 @@ function ConnectionRow({ target, conn, pilotEnabled, onUpdate }: { target: Avail
   const [pending, start] = useTransition();
   const [error, setError] = useState<string>();
   const working = conn.enabled && BUSY.has(conn.status ?? "");
+  const [terminalOpen, setTerminalOpen] = useState(working || conn.terminalEvents.length > 0);
+  const terminalRef = useRef<HTMLPreElement>(null);
   const surface = target.adapterKey === "eproc-portal" ? "evolution-eproc" : "evolution";
+
+  useEffect(() => {
+    if ((working || terminalOpen) && terminalRef.current) terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
+  }, [working, terminalOpen, conn.terminalEvents.length]);
 
   const act = (fn: () => Promise<{ ok: boolean; message?: string }>) => {
     setError(undefined);
@@ -66,6 +72,30 @@ function ConnectionRow({ target, conn, pilotEnabled, onUpdate }: { target: Avail
       </div>
       {error ? <Alert tone="error">{error}</Alert> : null}
       {conn.statusMessage && <p className="max-w-3xl text-xs text-muted">{conn.statusMessage}</p>}
+      <details
+        open={working || terminalOpen}
+        onToggle={(event) => setTerminalOpen(event.currentTarget.open)}
+        className="overflow-hidden rounded-lg border border-slate-700 bg-[#0b1020] text-slate-100"
+      >
+        <summary className="flex cursor-pointer items-center justify-between gap-3 px-3 py-2 font-mono text-xs">
+          <span>Terminal do login · {target.courtCode}</span>
+          <span className={working ? "text-emerald-300" : "text-slate-400"}>{working ? "AO VIVO" : `${conn.terminalEvents.length} evento(s)`}</span>
+        </summary>
+        <pre
+          ref={terminalRef}
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions text"
+          className="max-h-64 overflow-auto border-t border-slate-700 px-3 py-2 font-mono text-[11px] leading-5"
+        >
+          {conn.terminalEvents.length ? conn.terminalEvents.map((event, index) => (
+            <span key={`${event.at}-${index}`} className={`block ${event.level === "SUCCESS" ? "text-emerald-300" : event.level === "WARN" ? "text-amber-300" : event.level === "ERROR" ? "text-rose-300" : "text-slate-200"}`}>
+              <span className="text-slate-500">[{new Date(event.at).toLocaleTimeString("pt-BR", { hour12: false })}]</span> {event.message}
+            </span>
+          )) : <span className="text-slate-400">Aguardando a primeira tentativa de login…</span>}
+        </pre>
+        <p className="border-t border-slate-700 px-3 py-1.5 text-[10px] text-slate-400">Senhas, códigos do autenticador e dados privados do certificado nunca são exibidos aqui.</p>
+      </details>
       <div className="flex flex-wrap items-start gap-2">
         <Button size="sm" variant="secondary" disabled={pending} onClick={onUpdate}>Atualizar certificado e autenticador</Button>
         {pilotEnabled && <>

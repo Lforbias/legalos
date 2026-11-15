@@ -83,7 +83,24 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     include: { access: { include: { user: { select: { id: true, name: true } } } } },
   });
   if (!job || job.status !== "RUNNING") return { status: "SKIPPED" };
-  const origin = (job.summary as { origin?: string } | null)?.origin;
+  const savedSummary = job.summary && typeof job.summary === "object" && !Array.isArray(job.summary) ? job.summary as Record<string, unknown> : {};
+  const savedEvents = Array.isArray(savedSummary.terminalEvents) ? savedSummary.terminalEvents : [];
+  let terminalEvents = savedEvents.filter((event): event is { at: string; level: "INFO" | "SUCCESS" | "WARN" | "ERROR"; message: string } =>
+    Boolean(event && typeof event === "object" && "at" in event && typeof event.at === "string" && "message" in event && typeof event.message === "string" && "level" in event && ["INFO", "SUCCESS", "WARN", "ERROR"].includes(String(event.level))),
+  ).slice(-79);
+  let jobSummary: Record<string, unknown> = { ...savedSummary };
+  delete jobSummary.terminalEvents;
+  const recordProgress = async (message: string, level: "INFO" | "SUCCESS" | "WARN" | "ERROR" = "INFO") => {
+    terminalEvents = [...terminalEvents, { at: now().toISOString(), level, message: message.replace(/[\r\n]+/g, " ").slice(0, 240) }].slice(-80);
+    jobSummary = { ...jobSummary, terminalEvents };
+    try {
+      await db.robotJob.update({ where: { id: job.id }, data: { summary: jobSummary as never } });
+    } catch (error) {
+      logger.warn("robot.terminal_log_failed", { jobId: job.id, error: sanitizeError(error) });
+    }
+  };
+  const origin = typeof savedSummary.origin === "string" ? savedSummary.origin : undefined;
+  await recordProgress(`Worker iniciou tentativa ${job.attempts} para ${job.access.target}.`);
   const accessPjeTarget = getPjeTarget(job.access.target);
   const accessEprocTarget = getEprocPortalTarget(job.access.target);
   const isEvolutionPje = origin === EVOLUTION_PJE_JOB_ORIGIN && job.access.system === "pje" && Boolean(accessPjeTarget && isRegionalPjeTarget(accessPjeTarget));
@@ -94,8 +111,11 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     return { status: "SKIPPED" };
   }
   const access = job.access;
-  const finishJob = (status: string, message: string, summary: object = {}) =>
-    db.robotJob.update({ where: { id: job.id }, data: { status, message: message.slice(0, 400), finishedAt: status === "QUEUED" ? null : now(), summary: summary as never } });
+  const finishJob = async (status: string, message: string, summary: object = {}) => {
+    if (status !== "QUEUED") await recordProgress(`Trabalho finalizado: ${message}`, status === "DONE" ? "SUCCESS" : status === "WAITING_PERSON" ? "WARN" : "ERROR");
+    jobSummary = { ...jobSummary, ...summary, terminalEvents };
+    await db.robotJob.update({ where: { id: job.id }, data: { status, message: message.slice(0, 400), finishedAt: status === "QUEUED" ? null : now(), summary: jobSummary as never } });
+  };
 
   if (!access.enabled) {
     await finishJob("FAILED", "Este acesso está desligado.");
@@ -119,6 +139,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     await db.portalAccess.update({ where: { id: access.id }, data: { status: "NEEDS_ACTION", statusMessage: msg, statusAt: now() } });
     return { status: "FAILED" };
   }
+  await recordProgress("Acesso protegido aberto no cofre; segredo e código não são exibidos.");
   if (isEvolutionPilot && !secret.otpSecret) {
     const msg = "Cadastre a chave do autenticador antes de conectar ao tribunal.";
     await finishJob("FAILED", msg, { origin, code: "OTP_MISSING" });
@@ -145,6 +166,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     }
     try {
       certMaterial = await getCertificateMaterial(tenant, access.certificateId, "portal:login", null, "portal");
+      await recordProgress("Certificado digital liberado para esta tentativa; dados privados ocultos.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Não foi possível usar o certificado digital selecionado.";
       await finishJob("FAILED", msg, { origin, code: "CERTIFICATE_REJECTED" });
@@ -155,6 +177,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   }
 
   const names = nameWords(access.user.name);
+  const portalLabel = isEvolutionEproc ? "eproc" : "PJe";
   let outcome: LoginOutcome;
   let panel: Awaited<ReturnType<typeof probePjePanel>> | null = null;
   let rp: RobotPage | null = null;
@@ -163,25 +186,27 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
       ? [new URL(accessEprocTarget!.loginUrl).origin, ...(accessEprocTarget!.ssoOrigin ? [new URL(accessEprocTarget!.ssoOrigin).origin] : [])]
       : [target!.origin, PJE_SSO_ORIGIN];
     rp = await deps.openPage(certMaterial ? { pfx: certMaterial.pfx, passphrase: certMaterial.passphrase, origins } : undefined);
+    await recordProgress(`Navegador isolado pronto; iniciando o fluxo ${portalLabel}.`);
     const steps = usedOtpSteps.get(access.id) ?? new Set<number>();
     usedOtpSteps.set(access.id, steps);
     const credentials = { document: secret.document, password: secret.password, otpSecret: secret.otpSecret, certificateAuth: isEvolutionPilot };
     outcome = isEvolutionEproc
-      ? await loginEprocPortal(rp.page, accessEprocTarget!, credentials, { names, usedOtpSteps: steps })
-      : await (deps.login ?? loginPje)(rp.page, target!, credentials, { names, usedOtpSteps: steps });
+      ? await loginEprocPortal(rp.page, accessEprocTarget!, credentials, { names, usedOtpSteps: steps, onProgress: recordProgress })
+      : await (deps.login ?? loginPje)(rp.page, target!, credentials, { names, usedOtpSteps: steps, onProgress: recordProgress });
     if (outcome.ok && job.kind === "SYNC_NOTICES" && target) panel = await (deps.probe ?? probePjePanel)(rp.page, target, names);
   } catch (e) {
     logger.error("robot.job_crashed", { jobId, error: sanitizeError(e) });
     outcome = { ok: false, code: "NETWORK", message: "O navegador do robô falhou durante o teste.", retryable: true, signature: null, detail: String(sanitizeError(e)).slice(0, 240) };
   } finally {
     await rp?.close().catch(() => undefined);
+    await recordProgress("Navegador isolado encerrado; dados temporários removidos.");
     certMaterial?.pfx.fill(0);
     secret.password = "";
     secret.otpSecret = null;
   }
 
-  const portalLabel = isEvolutionEproc ? "eproc" : "PJe";
   const m = mapOutcome(outcome, job.attempts, portalLabel);
+  await recordProgress(outcome.ok ? "Resultado: acesso confirmado pelo tribunal." : `Resultado: ${outcome.message}`, outcome.ok ? "SUCCESS" : "ERROR");
   // Evidência real do acesso (login): é isto — e não o cadastro do acesso — que sustenta o estado "conectado" na Central de Conexões.
   try {
     await recordEvidence({
@@ -200,8 +225,10 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   } catch (e) {
     logger.error("robot.evidence_failed", { jobId, error: sanitizeError(e) });
   }
-  const summary = { ...(isEvolutionPilot ? { origin: isEvolutionEproc ? EVOLUTION_EPROC_JOB_ORIGIN : EVOLUTION_PJE_JOB_ORIGIN } : {}), code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
+  const summary = { ...jobSummary, ...(isEvolutionPilot ? { origin: isEvolutionEproc ? EVOLUTION_EPROC_JOB_ORIGIN : EVOLUTION_PJE_JOB_ORIGIN } : {}), terminalEvents, code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
   if (m.retry) {
+    await recordProgress(`Tentativa encerrada: ${outcome.ok ? m.message : outcome.message}. O robô tentará novamente depois da espera de segurança.`, "WARN");
+    summary.terminalEvents = terminalEvents;
     await db.robotJob.update({ where: { id: job.id }, data: { status: "QUEUED", runAfter: new Date(now().getTime() + backoffMs(job.attempts)), message: m.message.slice(0, 400), summary: summary as never } });
   } else {
     await finishJob(m.jobStatus, m.message, summary);
