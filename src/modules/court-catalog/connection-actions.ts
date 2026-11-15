@@ -41,6 +41,7 @@ export async function listAvailableTargetsAction() {
 }
 
 export type ConnectionInfo = {
+  id: string | null;
   courtCode: string;
   degree: string;
   adapterKey: string;
@@ -55,11 +56,12 @@ export async function listConnectionsAction() {
     const { db } = await import("@/lib/db/client");
     const accesses = await db.portalAccess.findMany({
       where: { organizationId: ctx.organizationId, userId: ctx.userId },
-      select: { target: true, status: true, enabled: true, system: true },
+      select: { id: true, target: true, status: true, enabled: true, system: true },
     });
     const connections: ConnectionInfo[] = accesses.map((a) => {
       const parts = a.target.split("-");
       return {
+        id: a.id,
         courtCode: (parts[0] ?? "").toUpperCase(),
         degree: parts[1] === "1g" ? "1" : "2",
         adapterKey: a.system,

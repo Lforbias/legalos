@@ -1,10 +1,15 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Alert } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { Plug, CheckCircle2, Clock, AlertTriangle, XCircle, Shield } from "lucide-react";
+import { ConfirmAction } from "@/components/ui/confirm-action";
+import { Plug, CheckCircle2, Clock, AlertTriangle, XCircle, Shield, Plus } from "lucide-react";
 import { listAvailableTargetsAction, listConnectionsAction, type AvailableTarget, type ConnectionInfo } from "./connection-actions";
+import { testConnectionAction, toggleConnectionAction, deleteConnectionAction } from "./connect-adapter-actions";
+import { ConnectAdapterForm } from "./connect-form";
 
 function statusBadge(status: string | null, enabled: boolean) {
   if (!enabled) return <Badge tone="neutral">Desligado</Badge>;
@@ -28,13 +33,75 @@ function statusIcon(status: string | null, enabled: boolean) {
   }
 }
 
+const BUSY = new Set(["PENDING", "CONNECTING"]);
+
+function ConnectionRow({ target, conn }: { target: AvailableTarget; conn: ConnectionInfo }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string>();
+  const working = conn.enabled && BUSY.has(conn.status ?? "");
+
+  const act = (fn: () => Promise<{ ok: boolean; message?: string }>) => {
+    setError(undefined);
+    start(async () => {
+      const res = await fn();
+      if (!res.ok) setError(res.message);
+      else router.refresh();
+    });
+  };
+
+  return (
+    <div className="space-y-2 py-3 first:pt-0 last:pb-0">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          {statusIcon(conn.status, conn.enabled)}
+          <div>
+            <p className="text-sm font-medium">{target.courtCode} · {target.degreeLabel}</p>
+            <p className="text-xs text-muted">{target.courtName} · {target.adapterLabel}</p>
+          </div>
+        </div>
+        {statusBadge(conn.status, conn.enabled)}
+      </div>
+      {error ? <Alert tone="error">{error}</Alert> : null}
+      <div className="flex flex-wrap items-start gap-2">
+        <Button
+          size="sm"
+          variant="secondary"
+          loading={pending}
+          disabled={!conn.enabled || working}
+          onClick={() => act(() => testConnectionAction(conn.id!))}
+        >
+          Testar de novo
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          disabled={pending}
+          onClick={() => act(() => toggleConnectionAction(conn.id!, !conn.enabled))}
+        >
+          {conn.enabled ? "Desligar" : "Ligar"}
+        </Button>
+        <ConfirmAction
+          label="Remover"
+          confirmLabel="Sim, remover"
+          description="Apaga as credenciais guardadas. Você pode cadastrar de novo quando quiser."
+          action={() => deleteConnectionAction(conn.id!)}
+          onDone={() => router.refresh()}
+        />
+      </div>
+    </div>
+  );
+}
+
 export function ConnectionPanel() {
   const [targets, setTargets] = useState<AvailableTarget[]>([]);
   const [connections, setConnections] = useState<ConnectionInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
+  const [showForm, setShowForm] = useState(false);
+  const router = useRouter();
 
-  useEffect(() => {
+  const reload = () => {
     Promise.all([listAvailableTargetsAction(), listConnectionsAction()])
       .then(([tRes, cRes]) => {
         if (tRes.ok && tRes.data) setTargets(tRes.data.targets);
@@ -42,7 +109,16 @@ export function ConnectionPanel() {
       })
       .catch(() => setError("Não foi possível carregar os dados de conexão."))
       .finally(() => setLoading(false));
-  }, []);
+  };
+
+  useEffect(() => { reload(); }, []);
+
+  useEffect(() => {
+    const busy = connections.some((c) => c.hasConnection && BUSY.has(c.status ?? ""));
+    if (!busy) return;
+    const t = setInterval(() => { reload(); }, 4000);
+    return () => clearInterval(t);
+  }, [connections]);
 
   if (loading) {
     return (
@@ -79,7 +155,6 @@ export function ConnectionPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Conexões ativas */}
       {connected.length > 0 && (
         <Card>
           <CardHeader
@@ -90,51 +165,57 @@ export function ConnectionPanel() {
             {connected.map((t) => {
               const conn = getConnection(t.courtCode, t.degree)!;
               return (
-                <div key={`${t.courtCode}-${t.degree}`} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                  <div className="flex items-center gap-3">
-                    {statusIcon(conn.status, conn.enabled)}
-                    <div>
-                      <p className="text-sm font-medium">{t.courtCode} · {t.degreeLabel}</p>
-                      <p className="text-xs text-muted">{t.courtName} · {t.adapterLabel}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {statusBadge(conn.status, conn.enabled)}
-                    <a href="/integracoes" className="text-xs text-primary-text hover:underline">Gerenciar</a>
-                  </div>
-                </div>
+                <ConnectionRow
+                  key={`${t.courtCode}-${t.degree}`}
+                  target={t}
+                  conn={conn}
+                />
               );
             })}
           </CardBody>
         </Card>
       )}
 
-      {/* Tribunais disponíveis para conexão */}
       {available.length > 0 && (
         <Card>
           <CardHeader
-            title="Tribunais com adaptador pronto"
-            description="Estes tribunais já têm adaptador implementado. Para conectar, acesse a página de integrações."
+            title="Tribunais disponíveis"
+            description="Estes tribunais já têm adaptador. Cadastre as credenciais para conectar."
           />
-          <CardBody className="divide-y divide-border">
-            {available.map((t) => (
-              <div key={`${t.courtCode}-${t.degree}`} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
-                <div className="flex items-center gap-3">
-                  <Plug className="h-4 w-4 text-muted" />
-                  <div>
-                    <p className="text-sm font-medium">{t.courtCode} · {t.degreeLabel}</p>
-                    <p className="text-xs text-muted">{t.courtName}</p>
+          <CardBody className="space-y-4">
+            {!showForm && (
+              <div className="divide-y divide-border">
+                {available.map((t) => (
+                  <div key={`${t.courtCode}-${t.degree}`} className="flex items-center justify-between py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <Plug className="h-4 w-4 text-muted" />
+                      <div>
+                        <p className="text-sm font-medium">{t.courtCode} · {t.degreeLabel}</p>
+                        <p className="text-xs text-muted">{t.courtName} · {t.engineLabel ?? t.adapterLabel}</p>
+                      </div>
+                    </div>
+                    <span className="text-xs text-muted">{t.authModes.map((m) => m.label).join(", ")}</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-muted">{t.authModes.map((m) => m.label).join(", ")}</span>
-                  <a href="/integracoes" className="inline-flex items-center gap-1 rounded-lg border border-border px-2 py-1 text-xs hover:bg-surface-2">
-                    <Shield className="h-3 w-3" />
-                    Conectar
-                  </a>
-                </div>
+                ))}
               </div>
-            ))}
+            )}
+            {showForm ? (
+              <ConnectAdapterForm
+                targets={available}
+                onDone={() => {
+                  setShowForm(false);
+                  reload();
+                }}
+              />
+            ) : (
+              <Button
+                variant="secondary"
+                onClick={() => setShowForm(true)}
+              >
+                <Plus className="mr-1.5 h-4 w-4" />
+                Conectar tribunal
+              </Button>
+            )}
           </CardBody>
         </Card>
       )}
