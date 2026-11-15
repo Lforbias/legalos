@@ -12,6 +12,7 @@ import { Input, Select } from "@/components/ui/form";
 import { Pagination } from "@/components/ui/pagination";
 import { formatPhone } from "@/lib/format/phone";
 import { formatDocument } from "@/lib/validation/br-documents";
+import { ArchiveClientButton } from "@/modules/clients/client-actions";
 import { CLIENT_STATUS_LABEL, CLIENT_STATUSES, CLIENT_TYPE_LABEL, CLIENT_TYPES } from "@/modules/clients/schemas";
 import { can } from "@/server/context";
 import { listClients, listClientTags } from "@/server/services/client.service";
@@ -32,6 +33,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
   const page = Math.max(1, Number.parseInt(sp.pagina ?? "1", 10) || 1);
   const [result, tags] = await Promise.all([listClients(ctx, { q: sp.q, status, type, tag: sp.etiqueta, page }), listClientTags(ctx)]);
   const filtered = Boolean(sp.q || status || type || sp.etiqueta);
+  const canDelete = can(ctx, "clients:delete");
 
   return (
     <div className="mx-auto max-w-7xl">
@@ -135,6 +137,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                   <th scope="col" className="px-4 py-2 font-medium">Situação</th>
                   <th scope="col" className="hidden px-4 py-2 font-medium lg:table-cell">Etiquetas</th>
                   <th scope="col" className="px-4 py-2 text-right font-medium">Processos</th>
+                  {canDelete ? <th scope="col" className="px-4 py-2 text-right font-medium">Ações</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -163,6 +166,7 @@ export default async function ClientsPage({ searchParams }: { searchParams: Prom
                       </div>
                     </td>
                     <td className="px-4 py-2.5 text-right tabular-nums">{c._count.parties}</td>
+                    {canDelete ? <td className="px-4 py-2.5 text-right"><div className="flex justify-end"><ArchiveClientButton clientId={c.id} compact redirectToList={false} /></div></td> : null}
                   </tr>
                 ))}
               </tbody>
