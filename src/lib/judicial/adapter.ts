@@ -15,7 +15,7 @@
  *    (sem cookies de outro escritório).
  */
 
-import type { ConnectorFamily, Capability, EvidenceEnvironment } from "./contracts";
+import type { ConnectorFamily, EvidenceEnvironment } from "./contracts";
 import type { CourtDegree } from "./court-catalog";
 
 // ────────── Resultado do adaptador ──────────

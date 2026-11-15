@@ -10,7 +10,7 @@
  *  3. Os targets do adaptador aparecem automaticamente no catálogo e na UI.
  */
 
-import { registerAdapter, listAdapters } from "./adapter-registry";
+import { registerAdapter } from "./adapter-registry";
 import { pjeAdapter } from "@/lib/robots/pje/pje-adapter";
 import { eprocAdapter } from "@/lib/robots/eproc/eproc-adapter";
 import { esajAdapter } from "@/lib/robots/esaj/esaj-adapter";

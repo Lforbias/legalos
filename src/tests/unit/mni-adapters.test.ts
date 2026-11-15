@@ -107,7 +107,7 @@ describe("projudi-adapter", () => {
 
 describe("bootstrap with all adapters", () => {
   it("registers all 4 adapters", async () => {
-    const { ensureAdapters, listAdapters, findAdapterForCourt } = await import("@/lib/judicial/adapter-bootstrap");
+    const { ensureAdapters, listAdapters } = await import("@/lib/judicial/adapter-bootstrap");
     ensureAdapters();
 
     const all = listAdapters();

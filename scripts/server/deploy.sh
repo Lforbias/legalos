@@ -30,6 +30,7 @@ fi
 rm -f /tmp/.dm.$$ "$APP_DIR/.deploy-meta"
 PREV_IMAGES="$(cat "$APP_DIR/.deployed-image" 2>/dev/null || true)"
 PREV_ROBOT_IMAGE="$(printf '%s\n' "$PREV_IMAGES" | sed -n 's/.*ROBOT_IMAGE=\([^ ]*\).*/\1/p')"
+PREV_LOGIN_FLAG="$(env_get EVOLUTION_PJE_LOGIN_ENABLED)"
 
 PREV="$(cat "$APP_DIR/.deployed-sha" 2>/dev/null || echo desconhecida)"
 log "publicando $SHA (anterior: $PREV)"
@@ -68,6 +69,21 @@ wait_ready() {
   done
   return 1
 }
+set_env_value() {
+  local key="$1" value="$2" tmp="$ENV_FILE.tmp.$$"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { found = 0 }
+    index($0, key "=") == 1 {
+      if (!found) print key "=" value
+      found = 1
+      next
+    }
+    { print }
+    END { if (!found) print key "=" value }
+  ' "$ENV_FILE" > "$tmp" || { rm -f "$tmp"; return 1; }
+  chmod --reference="$ENV_FILE" "$tmp"
+  mv "$tmp" "$ENV_FILE"
+}
 
 # 1) backup antes de mexer (se falhar, não publica)
 log "backup antes da publicação"
@@ -90,6 +106,7 @@ rollback() {
   diagnose
   log "ERRO na publicação: voltando para a versão anterior ($PREV)"
   install_tree "$SNAP" || true
+  set_env_value EVOLUTION_PJE_LOGIN_ENABLED "$PREV_LOGIN_FLAG" || true
   if rebuild_and_up && wait_ready; then log "voltou para a versão anterior e está de pé"; else log "ATENÇÃO: a versão anterior também não subiu. Verifique: docker compose logs app"; fi
   exit 1
 }
@@ -97,6 +114,12 @@ rollback() {
 # 3) troca o código, baixa/constrói a imagem e migra
 STAGE="copiar código"; install_tree "$TAR" || rollback
 chmod +x "$APP_DIR"/scripts/server/*.sh
+if [ -n "$(env_get CERT_ENCRYPTION_KEY)" ]; then
+  set_env_value EVOLUTION_PJE_LOGIN_ENABLED 1 || rollback
+  log "piloto autenticado TJMG habilitado com cofre configurado"
+else
+  log "cofre ausente; piloto autenticado TJMG permanece desligado"
+fi
 if [ "$FAST" = 1 ]; then
   STAGE="baixar imagens"; log "baixando as imagens prontas"
   export APP_IMAGE MIGRATE_IMAGE ROBOT_IMAGE
