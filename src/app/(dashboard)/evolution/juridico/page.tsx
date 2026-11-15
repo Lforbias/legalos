@@ -1,6 +1,6 @@
 import { listDocumentReviews } from "@/server/services/document-review.service";
 import Link from "next/link";
-import { ArrowUpRight, FolderOpen, Hourglass, FileText, Calculator, Bot, Plus, Bell } from "lucide-react";
+import { ArrowUpRight, FolderOpen, Hourglass, FileText, Calculator, Bot, Plus, Bell, Newspaper } from "lucide-react";
 import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { StatCard } from "@/components/evolution/stat-card";
@@ -121,6 +121,7 @@ export default async function JuridicoPage({ searchParams }: { searchParams: Pro
           </div>
         </Link>}
         {attentionTabs.length > 0 && <Link href="/alertas" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md"><Bell className="h-5 w-5 text-muted" aria-hidden /><div><p className="text-sm font-medium group-hover:text-primary">Central de alertas</p><p className="text-[12px] text-muted">Pendências jurídicas e operacionais</p></div></Link>}
+        {hasCases && <Link href="/evolution/juridico/publicacoes" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md"><Newspaper className="h-5 w-5 text-muted" aria-hidden /><div><p className="text-sm font-medium group-hover:text-primary">Publicações e movimentações</p><p className="text-[12px] text-muted">DJEN capturado e andamentos DataJud por processo</p></div></Link>}
         {can(ctx, "deadlines:read") && (
           <Link href="/prazos" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
             <Hourglass className="h-5 w-5 text-muted" aria-hidden />

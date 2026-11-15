@@ -8,7 +8,7 @@ import { coverageLevelOf, isLocalOrFakeUrl, type CoverageLevel } from "@/lib/jud
 import { UFS } from "@/lib/mni/tribunals";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { onlyDigits } from "@/lib/validation/br-documents";
-import { assertCan, type TenantContext } from "@/server/context";
+import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { requireMfa } from "./certificate.service";
 import { isUniqueViolation } from "./db-errors";
@@ -55,13 +55,17 @@ const OVERLAP_DAYS = 2;
 const FIRST_SYNC_DAYS = 7;
 const MAX_DAYS = 30;
 
+function assertCanManagePublications(ctx: TenantContext) {
+  if (!can(ctx, "integrations:manage") && !can(ctx, "cases:write")) throw new ForbiddenError();
+}
+
 export async function listMonitors(ctx: TenantContext): Promise<MonitorRow[]> {
-  assertCan(ctx, "integrations:manage");
+  assertCanManagePublications(ctx);
   return db.djenMonitor.findMany({ where: { organizationId: ctx.organizationId }, orderBy: { createdAt: "asc" }, select: { id: true, label: true, oabNumber: true, oabUf: true, enabled: true, lastSyncAt: true, lastStatus: true, lastMessage: true, defaultAssigneeId: true, defaultTeamId: true, professionalId: true, lastSuccessAt: true, lastCaptureAt: true, firstVerifiedAt: true } });
 }
 
 export async function createMonitor(ctx: TenantContext, input: { label: string; oabNumber: string; oabUf: string }) {
-  assertCan(ctx, "integrations:manage");
+  assertCanManagePublications(ctx);
   const label = input.label.trim();
   if (label.length < 2 || label.length > 80) throw new ValidationError("Dê um nome ao monitoramento (2 a 80 caracteres).", { label: ["Nome inválido."] });
   const oabNumber = onlyDigits(input.oabNumber).replace(/^0+/, "");
@@ -99,14 +103,14 @@ export async function setMonitorRecipients(ctx: TenantContext, id: string, input
 }
 
 export async function setMonitorEnabled(ctx: TenantContext, id: string, enabled: boolean) {
-  assertCan(ctx, "integrations:manage");
+  assertCanManagePublications(ctx);
   const r = await db.djenMonitor.updateMany({ where: { id, organizationId: ctx.organizationId }, data: { enabled } });
   if (r.count !== 1) throw new NotFoundError("Monitoramento não encontrado.");
   await audit({ action: enabled ? "djen.monitor_enable" : "djen.monitor_disable", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "djen_monitor", resourceId: id, meta: ctx.meta });
 }
 
 export async function deleteMonitor(ctx: TenantContext, id: string) {
-  assertCan(ctx, "integrations:manage");
+  assertCanManagePublications(ctx);
   await requireMfa(ctx.userId);
   const r = await db.djenMonitor.deleteMany({ where: { id, organizationId: ctx.organizationId } });
   if (r.count !== 1) throw new NotFoundError("Monitoramento não encontrado.");
@@ -152,10 +156,7 @@ export type SyncOptions = { days?: number; http?: DjenHttp; pauseMs?: number; tr
  *  - cada resultado vira evidência (inclusive falhas); respostas de transporte injetado nunca contam como prova real.
  */
 export async function syncDjen(ctx: TenantContext, monitorId: string, opts: SyncOptions = {}): Promise<DjenSyncResult> {
-  // `assertCan`/`can()` zeram qualquer permissão `inbox:*` enquanto BOX_AVAILABLE for falso (retirada do Box
-  // autenticado). O DJEN é público e faz parte do Box 3.0, por isso a verificação aqui é a permissão bruta do
-  // cargo (mesmo padrão já usado em src/server/judicial/box-v3.service.ts e em src/app/(dashboard)/box-v3/*).
-  if (!ctx.permissions.has("inbox:write")) throw new ForbiddenError();
+  assertCanManagePublications(ctx);
   const m = await db.djenMonitor.findFirst({ where: { id: monitorId, organizationId: ctx.organizationId } });
   if (!m) throw new NotFoundError("Monitoramento não encontrado.");
   const now = opts.now ?? new Date();
