@@ -10,18 +10,6 @@ const securityHeaders = [
   ...(isProd ? [{ key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains" }] : []),
 ];
 
-const oldProductPages = [
-  "/produto/recursos",
-  "/produto/desktop",
-  "/produto/precos",
-  "/produto/contato",
-  "/produto/novidades",
-  "/produto/roadmap",
-  "/produto/seguranca",
-  "/produto/sobre",
-  "/produto/fundadores",
-];
-
 const nextConfig: NextConfig = {
   // Para imagens Docker/implantação enxuta: BUILD_STANDALONE=1 npm run build, depois node .next/standalone/server.js
   ...(process.env.BUILD_STANDALONE === "1" ? { output: "standalone" as const } : {}),
@@ -29,13 +17,6 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@whiskeysockets/baileys", "pino", "qrcode", "web-push"],
   poweredByHeader: false,
   reactStrictMode: true,
-  async redirects() {
-    return oldProductPages.map(source => ({
-      source,
-      destination: "/produto",
-      permanent: false,
-    }));
-  },
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },

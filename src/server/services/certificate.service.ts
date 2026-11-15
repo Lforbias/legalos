@@ -9,6 +9,7 @@ import { certKey, openBytes, parsePfx, pfxForTls, sealBytes } from "@/lib/securi
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { notify } from "./notification.service";
+import { evolutionJudicialLoginEnabled } from "@/lib/evolution-judicial-login";
 
 export const MAX_PFX_BYTES = 100 * 1024;
 export const EXPIRY_WARN_DAYS = [30, 7] as const;
@@ -16,8 +17,12 @@ const DAY = 24 * 60 * 60 * 1000;
 
 export const vaultAvailable = () => certKey() !== null;
 
-type BoxSurface = "legacy" | "v3";
+type BoxSurface = "legacy" | "v3" | "portal";
 function assertBoxSurface(surface: BoxSurface = "legacy") {
+  if (surface === "portal") {
+    if (!evolutionJudicialLoginEnabled()) throw new ConflictError("O acesso a certificados para login em tribunais está desativado.");
+    return;
+  }
   if (surface === "v3") {
     if (!boxV3PreviewEnabled()) throw new ConflictError("A configuração do Box 3.0 está indisponível.");
   } else assertBoxAvailable();
@@ -25,6 +30,7 @@ function assertBoxSurface(surface: BoxSurface = "legacy") {
 
 /** The preview only permits local vault administration; signing/material access keeps the legacy guard. */
 function canManageVault(ctx: TenantContext, surface: BoxSurface): boolean {
+  if (surface === "portal") return evolutionJudicialLoginEnabled() && ctx.permissions.has("integrations:manage");
   return surface === "v3" ? boxV3PreviewEnabled() && ctx.permissions.has("certificates:manage") : can(ctx, "certificates:manage");
 }
 
@@ -187,12 +193,12 @@ export async function assertCertificatePurpose(ctx: TenantContext, id: string, p
   await enforceCertificatePurpose(ctx, certificate, purpose.trim().slice(0, 120));
 }
 
-export async function getCertificateMaterial(ctx: TenantContext, id: string, purpose: string, caseId?: string | null): Promise<CertificateMaterial> {
-  assertBoxAvailable();
+export async function getCertificateMaterial(ctx: TenantContext, id: string, purpose: string, caseId?: string | null, surface: BoxSurface = "legacy"): Promise<CertificateMaterial> {
+  assertBoxSurface(surface);
   const key = requireKey();
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
-  if (c.ownerUserId !== ctx.userId && !can(ctx, "certificates:manage")) {
+  if (c.ownerUserId !== ctx.userId && !(surface !== "portal" && can(ctx, "certificates:manage"))) {
     const auth = await db.certificateAuthorizedUser.findUnique({ where: { certificateId_userId: { certificateId: id, userId: ctx.userId } }, select: { userId: true } });
     if (!auth) throw new NotFoundError("Certificado não encontrado.");
   }
@@ -213,7 +219,7 @@ export async function getCertificateMaterial(ctx: TenantContext, id: string, pur
 export async function listUsableCertificates(ctx: TenantContext, surface: BoxSurface = "legacy"): Promise<{ id: string; label: string }[]> {
   assertBoxSurface(surface);
   const now = new Date();
-  const manage = canManageVault(ctx, surface);
+  const manage = surface === "portal" ? false : canManageVault(ctx, surface);
   const authIds = manage ? [] : (await db.certificateAuthorizedUser.findMany({ where: { userId: ctx.userId, organizationId: ctx.organizationId }, select: { certificateId: true } })).map((a) => a.certificateId);
   return db.certificate.findMany({
     where: { organizationId: ctx.organizationId, revokedAt: null, notAfter: { gt: now }, ...(manage ? {} : { OR: [{ ownerUserId: ctx.userId }, { id: { in: authIds } }] }) },
@@ -227,7 +233,7 @@ export async function assertCertificateUsable(ctx: TenantContext, id: string, su
   assertBoxSurface(surface);
   const c = await db.certificate.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { ownerUserId: true, revokedAt: true, notAfter: true } });
   if (!c) throw new NotFoundError("Certificado não encontrado.");
-  if (c.ownerUserId !== ctx.userId && !canManageVault(ctx, surface)) {
+  if (c.ownerUserId !== ctx.userId && !(surface !== "portal" && canManageVault(ctx, surface))) {
     const auth = await db.certificateAuthorizedUser.findUnique({ where: { certificateId_userId: { certificateId: id, userId: ctx.userId } }, select: { userId: true } });
     if (!auth) throw new NotFoundError("Certificado não encontrado.");
   }

@@ -12,7 +12,7 @@ afterAll(async () => { await browser?.close(); });
 const loginHtml = (error = "") => `<!doctype html><html><body>${error ? `<div class="alert-danger">${error}</div>` : ""}<form id="frmLogin" method="post" action="index.php" onsubmit="this.querySelector('input[name=pwdSenha]').value=document.querySelector('#pwdSenha').value"><input id="txtUsuario" name="txtUsuario"><input type="password" name="pwdSenha" hidden><input id="pwdSenha" type="text"><button type="submit" id="sbmEntrar">Entrar</button></form></body></html>`;
 const otpHtml = (error = "") => `<!doctype html><html><body>${error ? `<div class="alert-danger">${error}</div>` : ""}<form method="post" action="index.php"><label for="txtCodigo">Código de autenticação</label><input id="txtCodigo" name="txtCodigo"><button id="btnValidar" type="submit">Validar</button></form></body></html>`;
 
-async function fixture(fn: (page: Page, posts: string[]) => Promise<void>, invalidPassword = false) {
+async function fixture(fn: (page: Page, posts: string[]) => Promise<void>, invalidPassword = false, certificateLogin = false) {
   if (!browser) return;
   const context: BrowserContext = await browser.newContext();
   const posts: string[] = [];
@@ -20,7 +20,8 @@ async function fixture(fn: (page: Page, posts: string[]) => Promise<void>, inval
     const request = route.request();
     const url = new URL(request.url());
     if (url.origin !== ORIGIN) return route.abort();
-    if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "text/html", body: loginHtml() });
+    if (request.method() === "GET" && url.pathname.endsWith("/certificate")) return route.fulfill({ status: 200, contentType: "text/html", body: otpHtml() });
+    if (request.method() === "GET") return route.fulfill({ status: 200, contentType: "text/html", body: certificateLogin ? loginHtml() + `<a href="${ORIGIN}/certificate">Certificado Digital</a>` : loginHtml() });
     const body = new URLSearchParams(request.postData() ?? "");
     if (body.get("hdnAcao") === "login" || body.get("txtUsuario")) {
       posts.push("login");
@@ -52,6 +53,14 @@ describe.skipIf(!browser)("login eproc TJMG", () => {
       expect(totpCode(SECRET, totpStep(T0))).toHaveLength(6);
     });
   }, 15_000);
+
+  it("entra por certificado e exige o TOTP sem enviar usuário ou senha", async () => {
+    await fixture(async (page, posts) => {
+      const result = await loginEprocTjmg(page, { document: "", password: "", otpSecret: SECRET, certificateAuth: true }, { now: () => T0, sleep: async () => undefined, stepTimeoutMs: 8_000 });
+      expect(result).toMatchObject({ ok: true });
+      expect(posts).toEqual(["otp"]);
+    }, false, true);
+  });
 
   it("senha recusada: não repete o envio", async () => {
     await fixture(async (page, posts) => {

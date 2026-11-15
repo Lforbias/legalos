@@ -16,9 +16,9 @@ const T0 = Date.UTC(2027, 0, 1, 12, 0, 5); // 5 s depois do início de uma janel
 const browser = await chromium.launch({ args: ["--no-sandbox"] }).catch(() => null);
 afterAll(async () => { await browser?.close(); });
 
-type Scenario = { password: string; otp?: boolean; block?: boolean; captcha?: boolean };
+type Scenario = { password: string; otp?: boolean; block?: boolean; captcha?: boolean; certificate?: boolean };
 const page = (body: string) => `<!doctype html><html><head><title>Entrar</title></head><body>${body}</body></html>`;
-const loginPage = (err = "") => page(`<h1>Acesse sua conta</h1>${err ? `<span id="input-error" class="kc-feedback-text">${err}</span>` : ""}<form id="loginForm" method="post" action="${SSO}/auth/realms/pje/login-actions/authenticate?step=login"><input id="username" name="username" type="text"><input id="password" name="password" type="password"><input id="kc-login" type="submit" value="Entrar"></form>`);
+const loginPage = (err = "", certificate = false) => page(`<h1>Acesse sua conta</h1>${err ? `<span id="input-error" class="kc-feedback-text">${err}</span>` : ""}<form id="loginForm" method="post" action="${SSO}/auth/realms/pje/login-actions/authenticate?step=login"><input id="username" name="username" type="text"><input id="password" name="password" type="password"><input id="kc-login" type="submit" value="Entrar"></form>${certificate ? `<a href="${SSO}/certificate">Seu certificado digital</a>` : ""}`);
 const otpPage = (err = "") => page(`<h1>Código de verificação</h1>${err ? `<span class="kc-feedback-text">${err}</span>` : ""}<form method="post" action="${SSO}/auth/realms/pje/login-actions/authenticate?step=otp"><input id="otp" name="otp" type="text"><input id="kc-login" type="submit" value="Entrar"></form>`);
 
 async function withFixture<T>(sc: Scenario, fn: (page: Page, log: { posts: string[] }) => Promise<T>): Promise<T> {
@@ -33,7 +33,8 @@ async function withFixture<T>(sc: Scenario, fn: (page: Page, log: { posts: strin
     if (url.origin === APP && url.pathname === "/pje/login.seam") return redirect(`${SSO}/auth/realms/pje/protocol/openid-connect/auth?client_id=pje-trf1-1g`);
     if (url.origin === APP) return html(page("<h1>Painel do usuário</h1>"));
     if (url.origin !== SSO) return route.abort();
-    if (req.method() === "GET") return html(sc.captcha ? page(`<h1>Verificação</h1><div class="g-recaptcha" data-sitekey="x" style="width:300px;height:80px">captcha</div>`) : loginPage());
+    if (url.pathname === "/certificate") return sc.otp ? html(otpPage()) : redirect(`${APP}/pje/home.seam`);
+    if (req.method() === "GET") return html(sc.captcha ? page(`<h1>Verificação</h1><div class="g-recaptcha" data-sitekey="x" style="width:300px;height:80px">captcha</div>`) : loginPage("", Boolean(sc.certificate)));
     const form = new URLSearchParams(req.postData() ?? "");
     log.posts.push(url.searchParams.get("step") ?? "?");
     if (url.searchParams.get("step") === "otp") return verifyTotp(SECRET, form.get("otp") ?? "", clock.now) !== null ? redirect(`${APP}/pje/home.seam`) : html(otpPage("Código inválido."));
@@ -61,6 +62,14 @@ describe.skipIf(!browser)("robô de login do PJe (réplica do SSO)", () => {
       const r = await run(p, creds());
       expect(r.ok).toBe(true);
       if (r.ok) expect(r.signature.host).toBe("pje1g.trf1.jus.br");
+    });
+  });
+
+  it("entra com certificado e envia o TOTP sem mandar CPF ou senha", async () => {
+    await withFixture({ password: "", otp: true, certificate: true }, async (p, log) => {
+      const r = await run(p, creds({ document: "", password: "", otpSecret: SECRET, certificateAuth: true }));
+      expect(r.ok).toBe(true);
+      expect(log.posts).toEqual(["otp"]);
     });
   });
 

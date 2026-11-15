@@ -12,7 +12,10 @@ export function failureCodeForLogin(code: LoginFailureCode): OperationFailure["c
       return "AUTH_REJECTED";
     case "OTP_NOT_CONFIGURED":
     case "OTP_MISSING":
+    case "CERTIFICATE_REQUIRED":
       return "AUTH_REQUIRED";
+    case "CERTIFICATE_REJECTED":
+      return "AUTH_REJECTED";
     case "ACCOUNT_BLOCKED":
     case "NEEDS_PERSON":
       return "NEEDS_PERSON";

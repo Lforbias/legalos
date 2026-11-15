@@ -20,6 +20,10 @@ import { openBytes, certKey } from "@/lib/security/pfx";
 import { audit } from "@/server/services/audit.service";
 import { sanitizeError } from "@/server/job-runs";
 import type { PortalSecret } from "@/server/services/portal-access.service";
+import { resolveTenantContext } from "@/server/services/tenant.service";
+import { getCertificateMaterial } from "@/server/services/certificate.service";
+import { PJE_SSO_ORIGIN } from "@/lib/robots/pje/targets";
+import { TJMG_EPROC_LOGIN_URL } from "@/lib/robots/eproc/login";
 
 /**
  * Executor da fila do robô. Pega UM trabalho por vez (FOR UPDATE SKIP LOCKED), abre o navegador, faz o login no portal e
@@ -32,9 +36,10 @@ import type { PortalSecret } from "@/server/services/portal-access.service";
 export const STUCK_AFTER_MS = 10 * 60_000;
 
 export type RobotPage = { page: Page; close: () => Promise<void> };
+export type PortalClientCertificate = { pfx: Buffer; passphrase: string; origins: string[] };
 export type RobotDeps = {
   /** Abre uma página de navegador limpa (sem cookies) para um trabalho. */
-  openPage: () => Promise<RobotPage>;
+  openPage: (certificate?: PortalClientCertificate) => Promise<RobotPage>;
   now?: () => Date;
   /** Só para teste: troca o login e a leitura do painel por versões de mentira. */
   login?: typeof loginPje;
@@ -105,10 +110,44 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   try {
     secret = JSON.parse(openBytes(access.secretEnc, key).toString("utf8")) as PortalSecret;
   } catch {
-    const msg = "Não foi possível abrir a senha guardada. Cadastre o acesso de novo.";
+    const msg = "Não foi possível abrir os dados guardados. Atualize o acesso ao tribunal.";
     await finishJob("FAILED", msg);
     await db.portalAccess.update({ where: { id: access.id }, data: { status: "NEEDS_ACTION", statusMessage: msg, statusAt: now() } });
     return { status: "FAILED" };
+  }
+  if (isEvolutionPilot && !secret.otpSecret) {
+    const msg = "Cadastre a chave do autenticador antes de conectar ao tribunal.";
+    await finishJob("FAILED", msg, { origin, code: "OTP_MISSING" });
+    await db.portalAccess.update({ where: { id: access.id }, data: { status: "NEEDS_ACTION", statusMessage: msg, statusAt: now() } });
+    return { status: "FAILED" };
+  }
+
+  let certMaterial: Awaited<ReturnType<typeof getCertificateMaterial>> | null = null;
+  if (isEvolutionPilot) {
+    if (!access.certificateId || access.authMethod !== "CERTIFICATE") {
+      const msg = "Atualize este acesso e selecione um certificado digital.";
+      await finishJob("FAILED", msg, { origin, code: "CERTIFICATE_REQUIRED" });
+      await db.portalAccess.update({ where: { id: access.id }, data: { status: "NEEDS_ACTION", statusMessage: msg, statusAt: now() } });
+      secret.otpSecret = null;
+      return { status: "FAILED" };
+    }
+    const tenant = await resolveTenantContext(access.userId, access.organizationId, {});
+    if (!tenant) {
+      const msg = "A pessoa não tem mais acesso ativo a este escritório.";
+      await finishJob("FAILED", msg, { origin, code: "CERTIFICATE_REJECTED" });
+      await db.portalAccess.update({ where: { id: access.id }, data: { status: "NEEDS_ACTION", statusMessage: msg, statusAt: now() } });
+      secret.otpSecret = null;
+      return { status: "FAILED" };
+    }
+    try {
+      certMaterial = await getCertificateMaterial(tenant, access.certificateId, "portal:login", null, "portal");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Não foi possível usar o certificado digital selecionado.";
+      await finishJob("FAILED", msg, { origin, code: "CERTIFICATE_REJECTED" });
+      await db.portalAccess.update({ where: { id: access.id }, data: { status: "NEEDS_ACTION", statusMessage: msg, statusAt: now() } });
+      secret.otpSecret = null;
+      return { status: "FAILED" };
+    }
   }
 
   const names = nameWords(access.user.name);
@@ -116,10 +155,13 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   let panel: Awaited<ReturnType<typeof probePjePanel>> | null = null;
   let rp: RobotPage | null = null;
   try {
-    rp = await deps.openPage();
+    const origins = isEvolutionEproc
+      ? [new URL(TJMG_EPROC_LOGIN_URL).origin]
+      : [target!.origin, PJE_SSO_ORIGIN];
+    rp = await deps.openPage(certMaterial ? { pfx: certMaterial.pfx, passphrase: certMaterial.passphrase, origins } : undefined);
     const steps = usedOtpSteps.get(access.id) ?? new Set<number>();
     usedOtpSteps.set(access.id, steps);
-    const credentials = { document: secret.document, password: secret.password, otpSecret: secret.otpSecret };
+    const credentials = { document: secret.document, password: secret.password, otpSecret: secret.otpSecret, certificateAuth: isEvolutionPilot };
     outcome = isEvolutionEproc
       ? await loginEprocTjmg(rp.page, credentials, { names, usedOtpSteps: steps })
       : await (deps.login ?? loginPje)(rp.page, target!, credentials, { names, usedOtpSteps: steps });
@@ -129,6 +171,9 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     outcome = { ok: false, code: "NETWORK", message: "O navegador do robô falhou durante o teste.", retryable: true, signature: null, detail: String(sanitizeError(e)).slice(0, 240) };
   } finally {
     await rp?.close().catch(() => undefined);
+    certMaterial?.pfx.fill(0);
+    secret.password = "";
+    secret.otpSecret = null;
   }
 
   const portalLabel = isEvolutionEproc ? "eproc" : "PJe";

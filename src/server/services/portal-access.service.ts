@@ -13,12 +13,13 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions
 import { parseCourtOtpSecret } from "@/lib/pje/otp";
 import { PJE_TARGETS, getPjeTarget } from "@/lib/robots/pje/targets";
 import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
+import { assertCertificateUsable } from "@/server/services/certificate.service";
 import { isValidCnpj, isValidCpf, onlyDigits } from "@/lib/validation/br-documents";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 
 /**
- * Acesso do usuário a um portal de tribunal para o robô (hoje: PJe pelo SSO do PDPJ, com senha + 2º fator).
+ * Acesso do usuário a um portal de tribunal para o robô (piloto TJMG com certificado A1 + chave TOTP).
  * Uma linha por usuário e tribunal/grau. O segredo (senha e chave do 2º fator) é cifrado com a mesma chave do cofre,
  * nunca volta para tela ou API e só é aberto pelo worker na hora de usar. O dono vê e remove só os próprios acessos.
  */
@@ -52,9 +53,10 @@ const hint = (doc: string) => (doc.length === 11 ? `CPF final ${doc.slice(-2)}` 
 
 export const connectPjeSchema = z.object({
   targets: z.array(z.string().max(40)).min(1, "Escolha pelo menos um tribunal.").max(MAX_TARGETS),
-  document: z.string().trim().min(11).max(20),
-  password: z.string().min(1, "Informe a senha do PJe.").max(200),
-  /** Chave Base32 ou endereço otpauth lido do QR Code do 2º fator. Opcional: só vale se o PJe pedir o código. */
+  document: z.string().trim().max(20).optional(),
+  password: z.string().max(200).optional(),
+  certificateId: z.uuid().optional(),
+  /** Chave Base32 ou endereço otpauth lido do QR Code do 2º fator. Obrigatória nos logins do piloto. */
   otp: z.string().trim().max(2048).optional(),
 }).strict();
 
@@ -72,6 +74,7 @@ export type PortalAccessRow = {
   lastSyncAt: Date | null;
   documentHint: string;
   hasOtp: boolean;
+  hasCertificate: boolean;
   lastJob: { status: string; message: string | null; finishedAt: Date | null; createdAt: Date; summary: unknown } | null;
 };
 
@@ -116,6 +119,7 @@ export async function listMyPortalAccesses(ctx: TenantContext, surface: PortalAc
       lastSyncAt: r.lastSyncAt,
       documentHint: secret?.document ? (surface === "evolution-eproc" ? "Usuário eproc cadastrado" : hint(secret.document)) : "—",
       hasOtp: Boolean(secret?.otpSecret),
+      hasCertificate: Boolean(r.certificateId),
       lastJob: j ? { status: j.status, message: j.message, finishedAt: j.finishedAt, createdAt: j.createdAt, summary: j.summary } : null,
     };
   });
@@ -136,26 +140,32 @@ async function enqueue(organizationId: string, accessId: string, kind: "LOGIN_TE
   return job.id;
 }
 
-/** Cadastra (ou atualiza) o acesso aos tribunais escolhidos e enfileira o teste de login do primeiro. */
+/** Cadastra o certificado e o segredo TOTP e enfileira o teste do primeiro destino. */
 export async function connectPje(ctx: TenantContext, raw: unknown, surface: PortalAccessSurface = "legacy") {
   assertPortalSurface(surface);
   assertPortalPermission(ctx, surface);
   const input = connectPjeSchema.parse(raw);
+  const certificatePilot = surface !== "legacy";
+  if (certificatePilot && !input.certificateId) throw new ValidationError("Selecione um certificado digital válido.", { certificateId: ["O certificado é obrigatório neste acesso."] });
+  if (certificatePilot && !input.otp) throw new ValidationError("Informe a chave do autenticador.", { otp: ["A chave do autenticador é obrigatória."] });
+  if (!input.certificateId && !input.password) throw new ValidationError("Informe a senha ou selecione um certificado.", { password: ["A senha é obrigatória quando não há certificado."] });
   const key = requireKey();
   await requireOwnMfa(ctx.userId);
+  if (input.certificateId) await assertCertificateUsable(ctx, input.certificateId, certificatePilot ? "portal" : "legacy");
   const targets = [...new Set(input.targets)];
   if (surface === "evolution" && (targets.length !== 1 || targets[0] !== EVOLUTION_PJE_TARGET_KEY)) {
     throw new ValidationError("O piloto está limitado ao TJMG · 1º grau.", { targets: ["Escolha apenas TJMG · 1º grau."] });
   }
   const unknown = targets.filter((t) => !getPjeTarget(t));
   if (unknown.length) throw new ValidationError("Tribunal inválido.", { targets: ["Escolha tribunais da lista."] });
-  const document = onlyDigits(input.document);
-  if (!(document.length === 11 ? isValidCpf(document) : document.length === 14 ? isValidCnpj(document) : false)) throw new ValidationError("CPF/CNPJ inválido.", { document: ["Confira o CPF/CNPJ do login do PJe."] });
+  const document = onlyDigits(input.document ?? "");
+  if (!document && !input.certificateId) throw new ValidationError("Informe o CPF/CNPJ do login do PJe.", { document: ["CPF/CNPJ obrigatório sem certificado."] });
+  if (document && !(document.length === 11 ? isValidCpf(document) : document.length === 14 ? isValidCnpj(document) : false)) throw new ValidationError("CPF/CNPJ inválido.", { document: ["Confira o CPF/CNPJ do certificado."] });
   const otpSecret = input.otp ? parseCourtOtpSecret(input.otp) : null;
-  const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document, password: input.password, otpSecret } satisfies PortalSecret), "utf8"), key);
+  const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document, password: input.password ?? "", otpSecret } satisfies PortalSecret), "utf8"), key);
   const ids: string[] = [];
   for (const target of targets) {
-    const data = { authMethod: "PASSWORD_OTP", certificateId: null, secretEnc, enabled: true, status: "PENDING", statusMessage: "Aguardando o primeiro teste de login.", statusAt: new Date() };
+    const data = { authMethod: input.certificateId ? "CERTIFICATE" : "PASSWORD_OTP", certificateId: input.certificateId ?? null, secretEnc, enabled: true, status: "PENDING", statusMessage: certificatePilot ? "Aguardando o primeiro teste de login por certificado." : "Aguardando o primeiro teste de login.", statusAt: new Date() };
     const row = await db.portalAccess.upsert({
       where: { organizationId_userId_system_target: { organizationId: ctx.organizationId, userId: ctx.userId, system: "pje", target } },
       create: { organizationId: ctx.organizationId, userId: ctx.userId, system: "pje", target, label: getPjeTarget(target)!.label, ...data },
@@ -171,23 +181,26 @@ export async function connectPje(ctx: TenantContext, raw: unknown, surface: Port
 }
 
 const connectEprocTjmgSchema = z.object({
-  username: z.string().trim().min(1, "Informe o usuário do eproc.").max(30),
-  password: z.string().min(1, "Informe a senha do eproc.").max(40),
-  otp: z.string().trim().min(1, "Informe a chave do autenticador do eproc.").max(2048),
+  username: z.string().trim().max(30).optional(),
+  password: z.string().max(40).optional(),
+  certificateId: z.uuid(),
+  otp: z.string().trim().max(2048).optional(),
 }).strict();
 
-/** Guarda e testa login real do eproc TJMG 1º grau; não ativa consulta de processos. */
+/** Guarda e testa login do eproc TJMG 1º grau com certificado e segundo fator; não ativa consulta de processos. */
 export async function connectEprocTjmg(ctx: TenantContext, raw: unknown) {
   const surface: PortalAccessSurface = "evolution-eproc";
   assertPortalSurface(surface);
   assertPortalPermission(ctx, surface);
   const input = connectEprocTjmgSchema.parse(raw);
+  if (!input.otp) throw new ValidationError("Informe a chave do autenticador do eproc.", { otp: ["A chave do autenticador é obrigatória."] });
   const key = requireKey();
   await requireOwnMfa(ctx.userId);
+  await assertCertificateUsable(ctx, input.certificateId, "portal");
   const otpSecret = parseCourtOtpSecret(input.otp);
-  const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document: input.username, password: input.password, otpSecret } satisfies PortalSecret), "utf8"), key);
+  const secretEnc = sealBytes(Buffer.from(JSON.stringify({ document: input.username ?? "", password: input.password ?? "", otpSecret } satisfies PortalSecret), "utf8"), key);
   const target = EVOLUTION_TJMG_TARGET_KEY;
-  const data = { authMethod: "PASSWORD_OTP", certificateId: null, secretEnc, enabled: true, status: "PENDING", statusMessage: "Aguardando o primeiro teste de login no eproc.", statusAt: new Date() };
+  const data = { authMethod: "CERTIFICATE", certificateId: input.certificateId, secretEnc, enabled: true, status: "PENDING", statusMessage: "Aguardando o primeiro teste de login por certificado no eproc.", statusAt: new Date() };
   const access = await db.portalAccess.upsert({
     where: { organizationId_userId_system_target: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target } },
     create: { organizationId: ctx.organizationId, userId: ctx.userId, system: EVOLUTION_EPROC_SYSTEM, target, label: "TJMG · 1º grau (eproc)", ...data },
