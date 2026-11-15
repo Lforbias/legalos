@@ -3,6 +3,7 @@ import { DEPARTMENTS } from "@/config/evolution-navigation";
 import { DepartmentHeader } from "@/components/evolution/department-header";
 import { EmptyState } from "@/components/evolution/empty-state";
 import { CourtCatalogList } from "@/modules/court-catalog/court-catalog-ui";
+import { ConnectionPanel } from "@/modules/court-catalog/connection-panel";
 import { can } from "@/server/context";
 import { listCourtCatalog, getCourtCatalogSummary } from "@/server/services/court-catalog.service";
 import { requireTenant } from "@/server/session";
@@ -30,6 +31,8 @@ export default async function FontesPage() {
         title="Fontes e conexões"
         description="Catálogo dos 91 tribunais jurisdicionais do Brasil e estado das conexões do escritório. O login e a consulta de cada tribunal são habilitados por adaptador, um por vez."
       />
+      <ConnectionPanel />
+      <h2 className="mt-8 mb-4 text-base font-semibold">Catálogo nacional de tribunais</h2>
       <CourtCatalogList courts={courts} summary={summary} />
     </>
   );
