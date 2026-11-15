@@ -111,11 +111,21 @@ export async function loginEprocTjmg(page: Page, creds: PjeCredentials, opts: {
   let s = await waitUntil((state) => state.kind !== "UNKNOWN" || Boolean(state.errorText));
   if (!s) return fail("TIMEOUT", "A tela de acesso do eproc do TJMG não carregou a tempo.", true);
   if (s.kind === "CAPTCHA") return fail("NEEDS_PERSON", "O eproc pediu uma verificação de segurança. O LegalOS parou para você concluir no portal oficial.", false);
-  if (s.kind !== "LOGIN") return fail("UNKNOWN_PAGE", "A tela de acesso do eproc mudou; o LegalOS parou sem enviar os dados.", false);
+  if (creds.certificateAuth && s.kind === "LOGIN") {
+    const certificateButton = page.getByText(/certificado\s+digital/i).first();
+    if (!(await certificateButton.count())) return fail("NEEDS_PERSON", "O eproc abriu a tela de usuário e senha sem oferecer entrada por certificado.", false);
+    await certificateButton.click();
+    s = await waitUntil((state) => state.kind !== "LOGIN" || Boolean(state.errorText));
+    if (!s) return fail("TIMEOUT", "O eproc demorou para iniciar o login por certificado.", true);
+    if (s.kind === "LOGIN") return fail("CERTIFICATE_REJECTED", "O eproc recusou o certificado digital.", false);
+  }
+  if (s.kind !== "LOGIN" && !(creds.certificateAuth && (s.kind === "OTP" || s.kind === "OTP_SETUP"))) return fail("UNKNOWN_PAGE", "A tela de acesso do eproc mudou; o LegalOS parou sem enviar os dados.", false);
 
-  await page.fill("#txtUsuario", creds.document);
-  await page.fill("#pwdSenha", creds.password);
-  await page.click("#sbmEntrar");
+  if (!creds.certificateAuth) {
+    await page.fill("#txtUsuario", creds.document);
+    await page.fill("#pwdSenha", creds.password);
+    await page.click("#sbmEntrar");
+  }
   s = await waitUntil((state) => state.kind !== "LOGIN" || Boolean(state.errorText));
   if (!s) return fail("TIMEOUT", "O eproc demorou demais para responder ao login.", true);
   if (s.kind === "LOGIN") {

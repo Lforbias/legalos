@@ -21,8 +21,9 @@ const connectSchema = z.object({
   adapterKey: z.string().min(1).max(60),
   courtCode: z.string().min(2).max(20),
   degree: z.enum(["1", "2"]),
-  document: z.string().trim().min(1).max(30),
-  password: z.string().min(1, "Informe a senha.").max(200),
+  document: z.string().trim().max(30).optional(),
+  password: z.string().max(200).optional(),
+  certificateId: z.uuid(),
   otp: z.string().trim().max(2048).optional(),
 }).strict();
 
@@ -36,12 +37,13 @@ export async function connectAdapterAction(raw: unknown) {
     const { ctx } = await requireTenant();
     assertCan(ctx, "integrations:manage");
     const input = connectSchema.parse(raw);
+    if (!input.otp) throw new ValidationError("Informe a chave do autenticador.", { otp: ["A chave do autenticador é obrigatória."] });
     if (input.courtCode !== "TJMG" || input.degree !== "1" || !["pje-portal", "eproc-portal"].includes(input.adapterKey)) {
       throw new ValidationError("Somente os logins TJMG · 1º grau (PJe legado e eproc) estão disponíveis.", { courtCode: ["Este destino ainda não foi homologado."] });
     }
 
     if (input.adapterKey === "eproc-portal") {
-      const { id, jobId } = await connectEprocTjmg(ctx, { username: input.document, password: input.password, otp: input.otp });
+      const { id, jobId } = await connectEprocTjmg(ctx, { username: input.document, password: input.password, certificateId: input.certificateId, otp: input.otp });
       touch();
       return { id, jobId };
     }
@@ -50,6 +52,7 @@ export async function connectAdapterAction(raw: unknown) {
       targets: [EVOLUTION_PJE_TARGET_KEY],
       document: input.document,
       password: input.password,
+      certificateId: input.certificateId,
       otp: input.otp,
     }, "evolution");
 
@@ -59,6 +62,24 @@ export async function connectAdapterAction(raw: unknown) {
 }
 
 const surfaceSchema = z.enum(["evolution", "evolution-eproc"]);
+
+export async function uploadPortalCertificateAction(formData: FormData) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    assertCan(ctx, "integrations:manage");
+    const file = formData.get("file");
+    const password = formData.get("password");
+    const label = formData.get("label");
+    if (!(file instanceof File) || typeof password !== "string" || typeof label !== "string") {
+      throw new ValidationError("Selecione o certificado A1 e informe a senha do arquivo.");
+    }
+    if (!file.size || file.size > 100_000) throw new ValidationError("O arquivo deve ter até 100 KB.");
+    const { uploadCertificate } = await import("@/server/services/certificate.service");
+    await uploadCertificate(ctx, { file: Buffer.from(await file.arrayBuffer()), password, label, ownerUserId: ctx.userId }, "portal");
+    touch();
+    return undefined;
+  });
+}
 
 export async function testConnectionAction(id: string, rawSurface: unknown = "evolution") {
   return runAction(async () => {

@@ -9,16 +9,17 @@ import type { AvailableTarget } from "./connection-actions";
 
 export function ConnectAdapterForm({
   targets,
+  certificates,
   onDone,
 }: {
   targets: AvailableTarget[];
+  certificates: { id: string; label: string }[];
   onDone?: () => void;
 }) {
   const router = useRouter();
   const [selectedTarget, setSelectedTarget] = useState("");
-  const [document_, setDocument] = useState("");
-  const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [certificateId, setCertificateId] = useState("");
   const [error, setError] = useState<string>();
   const [done, setDone] = useState<string>();
   const [pending, start] = useTransition();
@@ -26,7 +27,6 @@ export function ConnectAdapterForm({
   const selected = targets.find(
     (t) => `${t.adapterKey}|${t.courtCode}|${t.degree}` === selectedTarget,
   );
-  const isEproc = selected?.adapterKey === "eproc-portal";
 
   return (
     <form
@@ -41,9 +41,8 @@ export function ConnectAdapterForm({
             adapterKey: selected.adapterKey,
             courtCode: selected.courtCode,
             degree: selected.degree as "1" | "2",
-            document: document_,
-            password,
-            otp: otp || undefined,
+            certificateId,
+            otp,
           };
           const res = await connectAdapterAction(input);
           if (!res.ok) {
@@ -54,8 +53,8 @@ export function ConnectAdapterForm({
             );
             return;
           }
-          setPassword("");
           setOtp("");
+          setCertificateId("");
           setDone(
             "Salvo. O teste de conexão foi colocado na fila. O resultado aparece quando o worker processar.",
           );
@@ -86,50 +85,27 @@ export function ConnectAdapterForm({
 
       {selected && (
         <>
-          <div className="grid gap-3 md:grid-cols-2">
-            <Field
-              label={isEproc ? "Usuário do eproc" : "CPF (ou CNPJ) do PJe"}
-              htmlFor="adapter-doc"
-              hint={isEproc ? "Usuário cadastrado no portal eproc do TJMG." : "CPF usado no login do PJe do TJMG."}
-            >
-              <Input
-                id="adapter-doc"
-                value={document_}
-                onChange={(e) => setDocument(e.target.value)}
-                required
-                inputMode={isEproc ? "text" : "numeric"}
-                autoComplete="off"
-                maxLength={isEproc ? 30 : 20}
-                disabled={pending}
-                placeholder={isEproc ? "Usuário do eproc" : "000.000.000-00"}
-              />
-            </Field>
-            <Field
-              label="Senha"
-              htmlFor="adapter-pass"
-              hint="Cifrada no cofre. Nunca volta para a tela."
-            >
-              <Input
-                id="adapter-pass"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoComplete="new-password"
-                maxLength={isEproc ? 40 : 200}
-                disabled={pending}
-              />
-            </Field>
+          <Field label="Certificado digital A1" htmlFor="adapter-certificate" hint="Escolha um certificado válido do cofre ou cadastre um arquivo .pfx/.p12 acima.">
+            <Select id="adapter-certificate" value={certificateId} onChange={(e) => setCertificateId(e.target.value)} required disabled={pending || certificates.length === 0}>
+              <option value="">Selecione o certificado…</option>
+              {certificates.map((certificate) => <option key={certificate.id} value={certificate.id}>{certificate.label}</option>)}
+            </Select>
+          </Field>
+
+          <div className="rounded-xl border border-border p-3 text-xs text-muted">
+            Login somente por certificado digital A1. A senha é a do arquivo .pfx/.p12, solicitada apenas ao cadastrar o certificado no cofre.
+            Certificado A3 em token físico/cartão não pode ser usado pelo navegador remoto do Legal OS.
           </div>
 
           <Field
-            label={isEproc ? "Chave do autenticador (obrigatória)" : "Chave do autenticador (opcional)"}
+            label="Chave do autenticador (obrigatória)"
             htmlFor="adapter-otp"
-            hint={isEproc ? "O eproc TJMG exige autenticação em dois fatores. A chave não volta a aparecer depois de salvar." : "Só será usada se o PJe pedir o segundo fator. Não volta a aparecer depois de salvar."}
+            hint="Informe a chave de configuração Base32 ou o endereço otpauth do aplicativo autenticador. O Legal OS gera o código temporário e guarda a chave cifrada."
           >
             <Input
               id="adapter-otp"
               type="password"
+              required
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
               autoComplete="off"
@@ -155,7 +131,7 @@ export function ConnectAdapterForm({
         <Button
           type="submit"
           loading={pending}
-          disabled={!selectedTarget || !document_ || !password || (isEproc && !otp)}
+          disabled={!selectedTarget || !certificateId || !otp || (certificates.length === 0)}
         >
           Salvar e conectar
         </Button>

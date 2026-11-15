@@ -6,7 +6,7 @@
  *  - ciência de intimação e qualquer finalidade desconhecida: nunca. O LegalOS não registra ciência oficial por conta própria.
  * Função pura: o servidor reúne os fatos e aplica a decisão num ponto único (`certificate.service`).
  */
-export const READ_ONLY_PURPOSES: ReadonlySet<string> = new Set(["local:tls-check", "mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos"]);
+export const READ_ONLY_PURPOSES: ReadonlySet<string> = new Set(["local:tls-check", "mni:wsdl", "mni:consultarAvisosPendentes", "mni:consultarProcesso", "mni:consultarProcesso:autos", "portal:login"]);
 export const SIGN_PURPOSES: ReadonlySet<string> = new Set(["mni:entregarManifestacaoProcessual"]);
 
 export type PurposeClass = "READ" | "SIGN" | "FORBIDDEN";

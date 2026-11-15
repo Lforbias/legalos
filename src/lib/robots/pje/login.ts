@@ -9,8 +9,8 @@ import { PJE_SSO_ORIGIN, pjeLoginUrl, type PjeTarget } from "./targets";
  * Regras que não mudam: nunca repetir senha errada (bloqueia a conta), nunca resolver captcha, nunca adivinhar tela
  * desconhecida (para e devolve a "assinatura" da tela para diagnóstico).
  */
-export type PjeCredentials = { document: string; password: string; otpSecret?: string | null };
-export type LoginFailureCode = "BAD_CREDENTIALS" | "ACCOUNT_BLOCKED" | "OTP_NOT_CONFIGURED" | "OTP_MISSING" | "OTP_REJECTED" | "NEEDS_PERSON" | "UNKNOWN_PAGE" | "TIMEOUT" | "NETWORK";
+export type PjeCredentials = { document: string; password: string; otpSecret?: string | null; certificateAuth?: boolean };
+export type LoginFailureCode = "BAD_CREDENTIALS" | "ACCOUNT_BLOCKED" | "OTP_NOT_CONFIGURED" | "OTP_MISSING" | "OTP_REJECTED" | "CERTIFICATE_REQUIRED" | "CERTIFICATE_REJECTED" | "NEEDS_PERSON" | "UNKNOWN_PAGE" | "TIMEOUT" | "NETWORK";
 export type LoginOutcome =
   | { ok: true; signature: PageSignature }
   | { ok: false; code: LoginFailureCode; message: string; retryable: boolean; signature: PageSignature | null; /** Causa técnica curta (ex.: net::ERR_CONNECTION_RESET), sem dados pessoais. */ detail?: string };
@@ -28,7 +28,7 @@ export type LoginOptions = {
 type PageState = { kind: "LOGIN_FORM" | "OTP" | "OTP_SETUP" | "CAPTCHA" | "APP" | "UNKNOWN"; host: string; errorText: string };
 
 /** Roda DENTRO da página: classifica a tela atual. Sem referências externas (é serializada). */
-export const detectState = (ssoHost: string): PageState => {
+export const detectState = ({ ssoHost, appHost }: { ssoHost: string; appHost: string }): PageState => {
   const vis = (el: Element | null): boolean => {
     if (!el) return false;
     const h = el as HTMLElement;
@@ -43,11 +43,12 @@ export const detectState = (ssoHost: string): PageState => {
     .join(" | ")
     .slice(0, 300);
   const host = location.host;
-  if (host !== ssoHost) return { kind: host ? "APP" : "UNKNOWN", host, errorText };
   if (any("iframe[src*='recaptcha'], iframe[src*='hcaptcha'], .g-recaptcha, .h-captcha, [data-sitekey]")) return { kind: "CAPTCHA", host, errorText };
   if (any("#kc-totp-secret-key, #kc-totp-secret-qr-code, input[name='totp'], input#totp")) return { kind: "OTP_SETUP", host, errorText };
   if (any("input[name='otp'], input#otp")) return { kind: "OTP", host, errorText };
   if (any("#username") && any("#password")) return { kind: "LOGIN_FORM", host, errorText };
+  if (host === appHost) return { kind: "APP", host, errorText };
+  if (host !== ssoHost) return { kind: "UNKNOWN", host, errorText };
   return { kind: "UNKNOWN", host, errorText };
 };
 
@@ -67,19 +68,19 @@ export const collectSignature = (): PageSignature => ({
 const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 const BLOCKED = /bloquead|excedeu|muitas tentativas|temporariamente|suspens/i;
 
-async function state(page: Page): Promise<PageState | null> {
+async function state(page: Page, target: PjeTarget): Promise<PageState | null> {
   try {
-    return await page.evaluate(detectState, new URL(PJE_SSO_ORIGIN).host);
+    return await page.evaluate(detectState, { ssoHost: new URL(PJE_SSO_ORIGIN).host, appHost: new URL(target.origin).host });
   } catch {
     return null; // a página estava navegando
   }
 }
 
 /** Espera até `until` ser verdadeiro para o estado da tela (ou esgotar o tempo). */
-async function waitFor(page: Page, until: (s: PageState) => boolean, timeoutMs: number, sleep: (ms: number) => Promise<void>): Promise<PageState | null> {
+async function waitFor(page: Page, target: PjeTarget, until: (s: PageState) => boolean, timeoutMs: number, sleep: (ms: number) => Promise<void>): Promise<PageState | null> {
   const end = Date.now() + timeoutMs;
   while (Date.now() < end) {
-    const s = await state(page);
+    const s = await state(page, target);
     if (s && until(s)) return s;
     await sleep(400);
   }
@@ -109,16 +110,31 @@ export async function loginPje(page: Page, target: PjeTarget, creds: PjeCredenti
     return fail("NETWORK", "Não foi possível abrir o PJe do tribunal agora. O sistema tentará de novo.", true, detail);
   }
 
-  let s = await waitFor(page, (x) => x.kind !== "UNKNOWN" || Boolean(x.errorText), 30_000, sleep);
+  let s = await waitFor(page, target, (x) => x.kind !== "UNKNOWN" || Boolean(x.errorText), 30_000, sleep);
   if (!s) return fail("TIMEOUT", "A tela de login do PJe não carregou a tempo.", true);
   if (s.kind === "CAPTCHA") return fail("NEEDS_PERSON", "O PJe pediu uma verificação de segurança (captcha). O LegalOS não resolve captcha: entre uma vez pelo navegador e tente de novo mais tarde.", false);
-  if (s.kind !== "LOGIN_FORM") return fail("UNKNOWN_PAGE", "A tela de login do PJe está diferente do esperado. O robô parou para não errar.", false);
+  if (creds.certificateAuth && s.kind === "LOGIN_FORM") {
+    const certificateButton = page.getByText(/certificado\s+digital/i).first();
+    if (!(await certificateButton.count())) return fail("CERTIFICATE_REQUIRED", "O PJe abriu a tela de senha sem oferecer entrada por certificado. O certificado foi apresentado pelo navegador, mas o portal não iniciou a autenticação.", false);
+    await certificateButton.click();
+    s = await waitFor(page, target, (x) => x.kind !== "LOGIN_FORM" || Boolean(x.errorText), timeout, sleep);
+    if (!s) return fail("TIMEOUT", "O PJe demorou demais para iniciar o login por certificado.", true);
+    if (s.kind === "LOGIN_FORM") return fail("CERTIFICATE_REJECTED", "O PJe recusou o certificado digital.", false);
+  }
+  if (creds.certificateAuth && s.kind === "APP") {
+    await page.waitForLoadState("load", { timeout: 20_000 }).catch(() => undefined);
+    const final = await sig();
+    return { ok: true, signature: final ?? { host: s.host, path: "", title: "", headings: [], fields: [], buttons: [] } };
+  }
+  if (s.kind !== "LOGIN_FORM" && !(creds.certificateAuth && (s.kind === "OTP" || s.kind === "OTP_SETUP"))) return fail("UNKNOWN_PAGE", "A tela de login do PJe está diferente do esperado. O robô parou para não errar.", false);
 
-  await page.fill("#username", onlyDigits(creds.document));
-  await page.fill("#password", creds.password);
-  await page.click("#kc-login");
+  if (!creds.certificateAuth) {
+    await page.fill("#username", onlyDigits(creds.document));
+    await page.fill("#password", creds.password);
+    await page.click("#kc-login");
+  }
 
-  s = await waitFor(page, (x) => x.kind !== "LOGIN_FORM" || Boolean(x.errorText), timeout, sleep);
+  s = await waitFor(page, target, (x) => x.kind !== "LOGIN_FORM" || Boolean(x.errorText), timeout, sleep);
   if (!s) return fail("TIMEOUT", "O PJe demorou demais para responder ao login.", true);
   if (s.kind === "LOGIN_FORM") {
     if (BLOCKED.test(s.errorText)) return fail("ACCOUNT_BLOCKED", "O PJe informou bloqueio ou excesso de tentativas. O LegalOS parou para não agravar. Aguarde e confira o acesso direto no portal.", false);
@@ -141,7 +157,7 @@ export async function loginPje(page: Page, target: PjeTarget, creds: PjeCredenti
     const submit = page.locator("#kc-login");
     if (await submit.count()) await submit.first().click();
     else await page.keyboard.press("Enter");
-    s = await waitFor(page, (x) => x.kind !== "OTP" || Boolean(x.errorText), timeout, sleep);
+    s = await waitFor(page, target, (x) => x.kind !== "OTP" || Boolean(x.errorText), timeout, sleep);
     if (!s) return fail("TIMEOUT", "O PJe demorou demais para responder ao código do 2º fator.", true);
     if (s.kind === "OTP") return fail("OTP_REJECTED", "O PJe recusou o código do 2º fator. Confira a chave cadastrada e o relógio do servidor.", false);
     if (s.kind === "CAPTCHA") return fail("NEEDS_PERSON", "O PJe pediu uma verificação de segurança (captcha). O LegalOS não resolve captcha.", false);

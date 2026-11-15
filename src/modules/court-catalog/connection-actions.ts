@@ -7,6 +7,7 @@ import { AUTH_MODE_LABEL } from "@/lib/judicial/adapter";
 import { getCourtByCode, ENGINE_LABEL } from "@/lib/judicial/court-catalog";
 import { evolutionJudicialLoginEnabled, EVOLUTION_EPROC_SYSTEM, EVOLUTION_PJE_TARGET_KEY } from "@/lib/evolution-judicial-login";
 import { assertCan } from "@/server/context";
+import { listUsableCertificates } from "@/server/services/certificate.service";
 
 export type AvailableTarget = {
   courtCode: string;
@@ -34,8 +35,8 @@ export async function listAvailableTargetsAction() {
         degree: target.degree,
         degreeLabel: target.degree === "1" ? "1º grau" : target.degree === "2" ? "2º grau" : target.degree,
         adapterKey: adapter.descriptor.key,
-        adapterLabel: adapter.descriptor.label,
-        authModes: adapter.descriptor.supportedAuthModes.map((m) => ({ mode: m, label: AUTH_MODE_LABEL[m] })),
+        adapterLabel: "PJe · certificado digital",
+        authModes: [{ mode: "CERTIFICATE" as AuthMode, label: AUTH_MODE_LABEL.CERTIFICATE }],
         engineLabel: target.courtCode === "TJMG" ? "PJe · acervo legado (não homologado)" : court?.engine ? ENGINE_LABEL[court.engine] ?? null : null,
       };
     });
@@ -45,11 +46,19 @@ export async function listAvailableTargetsAction() {
       degree: "1",
       degreeLabel: "1º grau",
       adapterKey: EVOLUTION_EPROC_SYSTEM,
-      adapterLabel: "eproc · login do portal",
-      authModes: [{ mode: "PASSWORD_OTP", label: AUTH_MODE_LABEL.PASSWORD_OTP }],
+      adapterLabel: "eproc · certificado digital",
+      authModes: [{ mode: "CERTIFICATE" as AuthMode, label: AUTH_MODE_LABEL.CERTIFICATE }],
       engineLabel: "eproc TJMG (implantação gradual) · não homologado",
     });
     return { targets, pilotEnabled };
+  });
+}
+
+export async function listPortalCertificatesAction() {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    assertCan(ctx, "integrations:manage");
+    return { certificates: await listUsableCertificates(ctx, "portal") };
   });
 }
 

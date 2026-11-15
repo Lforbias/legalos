@@ -7,9 +7,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { ConfirmAction } from "@/components/ui/confirm-action";
 import { Plug, CheckCircle2, Clock, AlertTriangle, XCircle, Plus } from "lucide-react";
-import { listAvailableTargetsAction, listConnectionsAction, type AvailableTarget, type ConnectionInfo } from "./connection-actions";
+import { listAvailableTargetsAction, listConnectionsAction, listPortalCertificatesAction, type AvailableTarget, type ConnectionInfo } from "./connection-actions";
 import { testConnectionAction, toggleConnectionAction, deleteConnectionAction } from "./connect-adapter-actions";
 import { ConnectAdapterForm } from "./connect-form";
+import { PortalCertificateUpload } from "./portal-certificate-upload";
 
 function statusBadge(status: string | null, enabled: boolean) {
   if (!enabled) return <Badge tone="neutral">Desligado</Badge>;
@@ -35,7 +36,7 @@ function statusIcon(status: string | null, enabled: boolean) {
 
 const BUSY = new Set(["PENDING", "CONNECTING"]);
 
-function ConnectionRow({ target, conn, pilotEnabled }: { target: AvailableTarget; conn: ConnectionInfo; pilotEnabled: boolean }) {
+function ConnectionRow({ target, conn, pilotEnabled, onUpdate }: { target: AvailableTarget; conn: ConnectionInfo; pilotEnabled: boolean; onUpdate: () => void }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string>();
@@ -65,6 +66,7 @@ function ConnectionRow({ target, conn, pilotEnabled }: { target: AvailableTarget
       </div>
       {error ? <Alert tone="error">{error}</Alert> : null}
       <div className="flex flex-wrap items-start gap-2">
+        <Button size="sm" variant="secondary" disabled={pending} onClick={onUpdate}>Atualizar certificado e autenticador</Button>
         {pilotEnabled && <>
           <Button
             size="sm"
@@ -100,18 +102,21 @@ export function ConnectionPanel() {
   const [targets, setTargets] = useState<AvailableTarget[]>([]);
   const [pilotEnabled, setPilotEnabled] = useState(false);
   const [connections, setConnections] = useState<ConnectionInfo[]>([]);
+  const [certificates, setCertificates] = useState<{ id: string; label: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>();
   const [showForm, setShowForm] = useState(false);
+  const [editingTarget, setEditingTarget] = useState<string>();
 
   const reload = () => {
-    Promise.all([listAvailableTargetsAction(), listConnectionsAction()])
-      .then(([tRes, cRes]) => {
+    Promise.all([listAvailableTargetsAction(), listConnectionsAction(), listPortalCertificatesAction()])
+      .then(([tRes, cRes, certRes]) => {
         if (tRes.ok && tRes.data) {
           setTargets(tRes.data.targets);
           setPilotEnabled(tRes.data.pilotEnabled);
         }
         if (cRes.ok && cRes.data) setConnections(cRes.data.connections);
+        if (certRes.ok && certRes.data) setCertificates(certRes.data.certificates);
       })
       .catch(() => setError("Não foi possível carregar os dados de conexão."))
       .finally(() => setLoading(false));
@@ -161,6 +166,7 @@ export function ConnectionPanel() {
 
   return (
     <div className="space-y-6">
+      {certificates.length === 0 && <PortalCertificateUpload onDone={reload} />}
       {!pilotEnabled && (
         <Card>
           <CardBody>
@@ -184,9 +190,27 @@ export function ConnectionPanel() {
                   target={t}
                   conn={conn}
                   pilotEnabled={pilotEnabled}
+                  onUpdate={() => { setEditingTarget(t.adapterKey); setShowForm(true); }}
                 />
               );
             })}
+          </CardBody>
+        </Card>
+      )}
+
+      {(showForm || editingTarget) && (
+        <Card>
+          <CardHeader title={editingTarget ? "Atualizar acesso ao tribunal" : "Conectar tribunal"} description="Selecione o certificado A1 e informe a chave obrigatória do autenticador." />
+          <CardBody>
+            <ConnectAdapterForm
+              targets={editingTarget ? targets.filter((t) => t.adapterKey === editingTarget) : available}
+              certificates={certificates}
+              onDone={() => {
+                setShowForm(false);
+                setEditingTarget(undefined);
+                reload();
+              }}
+            />
           </CardBody>
         </Card>
       )}
@@ -195,7 +219,7 @@ export function ConnectionPanel() {
         <Card>
           <CardHeader
             title="Tribunais disponíveis"
-            description="Destino TJMG · PJe legado disponível para teste de login. O acesso ainda não foi homologado e não ativa consulta de processos."
+            description="Acessos ao TJMG por certificado digital com chave autenticadora obrigatória."
           />
           <CardBody className="space-y-4">
             {!showForm && (
@@ -214,15 +238,7 @@ export function ConnectionPanel() {
                 ))}
               </div>
             )}
-            {showForm ? (
-              <ConnectAdapterForm
-                targets={available}
-                onDone={() => {
-                  setShowForm(false);
-                  reload();
-                }}
-              />
-            ) : (
+            {!showForm && !editingTarget && (
               <Button
                 variant="secondary"
                 onClick={() => setShowForm(true)}
@@ -247,8 +263,8 @@ export function ConnectionPanel() {
       )}
 
       <div className="rounded-xl border border-dashed border-border p-3 text-xs text-muted space-y-1">
-        <p>O LegalOS conecta-se a tribunais por adaptadores específicos de cada motor (PJe, eproc, e-SAJ, PROJUDI). Cada adaptador é validado com acesso real antes de ser liberado.</p>
-        <p>Credenciais são cifradas no cofre do escritório. O LegalOS não repete senha errada, não resolve captcha e para quando o portal pede ação humana.</p>
+        <p>Os logins do piloto TJMG usam certificado A1 e chave do autenticador. Cada tribunal e sistema só poderá ser habilitado após adaptação específica do portal.</p>
+        <p>O LegalOS cifra os dados do certificado e do autenticador no cofre. A3 em token/cartão físico não pode ser usado pelo navegador remoto.</p>
       </div>
     </div>
   );

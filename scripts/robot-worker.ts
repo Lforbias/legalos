@@ -1,5 +1,6 @@
 import "./load-env";
 import { chromium, type Browser } from "playwright-core";
+import { pfxForTls } from "../src/lib/security/pfx";
 import { drainQueue, type RobotDeps } from "../src/server/robots/pje-runner";
 
 /**
@@ -15,9 +16,10 @@ for (const sig of ["SIGTERM", "SIGINT"] as const) process.on(sig, () => { stoppi
 
 let browser: Browser | null = null;
 const deps: RobotDeps = {
-  openPage: async () => {
+  openPage: async (certificate) => {
     browser ??= await chromium.launch({ headless: true, args: ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu"] });
-    const context = await browser.newContext({ locale: "pt-BR", timezoneId: "America/Sao_Paulo", viewport: { width: 1280, height: 900 } });
+    const clientCertificates = certificate ? certificate.origins.map((origin) => ({ origin, pfx: pfxForTls(certificate.pfx, certificate.passphrase), passphrase: certificate.passphrase })) : [];
+    const context = await browser.newContext({ locale: "pt-BR", timezoneId: "America/Sao_Paulo", viewport: { width: 1280, height: 900 }, clientCertificates });
     // só o necessário para entrar: sem imagens, fontes ou mídia (menos memória e menos tráfego)
     await context.route("**/*", (route) => (["image", "font", "media"].includes(route.request().resourceType()) ? route.abort() : route.continue()));
     const page = await context.newPage();
