@@ -81,7 +81,21 @@ export type ConnectionInfo = {
   status: string | null;
   statusMessage: string | null;
   enabled: boolean;
+  terminalEvents: { at: string; level: "INFO" | "SUCCESS" | "WARN" | "ERROR"; message: string }[];
+  lastJobStatus: string | null;
 };
+
+function terminalEventsFrom(summary: unknown): ConnectionInfo["terminalEvents"] {
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return [];
+  const events = (summary as Record<string, unknown>).terminalEvents;
+  if (!Array.isArray(events)) return [];
+  return events.flatMap((event) => {
+    if (!event || typeof event !== "object" || Array.isArray(event)) return [];
+    const value = event as Record<string, unknown>;
+    if (typeof value.at !== "string" || typeof value.message !== "string" || !["INFO", "SUCCESS", "WARN", "ERROR"].includes(String(value.level))) return [];
+    return [{ at: value.at, level: value.level as ConnectionInfo["terminalEvents"][number]["level"], message: value.message.replace(/[\r\n\u0000-\u001f]+/g, " ").slice(0, 240) }];
+  }).slice(-80);
+}
 
 export async function listConnectionsAction() {
   return runAction(async () => {
@@ -95,7 +109,7 @@ export async function listConnectionsAction() {
         system: { in: ["pje", EVOLUTION_EPROC_SYSTEM] },
         target: { in: [...PJE_TARGETS.map((target) => target.key), ...EPROC_PORTAL_TARGETS.map((target) => target.key)] },
       },
-      select: { id: true, target: true, status: true, statusMessage: true, enabled: true, system: true },
+      include: { jobs: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, summary: true } } },
     });
     const connections: ConnectionInfo[] = accesses.map((a) => {
       const eprocTarget = a.system === EVOLUTION_EPROC_SYSTEM ? getEprocPortalTarget(a.target) : null;
@@ -110,6 +124,8 @@ export async function listConnectionsAction() {
         status: a.status,
         statusMessage: a.statusMessage,
         enabled: a.enabled,
+        terminalEvents: terminalEventsFrom(a.jobs[0]?.summary),
+        lastJobStatus: a.jobs[0]?.status ?? null,
       };
     });
     return { connections };

@@ -141,7 +141,8 @@ async function enqueue(organizationId: string, accessId: string, kind: "LOGIN_TE
     select: { id: true },
   });
   if (open) return open.id;
-  const job = await db.robotJob.create({ data: { organizationId, accessId, kind, ...(origin ? { summary: { origin } } : {}) }, select: { id: true } });
+  const terminalEvents = [{ at: new Date().toISOString(), level: "INFO", message: "Login solicitado; aguardando o robô do tribunal." }];
+  const job = await db.robotJob.create({ data: { organizationId, accessId, kind, summary: { ...(origin ? { origin } : {}), terminalEvents } }, select: { id: true } });
   return job.id;
 }
 

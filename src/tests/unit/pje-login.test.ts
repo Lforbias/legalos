@@ -76,6 +76,25 @@ describe.skipIf(!browser)("robô de login do PJe (réplica do SSO)", () => {
     });
   });
 
+  it("emite etapas legíveis no terminal sem revelar credenciais nem o TOTP", async () => {
+    await withFixture({ password: "", otp: true, certificate: true }, async (p) => {
+      const events: string[] = [];
+      const r = await loginPje(p, target, creds({ document: "", password: "", otpSecret: SECRET, certificateAuth: true }), {
+        names: ["Talita"],
+        now: () => T0,
+        sleep,
+        stepTimeoutMs: 8_000,
+        onProgress: (message) => { events.push(message); },
+      });
+      expect(r.ok).toBe(true);
+      expect(events).toContain("Selecionando a opção de entrada por certificado digital.");
+      expect(events.some((message) => message.includes("gerando o código temporário"))).toBe(true);
+      expect(events.at(-1)).toContain("Login confirmado pelo portal");
+      expect(events.join(" ")).not.toContain(totpCode(SECRET, totpStep(T0)));
+      expect(events.join(" ")).not.toContain(SECRET);
+    });
+  });
+
   it("abre o PDPJ a partir da página oficial do TRT antes de validar certificado e TOTP", async () => {
     const trt2 = getPjeTarget("trt2-1g")!;
     await withFixture({ password: "", otp: true, certificate: true, pdpjHome: true }, async (p, log) => {

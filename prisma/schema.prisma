@@ -4016,8 +4016,8 @@ model PortalAccess {
   @@map("portal_accesses")
 }
 
-/// Fila de trabalhos do robô de tribunais (o worker pega com SKIP LOCKED). `summary` guarda só contagens e a "assinatura" da tela
-/// (endereço sem parâmetros, títulos e nomes de campos), nunca conteúdo de processos nem segredos.
+/// Fila de trabalhos do robô de tribunais (o worker pega com SKIP LOCKED). `summary` guarda contagens, a "assinatura" da tela
+/// (endereço sem parâmetros, títulos e nomes de campos) e etapas sanitizadas do login, nunca conteúdo de processos nem segredos.
 model RobotJob {
   id             String    @id @default(uuid()) @db.Uuid
   organizationId String    @map("organization_id") @db.Uuid
