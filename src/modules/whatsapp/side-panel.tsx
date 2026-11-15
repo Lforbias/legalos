@@ -32,16 +32,16 @@ const label = <T extends Record<string, string>>(map: T, k: string) => (map as R
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-1.5 border-b border-border px-3 py-3 last:border-b-0">
-      <h3 className="text-xs font-semibold uppercase tracking-wide text-primary-text">{title}</h3>
+    <section className="space-y-2 border-b border-border px-4 py-4 last:border-b-0 sm:px-5">
+      <h3 className="text-xs font-bold uppercase tracking-[0.08em] text-primary-text sm:text-sm">{title}</h3>
       {children}
     </section>
   );
 }
 const Row = ({ k, v }: { k: string; v: React.ReactNode }) => (
-  <div className="flex justify-between gap-3 text-xs"><span className="text-muted">{k}</span><span className="text-right font-medium">{v}</span></div>
+  <div className="flex justify-between gap-3 text-sm"><span className="text-muted">{k}</span><span className="text-right font-medium">{v}</span></div>
 );
-const Empty = ({ children }: { children: React.ReactNode }) => <p className="text-xs text-muted">{children}</p>;
+const Empty = ({ children }: { children: React.ReactNode }) => <p className="text-sm text-muted">{children}</p>;
 
 export function SidePanel({ title, phone, data, meta, actions, controls, extras }: { title: string; phone: string; data: PanelView; meta: React.ReactNode; actions: React.ReactNode; controls?: React.ReactNode; extras?: React.ReactNode }) {
   const [tab, setTab] = React.useState<Tab>("contato");
@@ -54,9 +54,10 @@ export function SidePanel({ title, phone, data, meta, actions, controls, extras 
     <aside className="flex h-full min-h-0 w-full flex-col border-border xl:border-l" data-testid="wa-side">
       <div role="tablist" aria-label="Informações da conversa" className="flex overflow-x-auto border-b border-border">
         {TABS.map((t) => (
-          <button key={t.key} role="tab" type="button" title={t.label} aria-label={t.label} aria-selected={tab === t.key} data-testid={`side-tab-${t.key}`} onClick={() => setTab(t.key)} className={`relative flex flex-1 items-center justify-center px-2 py-2.5 ${tab === t.key ? "border-b-2 border-primary text-primary-text" : "text-muted hover:bg-surface-2"}`}>
-            <t.Icon className="h-4 w-4" aria-hidden="true" />
-            {counts[t.key] ? <span className="absolute right-1 top-1 rounded-full bg-danger px-1.5 text-[10px] text-white" data-testid={`side-count-${t.key}`}>{counts[t.key]}</span> : null}
+          <button key={t.key} role="tab" type="button" title={t.label} aria-label={t.label} aria-selected={tab === t.key} data-testid={`side-tab-${t.key}`} onClick={() => setTab(t.key)} className={`relative flex min-w-0 flex-1 items-center justify-center gap-2 px-2 py-3 text-xs font-medium transition-colors sm:text-sm ${tab === t.key ? "border-b-[3px] border-primary bg-surface text-primary-text" : "border-b-[3px] border-transparent text-muted hover:bg-surface-2 hover:text-fg"}`}>
+            <t.Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="hidden truncate sm:inline">{t.label}</span>
+            {counts[t.key] ? <span className="rounded-full bg-danger px-1.5 text-[10px] text-white" data-testid={`side-count-${t.key}`}>{counts[t.key]}</span> : null}
           </button>
         ))}
       </div>
@@ -199,7 +200,7 @@ export function SidePanel({ title, phone, data, meta, actions, controls, extras 
       </div>
 
       <details open className="border-t border-border" data-testid="side-actions">
-        <summary className="cursor-pointer px-3 py-2 text-xs font-semibold uppercase tracking-wide text-primary-text">Ações rápidas</summary>
+        <summary className="cursor-pointer px-3 py-2 text-xs font-bold uppercase tracking-[0.08em] text-primary-text sm:text-sm">Ações rápidas</summary>
         {actions}
       </details>
     </aside>

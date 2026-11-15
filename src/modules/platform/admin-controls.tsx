@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
 import type { ActionState } from "@/lib/validation/common";
-import { grantCreditsAction, reactivateOrganizationAction, setCreditsEnabledAction, setSubscriptionAction, updatePlanAction, setUserDisabledAction, suspendOrganizationAction, unlockUserAction } from "./actions";
+import { archiveOrganizationAction, grantCreditsAction, reactivateOrganizationAction, setCreditsEnabledAction, setSubscriptionAction, updatePlanAction, setUserDisabledAction, suspendOrganizationAction, unlockUserAction } from "./actions";
 
 function useRun() {
   const router = useRouter();
@@ -49,6 +49,30 @@ export function OrgSuspendControl({ orgId, suspended }: { orgId: string; suspend
         </div>
       ) : (
         <Button size="sm" variant="secondary" onClick={() => setAsking(true)}>Suspender…</Button>
+      )}
+    </div>
+  );
+}
+
+export function OrgArchiveControl({ orgId, name, suspended }: { orgId: string; name: string; suspended: boolean }) {
+  const { run, pending, error } = useRun();
+  const [asking, setAsking] = React.useState(false);
+  const [typedName, setTypedName] = React.useState("");
+  return (
+    <div className="mt-2 space-y-2">
+      {error ? <Alert tone="error">{error}</Alert> : null}
+      {asking ? (
+        <div className="max-w-72 space-y-2 rounded-md border border-danger/40 p-2">
+          <p className="text-xs text-muted">{suspended ? "O escritório sairá do sistema e seus membros perderão o acesso." : "O escritório será suspenso e sairá do sistema; seus membros perderão o acesso."} O histórico e os dados serão mantidos no banco, registrados como excluídos. Digite o nome exato para confirmar.</p>
+          <label htmlFor={`archive-office-${orgId}`} className="block text-xs text-muted">Nome do escritório</label>
+          <Input id={`archive-office-${orgId}`} value={typedName} onChange={(e) => setTypedName(e.target.value)} autoComplete="off" />
+          <div className="flex gap-2">
+            <Button size="sm" variant="danger" loading={pending} disabled={typedName.trim() !== name} onClick={() => run(() => archiveOrganizationAction(orgId, typedName), () => { setAsking(false); setTypedName(""); })}>Excluir escritório</Button>
+            <Button size="sm" variant="ghost" disabled={pending} onClick={() => { setAsking(false); setTypedName(""); }}>Cancelar</Button>
+          </div>
+        </div>
+      ) : (
+        <Button size="sm" variant="danger" onClick={() => setAsking(true)}>Excluir escritório…</Button>
       )}
     </div>
   );

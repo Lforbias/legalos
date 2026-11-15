@@ -1,4 +1,4 @@
-/** Flags históricas do Box. O módulo foi retirado em 29/10/2026; BOX_AVAILABLE=false prevalece sobre qualquer variável antiga. */
+/** Flags históricas do Box. BOX_AVAILABLE=false prevalece sobre qualquer variável antiga em produção. */
 type Env = Record<string, string | undefined>;
 import { BOX_AVAILABLE } from "./box-retirement";
 
@@ -7,7 +7,7 @@ const isOn = (v: string | undefined) => {
   return s === "1" || s === "true" || s === "on";
 };
 
-/** Ids de escritório liberados para o piloto (minúsculos, sem espaços). */
+/** Compatibilidade para verificações de pilotos históricos. */
 export function boxV2PilotOrgs(env: Env = process.env): string[] {
   return (env.LEGALOS_BOX_V2_ORGS ?? "")
     .split(",")
@@ -15,7 +15,6 @@ export function boxV2PilotOrgs(env: Env = process.env): string[] {
     .filter(Boolean);
 }
 
-/** O Box 2.0 está ligado para este escritório? Sem `orgId`, só a chave geral vale. */
 export function boxV2Enabled(orgId?: string | null, env: Env = process.env): boolean {
   if (!BOX_AVAILABLE) return false;
   if (isOn(env.LEGALOS_BOX_V2)) return true;
@@ -23,7 +22,6 @@ export function boxV2Enabled(orgId?: string | null, env: Env = process.env): boo
   return boxV2PilotOrgs(env).includes(orgId.toLowerCase());
 }
 
-/** Há algum escritório com o Box 2.0 ligado (chave geral ou piloto)? Usado para responder 404 cedo quando tudo está desligado. */
 export function boxV2EnabledAnywhere(env: Env = process.env): boolean {
   if (!BOX_AVAILABLE) return false;
   return isOn(env.LEGALOS_BOX_V2) || boxV2PilotOrgs(env).length > 0;

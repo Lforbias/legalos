@@ -50,7 +50,7 @@ export type ActivityInput = z.infer<typeof activitySchema>;
 export const lostSchema = z.object({ reason: z.string().trim().min(3, "Informe o motivo.").max(500) });
 export type LostInput = z.infer<typeof lostSchema>;
 
-export const convertSchema = z.object({ document: text(24) });
+export const convertSchema = z.object({ document: text(24), existingClientId: uuidOrEmpty.optional() });
 export type ConvertInput = z.infer<typeof convertSchema>;
 
 export const PROPOSAL_STATUS_LABEL = { DRAFT: "Rascunho", SENT: "Enviada", ACCEPTED: "Aceita", REJECTED: "Recusada" } as const;

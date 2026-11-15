@@ -19,12 +19,14 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   // visitante na raiz vê a página pública (sem dados do sistema) e entra pelo botão; rota protegida vai ao login
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
+  await expect(page.getByRole("heading", { name: /O escritório inteiro/ })).toBeVisible();
+  await page.goto("/inicio");
   await expect(page.getByRole("heading", { name: /Advocacia com atenção/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Áreas de atuação" })).toBeVisible();
   await expect(page.getByText(/não constituem consulta jurídica/)).toBeVisible();
   await page.goto("/clientes");
   await expect(page).toHaveURL(/\/login/);
-  await page.goto("/");
+  await page.goto("/inicio");
   await page.getByTestId("landing-login").click();
   await expect(page).toHaveURL(/\/login/);
 
@@ -39,7 +41,7 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   await expect(page.getByRole("heading", { name: "O que precisa da sua atenção" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Financeiro do escritório" })).toBeVisible();
   // todos os módulos do menu estão implementados: Relatórios abre a tela real
-  await page.getByRole("button", { name: "Gestão do escritório", exact: true }).click();
+  await page.getByRole("button", { name: "Administração & Gestão", exact: true }).click();
   await page.getByRole("link", { name: /Relatórios e BI/ }).first().click();
   await expect(page.getByRole("heading", { name: "Relatórios e BI" })).toBeVisible();
 

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { MODULES, SPACES } from "@/config/showcase";
+import { MODULES } from "@/config/showcase";
 import { CtaLink, SectionTitle } from "../_parts";
 import { BrowserFrame, Reveal } from "../showcase-client";
 
@@ -58,7 +58,7 @@ export default function Recursos() {
             </Reveal>
           ))}
         </div>
-        <p className="mt-6 text-center text-xs text-muted">{SPACES.length} espaços de trabalho (Func, Box e Chat) compartilham a mesma base de clientes, processos e permissões.</p>
+        <p className="mt-6 text-center text-xs text-muted">Os departamentos da Evolution compartilham a mesma base de clientes, processos e permissões.</p>
       </section>
 
       <section className="force-dark bg-[#0a0c13] text-fg">

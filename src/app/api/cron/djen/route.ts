@@ -15,10 +15,9 @@ function authorized(req: Request): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-/** Disparado por um agendador (cron) com `Authorization: Bearer $CRON_SECRET`. Sem segredo configurado, a rota fica desligada. */
+/** Atualiza os monitoramentos públicos DJEN ligados por OAB. */
 export async function POST(req: Request) {
   if (!process.env.CRON_SECRET) return NextResponse.json({ error: "Agendamento não configurado." }, { status: 503 });
   if (!authorized(req)) return NextResponse.json({ error: "Não autorizado." }, { status: 401 });
-  const r = await withJobRun("djen", "CRON", () => runDjenAll());
-  return NextResponse.json(r);
+  return NextResponse.json(await withJobRun("djen", "CRON", () => runDjenAll()));
 }

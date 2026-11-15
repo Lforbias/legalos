@@ -12,18 +12,17 @@ import { runDueSchedules } from "@/server/services/petition-queue.service";
 import { enqueueDueSyncs } from "@/server/services/portal-access.service";
 import { runAutosQueue } from "@/server/services/autos-queue.service";
 
-describe("retirada provisória do Box", () => {
+describe("remoção do módulo judicial", () => {
   it("bloqueia páginas, ações antigas e API da extensão antes da autenticação ou execução", () => {
     expect(BOX_AVAILABLE).toBe(false);
     for (const path of ["/box", "/box/conexoes", "/caixa-de-entrada/id", "/peticoes/nova", "/certificados", "/integracoes/pje", "/configuracoes/credenciais", "/processos/id/autos", "/downloads/legalos-pje.zip"]) {
       expect(proxy(new NextRequest(`https://example.test${path}`, { method: "POST" })).status).toBe(404);
     }
-    for (const path of ["/api/v1/pje/discoveries", "/api/v1/notices", "/api/certificates", "/api/box/events", "/api/cron/mni", "/api/cron/robots", "/api/cron/petition-queue"]) {
+    for (const path of ["/api/v1/pje/discoveries", "/api/v1/notices", "/api/certificates", "/api/box/events", "/api/webhooks/legalmail", "/api/cron/djen", "/api/cron/mni", "/api/cron/robots", "/api/cron/petition-queue"]) {
       expect(proxy(new NextRequest(`https://example.test${path}`, { method: "POST" })).status).toBe(410);
     }
-    expect(proxy(new NextRequest("https://example.test/api/cron/djen", { method: "POST" })).status).not.toBe(410);
     expect(isBoxPath("/box-v3/entrada")).toBe(true);
-    expect(isBoxPath("/api/cron/djen")).toBe(false);
+    expect(isBoxPath("/api/cron/djen")).toBe(true);
   });
   it("mantém caminhos compartilhados e permissões de Func, Chat, API e documentos", () => {
     for (const path of ["/dashboard", "/atendimento", "/integracoes", "/api/v1/tools", "/api/ready", "/documentos", "/processos/id"]) expect(isBoxPath(path)).toBe(false);
@@ -36,18 +35,17 @@ describe("retirada provisória do Box", () => {
     expect(await drainQueue({ openPage })).toBe(0);
     expect(openPage).not.toHaveBeenCalled();
     // MNI (sessão autenticada em tribunal), fila de peticionamento e fila de autos continuam presos à retirada do Box.
-    for (const run of [() => runMniAll(), () => runDueSchedules(), () => runAutosQueue(), () => enqueueDueSyncs()]) await expect(run()).rejects.toThrow("retirado temporariamente");
+    for (const run of [() => runMniAll(), () => runDueSchedules(), () => runAutosQueue(), () => enqueueDueSyncs()]) await expect(run()).rejects.toThrow("foi removido");
   });
-  it("mantém a rota agendada do DJEN público fora do bloqueio do Box autenticado", () => {
-    expect(isBoxPath("/api/cron/djen")).toBe(false);
+  it("bloqueia a rota antiga de captura do DJEN", () => {
+    expect(isBoxPath("/api/cron/djen")).toBe(true);
   });
   it("retira atalhos, apresentação comercial e agendamentos do Box", () => {
     expect(SETTINGS_ITEMS.some(item => isBoxPath(item.href))).toBe(false);
-    expect(SPACES.some(s => s.name === "LegalOS Box")).toBe(false);
+    expect(SPACES).toHaveLength(2);
     expect(MODULES.some(m => m.id === "caixa")).toBe(false);
-    // DJEN é público (Box 3.0) e continua na vitrine mesmo com o Box retirado; só o PJe/MNI (sessão de
-    // tribunal) some, porque ele sim depende do Box autenticado.
-    expect(INTEGRATIONS.some(i => i.name === "DJEN")).toBe(true);
+    expect(INTEGRATIONS.some(i => i.name === "DJEN")).toBe(false);
+    expect(INTEGRATIONS.some(i => i.name === "DataJud (CNJ)")).toBe(true);
     expect(INTEGRATIONS.some(i => i.name === "PJe / MNI")).toBe(false);
     const cron = fs.readFileSync("scripts/server/install-cron.sh", "utf8");
     for (const job of ["djen", "mni", "robots", "petition-queue", "autos-queue", "monitoring"]) expect(cron).not.toContain(`cron-call.sh ${job}`);

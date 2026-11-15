@@ -300,8 +300,8 @@ export async function runDjenAll(opts: { http?: DjenHttp; pauseMs?: number } = {
   for (const mon of monitors) {
     try {
       const ctx = await resolveTenantContext(mon.createdById, mon.organizationId, {});
-      if (!ctx || !ctx.permissions.has("inbox:write")) {
-        await db.djenMonitor.update({ where: { id: mon.id }, data: { lastSyncAt: new Date(), lastStatus: "ERROR", lastMessage: "Quem criou este monitoramento não tem mais acesso à caixa de entrada." } });
+      if (!ctx || (!ctx.permissions.has("cases:write") && !ctx.permissions.has("integrations:manage"))) {
+        await db.djenMonitor.update({ where: { id: mon.id }, data: { lastSyncAt: new Date(), lastStatus: "ERROR", lastMessage: "Quem criou este monitoramento não tem mais permissão para consultar publicações." } });
         out.failed++;
         continue;
       }

@@ -92,7 +92,7 @@ test("2FA obrigatório: o dono liga, quem não ativou fica preso na tela de ativ
   );
   await c.end();
 
-  await page2.goto("/");
+  await page2.goto("/dashboard");
   await expect(page2).toHaveURL(/\/exigir-2fa$/);
   await expect(page2.getByTestId("require-mfa-page")).toBeVisible();
   await page2.goto("/tarefas");

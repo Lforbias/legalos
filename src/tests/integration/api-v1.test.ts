@@ -44,9 +44,9 @@ describe("API pública v1 e chaves de API", () => {
       const u = await db.user.findUniqueOrThrow({ where: { id: o.ctx.userId } });
       await enableMfaFor(u.id, u.email);
     }
-    tokenAll = (await createApiKey(A.ctx, { name: "Tudo", scopes: ["cases:read", "clients:read", "deadlines:read", "notices:read", "notices:write"] })).token;
+    tokenAll = (await createApiKey(A.ctx, { name: "Tudo", scopes: ["cases:read", "clients:read", "deadlines:read"] })).token;
     tokenRead = (await createApiKey(A.ctx, { name: "Só processos", scopes: ["cases:read"] })).token;
-    tokenB = (await createApiKey(B.ctx, { name: "Chave B", scopes: ["cases:read", "notices:read"] })).token;
+    tokenB = (await createApiKey(B.ctx, { name: "Chave B", scopes: ["cases:read"] })).token;
     const open = await db.case.create({ data: { organizationId: A.org.id, title: "Aberto", number: CNJ } });
     const secret = await db.case.create({ data: { organizationId: A.org.id, title: "Sigiloso", confidential: true } });
     openCaseId = open.id;
@@ -90,7 +90,7 @@ describe("API pública v1 e chaves de API", () => {
     expect(r.status).toBe(200);
     const body = await r.json();
     expect(body.data.organization.id).toBe(A.org.id);
-    expect(body.data.scopes).toContain("notices:write");
+    expect(body.data.scopes).toContain("cases:read");
     expect(r.headers.get("cache-control")).toBe("no-store");
   });
 
@@ -100,7 +100,7 @@ describe("API pública v1 e chaves de API", () => {
     expect(c.status).toBe(403);
     expect((await c.json()).error.code).toBe("insufficient_scope");
     const p = await call(postNotice, tokenRead, "notices", { method: "POST", headers: { "content-type": "application/json" }, body: "{}" });
-    expect(p.status).toBe(403);
+    expect(p.status).toBe(410);
   });
 
   it("processos: isolamento entre escritórios; chave de administrador enxerga sigilosos", async () => {
@@ -147,34 +147,13 @@ describe("API pública v1 e chaves de API", () => {
     expect((await call(listCases, tokenAll, "cases?cursor=zzz")).status).toBe(422);
   });
 
-  it("intimações: cria, é idempotente por externalId, valida e respeita escritório", async () => {
-    const post = (b: unknown, t = tokenAll, ct = "application/json") => call(postNotice, t, "notices", { method: "POST", headers: { "content-type": ct }, body: typeof b === "string" ? b : JSON.stringify(b) });
-    const payload = { title: "Intimação para manifestação", content: "Fica intimada a parte para se manifestar em 5 dias.", caseNumber: CNJ, externalId: "erp-123" };
-    const first = await post(payload);
-    expect(first.status).toBe(201);
-    const f = await first.json();
-    expect(f.created).toBe(true);
-    expect(f.data.source).toBe("IMPORTED");
-    expect(f.data.caseId).toBe(openCaseId);
-    const again = await post(payload);
-    expect(again.status).toBe(200);
-    const a = await again.json();
-    expect(a.created).toBe(false);
-    expect(a.data.id).toBe(f.data.id);
-    expect(await db.courtNotice.count({ where: { organizationId: A.org.id, externalKey: "api:erp-123" } })).toBe(1);
-    expect((await post({ title: "x" })).status).toBe(422);
-    expect((await post({ ...payload, externalId: undefined, caseNumber: "123" })).status).toBe(422);
-    expect((await post("{ruim")).status).toBe(422);
-    expect((await post("[]")).status).toBe(422);
-    expect((await post(payload, tokenAll, "text/plain")).status).toBe(422);
-    const list = await (await call(listNotices, tokenAll, "notices")).json();
-    expect(list.data.find((n: { id: string }) => n.id === f.data.id)).toBeTruthy();
-    expect(list.data[0]).not.toHaveProperty("content");
-    const one = await (await callId(getNotice, tokenAll, f.data.id)).json();
-    expect(one.data.content).toContain("manifestar");
-    expect((await callId(getNotice, tokenB, f.data.id)).status).toBe(404);
-    const listB = await (await call(listNotices, tokenB, "notices")).json();
-    expect(listB.data).toHaveLength(0);
+  it("endpoints judiciais removidos não leem nem gravam comunicações", async () => {
+    const list = await call(listNotices, tokenAll, "notices");
+    expect(list.status).toBe(410);
+    expect(await list.json()).toMatchObject({ error: "box_removed" });
+    const created = await call(postNotice, tokenAll, "notices", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ title: "não salvar" }) });
+    expect(created.status).toBe(410);
+    expect((await callId(getNotice, tokenAll, crypto.randomUUID())).status).toBe(410);
   });
 
   it("revogação e expiração derrubam a chave; criador que sai do escritório também", async () => {

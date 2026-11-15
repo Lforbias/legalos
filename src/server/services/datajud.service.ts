@@ -86,7 +86,7 @@ export async function syncCaseFromDatajud(ctx: TenantContext, caseId: string, fe
     const res = await db.caseEvent.createMany({ data: rows, skipDuplicates: true });
     imported = res.count;
   }
-  await db.case.update({ where: { id: caseId }, data: { datajudSyncedAt: new Date() } });
+  await db.case.update({ where: { id: caseId }, data: { datajudSyncedAt: new Date(), ...(r.found ? { datajudClass: r.classe, datajudCourtUnit: r.orgaoJulgador } : {}) } });
   await audit({ action: "datajud.sync", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "case", resourceId: caseId, metadata: { alias: r.alias, found: r.found, imported }, meta: ctx.meta });
   return { alias: r.alias, found: r.found, total: r.movements.length, imported, classe: r.classe, orgaoJulgador: r.orgaoJulgador };
 }

@@ -61,13 +61,13 @@ test("painel de admin: super-admin sem 2FA vai ativar o 2FA; com 2FA vê as tela
   await expect(page.getByText("Suspenso", { exact: true })).toBeVisible();
 
   // o escritório suspenso perde o acesso na hora
-  await alvo.goto("/");
+  await alvo.goto("/dashboard");
   await expect(alvo).toHaveURL(/\/suspenso/);
   await expect(alvo.getByRole("heading", { name: "Acesso suspenso" })).toBeVisible();
 
   await page.getByRole("button", { name: "Reativar" }).click();
   await expect(page.getByText("Ativo", { exact: true })).toBeVisible();
-  await alvo.goto("/");
+  await alvo.goto("/dashboard");
   await expect(alvo.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // plano e assinatura: cancelar pela administração pausa só o que aumenta uso e avisa o escritório

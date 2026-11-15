@@ -6,7 +6,6 @@ export const PWA_THEME = "#0a0c13";
 export const PWA_SHORTCUTS = [
   { name: "Prazos", short_name: "Prazos", url: "/prazos" },
   { name: "Agenda", short_name: "Agenda", url: "/agenda" },
-  { name: "Caixa de entrada (intimações)", short_name: "Intimações", url: "/caixa-de-entrada" },
   { name: "Tarefas", short_name: "Tarefas", url: "/tarefas" },
 ] as const;
 

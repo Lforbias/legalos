@@ -4,7 +4,7 @@ test("site /produto: páginas públicas abrem sem login, imagens carregam e as a
   await page.goto("/produto");
   await expect(page).toHaveURL(/\/produto$/);
   await expect(page.getByRole("heading", { level: 1, name: /O escritório inteiro/ })).toBeVisible();
-  await expect(page.getByText("Telas reais do sistema, com dados de demonstração fictícios.")).toBeVisible();
+  await expect(page.getByText("Estas são telas reais do LegalOS, com dados de demonstração. Nenhum cliente real aparece aqui.")).toBeVisible();
 
   // futuro: deixa claro que ainda não existe
   const ai = page.getByTestId("future-ai");
@@ -32,7 +32,8 @@ test("site /produto: páginas públicas abrem sem login, imagens carregam e as a
   const img = page.getByRole("tabpanel").getByRole("img");
   await expect(img).toBeVisible();
   await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
-  await page.getByRole("tab", { name: "Intimações" }).press("ArrowRight");
+  await expect(page.getByRole("tab", { name: "Intimações" })).toHaveCount(0);
+  await page.getByRole("tab", { name: "LegalOS Chat" }).click();
   await expect(page.getByRole("tab", { name: "LegalOS Chat" })).toHaveAttribute("aria-selected", "true");
 
   for (const [path, h1] of [["/produto/recursos", /Tudo o que o escritório/], ["/produto/roadmap", /Tudo o que temos/], ["/produto/seguranca", /Privado/], ["/produto/sobre", /Feito por quem/], ["/produto/contato", /Vamos/]] as const) {
@@ -68,7 +69,8 @@ test("site /produto: sem contato configurado não inventa telefone nem e-mail e 
   await expect(page.getByRole("heading", { name: "Contato em breve" })).toBeVisible();
   await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
   await expect(page.locator('a[href^="https://wa.me"]')).toHaveCount(0);
-  await expect(page.getByRole("banner").getByRole("link", { name: /Entrar/ }).first()).toBeVisible();
+  await page.getByRole("link", { name: "Entrar no sistema", exact: true }).first().click();
+  await expect(page).toHaveURL(/\/login/);
 });
 
 test("site /produto: a página da equipe do escritório (/inicio) e a raiz continuam funcionando", async ({ page }) => {

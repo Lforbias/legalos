@@ -1,5 +1,6 @@
 "use client";
 
+import { ClientPicker } from "@/modules/clients/client-picker";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { fieldError, useServerForm } from "@/components/forms/use-server-form";
@@ -93,11 +94,13 @@ export function LostForm({ leadId }: { leadId: string }) {
   );
 }
 
-export function ConvertForm({ leadId, type }: { leadId: string; type: "PERSON" | "COMPANY" }) {
+export function ConvertForm({ leadId, type, canReadClients = false }: { leadId: string; type: "PERSON" | "COMPANY"; canReadClients?: boolean }) {
+  const [existing, setExisting] = React.useState(false);
+  const [clientLabel, setClientLabel] = React.useState("");
   const router = useRouter();
   const { form, submit, pending, message } = useServerForm<ConvertInput, { clientId: string }>({
     schema: convertSchema,
-    defaultValues: { document: "" },
+    defaultValues: { document: "", existingClientId: "" },
     action: (v) => convertLeadAction(leadId, v),
     onSuccess: (d) => {
       if (d) router.push(`/clientes/${d.clientId}`);
@@ -108,10 +111,11 @@ export function ConvertForm({ leadId, type }: { leadId: string; type: "PERSON" |
   return (
     <form onSubmit={submit} noValidate className="space-y-2">
       {message ? <Alert tone="error">{message}</Alert> : null}
-      <Field label={`Converter em cliente — ${type === "PERSON" ? "CPF" : "CNPJ"} (opcional)`} htmlFor="conv-doc" error={err} hint="Cria o cliente ativo com os dados do lead e marca o lead como ganho.">
+      {canReadClients && <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={existing} disabled={pending} onChange={e => { setExisting(e.target.checked); form.setValue("document", ""); form.setValue("existingClientId", ""); }} />Vincular a cliente já cadastrado</label>}
+      {existing ? <Field label="Cliente existente" htmlFor="conversion-client"><ClientPicker id="conversion-client" value={form.watch("existingClientId") ?? ""} label={clientLabel} disabled={pending} onChange={(id, label) => { form.setValue("existingClientId", id); setClientLabel(label); }} /></Field> : <Field label={`Converter em cliente — ${type === "PERSON" ? "CPF" : "CNPJ"} (opcional)`} htmlFor="conv-doc" error={err} hint="Cria o cliente ativo com os dados do lead e marca o lead como ganho.">
         <Input id="conv-doc" aria-invalid={Boolean(err)} {...form.register("document")} />
-      </Field>
-      <Button type="submit" size="sm" loading={pending}>Converter em cliente</Button>
+      </Field>}
+      <Button type="submit" size="sm" loading={pending} disabled={existing && !form.watch("existingClientId")}>Converter em cliente</Button>
     </form>
   );
 }

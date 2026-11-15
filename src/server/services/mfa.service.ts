@@ -17,6 +17,11 @@ export async function mfaStatus(userId: string): Promise<MfaStatus> {
   return { available: mfaAvailable(), enabled: Boolean(m?.enabledAt), recoveryCodesLeft: left };
 }
 
+export async function assertMfaEnabled(userId: string) {
+  const mfa = await db.userMfa.findUnique({ where: { userId }, select: { enabledAt: true } });
+  if (!mfa?.enabledAt) throw new ConflictError("Ative a verificação em duas etapas em Minha conta para gerenciar esta integração.");
+}
+
 function requireKey(): Buffer {
   const k = mfaKey();
   if (!k) throw new ConflictError("A autenticação em duas etapas não está configurada neste sistema (falta MFA_ENCRYPTION_KEY).");

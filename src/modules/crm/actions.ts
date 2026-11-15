@@ -72,7 +72,8 @@ export async function addLeadActivityAction(id: string, input: unknown): Promise
 export async function convertLeadAction(id: string, input: unknown): Promise<ActionState<{ clientId: string }>> {
   return runAction(async () => {
     const { ctx } = await requireTenant();
-    const res = await convertLead(ctx, parse(uuidSchema, id), parse(convertSchema, input).document);
+    const data = parse(convertSchema, input);
+    const res = await convertLead(ctx, parse(uuidSchema, id), data.document, data.existingClientId || undefined);
     touch(id);
     revalidatePath("/clientes");
     return res;

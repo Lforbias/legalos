@@ -27,21 +27,14 @@ describe("retirada real do Box: sem mock de disponibilidade", () => {
   it("suspende o worker e a sessão de tribunal (MNI) sem apagar ou alterar o estado persistido", async () => {
     const beforeMonitor = await db.djenMonitor.findUniqueOrThrow({ where: { id: monitorId } });
     const beforeNotice = await db.courtNotice.findUniqueOrThrow({ where: { id: noticeId } });
-    await expect(runMniAll()).rejects.toThrow("retirado temporariamente");
+    await expect(runMniAll()).rejects.toThrow("foi removido");
     const openPage = vi.fn(); expect(await drainQueue({ openPage })).toBe(0); expect(openPage).not.toHaveBeenCalled();
     expect(await db.djenMonitor.findUniqueOrThrow({ where: { id: monitorId } })).toEqual(beforeMonitor);
     expect(await db.courtNotice.findUniqueOrThrow({ where: { id: noticeId } })).toEqual(beforeNotice);
   });
-  it("Box 3.0: o DJEN (fonte pública, sem certificado nem sessão de tribunal) continua disponível mesmo com o Box autenticado retirado", () => {
-    // `can()`/`assertCan()` seguem negando QUALQUER `inbox:*` enquanto BOX_AVAILABLE for falso — é o que mantém
-    // a antiga Entrada do Box (sessão de tribunal, ciência, peticionamento) bloqueada.
+  it("remove também o antigo agendamento de captura pública", () => {
     expect(can(office.ctx, "inbox:write")).toBe(false);
-    // syncDjen()/runDjenAll() (src/server/services/djen.service.ts) checam a permissão BRUTA do cargo
-    // (ctx.permissions.has, não can()) exatamente para não depender dessa chave — o mesmo padrão usado em
-    // src/server/judicial/box-v3.service.ts e em src/app/(dashboard)/box-v3/*. Não chamamos a rede real do
-    // DJEN aqui de propósito: a cobertura funcional (com transporte HTTP injetado) está em
-    // src/tests/integration/djen.test.ts.
-    expect(office.ctx.permissions.has("inbox:write")).toBe(true);
+    expect(BOX_AVAILABLE).toBe(false);
   });
   it("mantém a consulta de clientes do Func sem depender do Box", async () => {
     await db.client.create({ data: { organizationId: office.org.id, name: "Cliente fictício Func", type: "PERSON", status: "ACTIVE" } });

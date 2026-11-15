@@ -22,7 +22,7 @@ export function DatajudSyncButton({ caseId }: { caseId: string }) {
             if (!r.ok || !r.data) return setMsg({ tone: "error", text: r.message ?? "Não foi possível consultar o DataJud." });
             const d = r.data;
             if (!d.found) setMsg({ tone: "info", text: `O DataJud (${d.alias}) não retornou este processo. Ele pode não estar publicado ainda ou ser sigiloso.` });
-            else setMsg({ tone: "success", text: `DataJud consultado: ${d.imported} novo(s) andamento(s) importado(s) de ${d.total}.${d.classe ? ` Classe: ${d.classe}.` : ""}` });
+            else setMsg({ tone: "success", text: `DataJud consultado: ${d.imported} novo(s) andamento(s) importado(s) de ${d.total}.${d.classe ? ` Classe: ${d.classe}.` : ""}${d.orgaoJulgador ? ` Órgão julgador: ${d.orgaoJulgador}.` : ""}` });
             router.refresh();
           })
         }

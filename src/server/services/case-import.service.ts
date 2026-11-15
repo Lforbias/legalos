@@ -32,7 +32,7 @@ const emptyCase = { legacyNumber: "", area: "", court: "", courtUnit: "", courtS
 export async function createImportBatch(ctx: TenantContext, raw: BatchInput) {
   assertCan(ctx, "cases:write");
   const input = batchInputSchema.parse(raw);
-  if (!BOX_AVAILABLE && (input.datajud || input.autos || input.updateExisting)) assertBoxAvailable();
+  if (!BOX_AVAILABLE && input.autos) assertBoxAvailable();
   if (input.autos) assertCan(ctx, "documents:write");
   const parsed = parseNumberList(input.numbers);
   if (parsed.length === 0) throw new ValidationError("Cole ao menos um número.", { numbers: ["Cole ao menos um número CNJ."] });
@@ -139,11 +139,8 @@ export async function processBatchStep(ctx: TenantContext, batchId: string, deps
   const batch = await db.caseImportBatch.findFirst({ where: { id: batchId, organizationId: ctx.organizationId }, select: { id: true, options: true } });
   if (!batch) throw new NotFoundError("Lote não encontrado.");
 
-  if (!BOX_AVAILABLE) {
-    const options = batch.options as { datajud?: boolean; autos?: boolean };
-    if (options.datajud || options.autos) assertBoxAvailable();
-    return { remaining: 0 };
-  }
+  const options = batch.options as { datajud?: boolean; autos?: boolean };
+  if (!BOX_AVAILABLE && options.autos) assertBoxAvailable();
   const syncItems = await db.caseImportItem.findMany({ where: { batchId, syncStatus: "PENDING" }, orderBy: { position: "asc" }, take: 5 });
   for (const it of syncItems) {
     try {
@@ -154,7 +151,7 @@ export async function processBatchStep(ctx: TenantContext, batchId: string, deps
     }
   }
 
-  if (can(ctx, "documents:write")) {
+  if (BOX_AVAILABLE && can(ctx, "documents:write")) {
     const autosItems = await db.caseImportItem.findMany({ where: { batchId, autosStatus: { in: ["PENDING", "PARTIAL"] } }, orderBy: { position: "asc" }, take: 2 });
     for (const it of autosItems) {
       try {

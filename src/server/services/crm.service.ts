@@ -149,13 +149,15 @@ export async function addLeadActivity(ctx: TenantContext, id: string, raw: Activ
  * Converte o lead em cliente (ganho). Tudo em uma transação: o cliente nasce com status ATIVO,
  * o lead passa a GANHO e fica vinculado ao cliente. Documento (CPF/CNPJ) é opcional, validado e único.
  */
-export async function convertLead(ctx: TenantContext, id: string, rawDocument: string) {
+export async function convertLead(ctx: TenantContext, id: string, rawDocument: string, existingClientId?: string) {
   assertCan(ctx, "crm:write");
   assertCan(ctx, "clients:write");
   const lead = await loadOpen(ctx, id);
   if (lead.stage === "WON" || lead.stage === "LOST") throw new ConflictError("O lead já foi encerrado.");
   const docInput = rawDocument.trim();
   let document: string | null = null;
+  if (existingClientId && docInput) throw new ValidationError("Ao selecionar um cliente existente, mantenha seu cadastro atual sem informar outro documento.");
+  if (existingClientId) assertCan(ctx, "clients:read");
   if (docInput) {
     document = normalizeDocument(lead.type, docInput);
     if (!document) throw new ValidationError(lead.type === "PERSON" ? "CPF inválido." : "CNPJ inválido.", { document: [lead.type === "PERSON" ? "CPF inválido." : "CNPJ inválido."] });
@@ -167,7 +169,10 @@ export async function convertLead(ctx: TenantContext, id: string, rawDocument: s
     clientId = await db.$transaction(async (tx) => {
       const claimed = await tx.lead.updateMany({ where: { id, organizationId: ctx.organizationId, deletedAt: null, stage: { in: [...OPEN_STAGES] }, clientId: null }, data: { stage: "NEW" } });
       if (claimed.count === 0) throw new ConflictError("O lead já foi encerrado.");
-      const client = await tx.client.create({
+      const existing = existingClientId ? await tx.client.findFirst({ where: { id: existingClientId, organizationId: ctx.organizationId, deletedAt: null, status: "ACTIVE" }, select: { id: true, type: true } }) : null;
+      if (existingClientId && !existing) throw new ValidationError("Selecione um cliente ativo deste escritório.");
+      if (existing && existing.type !== lead.type) throw new ValidationError("O tipo de pessoa do cliente deve corresponder ao lead.");
+      const client = existing ?? await tx.client.create({
         data: {
           organizationId: ctx.organizationId,
           type: lead.type,
@@ -182,8 +187,8 @@ export async function convertLead(ctx: TenantContext, id: string, rawDocument: s
         },
       });
       await tx.lead.update({ where: { id }, data: { stage: "WON", clientId: client.id, closedAt: new Date() } });
-      await tx.leadActivity.create({ data: { organizationId: ctx.organizationId, leadId: id, kind: "STAGE", body: "Ganho: convertido em cliente.", createdById: ctx.userId } });
-      await audit({ action: "lead.convert", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "lead", resourceId: id, metadata: { clientId: client.id }, meta: ctx.meta }, tx);
+      await tx.leadActivity.create({ data: { organizationId: ctx.organizationId, leadId: id, kind: "STAGE", body: existingClientId ? "Ganho: vinculado ao cliente existente, preservando seu cadastro." : "Ganho: convertido em cliente.", createdById: ctx.userId } });
+      await audit({ action: "lead.convert", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "lead", resourceId: id, metadata: { clientId: client.id, existingClient: Boolean(existingClientId) }, meta: ctx.meta }, tx);
       return client.id;
     });
   } catch (err) {

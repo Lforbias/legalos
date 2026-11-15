@@ -1,12 +1,8 @@
 # Evolution 1.0 — Matriz de Rastreabilidade de Rotas
 
-> Mapeamento Ethos → Evolution. Nenhuma rota antiga foi removida.
-
 ## Como funciona
 
-A Evolution cria uma **camada de navegação paralela** sob `/evolution/*`.
-Cada departamento tem uma landing page que agrega links para as rotas existentes.
-A feature flag `LEGALOS_EVOLUTION=1` ativa a experiência; sem ela, `/evolution` redireciona para `/dashboard`.
+A Evolution é a interface da área interna. As páginas departamentais e os módulos operacionais compartilham o mesmo layout. Os endereços dos módulos continuam válidos para links salvos, notificações e integrações.
 
 ## Rotas novas (Evolution)
 
@@ -56,11 +52,3 @@ A feature flag `LEGALOS_EVOLUTION=1` ativa a experiência; sem ela, `/evolution`
 - `/admin` — administração interna do LegalOS
 - Todas as rotas `/box*`, `/certificados`, `/peticoes`, `/monitoramento` — permanecem desativadas (`BOX_AVAILABLE=false`)
 - `/area-de-trabalho` — continua acessível independentemente da Evolution
-
-## Procedimento de retorno
-
-1. Remova `LEGALOS_EVOLUTION=1` do `.env`
-2. Reinicie a aplicação
-3. As rotas `/evolution/*` passam a redirecionar para `/dashboard`
-4. O link "Meu Escritório →" desaparece da barra lateral
-5. Nenhum dado foi alterado — retorno imediato e sem efeitos colaterais

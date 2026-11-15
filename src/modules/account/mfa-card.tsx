@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
 import { Alert } from "@/components/ui/alert";
@@ -50,6 +51,8 @@ export function MfaCard({ available, enabled, recoveryLeft, afterCodesHref }: { 
             Já guardei os códigos
           </Button>
         </div>
+      ) : enabled && afterCodesHref ? (
+        <Link href={afterCodesHref} className="text-sm font-medium text-primary-text underline">Voltar ao painel</Link>
       ) : setup ? (
         <div className="space-y-3">
           <p className="text-sm">Escaneie o QR code no aplicativo autenticador (Google Authenticator, Authy, 1Password…) ou digite a chave manualmente.</p>

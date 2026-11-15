@@ -1,412 +1,223 @@
-import type { Metadata } from "next";
-import Image from "next/image";
+import { ArrowRight, BellRing, CalendarClock, MessageCircle, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
-import { ArrowRight, Check, MessageCircle } from "lucide-react";
-import { FACTS, MODULES, RUTE_INFO, HONESTY, INTEGRATIONS, COMING_SOON } from "@/config/showcase";
-import { LEGALOS_PLANS, formatBRL } from "@/config/pricing";
+import { COMING_SOON, FACTS, RUTE_INFO, HONESTY, INTEGRATIONS, MODULES, PWA, SPACES } from "@/config/showcase";
 import { PHASES_2 } from "@/lib/updates";
-import { CtaLink, contact } from "./_parts";
+import { CtaLink, Eyebrow, SectionTitle } from "./_parts";
 import { ModuleTabs, Reveal } from "./showcase-client";
+import { ProductHero } from "./product-hero";
+import { DesktopShowcase } from "./desktop-showcase";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = {
-  title: "LegalOS — gestão jurídica integrada",
-  description: "Processos, tarefas, prazos, financeiro e atendimento por WhatsApp num só sistema, feito para escritórios de advocacia. Planos a partir de R$ 79/mês.",
-  robots: { index: true, follow: true },
-  openGraph: { title: "LegalOS — gestão jurídica integrada", description: "Tudo do escritório num só sistema.", type: "website", locale: "pt_BR" },
-};
-
 const STATS = [
-  { n: String(FACTS.spaces), label: "espaços integrados" },
-  { n: String(FACTS.permissions), label: "permissões granulares" },
-  { n: `${FACTS.tests}+`, label: "testes automatizados" },
-  { n: `${FACTS.tables}`, label: "estruturas de dados" },
+  { n: String(FACTS.spaces), label: "espaços integrados", sub: "Func e Chat" },
+  { n: String(FACTS.permissions), label: "permissões granulares", sub: "mínimo de acesso por padrão" },
+  { n: `${FACTS.tests}+`, label: "testes automatizados", sub: `mais ${FACTS.e2e} testes de ponta a ponta` },
+  { n: `${FACTS.tables}`, label: "estruturas de dados", sub: "tudo isolado por escritório" },
 ];
 
-const SHOWCASES = [
-  {
-    eyebrow: "Gestão jurídica",
-    title: "Cada caso, com tudo\nnum lugar só.",
-    text: "Dados, partes, linha do tempo, prazos, tarefas e documentos. Tudo ligado ao cliente e à conversa de WhatsApp do caso.",
-    image: "/produto/processo.webp",
-    alt: "Tela de um processo no LegalOS com dados, vínculos e conversa de WhatsApp",
-    points: ["Número CNJ validado pelo dígito verificador", "Registro de andamentos do processo", "Portal do cliente com compartilhamento controlado", "Processos sigilosos visíveis apenas a quem tem acesso"],
-  },
-  {
-    eyebrow: "LegalOS Chat",
-    title: "WhatsApp do escritório.\nLigado ao resto.",
-    text: "Atendimento em equipe com fila, etiquetas e respostas rápidas. A conversa já mostra o cliente, o processo, as tarefas e o financeiro.",
-    image: "/produto/atendimento.webp",
-    alt: "Atendimento por WhatsApp em três colunas com painel do cliente e processo vinculados",
-    points: ["API oficial da Meta ou conexão por QR-Code", "Filas, etiquetas, atribuição e notas internas", "Robô e automações, cada um com botão de ligar e desligar", "Nada é enviado a cliente sem autorização"],
-  },
-  {
-    eyebrow: "Financeiro",
-    title: "Honorários e despesas.\nSob controle.",
-    text: "Contas a receber e a pagar, parcelas, fluxo de caixa por mês e saldo das contas, sempre em reais e calculado sem arredondamento.",
-    image: "/produto/financeiro.webp",
-    alt: "Financeiro do LegalOS com contas a receber, a pagar e fluxo de caixa",
-    points: ["Lançamentos parcelados por cliente e processo", "Cobrança pelo Asaas (Pix, boleto e cartão)", "Lembretes de cobrança por WhatsApp, desligados até autorizar", "Exportação de relatórios em planilha"],
-  },
+const DAY = [
+  { t: "08:02", icon: CalendarClock, title: "Organize o dia", text: "Confira os compromissos e as tarefas do escritório." },
+  { t: "08:03", icon: Sparkles, title: "Vai para quem trata", text: "A tarefa é atribuída à pessoa responsável pelo caso." },
+  { t: "08:10", icon: CalendarClock, title: "Vira prazo", text: "O prazo é calculado, fica como rascunho e só vale depois de conferido por uma pessoa." },
+  { t: "09:30", icon: MessageCircle, title: "O cliente pergunta", text: "A conversa de WhatsApp já mostra o processo, as tarefas e o financeiro daquele cliente." },
+  { t: "17:00", icon: BellRing, title: "Nada se perde", text: "Prazos e tarefas do dia aparecem para cada pessoa, com aviso dentro do sistema." },
 ];
 
-const RESOURCE_GROUPS = [
-  { title: "Gestão do escritório", items: ["Clientes, processos, tarefas e prazos", "Agenda de audiências e compromissos", "Documentos com versões e modelos", "CRM comercial com funis e automações", "Portal do cliente com compartilhamento controlado"] },
-  { title: "Atendimento", items: ["WhatsApp pela API oficial da Meta ou QR-Code", "Filas, etiquetas e respostas rápidas", "Robô e automações com interruptores", "E-mail IMAP/SMTP integrado"] },
-  { title: "Financeiro e relatórios", items: ["Contas a receber e a pagar, parcelas e fluxo de caixa", "Cobrança pelo Asaas (Pix, boleto e cartão)", "Relatórios por permissão com exportação"] },
-  { title: "RUTE — Assistente de IA", items: ["Conecta Claude, ChatGPT e Gemini ao escritório", "Consulta dados com as permissões do perfil", "Propostas que só valem após confirmação humana", "Governança: limites, auditoria e relatório de LGPD"] },
-  { title: "Cálculos jurídicos", items: ["Atrasados da JF, débito TJSP e trabalhista", "Índices oficiais do Banco Central", "Memorial e exportação em Excel/CSV"] },
-  { title: "Para quem integra", items: ["API pública v1 com chaves por escopo", "Webhooks assinados com reenvio", "Instalável no celular (PWA)"] },
-];
-
-export default function LandingPage() {
-  const c = contact();
-  const upcoming = [...PHASES_2.filter((p) => p.status !== "feita").map((p) => p.title), ...COMING_SOON].slice(0, 6);
-
+export default function ProdutoHome() {
+  const upcoming = [...PHASES_2.filter((p) => p.status !== "feita").map((p) => p.title), ...COMING_SOON].slice(0, 10);
   return (
     <>
-      {/* ── HERO ── */}
-      <section className="relative overflow-hidden pb-16 pt-32 md:pb-24 md:pt-44">
-        <div className="pointer-events-none absolute left-1/2 top-0 h-[600px] w-[900px] -translate-x-1/2 rounded-full bg-[#ffe168]/[.07] blur-[140px]" aria-hidden />
-        <div className="relative mx-auto max-w-[1400px] px-6 md:px-10">
-          <div className="prod-hero-in mx-auto max-w-5xl text-center">
-            <p className="text-[13px] font-medium uppercase tracking-[.3em] text-white/35">
-              Gestão jurídica integrada
-            </p>
-            <h1 className="mt-8 text-[clamp(3rem,7.5vw,7rem)] font-bold leading-[0.92] tracking-[-0.04em]">
-              O escritório inteiro.
-              <br />
-              <span className="inline-block bg-gradient-to-r from-white via-[#ffe168] to-[#ffd000] bg-clip-text text-transparent">
-                Num só sistema.
-              </span>
+      {/* HERO — escuro */}
+      <section className="force-dark relative overflow-hidden text-fg" style={{ background: "#08090b", color: "#f5f5f7" }}>
+        <div className="prod-grid-bg pointer-events-none absolute inset-0" aria-hidden />
+        <div className="prod-glow pointer-events-none absolute -top-40 left-1/2 h-[520px] w-[820px] -translate-x-1/2 rounded-full bg-[#ffe168]/10 blur-[120px]" aria-hidden />
+        <div className="prod-glow pointer-events-none absolute top-40 -right-40 h-[420px] w-[420px] rounded-full bg-white/5 blur-[110px]" aria-hidden />
+        <div className="relative mx-auto max-w-7xl px-4 pb-16 pt-16 md:pt-24">
+          <div className="prod-hero-in mx-auto max-w-4xl text-center">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs text-white/80 backdrop-blur">
+              <span className="h-1.5 w-1.5 rounded-full bg-[#34d399]" aria-hidden /> Feito dentro de um escritório de advocacia, para escritórios de advocacia
+            </span>
+            <h1 className="mt-7 text-5xl font-semibold leading-[1.02] tracking-tight md:text-7xl">
+              O escritório inteiro.<br /><span style={{ background: "linear-gradient(110deg, #fff 15%, #ffe168 85%)", backgroundClip: "text", color: "transparent" }}>Num só sistema.</span>
             </h1>
-            <p className="mx-auto mt-8 max-w-2xl text-lg leading-relaxed text-white/45 md:text-xl">
-              Processos, tarefas, prazos, financeiro e WhatsApp conversando entre si.
-              Menos aba aberta, menos prazo na cabeça, mais tempo para advogar.
+            <p className="mx-auto mt-6 max-w-2xl text-lg text-white/70 md:text-xl">
+              Processos, tarefas, prazos, financeiro e WhatsApp conversando entre si. Menos aba aberta, menos prazo na cabeça, mais tempo para advogar.
             </p>
-            <div className="mt-12 flex flex-wrap items-center justify-center gap-5">
+            <div className="mt-9 flex flex-wrap items-center justify-center gap-3">
               <CtaLink variant="solid" />
-              <a href="#recursos" className="group inline-flex items-center gap-2 text-sm font-medium text-white/45 transition hover:text-white">
-                Ver os recursos <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden />
-              </a>
+              <Link href="/produto/recursos" className="inline-flex h-11 items-center gap-2 rounded-full border border-white/20 px-6 text-sm font-semibold text-white transition hover:bg-white/10">Ver os recursos</Link>
+              <Link href="/produto/precos" className="inline-flex h-11 items-center gap-2 px-4 text-sm font-medium text-white/75 underline underline-offset-4 transition hover:text-white">Comparar recursos e planos</Link>
             </div>
           </div>
 
-          <Reveal className="relative mx-auto mt-20 max-w-6xl md:mt-28">
-            <div className="pointer-events-none absolute -inset-20 rounded-full bg-[#ffe168]/[.05] blur-[100px]" aria-hidden />
-            <div className="relative overflow-hidden rounded-2xl border border-white/[.08] shadow-[0_50px_120px_-30px_rgba(0,0,0,.8)]">
-              <Image
-                src="/produto/desktop.webp"
-                alt="LegalOS Desktop: área de trabalho com busca e pastas de clientes fictícios"
-                width={1800} height={1125} priority unoptimized
-                className="block w-full"
-              />
-            </div>
-            <p className="mt-6 text-center text-[11px] text-white/25">Tela real com dados fictícios.</p>
-          </Reveal>
+          <ProductHero />
+          <p className="mt-5 text-center text-[11px] text-white/40">Composição ilustrativa do ecossistema com tela real e dados fictícios.</p>
         </div>
       </section>
 
-      {/* ── STATS ── */}
-      <section className="border-y border-white/[.06]">
-        <div className="mx-auto grid max-w-[1400px] grid-cols-2 gap-8 px-6 py-14 md:grid-cols-4 md:px-10">
+      {/* NÚMEROS */}
+      <section className="border-b border-border bg-surface">
+        <div className="mx-auto grid max-w-7xl grid-cols-2 gap-px px-4 py-12 md:grid-cols-4">
           {STATS.map((s, i) => (
-            <Reveal key={s.label} delay={i * 80} className="text-center">
-              <p className="text-4xl font-bold tracking-tight text-white md:text-5xl">{s.n}</p>
-              <p className="mt-2 text-[13px] text-white/35">{s.label}</p>
+            <Reveal key={s.label} delay={i * 80} className="px-4 py-2 text-center">
+              <p className="text-4xl font-semibold tracking-tight md:text-5xl">{s.n}</p>
+              <p className="mt-1 text-sm font-medium">{s.label}</p>
+              <p className="text-xs text-muted">{s.sub}</p>
             </Reveal>
           ))}
         </div>
       </section>
 
-      {/* ── STATEMENT ── */}
-      <section className="force-light bg-[#fafaf7]">
-        <div className="mx-auto max-w-[1400px] px-6 py-28 md:px-10 md:py-40">
-          <Reveal>
-            <h2 className="max-w-[900px] text-[clamp(2rem,5.5vw,4.5rem)] font-bold leading-[0.98] tracking-[-0.03em] text-[#1a1a1a]">
-              Planilha aqui.{" "}
-              <span className="text-[#1a1a1a]/25">WhatsApp ali.</span>
-              <br />
-              Prazo{" "}
-              <span className="text-[#1a1a1a]/25">na cabeça.</span>
-            </h2>
-            <p className="mt-8 max-w-2xl text-lg leading-relaxed text-[#1a1a1a]/45 md:text-xl">
-              O escritório funciona quando tudo conversa. No LegalOS, o processo reúne os prazos,
-              a tarefa aparece na conversa do cliente e o honorário fica no processo.
-            </p>
-          </Reveal>
-        </div>
+      {/* PROBLEMA */}
+      <section className="mx-auto max-w-5xl px-4 py-24 text-center">
+        <Reveal>
+          <h2 className="text-3xl font-semibold leading-[1.15] tracking-tight md:text-6xl">
+            Planilha aqui. <span className="text-muted">WhatsApp ali.</span> Prazo <span className="text-muted">na cabeça.</span>
+          </h2>
+          <p className="mx-auto mt-6 max-w-2xl text-lg text-muted">
+            O escritório funciona quando tudo conversa. No LegalOS, o processo reúne os prazos, a tarefa aparece na conversa do cliente e o honorário fica no processo.
+          </p>
+        </Reveal>
       </section>
 
-      {/* ── FEATURE SHOWCASES ── */}
-      {SHOWCASES.map((feat, i) => {
-        const dark = i % 2 !== 0;
-        const reversed = i % 2 !== 0;
-        return (
-          <section key={feat.eyebrow} className={dark ? "bg-[#08090b]" : "force-light bg-[#fafaf7]"}>
-            <div className="mx-auto max-w-[1400px] px-6 py-24 md:px-10 md:py-36">
-              <div className={`grid items-center gap-12 md:gap-20 lg:grid-cols-2 ${reversed ? "lg:[direction:rtl] lg:[&>*]:[direction:ltr]" : ""}`}>
-                <Reveal>
-                  <p className={`text-[13px] font-medium uppercase tracking-[.25em] ${dark ? "text-white/30" : "text-[#1a1a1a]/30"}`}>
-                    {feat.eyebrow}
-                  </p>
-                  <h2 className={`mt-5 whitespace-pre-line text-3xl font-bold leading-[1.08] tracking-tight md:text-[2.75rem] ${dark ? "text-white" : "text-[#1a1a1a]"}`}>
-                    {feat.title}
-                  </h2>
-                  <p className={`mt-5 text-base leading-relaxed md:text-lg ${dark ? "text-white/45" : "text-[#1a1a1a]/45"}`}>
-                    {feat.text}
-                  </p>
-                  <ul className="mt-8 space-y-3">
-                    {feat.points.map(p => (
-                      <li key={p} className={`flex items-start gap-3 text-sm leading-relaxed ${dark ? "text-white/55" : "text-[#1a1a1a]/55"}`}>
-                        <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#ffe168]" aria-hidden />
-                        {p}
-                      </li>
-                    ))}
-                  </ul>
-                </Reveal>
-                <Reveal delay={120}>
-                  <div className={`overflow-hidden rounded-2xl border ${dark ? "border-white/[.08] shadow-[0_30px_80px_-20px_rgba(0,0,0,.6)]" : "border-black/[.06] shadow-[0_30px_80px_-20px_rgba(0,0,0,.12)]"}`}>
-                    <Image src={feat.image} alt={feat.alt} width={1800} height={1125} unoptimized className="block w-full" />
-                  </div>
-                </Reveal>
-              </div>
-            </div>
-          </section>
-        );
-      })}
-
-      {/* ── RUTE (AI) ── */}
-      <section className="relative overflow-hidden bg-[#08090b] py-28 md:py-40">
-        <div className="pointer-events-none absolute right-0 top-1/4 h-[500px] w-[500px] rounded-full bg-[#d7263d]/[.08] blur-[140px]" aria-hidden />
-        <div className="relative mx-auto max-w-[1400px] px-6 md:px-10">
-          <Reveal>
-            <p className="text-[13px] font-medium uppercase tracking-[.25em] text-white/30">Inteligência artificial</p>
-            <h2 className="mt-5 max-w-3xl text-[clamp(2rem,5vw,4rem)] font-bold leading-[1] tracking-[-0.02em] text-white">
-              A IA propõe.
-              <br />
-              <span className="text-white/35">Uma pessoa decide.</span>
-            </h2>
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/40 md:text-lg">
-              {RUTE_INFO.text}
-            </p>
-          </Reveal>
-          <div className="mt-16 grid items-center gap-12 md:gap-20 lg:grid-cols-2">
-            <Reveal>
-              <div className="overflow-hidden rounded-2xl border border-white/[.08] shadow-[0_30px_80px_-20px_rgba(0,0,0,.6)]">
-                <Image src="/produto/rute-assistente.webp" alt="Assistente RUTE respondendo com consultas feitas e proposta de tarefa" width={1800} height={1125} unoptimized className="block w-full" />
-              </div>
+      {/* ESPAÇOS */}
+      <section className="mx-auto max-w-7xl px-4 pb-24">
+        <SectionTitle center eyebrow="LegalOS Evolution" title="Cada rotina no seu lugar. Tudo ligado." />
+        <div className="mt-14 grid gap-5 md:grid-cols-2">
+          {SPACES.map((s, i) => (
+            <Reveal key={s.name} delay={i * 100}>
+              <article className="group relative h-full overflow-hidden rounded-3xl border border-border bg-surface p-7 transition hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/10">
+                <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full opacity-20 blur-3xl transition group-hover:opacity-40" style={{ background: s.tone }} aria-hidden />
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl text-white" style={{ background: s.tone }} aria-hidden><ShieldCheck className="h-5 w-5" /></span>
+                <h3 className="relative mt-5 text-xl font-semibold">{s.name}</h3>
+                <p className="relative mt-2 text-sm text-muted">{s.text}</p>
+                <ul className="relative mt-5 space-y-2 text-sm">
+                  {s.items.map((it) => <li key={it} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full" style={{ background: s.tone }} aria-hidden />{it}</li>)}
+                </ul>
+              </article>
             </Reveal>
-            <Reveal delay={100}>
-              <ul className="space-y-5">
-                {RUTE_INFO.items.map(it => (
-                  <li key={it} className="flex items-start gap-3 text-white/55">
-                    <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: RUTE_INFO.tone }} aria-hidden />
-                    <span className="text-base leading-relaxed">{it}</span>
-                  </li>
-                ))}
+          ))}
+        </div>
+        <Reveal delay={300}>
+          <article className="force-dark relative mt-5 overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0f] p-7 text-fg md:p-9" data-testid="future-ai">
+            <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full opacity-30 blur-3xl" style={{ background: RUTE_INFO.tone }} aria-hidden />
+            <div className="relative grid gap-8 md:grid-cols-[1.2fr_1fr] md:items-center">
+              <div>
+                <div className="flex items-center gap-3">
+                  <svg viewBox="0 0 48 48" width="44" height="44" role="img" aria-label="Logotipo da RUTE" className="shrink-0">
+                    <rect width="48" height="48" rx="12" fill="#0b0b0f" stroke="#ffffff" strokeOpacity="0.25" />
+                    <path d="M24 9 L27.2 20.8 L39 24 L27.2 27.2 L24 39 L20.8 27.2 L9 24 L20.8 20.8 Z" fill="#ffffff" />
+                    <circle cx="36" cy="12" r="4" fill={RUTE_INFO.tone} />
+                  </svg>
+                  <h3 className="text-2xl font-semibold">{RUTE_INFO.name}</h3>
+                  <span className="rounded-full border border-white/25 px-2.5 py-0.5 text-xs font-medium" style={{ color: "#7ee0a0" }}>Disponível</span>
+                </div>
+                <p className="mt-4 max-w-xl text-sm text-muted">{RUTE_INFO.text}</p>
+                <p className="mt-3 text-xs text-muted">Nasce desligada em cada escritório e só funciona com a chave real do provedor e a autorização de quem administra.</p>
+              </div>
+              <ul className="space-y-2.5 text-sm">
+                {RUTE_INFO.items.map((it) => <li key={it} className="flex items-center gap-2"><span className="h-1.5 w-1.5 rounded-full" style={{ background: RUTE_INFO.tone }} aria-hidden />{it}</li>)}
               </ul>
+            </div>
+          </article>
+        </Reveal>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-12"><Link href="/produto/novidades" className="block rounded-2xl border border-border bg-surface p-6 transition hover:bg-surface-2"><p className="text-xs uppercase tracking-widest text-muted">Novidades do Chat</p><h2 className="mt-3 text-2xl font-semibold tracking-tight">WhatsApp, e-mail e um copiloto para a equipe.</h2><p className="mt-3 text-sm text-muted">Conheça as novas rotinas de atendimento, campanhas, API e o que precisa ser configurado no seu escritório.</p><span className="mt-4 inline-block text-sm font-medium">Ver a atualização →</span></Link></section>
+      <DesktopShowcase />
+
+      {/* MÓDULOS */}
+      <section className="border-y border-border bg-surface-2/60 py-24">
+        <div className="mx-auto max-w-7xl px-4">
+          <SectionTitle center eyebrow="O produto por dentro" title="Veja o sistema de verdade." text="Estas são telas reais do LegalOS, com dados de demonstração. Nenhum cliente real aparece aqui." />
+          <div className="mt-12"><ModuleTabs modules={MODULES} /></div>
+          <p className="mt-10 text-center"><Link href="/produto/recursos" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-text hover:underline">Todos os recursos <ArrowRight className="h-4 w-4" aria-hidden /></Link></p>
+        </div>
+      </section>
+
+      {/* UM DIA */}
+      <section className="mx-auto max-w-5xl px-4 py-24">
+        <SectionTitle eyebrow="Exemplo ilustrativo" title="Um dia no escritório, sem perder o fio." />
+        <ol className="relative mt-12 space-y-8 border-l border-border pl-8">
+          {DAY.map((d, i) => (
+            <Reveal key={d.t} delay={i * 70}>
+              <li className="relative">
+                <span className="absolute -left-[3.05rem] flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface text-primary-text shadow-sm"><d.icon className="h-4 w-4" aria-hidden /></span>
+                <p className="font-mono text-xs text-muted">{d.t}</p>
+                <h3 className="text-lg font-semibold">{d.title}</h3>
+                <p className="mt-1 text-sm text-muted">{d.text}</p>
+              </li>
             </Reveal>
-          </div>
-        </div>
+          ))}
+        </ol>
       </section>
 
-      {/* ── ALL MODULES ── */}
-      <section id="recursos" className="force-light scroll-mt-20 bg-[#fafaf7]">
-        <div className="mx-auto max-w-[1400px] px-6 py-28 md:px-10 md:py-36">
-          <Reveal>
-            <p className="text-[13px] font-medium uppercase tracking-[.25em] text-[#1a1a1a]/30">O produto por dentro</p>
-            <h2 className="mt-5 text-3xl font-bold tracking-tight text-[#1a1a1a] md:text-5xl">
-              Veja o sistema de verdade.
-            </h2>
-            <p className="mt-4 max-w-2xl text-base text-[#1a1a1a]/45 md:text-lg">
-              Telas reais do LegalOS com dados de demonstração. Nenhum cliente real aparece aqui.
-            </p>
-          </Reveal>
-          <div className="mt-14">
-            <ModuleTabs modules={MODULES} />
-          </div>
-        </div>
-      </section>
-
-      {/* ── COMPLETE FEATURES ── */}
-      <section className="force-light bg-white">
-        <div className="mx-auto max-w-[1400px] px-6 py-24 md:px-10 md:py-32">
-          <Reveal>
-            <p className="text-[13px] font-medium uppercase tracking-[.25em] text-[#1a1a1a]/30">A lista completa</p>
-            <h2 className="mt-5 text-3xl font-bold tracking-tight text-[#1a1a1a] md:text-5xl">
-              Tudo o que o escritório precisa.
-            </h2>
-          </Reveal>
-          <div className="mt-14 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
-            {RESOURCE_GROUPS.map((g, i) => (
-              <Reveal key={g.title} delay={(i % 3) * 80}>
-                <article className="h-full rounded-2xl border border-[#1a1a1a]/[.06] bg-[#fafaf7] p-7">
-                  <h3 className="text-base font-semibold text-[#1a1a1a]">{g.title}</h3>
-                  <ul className="mt-5 space-y-3">
-                    {g.items.map(it => (
-                      <li key={it} className="flex items-start gap-3 text-sm leading-relaxed text-[#1a1a1a]/50">
-                        <span className="mt-[7px] h-1 w-1 shrink-0 rounded-full bg-[#1a1a1a]/20" aria-hidden />{it}
-                      </li>
-                    ))}
-                  </ul>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── INTEGRATIONS ── */}
-      <section className="force-light overflow-hidden border-y border-[#1a1a1a]/[.06] bg-[#fafaf7] py-14">
-        <div className="mx-auto max-w-[1400px] px-6 md:px-10">
-          <p className="mb-8 text-center text-[13px] font-medium uppercase tracking-[.25em] text-[#1a1a1a]/30">Integrações</p>
-        </div>
-        <div className="relative">
-          <div className="prod-marquee flex w-max gap-4 whitespace-nowrap">
-            {[...INTEGRATIONS, ...INTEGRATIONS].map((x, i) => (
-              <span key={i} className="rounded-full border border-[#1a1a1a]/[.08] bg-white px-6 py-3 text-sm font-medium text-[#1a1a1a]/70" aria-hidden={i >= INTEGRATIONS.length}>
-                {x.name}{x.note ? <span className="ml-2 text-xs font-normal text-[#1a1a1a]/30">({x.note})</span> : null}
-              </span>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── TRUST ── */}
-      <section className="bg-[#08090b] py-28 md:py-36">
-        <div className="mx-auto max-w-[1400px] px-6 md:px-10">
-          <Reveal>
-            <p className="text-[13px] font-medium uppercase tracking-[.25em] text-white/30">Princípios</p>
-            <h2 className="mt-5 text-3xl font-bold tracking-tight text-white md:text-5xl">
-              Honesto. Privado. Sob o seu controle.
-            </h2>
-          </Reveal>
-          <div className="mt-14 grid gap-5 md:grid-cols-3">
+      {/* PRINCÍPIOS */}
+      <section className="border-y border-border bg-surface py-24">
+        <div className="mx-auto max-w-7xl px-4">
+          <SectionTitle center eyebrow="Princípios" title="Honesto. Privado. Sob o seu controle." />
+          <div className="mt-12 grid gap-5 md:grid-cols-3">
             {HONESTY.map((h, i) => (
               <Reveal key={h.title} delay={i * 90}>
-                <article className="h-full rounded-2xl border border-white/[.06] bg-white/[.03] p-7">
-                  <h3 className="text-lg font-semibold text-white">{h.title}</h3>
-                  <p className="mt-3 text-sm leading-relaxed text-white/40">{h.text}</p>
+                <article className="h-full rounded-3xl border border-border bg-bg p-7">
+                  <h3 className="text-lg font-semibold">{h.title}</h3>
+                  <p className="mt-2 text-sm text-muted">{h.text}</p>
                 </article>
               </Reveal>
             ))}
           </div>
+          <p className="mt-10 text-center"><Link href="/produto/seguranca" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-text hover:underline">Como protegemos os dados do escritório <ArrowRight className="h-4 w-4" aria-hidden /></Link></p>
         </div>
       </section>
 
-      {/* ── PLANS ── */}
-      <section id="planos" className="scroll-mt-20 border-t border-white/[.06] py-28 md:py-36" data-testid="legalos-plans">
-        <div className="mx-auto max-w-[1400px] px-6 md:px-10">
-          <Reveal>
-            <p className="text-[13px] font-medium uppercase tracking-[.25em] text-white/30">Planos</p>
-            <h2 className="mt-5 text-[clamp(2rem,5vw,4rem)] font-bold leading-[1] tracking-[-0.02em] text-white">
-              Um começo simples.
-              <br />
-              <span className="text-white/35">Espaço para evoluir.</span>
-            </h2>
-            <p className="mt-6 max-w-2xl text-base leading-relaxed text-white/40 md:text-lg">
-              Quatro níveis para diferentes momentos do escritório.
-            </p>
-          </Reveal>
-
-          <div className="mt-16 grid gap-5 md:grid-cols-2 xl:grid-cols-4">
-            {LEGALOS_PLANS.map(p => (
-              <Reveal key={p.id}>
-                <article className={`flex h-full flex-col rounded-2xl border p-7 ${p.featured ? "border-white/20 bg-white/[.06]" : "border-white/[.06] bg-white/[.02]"}`}>
-                  {p.featured && <p className="mb-5 w-fit rounded-full bg-white/10 px-3 py-1 text-[11px] font-medium uppercase tracking-wider text-white/60">Foco em equipes</p>}
-                  <h3 className="text-2xl font-semibold text-white">{p.name}</h3>
-                  <p className="mt-2 min-h-[3rem] text-sm leading-relaxed text-white/40">{p.subtitle}</p>
-                  <p className="mt-6 text-4xl font-bold tracking-tight text-white">
-                    {formatBRL(p.price)}<span className="ml-1 text-sm font-normal text-white/30">/mês</span>
-                  </p>
-                  <ul className="mt-5 space-y-2 text-sm text-white/55">
-                    <li>{p.users} usuários</li>
-                    <li>Até {p.processes.toLocaleString("pt-BR")} processos</li>
-                    {p.whatsappNumbers !== null && <li>{p.whatsappNumbers} {p.whatsappNumbers === 1 ? "número de WhatsApp" : "números de WhatsApp"}</li>}
-                  </ul>
-                  <p className="mt-6 text-[13px] leading-relaxed text-white/35">{p.audience}</p>
-                  <ul className="mt-6 space-y-3 text-sm text-white/45">
-                    {p.focus.map(f => (
-                      <li key={f} className="flex gap-2.5">
-                        <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-white/20" aria-hidden />{f}
-                      </li>
-                    ))}
-                  </ul>
-                  <div className="mt-auto pt-7">
-                    <CtaLink variant="ghost" className="w-full justify-center">Conversar sobre este plano</CtaLink>
-                  </div>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-          <p className="mt-8 max-w-4xl text-xs leading-relaxed text-white/25">
-            Valores mensais em reais. Serviços de IA, WhatsApp, pagamentos e integrações podem ter custos de terceiros. Consulte as condições.
-          </p>
-        </div>
-      </section>
-
-      {/* ── ROADMAP ── */}
-      <section className="force-light bg-[#fafaf7]">
-        <div className="mx-auto max-w-[1400px] px-6 py-24 md:px-10 md:py-32">
-          <Reveal>
-            <p className="text-[13px] font-medium uppercase tracking-[.25em] text-[#1a1a1a]/30">Em construção</p>
-            <h2 className="mt-5 text-3xl font-bold tracking-tight text-[#1a1a1a] md:text-5xl">
-              E o sistema continua evoluindo.
-            </h2>
-          </Reveal>
-          <ul className="mt-12 grid gap-3 md:grid-cols-2">
-            {upcoming.map(t => (
-              <Reveal key={t}>
-                <li className="flex items-start gap-3 rounded-2xl border border-[#1a1a1a]/[.06] bg-white px-6 py-5 text-sm leading-relaxed text-[#1a1a1a]/55">
-                  <span className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-[#ffe168]" aria-hidden />{t}
-                </li>
-              </Reveal>
-            ))}
-          </ul>
-        </div>
-      </section>
-
-      {/* ── CTA ── */}
-      <section id="contato" className="relative overflow-hidden py-28 md:py-40">
-        <div className="pointer-events-none absolute left-1/2 top-0 h-[400px] w-[800px] -translate-x-1/2 rounded-full bg-[#ffe168]/[.06] blur-[140px]" aria-hidden />
-        <div className="relative mx-auto max-w-[1400px] px-6 text-center md:px-10">
-          <Reveal>
-            <p className="text-[13px] font-medium uppercase tracking-[.3em] text-white/30">Vamos conversar</p>
-            <h2 className="mt-6 text-[clamp(2.25rem,6vw,5rem)] font-bold leading-[0.95] tracking-[-0.03em] text-white">
-              Conheça o LegalOS
-              <br />
-              <span className="inline-block bg-gradient-to-r from-white via-[#ffe168] to-[#ffd000] bg-clip-text text-transparent">
-                no seu escritório.
+      {/* INTEGRAÇÕES */}
+      <section className="overflow-hidden py-20" aria-label="Integrações">
+        <div className="mx-auto max-w-7xl px-4"><SectionTitle center eyebrow="Conecta com o que você já usa" title="Integrações" /></div>
+        <div className="relative mt-10">
+          <div className="prod-marquee flex w-max gap-4 whitespace-nowrap">
+            {[...INTEGRATIONS, ...INTEGRATIONS].map((x, i) => (
+              <span key={i} className="rounded-full border border-border bg-surface px-6 py-3 text-sm font-medium shadow-sm" aria-hidden={i >= INTEGRATIONS.length}>
+                {x.name}{x.note ? <span className="ml-2 text-xs font-normal text-muted">({x.note})</span> : null}
               </span>
-            </h2>
-            <p className="mx-auto mt-6 max-w-xl text-lg text-white/40">
-              Mostramos o sistema funcionando e respondemos o que for preciso.
-            </p>
-            <div className="mt-10 flex flex-wrap justify-center gap-5">
-              <CtaLink variant="solid" />
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* O QUE VEM */}
+      <section className="mx-auto max-w-5xl px-4 py-24" data-testid="produto-pwa">
+        <SectionTitle eyebrow="Aplicativo" title={PWA.title} text={PWA.text} />
+        <div className="mt-10 grid gap-4 sm:grid-cols-2">
+          {PWA.points.map((p) => (
+            <div key={p.title} className="rounded-xl border border-border bg-surface p-5">
+              <h3 className="font-semibold">{p.title}</h3>
+              <p className="mt-1 text-sm text-muted">{p.text}</p>
             </div>
-          </Reveal>
-          {c.available && (
-            <div className="mx-auto mt-16 flex max-w-md flex-wrap justify-center gap-6">
-              {c.whatsapp && (
-                <a href={c.whatsapp} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-sm text-white/30 transition hover:text-white/60">
-                  <MessageCircle className="h-4 w-4" /> WhatsApp
-                </a>
-              )}
-              {c.email && (
-                <a href={c.mail!} className="flex items-center gap-2 text-sm text-white/30 transition hover:text-white/60">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
-                  {c.email}
-                </a>
-              )}
-            </div>
-          )}
-          <p className="mt-12 text-sm text-white/25">
-            Já é do escritório?{" "}
-            <Link href="/login" className="font-semibold text-white/55 transition hover:text-white hover:underline">Entrar no sistema</Link>
-          </p>
+          ))}
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-5xl px-4 pb-24">
+        <SectionTitle eyebrow="Em construção" title="E o sistema continua evoluindo." text="Próximas entregas já planejadas:" />
+        <ul className="mt-8 grid gap-3 md:grid-cols-2">
+          {upcoming.map((t) => (
+            <li key={t} className="flex items-start gap-3 rounded-2xl border border-border bg-surface px-5 py-4 text-sm">
+              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-accent" aria-hidden /> {t}
+            </li>
+          ))}
+        </ul>
+        <p className="mt-6 text-sm"><Link href="/produto/roadmap" className="font-semibold text-primary-text hover:underline">Ver tudo o que já temos e tudo o que estamos construindo →</Link></p>
+      </section>
+
+      {/* CTA FINAL — escuro */}
+      <section className="force-dark relative overflow-hidden bg-[#0a0c13] text-fg">
+        <div className="prod-glow pointer-events-none absolute left-1/2 top-0 h-[360px] w-[760px] -translate-x-1/2 rounded-full bg-[#FF3B4E]/25 blur-[120px]" aria-hidden />
+        <div className="relative mx-auto max-w-4xl px-4 py-24 text-center">
+          <Eyebrow>Vamos conversar</Eyebrow>
+          <h2 className="mt-4 text-4xl font-semibold leading-[1.05] tracking-tight md:text-6xl">Conheça o LegalOS <span className="prod-gradient-text">no seu escritório.</span></h2>
+          <p className="mx-auto mt-5 max-w-xl text-lg text-white/70">Mostramos o sistema funcionando e respondemos o que for preciso.</p>
+          <div className="mt-9 flex flex-wrap justify-center gap-3"><CtaLink variant="solid" /><Link href="/produto/contato" className="inline-flex h-11 items-center rounded-full border border-white/20 px-6 text-sm font-semibold text-white hover:bg-white/10">Outras formas de contato</Link></div>
         </div>
       </section>
     </>

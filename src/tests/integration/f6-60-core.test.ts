@@ -222,7 +222,7 @@ describe("6.0 — RUTE", () => {
       expect(p?.ctx.userId).toBe(A.owner.id);
     });
     it("chave sem escopo mcp, revogada ou lixo não autentica", async () => {
-      const k = await createApiKey(A.ctx, { name: "Só intimações", scopes: ["notices:read"] });
+      const k = await createApiKey(A.ctx, { name: "Só processos", scopes: ["cases:read"] });
       expect(await authenticateMcpBearer(k.token)).toBeNull();
       expect(await authenticateMcpBearer("lixo")).toBeNull();
       expect(await authenticateMcpBearer("lgmcp_a_naoexiste")).toBeNull();

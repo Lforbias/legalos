@@ -119,7 +119,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
                   <CardBody><StageSelect leadId={l.id} stage={l.stage} /></CardBody>
                 </Card>
                 {can(ctx, "clients:write") ? (
-                  <Card><CardBody><ConvertForm leadId={l.id} type={l.type} /></CardBody></Card>
+                  <Card><CardBody><ConvertForm canReadClients={can(ctx, "clients:read")} leadId={l.id} type={l.type} /></CardBody></Card>
                 ) : null}
                 <Card><CardBody><LostForm leadId={l.id} /></CardBody></Card>
               </>

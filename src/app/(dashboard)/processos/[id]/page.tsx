@@ -11,7 +11,7 @@ import { PageActionsMenu } from "@/components/layout/page-actions-menu";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
-import { TabsNav } from "@/components/ui/tabs-nav";
+import { CaseSectionsNav } from "@/modules/cases/case-sections-nav";
 import { formatDate, formatDateTime } from "@/lib/dates/format";
 import { NotFoundError } from "@/lib/permissions/check";
 import { formatCnj, CNJ_SEGMENTS, isValidCnj, parseCnj } from "@/lib/validation/br-documents";
@@ -174,11 +174,11 @@ export default async function CaseDetailPage({
             {can(ctx, "ai:use") ? (
               <PageActionsMenu label="Mais ações do processo" items={[
                 { href: `/ia?processo=${c.id}`, label: "Perguntar à IA sobre este processo" },
-                { href: `/rute?aba=assistente&caso=${c.id}`, label: "Abrir RUTE neste processo" },
               ]} />
             ) : null}
             {canSyncLegalMail ? <LegalMailHistoryButton caseId={c.id} /> : null}
             {showDatajud ? <DatajudSyncButton caseId={c.id} /> : null}
+            {c.datajudSyncedAt && (c.datajudClass || c.datajudCourtUnit) ? <p className="mt-2 text-xs text-muted">DataJud · {[c.datajudClass ? `Classe ${c.datajudClass}` : null, c.datajudCourtUnit].filter(Boolean).join(" · ")}</p> : null}
             {mni ? <MniConsultButton caseId={c.id} label={mni.label} /> : null}
             {mni && can(ctx, "documents:write") ? <MniAutosButton caseId={c.id} label={mni.label} /> : null}
             {canWrite ? (
@@ -189,7 +189,7 @@ export default async function CaseDetailPage({
           </div>
         }
       />
-      <TabsNav base={`/processos/${c.id}`} current={tab} tabs={tabs} compactOnMobile />
+      <CaseSectionsNav base={`/processos/${c.id}`} current={tab} tabs={tabs} />
 
       {tab === "resumo" ? (
         <div className="grid gap-4 lg:grid-cols-3">
@@ -374,7 +374,7 @@ export default async function CaseDetailPage({
 
       {tab === "publicacoes" && publicNotices ? (
         <Card>
-          <CardHeader title="Publicações públicas" description="Capturadas do DJEN. O DataJud é exibido na linha do tempo. Esta área não consulta sessões privadas dos tribunais." />
+          <CardHeader title="Publicações públicas" description="Capturadas do DJEN. O DataJud aparece na linha do tempo. Esta área não consulta sessões privadas dos tribunais." />
           <CardBody>
             {publicNotices.length ? <ul className="divide-y divide-border">{publicNotices.map((notice) => (
               <li key={notice.id} className="space-y-2 py-3 first:pt-0 last:pb-0">

@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("Configuração Gemini persiste e erro de salvamento preserva os campos", async ({ page }) => {
+test("A configuração e os recursos da RUTE permanecem desativados", async ({ page }) => {
   const id = Math.random().toString(36).slice(2, 9);
   await page.goto("/register");
   await page.getByLabel("Nome completo").fill(`Pessoa IA ${id}`);
@@ -11,30 +11,10 @@ test("Configuração Gemini persiste e erro de salvamento preserva os campos", a
   await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await page.goto("/configuracoes");
-  await page.getByRole("link", { name: /^IA do escritório/ }).click();
-  await expect(page).toHaveURL(/\/configuracoes\/ia$/);
-  await page.getByLabel("Provedor", { exact: true }).selectOption("GEMINI");
-  const key = page.getByLabel("Chave de API do escritório (opcional)", { exact: true });
-  const fake = "AQ.chave-ficticia-somente-teste-1234567890";
-  await key.fill(fake);
-  await page.getByLabel("Modelo (opcional)", { exact: true }).fill("modelo invalido");
-  await page.getByRole("button", { name: "Salvar configuração de IA", exact: true }).click();
-  await expect(page.getByText("Nome de modelo inválido.", { exact: true })).toBeVisible();
-  await expect(key).toHaveValue(fake);
-  await expect(page.getByLabel("Provedor", { exact: true })).toHaveValue("GEMINI");
-  await page.getByLabel("Modelo (opcional)", { exact: true }).fill("");
-  await page.getByRole("button", { name: "Salvar configuração de IA", exact: true }).click();
-  await expect(page.getByText(/Configuração salva\. A chave fica protegida/)).toBeVisible();
-  await expect(key).toHaveValue("");
-  await page.reload();
-  await expect(page.getByLabel("Provedor", { exact: true })).toHaveValue("GEMINI");
-  await expect(page.getByText(/Já há uma chave salva/)).toBeVisible();
-  await page.getByRole("button", { name: "Ligar IA neste escritório", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Desligar IA neste escritório", exact: true })).toBeVisible();
-  await page.goto("/ia");
-  await expect(page.getByText(/Modelo: gemini/)).toBeVisible();
-  await expect(page.getByText(/falta a chave do provedor/)).toHaveCount(0);
-  await page.goto("/rute?aba=situacao");
-  await expect(page.getByLabel("Provedor", { exact: true })).toHaveValue("GEMINI");
-  await expect(page.getByText(/Já há uma chave salva/)).toBeVisible();
+  await expect(page.getByRole("link", { name: /^IA do escritório/ })).toHaveCount(0);
+  await page.goto("/configuracoes/ia");
+  await expect(page.getByRole("heading", { name: "Configuração de IA indisponível" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Salvar configuração de IA" })).toHaveCount(0);
+  await page.goto("/rute");
+  await expect(page.getByRole("heading", { name: "RUTE desativada" })).toBeVisible();
 });

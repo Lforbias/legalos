@@ -1,3 +1,4 @@
+import { expectRetired } from "./box-retired-checks";
 import { expect, test, type Page } from "@playwright/test";
 
 const password = "SenhaForte123";
@@ -27,7 +28,9 @@ test("tarefas, prazos (validação humana), agenda e notificações", async ({ p
   const caseUrl = page.url();
 
   // ---- tarefa: validação, criação, quadro e mudança de situação ----
-  await page.getByRole("link", { name: /^Tarefas/ }).first().click();
+  const nav = page.getByRole("navigation", { name: "Navegação Evolution" });
+  await nav.getByRole("button", { name: "Minha Mesa", exact: true }).click();
+  await nav.getByRole("link", { name: "Tarefas", exact: true }).click();
   await expect(page.getByText("Nenhuma tarefa cadastrada ainda.")).toBeVisible();
   await page.getByRole("link", { name: "Nova tarefa" }).first().click();
   await page.getByLabel("Título").fill("ab");
@@ -38,7 +41,7 @@ test("tarefas, prazos (validação humana), agenda e notificações", async ({ p
   await page.getByRole("button", { name: "Criar tarefa" }).click();
   await expect(page.getByRole("heading", { name: `Revisar contrato ${id}` })).toBeVisible();
 
-  await page.getByLabel("Comentário").fill("Falta a cláusula de rescisão.");
+  await page.getByLabel("Comentário", { exact: true }).fill("Falta a cláusula de rescisão.");
   await page.getByRole("button", { name: "Comentar" }).click();
   await expect(page.getByText("Falta a cláusula de rescisão.")).toBeVisible();
 
@@ -118,8 +121,8 @@ test("equipe e produtividade: carga por responsável e registro de horas", async
   await page.getByRole("button", { name: "Criar tarefa" }).click();
   await expect(page.getByRole("heading", { name: `Tarefa de carga ${id}` })).toBeVisible();
 
-  await page.getByRole("button", { name: "Gestão do escritório", exact:true }).click();
-  await page.getByRole("link", { name: /^Equipe e produtividade/ }).first().click();
+  await page.getByRole("button", { name: "Administração & Gestão", exact:true }).click();
+  await page.getByRole("link", { name: "Equipe", exact: true }).first().click();
   await expect(page.getByRole("heading", { name: "Equipe e produtividade" })).toBeVisible();
   const row = page.getByRole("row", { name: new RegExp(`Dona eq${id}`) });
   await expect(row).toBeVisible();
@@ -136,70 +139,6 @@ test("equipe e produtividade: carga por responsável e registro de horas", async
   await expect(page.getByText("Revisão de minuta")).toHaveCount(0);
 });
 
-function cnj(seq: string) {
-  const base = `${seq}2024826` + "0100";
-  const dd = String(98n - (BigInt(`${base}00`) % 97n)).padStart(2, "0");
-  return `${seq}-${dd}.2024.8.26.0100`;
-}
-
-test("caixa de entrada: texto colado, vínculo automático, duplicidade, providências e isolamento", async ({ page, browser }) => {
-  const id = await signUpWithOffice(page, "cx");
-  const number = cnj("0007777");
-
-  await page.goto("/processos/novo");
-  await page.getByLabel("Título do caso ou processo").fill(`Caso ${id}`);
-  await page.getByLabel("Número CNJ").fill(number);
-  await page.getByRole("button", { name: "Cadastrar caso ou processo" }).click();
-  await expect(page.getByRole("heading", { name: `Caso ${id}` })).toBeVisible();
-
-  await page.getByTestId("space-box").first().click();
-  await expect(page.getByTestId("box-dashboard")).toBeVisible();
-  await page.getByRole("link", { name: /^Caixa de entrada/ }).first().click();
-  await expect(page.getByText("Nenhuma intimação encontrada.")).toBeVisible();
-  await page.getByRole("link", { name: "Nova intimação" }).first().click();
-
-  const texto = `TRIBUNAL DE JUSTIÇA DO ESTADO DE SÃO PAULO\nProcesso ${number}\nData da publicação: 12/03/2030\nIntimação para manifestação no prazo de 5 dias úteis. Ref ${id}`;
-  await page.getByLabel("Texto", { exact: true }).fill(texto);
-  await page.getByRole("button", { name: "Analisar texto" }).click();
-  await expect(page.getByText(/Campos sugeridos a partir do texto/)).toBeVisible();
-  await expect(page.getByLabel("Número do processo (CNJ)")).toHaveValue(number);
-  await expect(page.getByLabel("Data de publicação")).toHaveValue("2030-03-12");
-  await page.getByLabel("Título", { exact: true }).fill(`Intimação ${id}`);
-  await page.getByRole("button", { name: "Registrar intimação" }).click();
-
-  await expect(page.getByRole("heading", { name: `Intimação ${id}` })).toBeVisible();
-  await expect(page.getByRole("link", { name: `Caso ${id}` }).first()).toBeVisible(); // vinculada automaticamente
-  await expect(page.getByText(/O texto menciona prazo de/)).toBeVisible();
-  const noticeUrl = page.url();
-
-  // duplicata do mesmo texto
-  await page.goto("/caixa-de-entrada/nova");
-  await page.getByLabel("Texto", { exact: true }).fill(texto);
-  await page.getByLabel("Título", { exact: true }).fill(`Repetida ${id}`);
-  await page.getByLabel("Data de recebimento").fill("2030-03-13");
-  await page.getByRole("button", { name: "Registrar intimação" }).click();
-  await expect(page.getByText(/Teor idêntico/)).toBeVisible();
-
-  // providência: prazo pré-preenchido a partir da intimação
-  await page.goto(noticeUrl);
-  await page.getByRole("link", { name: "Cadastrar prazo" }).click();
-  await expect(page.getByLabel("Dias", { exact: true })).toHaveValue("5");
-  await page.getByRole("button", { name: "Calcular sugestão" }).click();
-  await expect(page.getByLabel("Data fatal")).toHaveValue("2030-03-19");
-  await page.getByRole("button", { name: "Cadastrar prazo" }).click();
-  await page.waitForURL(/\/prazos\/[0-9a-f-]{36}$/);
-  await expect(page.getByText("Aguardando validação").first()).toBeVisible();
-
-  await page.goto(noticeUrl);
-  await expect(page.getByRole("link", { name: /Prazo — Intimação/ })).toBeVisible();
-  await page.getByRole("button", { name: "Marcar como tratada" }).click();
-  await expect(page.getByText("Tratada", { exact: true }).first()).toBeVisible();
-
-  // outro escritório não enxerga
-  const ctxB = await browser.newContext({ baseURL: noticeUrl.split("/caixa-de-entrada")[0] });
-  const b = await ctxB.newPage();
-  await signUpWithOffice(b, "cx-b");
-  await b.goto(noticeUrl);
-  await expect(b.getByRole("heading", { name: `Intimação ${id}` })).toHaveCount(0);
-  await ctxB.close();
+test("caixa de entrada retirada bloqueia leitura e cadastro", async ({ request }) => {
+  await expectRetired(request, ["/caixa-de-entrada", "/caixa-de-entrada/nova"]);
 });

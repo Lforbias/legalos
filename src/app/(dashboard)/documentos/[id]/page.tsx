@@ -1,3 +1,5 @@
+import { ReviewPanel } from "@/modules/documents/review-panel";
+import { listDocumentReviews } from "@/server/services/document-review.service";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -38,6 +40,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
   const data = await getDocument(ctx, id.data).catch((e) => (e instanceof NotFoundError ? null : Promise.reject(e)));
   if (!data) notFound();
   const { doc, versions, owner, petitions } = data;
+  const reviews = await listDocumentReviews(ctx, doc.id);
   const textInfo = await getDocumentTextInfo(ctx, doc.id);
   const names = await userNames(ctx, versions.map((v) => v.uploadedById));
   const canWrite = can(ctx, "documents:write");
@@ -63,6 +66,7 @@ export default async function DocumentPage({ params, searchParams }: { params: P
           Alguns dados não estavam cadastrados e ficaram marcados como <strong>[PREENCHER]</strong> no documento: {missing.join(", ")}. Abra o arquivo, complete e envie como nova versão.
         </Alert>
       ) : null}
+      <div className="mb-4"><ReviewPanel documentId={doc.id} version={doc.currentVersion} reviews={reviews} canWrite={canWrite} userId={ctx.userId} /></div>
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
         <div className="space-y-4">
           <Card>

@@ -62,7 +62,7 @@ curl -H "Authorization: Bearer $LEGALOS_KEY" "https://SEU-DOMINIO/api/v1/cases?s
 
 ## Catálogo de ferramentas compartilhado
 
-Para a documentação detalhada, exemplos REST/n8n/MCP, as 82 operações disponíveis e seus limites, veja [API expandida](api-expandida.md).
+Para documentação detalhada, exemplos REST/n8n/MCP e limites, veja [API expandida](api-expandida.md). A lista executável de ferramentas e os esquemas autorizados para cada chave são publicados pelo catálogo autenticado e pelo OpenAPI.
 
 - `GET /api/v1/tools` descobre as ferramentas autorizadas para a chave.
 - `POST /api/v1/tools/{name}` executa uma consulta ou registra uma proposta. Corpo: argumentos JSON diretamente.
@@ -122,7 +122,7 @@ As quinze ferramentas `propor_*` apenas registram uma proposta pendente de decis
 Catálogo completo, limites e cobertura por módulo: [Inventário de RUTE, REST e MCP](inventario-api-mcp.md).
 
 
-O catálogo atual possui 35 ferramentas compartilhadas. Além das consultas, há propostas para cadastro/atualização básica de clientes, edição/comentário/situação de tarefas e criação/edição/cancelamento de compromissos. `capacidades`, `listar_propostas` e `ver_proposta` permitem descobrir e acompanhar operações. A confirmação pode ser feita pela pessoa no chat interno do LegalOS. Campos de destino e versão não podem ser modificados pela edição de uma proposta; alterações concorrentes exigem nova proposta.
+O catálogo de ferramentas é compartilhado por RUTE, MCP e REST. Além das consultas, há ações propostas sujeitas às permissões configuradas e, quando aplicável, à confirmação humana. `capacidades`, `listar_propostas` e `ver_proposta` permitem descobrir e acompanhar operações. Consulte o catálogo autenticado para ver as ferramentas e os esquemas disponíveis à chave atual.
 
 
 ### Chave obrigatória nas ferramentas externas de escrita

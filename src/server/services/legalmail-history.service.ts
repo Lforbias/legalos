@@ -42,7 +42,7 @@ async function getLegalMailList(path: "all" | "case-files", key: string, params:
 
 export async function syncLegalMailHistory(ctx: TenantContext, caseId: string, fetcher: typeof fetch = fetch, selectedId?: number) {
   assertCan(ctx, "cases:write");
-  if (!(await canImportLegalMail(ctx))) throw new ConflictError("O LegalMail está disponível apenas para administradores do escritório autorizado.");
+  if (!(await canImportLegalMail(ctx))) throw new ConflictError("A captura judicial pelo LegalMail foi removida do LegalOS.");
   const local = await assertCaseVisible(ctx, caseId);
   const cnj = local.number && isValidCnj(local.number) ? formatCnj(local.number) : null;
   if (!cnj) throw new ConflictError("Cadastre um número CNJ válido neste processo.");

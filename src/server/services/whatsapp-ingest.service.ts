@@ -1,3 +1,4 @@
+import { safeChatPreview } from "@/lib/whatsapp/safe-preview";
 import { chatContactBlocked } from "./chat-contact-control.service";
 import { emitChatEvent } from "./chat-workbench.service";
 import { applyInboundLifecycle, humanReplyLifecycle } from "./chat-lifecycle.service";
@@ -99,7 +100,7 @@ export async function ingestMessage(account: IngestAccount, m: IngestMessage): P
     if (isUniqueViolation(e)) return;
     throw e;
   }
-  const preview = (body ?? `[${label}]`).replace(/\s+/g, " ").slice(0, 120);
+  const preview = (safeChatPreview(body) ?? `[${label}]`).replace(/\s+/g, " ").slice(0, 120);
   if (m.fromMe) {
     if(conv.lastMessageAt&&m.timestamp<conv.lastMessageAt)return;
     await humanReplyLifecycle(account.organizationId,conv.id);
