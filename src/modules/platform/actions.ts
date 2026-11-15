@@ -6,7 +6,7 @@ import { uuidSchema, type ActionState } from "@/lib/validation/common";
 import { parse, runAction } from "@/server/action-helpers";
 import { requirePlatform } from "@/server/platform";
 import { grantCredits, setOrganizationCreditsEnabled } from "@/server/services/credit.service";
-import { setOrganizationSubscription, updatePlan, setOrganizationSuspended, setUserDisabled, unlockUser } from "@/server/services/platform.service";
+import { archiveOrganization, setOrganizationSubscription, updatePlan, setOrganizationSuspended, setUserDisabled, unlockUser } from "@/server/services/platform.service";
 
 export async function suspendOrganizationAction(orgId: string, reason: string): Promise<ActionState> {
   return runAction(async () => {
@@ -21,6 +21,15 @@ export async function reactivateOrganizationAction(orgId: string): Promise<Actio
   return runAction(async () => {
     const { pc } = await requirePlatform();
     await setOrganizationSuspended(pc, parse(uuidSchema, orgId), null);
+    revalidatePath("/admin/escritorios");
+    revalidatePath("/admin");
+    return undefined;
+  });
+}
+export async function archiveOrganizationAction(orgId: string, confirmationName: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { pc } = await requirePlatform();
+    await archiveOrganization(pc, parse(uuidSchema, orgId), parse(z.string().trim().min(2).max(120), confirmationName));
     revalidatePath("/admin/escritorios");
     revalidatePath("/admin");
     return undefined;
