@@ -110,6 +110,18 @@ function runCertificate(page: Page, extra: Record<string, unknown> = {}) {
 const sso = () => ({ ...getEprocPortalTarget("tjsp-1g")!, loginUrl: `${EPROC}/` }) satisfies EprocPortalTarget;
 
 describe.skipIf(!browser)("login eproc TJMG", () => {
+  it("aguarda o redirecionamento lento de index.php depois do código sem reenviá-lo", async () => {
+    await fixture(async (page, log) => {
+      const { outcome, why } = await runCertificate(page);
+      expect(outcome, why).toMatchObject({ ok: true });
+      expect(log.requests.filter((request) => request.startsWith(`POST ${new URL(ORIGIN).host}/eproc/index.php`))).toHaveLength(1);
+    }, {
+      handler: (url, method) => method === "POST" && url.pathname === "/eproc/index.php"
+        ? { body: `<p>Aguarde</p><script>setTimeout(() => location.replace("${EPROC}/controlador.php?acao=principal"), 2400)</script>` }
+        : undefined,
+    });
+  });
+
   it("lê o relatório vinculado à sessão sem abrir autos ou registrar ciência", async () => {
     const context = await browser!.newContext();
     try {

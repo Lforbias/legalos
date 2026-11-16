@@ -290,7 +290,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
    *  - estados `tentative` (ex.: área autenticada logo depois do certificado, aviso de 2º fator pendente): só valem se nenhum
    *    desafio (código de dois fatores, captcha, erro) aparecer em seguida, em outra aba ou quadro.
    */
-  const waitOutcome = async (cfg: { done: (state: EprocState) => boolean; giveUpOnUnknown: boolean; tentative?: EprocStateKind[] }): Promise<Outcome | null> => {
+  const waitOutcome = async (cfg: { done: (state: EprocState) => boolean; giveUpOnUnknown: boolean; tentative?: EprocStateKind[]; afterOtp?: boolean }): Promise<Outcome | null> => {
     const end = Date.now() + timeout;
     let candidateKey = "";
     let candidateSince = 0;
@@ -307,11 +307,17 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
       const unknownCandidate = cfg.giveUpOnUnknown && (current.foreignPages > 0 || current.browserErrorPages > 0 || best?.state.kind === "UNKNOWN");
       if ((tentative || unknownCandidate) && !current.mainLoading) {
         const where = best ? hostAndPath(best.frame.url()) : { host: "", path: "" };
+        const awaitingTjmgRedirect = cfg.afterOtp && target.key === "tjmg-1g" &&
+          best?.state.kind === "UNKNOWN" && !best.state.errorText && where.host === targetHost &&
+          where.path === "/eproc/index.php" && !current.foreignPages && !current.browserErrorPages &&
+          !current.browserNavigationFailures.length;
+        const settle = awaitingTjmgRedirect ? Math.min(18_000, timeout * 0.8) :
+          best?.state.kind === "APP" ? Math.min(settleMs, 2_500) : settleMs;
         const key = `${tentative ? "T" : "U"}|${current.foreignHosts.join(",")}|${current.browserNavigationFailures.map(({ code, host }) => `${code}:${host}`).join(",")}|${best?.state.kind ?? ""}|${where.host}${where.path}`;
         if (key !== candidateKey) {
           candidateKey = key;
           candidateSince = Date.now();
-        } else if (Date.now() - candidateSince >= (best?.state.kind === "APP" ? Math.min(settleMs, 2_500) : settleMs)) {
+        } else if (Date.now() - candidateSince >= settle) {
           return tentative ? { located: best, scan: current, unknown: false } : { located: best, scan: current, unknown: true };
         }
       } else {
@@ -399,7 +405,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
     await opts.onProgress?.("Código enviado; aguardando validação do portal.");
     // Depois do código só vale um resultado: área autenticada, código recusado, captcha ou erro. Um formulário de acesso sem erro
     // pode ser só a aba/quadro anterior ainda aberta.
-    outcome = await waitOutcome({ done: (state) => (state.kind !== "OTP" && state.kind !== "LOGIN") || Boolean(state.errorText), giveUpOnUnknown: true, tentative: ["OTP_SETUP"] });
+    outcome = await waitOutcome({ done: (state) => (state.kind !== "OTP" && state.kind !== "LOGIN") || Boolean(state.errorText), giveUpOnUnknown: true, tentative: ["OTP_SETUP"], afterOtp: true });
     if (!outcome) return fail("TIMEOUT", "O eproc demorou demais para validar o código de dois fatores.", true, true);
     if (outcome.unknown) return failUnknown(outcome, "otp");
     located = outcome.located!;
