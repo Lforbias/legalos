@@ -9,6 +9,7 @@ const ORIGIN = "https://eproc1g.tjmg.jus.br";
 const EPROC = `${ORIGIN}/eproc`;
 /** SSO oficial do catálogo do TJSP; só serve aqui para provar o redirecionamento para uma segunda origem permitida. */
 const SSO = "https://sso.tjsp.jus.br";
+const CERT_SSO = "https://certificado-sso.tjsp.jus.br";
 const FOREIGN = "https://portal-falso.example.com";
 const SECRET = base32Encode(Buffer.from("12345678901234567890"));
 const T0 = Date.UTC(2027, 0, 1, 12, 0, 5);
@@ -59,14 +60,14 @@ async function fixture(fn: (page: Page, log: Log) => Promise<void>, options: Fix
     const form = new URLSearchParams(request.postData() ?? "");
     let reply: Reply | undefined = options.handler?.(url, method);
     if (!reply && method === "POST" && url.origin === FOREIGN) log.foreignPosts.push(url.pathname);
-    if (!reply && (url.origin === ORIGIN || url.origin === SSO)) {
+    if (!reply && [ORIGIN, SSO, CERT_SSO].includes(url.origin)) {
       if (method === "GET" && url.pathname === "/eproc/") reply = { body: loginHtml(options.login) };
       else if (method === "GET" && url.pathname === "/eproc/controlador.php") reply = { body: appHtml };
       else if (method === "GET" && url.searchParams.get("acao") === "token") reply = { body: otpHtml() };
       else if (method === "GET" && url.searchParams.get("acao") === "token_subfrm") reply = { body: otpHtml("", "externo_controlador.php?acao=token_validar") };
       else if (method === "GET" && url.searchParams.get("acao") === "erro_carregar_certificado_digital") reply = { body: slowCertificateHtml };
       else if (method === "GET" && url.searchParams.get("acao") === "erro_certificado_digital") reply = { body: certificateErrorHtml };
-      else if (method === "GET" && url.origin === SSO && url.pathname === "/auth/otp") reply = { body: otpHtml("", `${SSO}/auth/otp`) };
+      else if (method === "GET" && [SSO, CERT_SSO].includes(url.origin) && url.pathname === "/auth/otp") reply = { body: otpHtml("", `${url.origin}/auth/otp`) };
       else if (method === "POST" && url.searchParams.get("acao") === "login_cert") {
         log.posts.push("cert");
         log.certForms.push(form);
@@ -314,7 +315,22 @@ describe("origens oficiais do fluxo eproc", () => {
   });
 
   it("inclui o SSO oficial quando o tribunal usa um", () => {
-    expect(eprocAllowedOrigins(getEprocPortalTarget("tjsp-1g")!)).toEqual(["https://eproc1g.tjsp.jus.br", "https://sso.tjsp.jus.br"]);
+    expect(eprocAllowedOrigins(getEprocPortalTarget("tjsp-1g")!)).toEqual(["https://eproc1g.tjsp.jus.br", "https://sso.tjsp.jus.br", CERT_SSO]);
+  });
+
+  it("TJSP: acompanha o host de certificado apontado pelo botão oficial do SSO", async () => {
+    await fixture(async (page, log) => {
+      const events: string[] = [];
+      const outcome = await loginEprocPortal(page, sso(), certCredentials, { ...base(), onProgress: (message) => { events.push(message); } });
+      expect(outcome, events.join(" / ")).toMatchObject({ ok: true });
+      expect(log.posts).toEqual(["cert", "otp"]);
+      expect(log.otpHosts).toEqual(["certificado-sso.tjsp.jus.br"]);
+    }, { afterCert: redirect(`${CERT_SSO}/auth/otp`) });
+  }, 20_000);
+
+  it("apresenta o certificado somente em hosts .jus.br fixados no catálogo", () => {
+    expect(eprocAllowedOrigins(getEprocPortalTarget("tjsp-2g")!)).toContain(CERT_SSO);
+    expect(EPROC_PORTAL_TARGETS.every((target) => eprocAllowedOrigins(target).every((origin) => new URL(origin).hostname.endsWith(".jus.br")))).toBe(true);
   });
 
   it("todo destino do catálogo é https e .jus.br", () => {
@@ -332,5 +348,6 @@ describe("origens oficiais do fluxo eproc", () => {
     expect(() => eprocAllowedOrigins({ ...tjmg, ssoOrigin: "https://sso.exemplo.com" })).toThrow(/oficial/i);
     expect(() => eprocAllowedOrigins({ ...tjmg, ssoOrigin: "http://sso.tjmg.jus.br" })).toThrow(/oficial/i);
     expect(() => eprocAllowedOrigins({ ...tjmg, ssoOrigin: "https://www.certisign.com.br" })).toThrow(/oficial/i);
+    expect(() => eprocAllowedOrigins({ ...tjmg, authOrigins: ["https://autenticador.certisign.com.br"] })).toThrow(/oficial/i);
   });
 });
