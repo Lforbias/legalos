@@ -41,6 +41,19 @@ function FeatureRow({ feature, label, hint, on, needConsent, disabled }: { featu
   );
 }
 
+export function McpAccessPanel({ enabled, canManage }: { enabled: boolean; canManage: boolean }) {
+  return (
+    <FeatureRow
+      feature="mcp"
+      label="Acesso externo às ferramentas (MCP e API)"
+      hint="A IA usa as permissões da pessoa que conectar a própria conta."
+      on={enabled}
+      needConsent
+      disabled={!canManage}
+    />
+  );
+}
+
 export function SettingsPanel({ s, canManage }: { s: SettingsView; canManage: boolean }) {
   const stop = useRun();
   return (
@@ -80,7 +93,7 @@ export function ConnectGuide({ mcpUrl, enabled }: { mcpUrl: string; enabled: boo
   const gemini = JSON.stringify({ mcpServers: { legalos: { httpUrl: mcpUrl, headers: { Authorization: "Bearer COLE_AQUI_A_CHAVE" } } } }, null, 2);
   return (
     <div className="space-y-4 text-sm">
-      {!enabled ? <Alert tone="warning">A conexão de IAs externas está desligada. Quem administra liga em Situação.</Alert> : null}
+      {!enabled ? <Alert tone="warning">A conexão de IAs externas está desligada. Quem administra pode ligar nesta página.</Alert> : null}
       <div className="flex flex-wrap items-center gap-2 rounded-md bg-surface-2 p-3">
         <span className="text-xs text-muted">Endereço do servidor:</span>
         <code className="break-all text-xs">{mcpUrl}</code>
@@ -89,8 +102,8 @@ export function ConnectGuide({ mcpUrl, enabled }: { mcpUrl: string; enabled: boo
       <div>
         <p className="font-medium">Claude (claude.ai)</p>
         <ol className="ml-5 list-decimal space-y-1 text-muted">
-          <li>No Claude, abra Configurações → Conectores e escolha adicionar um conector personalizado.</li>
-          <li>Cole o endereço acima e conclua. O Claude abre uma tela do LegalOS pedindo a sua permissão.</li>
+          <li>No Claude, abra Conectores e adicione um conector personalizado.</li>
+          <li>Cole o endereço acima, escolha entrar agora e, se solicitado, selecione o registro automático do cliente OAuth.</li>
           <li>Entre no LegalOS (se pedir), escolha os acessos e clique em Permitir.</li>
         </ol>
       </div>
