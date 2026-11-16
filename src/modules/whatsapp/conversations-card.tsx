@@ -7,11 +7,11 @@ import { formatWaId } from "@/lib/whatsapp/phone";
 export type ConversationRow = { id: string; waId: string; contactName: string | null; status: string; lastMessageAt: Date | null; lastPreview: string | null; unreadCount: number; assignedTo: { name: string } | null };
 
 /** Conversas de WhatsApp (LegalOS Chat) mostradas na ficha de cliente, processo ou lead. Só renderiza se houver conversa. */
-export function ConversationsCard({ rows }: { rows: ConversationRow[] }) {
+export function ConversationsCard({ rows, title = "Conversas de WhatsApp" }: { rows: ConversationRow[]; title?: string }) {
   if (rows.length === 0) return null;
   return (
     <Card data-testid="chat-conversations">
-      <CardHeader title="Conversas de WhatsApp" description="LegalOS Chat" />
+      <CardHeader title={title} description="LegalOS Chat" />
       <CardBody className="space-y-2">
         {rows.map((r) => (
           <Link key={r.id} href={`/atendimento?f=${r.status === "OPEN" ? "open" : "closed"}&c=${r.id}`} className="block rounded-md border border-border p-2 text-sm hover:bg-surface-2">

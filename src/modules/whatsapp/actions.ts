@@ -17,7 +17,7 @@ import { sendToClient } from "@/server/services/chat-send.service";
 import { billingPreview, removeOptout, saveBillingSettings, sendBillingNow } from "@/server/services/chat-billing.service";
 import { deleteField, deleteLabel, saveField, saveLabel, setConversationLabels, setFieldValues } from "@/server/services/chat-meta.service";
 import { connectQr, disconnectQr, getQrStatus, restartQr, type QrStatus } from "@/server/services/whatsapp-qr.service";
-import { addNote, assignConversation, linkClient, searchClientsForLink, sendMessage, sendTemplateMessage, setConversationStatus, startConversation } from "@/server/services/whatsapp.service";
+import { addNote, assignConversation, linkClient, searchClientsForLink, sendMessage, sendTemplateMessage, setConversationStatus, startClientWhatsapp, startConversation } from "@/server/services/whatsapp.service";
 
 const text = z.string().max(5000);
 
@@ -88,6 +88,17 @@ export async function startConversationAction(phone: string, clientId: string | 
     const r = await startConversation(ctx, { phone: parse(z.string().min(8).max(30), phone), clientId: parse(uuidSchema.nullable(), clientId) });
     revalidatePath("/atendimento");
     return r;
+  });
+}
+
+export async function startClientWhatsappAction(clientId: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const id = parse(uuidSchema, clientId);
+    await startClientWhatsapp(ctx, id);
+    revalidatePath(`/clientes/${id}`);
+    revalidatePath("/atendimento");
+    return undefined;
   });
 }
 

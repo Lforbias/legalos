@@ -85,13 +85,13 @@ function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; act
   );
 }
 
-export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras, tools, transcripts, canTranscribe }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData; tools?: ConvToolsData; transcripts?: Record<string, string>; canTranscribe?: boolean }) {
+export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras, tools, transcripts, canTranscribe, embedded = false }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData; tools?: ConvToolsData; transcripts?: Record<string, string>; canTranscribe?: boolean; embedded?: boolean }) {
   const router = useRouter();
   const [text, setText] = React.useState("");
   const [note, setNote] = React.useState(false);
   const [msg, setMsg] = React.useState<{ tone: "error" | "success"; text: string } | null>(null);
   const [pending, start] = React.useTransition();
-  const endRef = React.useRef<HTMLDivElement>(null);
+  const historyRef = React.useRef<HTMLDivElement>(null);
   const fileRef = React.useRef<HTMLInputElement>(null);
   const [tpl, setTpl] = React.useState("");
   const [panel, setPanel] = React.useState<Panel>(null);
@@ -102,9 +102,11 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
   const [q, setQ] = React.useState("");
   const [found, setFound] = React.useState<{ id: string; name: string }[]>([]);
 
+  const lastMessageId = messages.at(-1)?.id;
   React.useEffect(() => {
-    endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages.length, chat.id]);
+    const history = historyRef.current;
+    if (history) history.scrollTop = history.scrollHeight;
+  }, [lastMessageId, chat.id]);
 
   const run = (fn: () => Promise<{ ok: boolean; message?: string }>, after?: () => void) =>
     start(async () => {
@@ -122,7 +124,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
 
   function submit() {
     const body = text.trim();
-    if (!body) return;
+    if (!body || pending) return;
     if (note) run(() => addNoteAction(chat.id, body), () => setText(""));
     else
       run(async () => {
@@ -205,25 +207,25 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col xl:flex-row" data-testid="wa-chat-wrap">
       <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${side ? "h-[62%] shrink-0 xl:h-full" : "h-full"}`} data-testid="wa-chat">
         <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-4">
-          <Link href={chat.backHref ?? "/atendimento"} aria-label="Voltar às conversas" className="rounded-full p-1.5 hover:bg-surface-2 lg:hidden"><ArrowLeft className="h-5 w-5" aria-hidden /></Link>
+          {!embedded ? <Link href={chat.backHref ?? "/atendimento"} aria-label="Voltar às conversas" className="rounded-full p-1.5 hover:bg-surface-2 lg:hidden"><ArrowLeft className="h-5 w-5" aria-hidden /></Link> : null}
           <Avatar name={chat.title} size={40} />
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{chat.title}</div>
             <div className="truncate text-xs text-muted">
               {chat.phone}
-              {chat.client ? <> · <Link className="underline" href={`/clientes/${chat.client.id}`}>{chat.client.name}</Link></> : " · cliente não vinculado"}
+              {!embedded && (chat.client ? <> · <Link className="underline" href={`/clientes/${chat.client.id}`}>{chat.client.name}</Link></> : " · cliente não vinculado")}
               {assignee ? ` · ${assignee.name}` : ""}
             </div>
           </div>
-          <span className={`hidden rounded px-2 py-1 text-[11px] font-bold uppercase tracking-wide sm:inline ${open ? "bg-primary text-primary-fg" : "bg-surface-3 text-muted"}`} data-testid="wa-status">{SERVICE_STATUS_LABEL[(chat.serviceStatus??chat.status) as ServiceStatus]??chat.status}</span>
-          {chat.canWrite ? (
+          {!embedded ? <span className={`hidden rounded px-2 py-1 text-[11px] font-bold uppercase tracking-wide sm:inline ${open ? "bg-primary text-primary-fg" : "bg-surface-3 text-muted"}`} data-testid="wa-status">{SERVICE_STATUS_LABEL[(chat.serviceStatus??chat.status) as ServiceStatus]??chat.status}</span> : null}
+          {!embedded && chat.canWrite ? (
             <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => setStatusAction(chat.id, open ? "CLOSED" : "OPEN"))}>
               {open ? "Encerrar" : "Reabrir"}
             </Button>
           ) : null}
         </div>
 
-        {chat.canWrite && chat.canLinkClient && !chat.client ? (
+        {!embedded && chat.canWrite && chat.canLinkClient && !chat.client ? (
           <div className="space-y-2 border-b border-border bg-surface p-3 text-sm">
             <div className="flex gap-2">
               <Input aria-label="Buscar cliente" placeholder="Vincular a um cliente (nome ou CPF/CNPJ)" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -235,28 +237,27 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           </div>
         ) : null}
 
-        {!side ? (
+        {!embedded && !side ? (
           <>
             {chat.canWrite ? <ChatActions key={`${panel?.kind ?? "-"}:${panel?.messageId ?? ""}:${panelN}`} chatId={chat.id} title={chat.title} links={links} can={chat.can} team={team} me={chat.me} panel={panel} setPanel={openPanel} onMsg={setMsg} /> : null}
             {chat.canWrite && meta ? <MetaPanel key={JSON.stringify([meta.selected, meta.values])} chatId={chat.id} labels={meta.labels} selected={meta.selected} fields={meta.fields} values={meta.values} onMsg={setMsg} /> : null}
           </>
         ) : null}
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-surface-2/60 px-4 py-5 md:px-8" data-testid="wa-messages">
+        <div ref={historyRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-surface-2/60 px-4 py-5 md:px-8" data-testid="wa-messages">
           {messages.length === 0 ? <p className="mx-auto w-fit rounded-md bg-surface/80 px-3 py-1 text-sm text-muted">Sem mensagens ainda.</p> : null}
           {grouped.map((g) => (
             <div key={g.key} className="space-y-1.5">
               <div className="sticky top-0 z-[1] flex justify-center py-1"><span className="rounded-md bg-surface/90 px-3 py-0.5 text-xs font-medium text-muted shadow-sm">{g.label}</span></div>
-              {g.items.map((m) => <Bubble key={m.id} m={m} transcript={transcripts?.[m.id]} canTranscribe={canTranscribe} actions={chat.canWrite && m.direction !== "NOTE" ? <MessageActions messageId={m.id} excerpt={m.body ?? ""} hasMedia={m.hasMedia} links={links} can={chat.can} onPanel={openPanel} onDone={setMsg} /> : undefined} />)}
+              {g.items.map((m) => <Bubble key={m.id} m={m} transcript={transcripts?.[m.id]} canTranscribe={canTranscribe} actions={!embedded && chat.canWrite && m.direction !== "NOTE" ? <MessageActions messageId={m.id} excerpt={m.body ?? ""} hasMedia={m.hasMedia} links={links} can={chat.can} onPanel={openPanel} onDone={setMsg} /> : undefined} />)}
             </div>
           ))}
-          <div ref={endRef} />
         </div>
 
         {msg ? <div className="border-t border-border bg-surface px-4 py-4"><Alert tone={msg.tone}>{msg.text}</Alert></div> : null}
 
         {chat.canWrite ? (
-          <div className="space-y-3 border-t border-border bg-surface p-4">
+          <div className={`space-y-3 border-t border-border bg-surface p-4 ${embedded && !chat.windowOpen ? "max-h-[55%] overflow-y-auto" : ""}`}>
             {!chat.windowOpen && !note ? (
               <div className="space-y-2 rounded-md border border-warning/40 bg-warning-bg p-3 text-sm text-warning" data-testid="wa-window-closed">
                 <p>A janela de 24 horas está fechada: só é possível enviar um modelo aprovado pela Meta.</p>
@@ -283,7 +284,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
                 {quickMatch.map((r) => <button key={r.id} type="button" className="rounded-md border border-border px-2 py-1 text-xs hover:bg-surface-2" onClick={() => setText(r.body)}>/{r.shortcut} — {r.title}</button>)}
               </div>
             ) : null}
-            <label className="flex w-fit items-center gap-2 rounded-full border border-border px-2.5 py-0.5 text-xs"><input type="checkbox" checked={note} onChange={(e) => setNote(e.target.checked)} /> Nota interna</label>
+            {!embedded ? <label className="flex w-fit items-center gap-2 rounded-full border border-border px-2.5 py-0.5 text-xs"><input type="checkbox" checked={note} onChange={(e) => setNote(e.target.checked)} /> Nota interna</label> : null}
             {(chat.windowOpen || note) ? (
               <div className={`flex items-end gap-1.5 rounded-2xl border px-1.5 py-1.5 ${note ? "border-warning/50 bg-warning-bg" : "border-border bg-surface-2"}`}>
                 <EmojiPicker onPick={addEmoji} disabled={pending} />

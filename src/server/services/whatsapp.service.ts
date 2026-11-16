@@ -11,7 +11,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions
 import { deleteObject, putObject } from "@/lib/storage/local-storage";
 import { markAsRead, sendTemplate as apiSendTemplate, WhatsappApiError, type OutKind } from "@/lib/whatsapp/client";
 import { isWindowOpen, MAX_TEXT, windowClosesAt } from "@/lib/whatsapp/constants";
-import { normalizeWaId } from "@/lib/whatsapp/phone";
+import { normalizeWaId, phoneCandidates } from "@/lib/whatsapp/phone";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { isUniqueViolation } from "./db-errors";
@@ -80,6 +80,51 @@ export async function openConversation(ctx: TenantContext, id: string) {
     conversation: { ...c, unreadCount: 0, windowOpen: qr || isWindowOpen(c.lastInboundAt), windowClosesAt: qr ? null : windowClosesAt(c.lastInboundAt) },
     messages: messages.map(({ mediaKey, ...m }) => ({ ...m, hasMedia: !!mediaKey })),
   };
+}
+
+/** Localiza a conversa pelo telefone atual do cliente e pelo número principal do escritório. */
+export async function findClientWhatsapp(ctx: TenantContext, clientId: string, phone: string | null) {
+  assertCan(ctx, "clients:read");
+  assertCan(ctx, "whatsapp:read");
+  const waId = phone ? normalizeWaId(phone) : null;
+  if (!waId) return { waId, account: null, conversation: null, blocked: false };
+
+  const account = await db.whatsappAccount.findFirst({
+    where: { organizationId: ctx.organizationId, isPrimary: true },
+    select: { id: true, enabled: true, displayPhone: true, label: true },
+  });
+  if (!account) return { waId, account, conversation: null, blocked: false };
+
+  const matches = await db.whatsappConversation.findMany({
+    where: { organizationId: ctx.organizationId, accountId: account.id, waId: { in: phoneCandidates(waId) } },
+    orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }, { id: "asc" }],
+    select: { id: true, waId: true, clientId: true },
+  });
+  const match = matches.find((row) => row.waId === waId) ?? matches[0];
+  const blocked = !!match?.clientId && match.clientId !== clientId;
+  return { waId, account, conversation: blocked ? null : match ?? null, blocked };
+}
+
+/** Prepara a conversa na ficha para envio de texto ou de um modelo aprovado. */
+export async function startClientWhatsapp(ctx: TenantContext, clientId: string) {
+  assertCan(ctx, "whatsapp:write");
+  assertCan(ctx, "clients:read");
+  const client = await db.client.findFirst({
+    where: { id: clientId, organizationId: ctx.organizationId, deletedAt: null },
+    select: { phone: true },
+  });
+  if (!client) throw new NotFoundError("Cliente não encontrado.");
+
+  const { waId, account, conversation, blocked } = await findClientWhatsapp(ctx, clientId, client.phone);
+  if (!waId) throw new ConflictError("Cadastre um número de WhatsApp válido para o cliente.");
+  if (!account?.enabled) throw new ConflictError("Conecte o WhatsApp principal do escritório.");
+  if (blocked) throw new ConflictError("O número está vinculado à conversa de outro cliente.");
+  if (conversation) return;
+
+  await db.whatsappConversation.createMany({
+    data: { organizationId: ctx.organizationId, accountId: account.id, waId, clientId, assignedToId: ctx.userId, status: "OPEN" },
+    skipDuplicates: true,
+  });
 }
 
 async function markLastInboundRead(organizationId: string, conversationId: string) {
