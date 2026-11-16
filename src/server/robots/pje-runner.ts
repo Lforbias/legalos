@@ -12,6 +12,8 @@ import { logger } from "@/lib/logging/logger";
 import { loginPje, type LoginOutcome } from "@/lib/robots/pje/login";
 import { loginEprocPortal } from "@/lib/robots/eproc/login";
 import { observeEprocPanel, type EprocPanelObservation } from "@/lib/robots/eproc/panel";
+import { getTjmgReportLink, readTjmgReport, TJMG_REPORT_LABELS } from "@/lib/robots/eproc/report";
+import { encryptSecret } from "@/lib/security/totp";
 import { MAX_ATTEMPTS, backoffMs, mapOutcome } from "@/lib/robots/pje/outcome";
 import { failureCodeForLogin } from "@/lib/judicial/robot-evidence";
 import { recordEvidence } from "@/server/judicial/evidence.service";
@@ -206,6 +208,24 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
           ? `Leitura segura do painel concluída: ${labels.length} listas identificadas (${[...new Set(labels)].join(", ")}). Nenhum processo ou comunicação foi aberto.`
           : "Login confirmado; o painel foi lido sem interagir com itens. Ainda não identifiquei as listas de processos ou comunicações nesta tela.", labels.length ? "SUCCESS" : "WARN");
       }
+    }
+    if (outcome.ok && isEvolutionEproc && access.target === "tjmg-1g" && key) {
+      const reports = [];
+      for (const label of TJMG_REPORT_LABELS) {
+        try {
+          const href = await getTjmgReportLink(rp.page, label);
+          const result = href ? await readTjmgReport(rp.page, href) : null;
+          if (!result?.recognized) {
+            await recordProgress(`${label}: relatório indisponível ou tabela não identificada.`, "WARN");
+            continue;
+          }
+          reports.push({ label, rows: result.rows, truncated: result.truncated });
+          await recordProgress(`${label}: ${result.rows.length} registros lidos na página do relatório.`, "SUCCESS");
+        } catch {
+          await recordProgress(`${label}: não foi possível ler o relatório nesta tentativa.`, "WARN");
+        }
+      }
+      if (reports.length) jobSummary.eprocReportsEnc = encryptSecret(JSON.stringify(reports), key);
     }
     if (outcome.ok && job.kind === "SYNC_NOTICES" && target) panel = await (deps.probe ?? probePjePanel)(rp.page, target, names);
   } catch (e) {

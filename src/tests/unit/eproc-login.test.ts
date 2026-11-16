@@ -3,6 +3,7 @@ import { chromium, type BrowserContext, type Page } from "playwright-core";
 import { detectEprocState, loginEprocPortal, loginEprocTjmg } from "@/lib/robots/eproc/login";
 import { pageSerializable } from "@/lib/robots/pje/signature";
 import { observeEprocPanel } from "@/lib/robots/eproc/panel";
+import { getTjmgReportLink, readTjmgReport } from "@/lib/robots/eproc/report";
 import { EPROC_PORTAL_TARGETS, eprocAllowedOrigins, getEprocPortalTarget, type EprocPortalTarget } from "@/lib/robots/eproc/targets";
 import { base32Encode, totpCode, totpStep, verifyTotp } from "@/lib/security/totp";
 
@@ -109,6 +110,34 @@ function runCertificate(page: Page, extra: Record<string, unknown> = {}) {
 const sso = () => ({ ...getEprocPortalTarget("tjsp-1g")!, loginUrl: `${EPROC}/` }) satisfies EprocPortalTarget;
 
 describe.skipIf(!browser)("login eproc TJMG", () => {
+  it("lê o relatório vinculado à sessão sem abrir autos ou registrar ciência", async () => {
+    const context = await browser!.newContext();
+    try {
+      const page = await context.newPage();
+      const requests: string[] = [];
+      const action = "relatorio_processo_procurador_listar";
+      await context.route(`${EPROC}/**`, async (route) => {
+        const url = new URL(route.request().url());
+        const operation = url.searchParams.get("acao") ?? "";
+        requests.push(operation);
+        await route.fulfill({ contentType: "text/html; charset=utf-8", body: operation === action
+          ? "<table><tr><th>Número Processo</th><th>Último Evento</th><th>Data/Hora Ult. Evento</th></tr><tr><td><a href='?acao=abrir_prazo'>1234567-<br>00.2026.8.13.0001</a></td><td>Juntada</td><td>16/11/2026 12:00</td></tr></table>"
+          : `<a href='?acao=abrir_prazo'>Relação de Processos</a><a href='?acao=${action}&amp;hash=ficticio'>Relação de Processos</a>` });
+      });
+      await page.goto(`${EPROC}/controlador.php?acao=painel_adv_listar`);
+      const link = await getTjmgReportLink(page);
+      expect(link).toContain("hash=ficticio");
+      expect(await readTjmgReport(page, link!)).toEqual({
+        recognized: true, truncated: false,
+        rows: [{ processNumber: "1234567-00.2026.8.13.0001", event: "Juntada", eventDate: "16/11/2026 12:00" }],
+      });
+      expect(requests).toEqual(["painel_adv_listar", action]);
+      expect(context.pages()).toEqual([page]);
+    } finally {
+      await context.close();
+    }
+  });
+
   it("classifica o formulário dentro do Chromium sem depender do runtime Node", async () => {
     await fixture(async (page) => {
       await page.goto(`${EPROC}/`, { waitUntil: "domcontentloaded" });

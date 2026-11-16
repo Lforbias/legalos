@@ -11,6 +11,9 @@ import { listUsableCertificates } from "@/server/services/certificate.service";
 import { PJE_TARGETS } from "@/lib/robots/pje/targets";
 import { EPROC_PORTAL_TARGETS, getEprocPortalTarget } from "@/lib/robots/eproc/targets";
 import { isRegionalPjeTarget } from "@/server/services/portal-access.service";
+import { certKey } from "@/lib/security/pfx";
+import { decryptSecret } from "@/lib/security/totp";
+import type { EprocReportRow } from "@/lib/robots/eproc/report";
 
 export type AvailableTarget = {
   targetKey: string;
@@ -83,7 +86,20 @@ export type ConnectionInfo = {
   enabled: boolean;
   terminalEvents: { at: string; level: "INFO" | "SUCCESS" | "WARN" | "ERROR"; message: string }[];
   lastJobStatus: string | null;
+  eprocReports: { label: string; rows: EprocReportRow[]; truncated: boolean }[];
 };
+
+function eprocReportsFrom(summary: unknown): ConnectionInfo["eprocReports"] {
+  if (!summary || typeof summary !== "object" || !("eprocReportsEnc" in summary) ||
+    typeof summary.eprocReportsEnc !== "string") return [];
+  const key = certKey();
+  if (!key) return [];
+  try {
+    return JSON.parse(decryptSecret(summary.eprocReportsEnc, key)) as ConnectionInfo["eprocReports"];
+  } catch {
+    return [];
+  }
+}
 
 function terminalEventsFrom(summary: unknown): ConnectionInfo["terminalEvents"] {
   if (!summary || typeof summary !== "object" || Array.isArray(summary)) return [];
@@ -126,6 +142,9 @@ export async function listConnectionsAction() {
         enabled: a.enabled,
         terminalEvents: terminalEventsFrom(a.jobs[0]?.summary),
         lastJobStatus: a.jobs[0]?.status ?? null,
+        eprocReports: a.system === EVOLUTION_EPROC_SYSTEM && a.target === "tjmg-1g"
+          ? eprocReportsFrom(a.jobs[0]?.summary)
+          : [],
       };
     });
     return { connections };

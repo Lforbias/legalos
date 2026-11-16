@@ -96,6 +96,24 @@ function ConnectionRow({ target, conn, pilotEnabled, onUpdate }: { target: Avail
         </pre>
         <p className="border-t border-slate-700 px-3 py-1.5 text-[10px] text-slate-400">Senhas, códigos do autenticador e dados privados do certificado nunca são exibidos aqui.</p>
       </details>
+      {conn.eprocReports?.map(({ label, rows, truncated }) => (
+        <details key={label} className="rounded-lg border p-3 text-sm">
+          <summary className="cursor-pointer font-medium">{label} · {rows.length} registros lidos</summary>
+          {truncated && <p className="mt-2 text-xs text-muted">Exibindo os primeiros 200 registros desta página.</p>}
+          {rows.length > 0 && <div className="mt-2 overflow-auto">
+            <table className="w-full text-left text-xs">
+              <thead><tr><th scope="col">Processo</th><th scope="col">Evento</th><th scope="col">Data e hora</th></tr></thead>
+              <tbody>
+                {rows.map((row, index) => <tr key={`${row.processNumber}-${index}`} className="border-t">
+                  <td className="whitespace-nowrap px-2 py-1">{row.processNumber}</td>
+                  <td className="px-2 py-1">{row.event ?? "—"}</td>
+                  <td className="whitespace-nowrap px-2 py-1">{row.eventDate ?? "—"}</td>
+                </tr>)}
+              </tbody>
+            </table>
+          </div>}
+        </details>
+      ))}
       <div className="flex flex-wrap items-start gap-2">
         <Button size="sm" variant="secondary" disabled={pending} onClick={onUpdate}>Atualizar certificado e autenticador</Button>
         {pilotEnabled && <>
@@ -106,7 +124,7 @@ function ConnectionRow({ target, conn, pilotEnabled, onUpdate }: { target: Avail
             disabled={!conn.enabled || working}
             onClick={() => act(() => testConnectionAction(conn.id!, surface))}
           >
-            {target.adapterKey === "eproc-portal" ? "Mapear listas do eproc" : "Testar de novo"}
+            {target.targetKey === "tjmg-1g" && target.adapterKey === "eproc-portal" ? "Ler relatórios do eproc" : target.adapterKey === "eproc-portal" ? "Mapear listas do eproc" : "Testar de novo"}
           </Button>
           <Button
             size="sm"
