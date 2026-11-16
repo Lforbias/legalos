@@ -1,7 +1,7 @@
 import type { Page } from "playwright-core";
 import { totpCode, totpStep, TOTP_PERIOD } from "@/lib/security/totp";
 import { onlyDigits } from "@/lib/validation/br-documents";
-import { sanitizeSignature, type PageSignature } from "./signature";
+import { pageSerializable, sanitizeSignature, type PageSignature } from "./signature";
 import { PJE_SSO_ORIGIN, pjeLoginUrl, type PjeTarget } from "./targets";
 
 /**
@@ -31,14 +31,14 @@ export type LoginOptions = {
 type PageState = { kind: "PJE_HOME" | "LOGIN_FORM" | "OTP" | "OTP_SETUP" | "CAPTCHA" | "APP" | "UNKNOWN"; host: string; errorText: string };
 
 /** Roda DENTRO da página: classifica a tela atual. Sem referências externas (é serializada). */
-export const detectState = ({ ssoHost, appHost }: { ssoHost: string; appHost: string }): PageState => {
-  const vis = (el: Element | null): boolean => {
+export function detectState({ ssoHost, appHost }: { ssoHost: string; appHost: string }): PageState {
+  function vis(el: Element | null): boolean {
     if (!el) return false;
     const h = el as HTMLElement;
     const st = getComputedStyle(h);
     return st.display !== "none" && st.visibility !== "hidden" && (h.offsetWidth > 0 || h.offsetHeight > 0 || h.getClientRects().length > 0);
-  };
-  const any = (sel: string) => Array.from(document.querySelectorAll(sel)).some(vis);
+  }
+  function any(sel: string) { return Array.from(document.querySelectorAll(sel)).some(vis); }
   const errorText = Array.from(document.querySelectorAll(".alert-error, .alert-danger, .kc-feedback-text, #input-error, #input-error-username, #input-error-password, #input-error-otp-code, .pf-m-error, [role='alert']"))
     .filter(vis)
     .map((e) => (e.textContent || "").replace(/\s+/g, " ").trim())
@@ -54,7 +54,7 @@ export const detectState = ({ ssoHost, appHost }: { ssoHost: string; appHost: st
   if (host === appHost) return { kind: "APP", host, errorText };
   if (host !== ssoHost) return { kind: "UNKNOWN", host, errorText };
   return { kind: "UNKNOWN", host, errorText };
-};
+}
 
 /** Roda DENTRO da página: só estrutura da tela, nenhum valor digitado. */
 export const collectSignature = (): PageSignature => ({
@@ -74,7 +74,7 @@ const BLOCKED = /bloquead|excedeu|muitas tentativas|temporariamente|suspens/i;
 
 async function state(page: Page, target: PjeTarget): Promise<PageState | null> {
   try {
-    return await page.evaluate(detectState, { ssoHost: new URL(PJE_SSO_ORIGIN).host, appHost: new URL(target.origin).host });
+    return await page.evaluate(pageSerializable(detectState), { ssoHost: new URL(PJE_SSO_ORIGIN).host, appHost: new URL(target.origin).host });
   } catch {
     return null; // a página estava navegando
   }

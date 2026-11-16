@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { chromium, type BrowserContext, type Page, type Route } from "playwright-core";
-import { loginPje, type PjeCredentials } from "@/lib/robots/pje/login";
+import { detectState, loginPje, type PjeCredentials } from "@/lib/robots/pje/login";
+import { pageSerializable } from "@/lib/robots/pje/signature";
 import { getPjeTarget } from "@/lib/robots/pje/targets";
 import { base32Encode, totpCode, totpStep, verifyTotp } from "@/lib/security/totp";
 
@@ -60,6 +61,14 @@ const creds = (over: Partial<PjeCredentials> = {}): PjeCredentials => ({ documen
 const run = (p: Page, c: PjeCredentials, steps = new Set<number>(), portalTarget = target) => { clock.now = T0; return loginPje(p, portalTarget, c, { names: ["Talita"], usedOtpSteps: steps, now: () => clock.now, sleep, stepTimeoutMs: 8_000 }); };
 
 describe.skipIf(!browser)("robô de login do PJe (réplica do SSO)", () => {
+  it("classifica a tela dentro do Chromium sem depender do runtime Node", async () => {
+    await withFixture({ password: "segredo" }, async (p) => {
+      await p.goto(getPjeTarget("trf1-1g")!.origin + getPjeTarget("trf1-1g")!.loginPath, { waitUntil: "domcontentloaded" });
+      const r = await p.evaluate(pageSerializable(detectState), { ssoHost: new URL(SSO).host, appHost: new URL(target.origin).host });
+      expect(r.kind).toBe("LOGIN_FORM");
+    });
+  });
+
   it("entra com CPF e senha", async () => {
     await withFixture({ password: "segredo" }, async (p) => {
       const r = await run(p, creds());

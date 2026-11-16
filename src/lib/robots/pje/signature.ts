@@ -4,6 +4,16 @@
  */
 export type PageSignature = { host: string; path: string; title: string; headings: string[]; fields: string[]; buttons: string[] };
 
+/**
+ * tsx/esbuild adds a Node-only `__name` helper around named functions. Playwright serializes a function into the
+ * browser, where that helper does not exist. Strip those name markers before passing self-contained classifiers to
+ * `page.evaluate`.
+ */
+export function pageSerializable<F extends (...args: never[]) => unknown>(fn: F): F {
+  const source = fn.toString().replace(/\b__name\(([A-Za-z_$][\w$]*),\s*(['"])[^'"]*\2\);?/g, "");
+  return new Function(`return (${source})`)() as F;
+}
+
 const clip = (s: string, n: number) => s.replace(/\s+/g, " ").trim().slice(0, n);
 
 /** Remove sequências de 3+ dígitos e quaisquer palavras do nome da pessoa (para nunca vazar CPF, número de processo ou nome). */
