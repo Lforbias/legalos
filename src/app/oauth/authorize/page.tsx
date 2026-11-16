@@ -4,7 +4,7 @@ import { Alert } from "@/components/ui/alert";
 import { can } from "@/server/context";
 import { OAuthConsent } from "@/modules/rute/oauth-consent";
 import { getClient, MCP_SCOPES, parseScopes, OAuthError } from "@/server/services/mcp-auth.service";
-import { getRuteSettings } from "@/server/services/rute-settings.service";
+import { getRuteSettings, MCP_ENABLED } from "@/server/services/rute-settings.service";
 import { requireTenant } from "@/server/session";
 import { db } from "@/lib/db/client";
 
@@ -47,8 +47,9 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     return bad(e instanceof OAuthError ? e.message : "Acesso inválido.");
   }
   if (!can(ctx, "ai:use")) return bad("Seu perfil não tem acesso aos recursos de IA. Peça a quem administra o escritório.");
+  if (!MCP_ENABLED) return bad("O acesso MCP está desativado no servidor.");
   const settings = await getRuteSettings(ctx);
-  if (!settings.mcpEnabled || settings.emergencyStop) return bad("A conexão de IAs externas está desligada neste escritório. Quem administra as integrações liga em RUTE → Situação.");
+  if (!settings.mcpEnabled || settings.emergencyStop) return bad("A conexão de IAs externas está desligada neste escritório. Quem administra as integrações pode conferir a situação em Integrações → MCP.");
   const mfa = await db.userMfa.findUnique({ where: { userId: ctx.userId }, select: { enabledAt: true } });
   if (!mfa?.enabledAt) return bad("Ative a verificação em duas etapas em Minha conta antes de conectar uma IA.");
 
@@ -66,7 +67,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
         state={one(sp.state)}
         scopes={scopes.map((k) => ({ key: k, label: MCP_SCOPES[k] }))}
       />
-      <p className="text-xs text-muted">Você pode revogar a conexão a qualquer momento em RUTE → Conexões.</p>
+      <p className="text-xs text-muted">Você pode revogar a conexão a qualquer momento em Integrações → MCP.</p>
     </Shell>
   );
 }

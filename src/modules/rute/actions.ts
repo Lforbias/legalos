@@ -15,7 +15,7 @@ import { setAssistantProvider, setEmergencyStop, setGovernance, setRuteFeature }
 import { callTool, toolList } from "@/server/services/rute-tools.service";
 import { requireTenant } from "@/server/session";
 
-const done = () => { revalidatePath("/rute"); revalidatePath("/configuracoes/ia"); revalidatePath("/ia"); };
+const done = () => { revalidatePath("/integracoes/mcp"); revalidatePath("/rute"); revalidatePath("/configuracoes/ia"); revalidatePath("/ia"); };
 
 export async function setFeatureAction(input: { feature: string; on: boolean; consent?: boolean }): Promise<ActionState> {
   return runAction(async () => {
