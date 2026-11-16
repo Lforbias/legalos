@@ -201,7 +201,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
         await recordProgress("Login confirmado; a leitura do painel falhou sem alterar o acesso ao tribunal.", "WARN");
       }
       if (eprocPanel) {
-        const labels = eprocPanel.sections.map((section) => section.label);
+        const labels = eprocPanel.sections.map(({ label, count }) => count === null ? label : `${label}: ${count}`);
         await recordProgress(labels.length
           ? `Leitura segura do painel concluída: ${labels.length} listas identificadas (${[...new Set(labels)].join(", ")}). Nenhum processo ou comunicação foi aberto.`
           : "Login confirmado; o painel foi lido sem interagir com itens. Ainda não identifiquei as listas de processos ou comunicações nesta tela.", labels.length ? "SUCCESS" : "WARN");

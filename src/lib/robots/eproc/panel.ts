@@ -11,12 +11,14 @@ export type EprocPanelObservation = {
 /** Roda no navegador autenticado e lê somente rótulos/contagens do painel; não abre processos ou comunicações. */
 export function collectEprocPanel(): EprocPanelObservation {
   const PANEL_LABEL = /rela[cç][ãa]o de processos|[úu]ltimas movimenta[cç][õo]es|cita[cç][õo]es\s*\/\s*intima[cç][õo]es|processos com prazo|processos pendentes de cita[cç][ãa]o|processos pendentes de intima[cç][ãa]o|audi[eê]ncias/i;
-  const visible = (element: Element) => {
+  function visible(element: Element) {
     const style = getComputedStyle(element);
     return style.display !== "none" && style.visibility !== "hidden" && (element as HTMLElement).getClientRects().length > 0;
-  };
-  const clean = (value: string) => value.replace(/\s+/g, " ").trim().slice(0, 120);
-  const category = (value: string) => {
+  }
+  function clean(value: string) {
+    return value.replace(/\s+/g, " ").trim().slice(0, 120);
+  }
+  function category(value: string) {
     if (/rela[cç][ãa]o de processos/i.test(value)) return "Relação de Processos";
     if (/[úu]ltimas movimenta[cç][õo]es/i.test(value)) return "Últimas Movimentações";
     if (/cita[cç][õo]es\s*\/\s*intima[cç][õo]es/i.test(value)) return "Citações/Intimações";
@@ -25,8 +27,10 @@ export function collectEprocPanel(): EprocPanelObservation {
     if (/processos pendentes de intima[cç][ãa]o/i.test(value)) return "Processos pendentes de intimação";
     if (/audi[eê]ncias/i.test(value)) return "Audiências";
     return "Painel do Advogado";
-  };
-  const safePath = (path: string) => path.replace(/\d{5,}/g, ":id").slice(0, 160);
+  }
+  function safePath(path: string) {
+    return path.replace(/\d{5,}/g, ":id").slice(0, 160);
+  }
   const sections = new Map<string, { label: string; count: number | null; path: string; queryKeys: string[] }>();
   const links = Array.from(document.querySelectorAll<HTMLAnchorElement>("a[href]")).filter(visible);
 
