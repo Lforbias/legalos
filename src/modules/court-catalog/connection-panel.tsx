@@ -106,7 +106,7 @@ function ConnectionRow({ target, conn, pilotEnabled, onUpdate }: { target: Avail
             disabled={!conn.enabled || working}
             onClick={() => act(() => testConnectionAction(conn.id!, surface))}
           >
-            Testar de novo
+            {target.adapterKey === "eproc-portal" ? "Mapear listas do eproc" : "Testar de novo"}
           </Button>
           <Button
             size="sm"

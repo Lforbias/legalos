@@ -11,6 +11,7 @@ import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { loginPje, type LoginOutcome } from "@/lib/robots/pje/login";
 import { loginEprocPortal } from "@/lib/robots/eproc/login";
+import { observeEprocPanel, type EprocPanelObservation } from "@/lib/robots/eproc/panel";
 import { MAX_ATTEMPTS, backoffMs, mapOutcome } from "@/lib/robots/pje/outcome";
 import { failureCodeForLogin } from "@/lib/judicial/robot-evidence";
 import { recordEvidence } from "@/server/judicial/evidence.service";
@@ -180,6 +181,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   const portalLabel = isEvolutionEproc ? "eproc" : "PJe";
   let outcome: LoginOutcome;
   let panel: Awaited<ReturnType<typeof probePjePanel>> | null = null;
+  let eprocPanel: EprocPanelObservation | null = null;
   let rp: RobotPage | null = null;
   try {
     // O certificado do cofre só é apresentado às origens oficiais do próprio fluxo (catálogo fixo; nunca URL informada pelo usuário).
@@ -192,6 +194,19 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     outcome = isEvolutionEproc
       ? await loginEprocPortal(rp.page, accessEprocTarget!, credentials, { names, usedOtpSteps: steps, onProgress: recordProgress })
       : await (deps.login ?? loginPje)(rp.page, target!, credentials, { names, usedOtpSteps: steps, onProgress: recordProgress });
+    if (outcome.ok && isEvolutionEproc && job.kind === "LOGIN_TEST") {
+      try { eprocPanel = await observeEprocPanel(rp.page, accessEprocTarget!); }
+      catch (error) {
+        logger.warn("robot.eproc_panel_probe_failed", { jobId, error: sanitizeError(error) });
+        await recordProgress("Login confirmado; a leitura do painel falhou sem alterar o acesso ao tribunal.", "WARN");
+      }
+      if (eprocPanel) {
+        const labels = eprocPanel.sections.map((section) => section.label);
+        await recordProgress(labels.length
+          ? `Leitura segura do painel concluída: ${labels.length} listas identificadas (${[...new Set(labels)].join(", ")}). Nenhum processo ou comunicação foi aberto.`
+          : "Login confirmado; o painel foi lido sem interagir com itens. Ainda não identifiquei as listas de processos ou comunicações nesta tela.", labels.length ? "SUCCESS" : "WARN");
+      }
+    }
     if (outcome.ok && job.kind === "SYNC_NOTICES" && target) panel = await (deps.probe ?? probePjePanel)(rp.page, target, names);
   } catch (e) {
     logger.error("robot.job_crashed", { jobId, error: sanitizeError(e) });
@@ -224,7 +239,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   } catch (e) {
     logger.error("robot.evidence_failed", { jobId, error: sanitizeError(e) });
   }
-  const summary = { ...jobSummary, ...(isEvolutionPilot ? { origin: isEvolutionEproc ? EVOLUTION_EPROC_JOB_ORIGIN : EVOLUTION_PJE_JOB_ORIGIN } : {}), terminalEvents, code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}) };
+  const summary = { ...jobSummary, ...(isEvolutionPilot ? { origin: isEvolutionEproc ? EVOLUTION_EPROC_JOB_ORIGIN : EVOLUTION_PJE_JOB_ORIGIN } : {}), terminalEvents, code: outcome.ok ? "OK" : outcome.code, ...(!outcome.ok && outcome.detail ? { detail: outcome.detail } : {}), signature: outcome.signature, ...(panel ? { panel } : {}), ...(eprocPanel ? { eprocPanel } : {}) };
   if (m.retry) {
     await recordProgress(`Tentativa encerrada: ${outcome.ok ? m.message : outcome.message}. O robô tentará novamente depois da espera de segurança.`, "WARN");
     summary.terminalEvents = terminalEvents;

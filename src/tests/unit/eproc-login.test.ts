@@ -2,6 +2,7 @@ import { afterAll, describe, expect, it } from "vitest";
 import { chromium, type BrowserContext, type Page } from "playwright-core";
 import { detectEprocState, loginEprocPortal, loginEprocTjmg } from "@/lib/robots/eproc/login";
 import { pageSerializable } from "@/lib/robots/pje/signature";
+import { observeEprocPanel } from "@/lib/robots/eproc/panel";
 import { EPROC_PORTAL_TARGETS, eprocAllowedOrigins, getEprocPortalTarget, type EprocPortalTarget } from "@/lib/robots/eproc/targets";
 import { base32Encode, totpCode, totpStep, verifyTotp } from "@/lib/security/totp";
 
@@ -28,6 +29,7 @@ const certificateErrorHtml = `<!doctype html><html><head><title>:: eproc - Não 
 const captchaHtml = `<!doctype html><html><head><title>:: eproc ::</title></head><body><h1>Verificação de segurança</h1><div class="g-recaptcha" data-sitekey="chave-publica-de-teste" style="width:300px;height:80px"></div></body></html>`;
 const maintenanceHtml = `<!doctype html><html><head><title>Manutenção 0001234-56.2024.8.13.0024 — TALITA</title></head><body><h1>Sistema em manutenção</h1><input name="txtPrefill" value="SEGREDO-ABC123"><input type="button" value="Voltar"></body></html>`;
 const foreignOtpHtml = `<!doctype html><html><body><h1>Login</h1><label for="txtCodigo">Código</label><input id="txtCodigo" name="txtCodigo"><button id="btnValidar" type="submit">Validar</button></body></html>`;
+const eprocPanelHtml = `<!doctype html><html><head><title>Painel do Advogado</title></head><body><table><tr><td>Processos com prazo em aberto</td><td>4</td></tr><tr><td>Processos pendentes de citação/intimação</td><td>2</td></tr></table><a href="${EPROC}/controlador.php?acao=relacao_processos&num_processo_bi=123456789">Relação de Processos</a><a href="${EPROC}/controlador.php?acao=ultimas_movimentacoes">Últimas Movimentações</a></body></html>`;
 
 type Reply = { status?: number; body?: string; delayMs?: number };
 type Log = { posts: string[]; certForms: URLSearchParams[]; otpHosts: string[]; foreignPosts: string[]; requests: string[] };
@@ -341,6 +343,19 @@ describe("origens oficiais do fluxo eproc", () => {
         expect(url.hostname.endsWith(".jus.br")).toBe(true);
       }
     }
+  });
+
+  it("lê somente rótulos, contagens e caminhos do painel, sem coletar valores dos processos", async () => {
+    await fixture(async (page) => {
+      await page.goto(`${EPROC}/painel`, { waitUntil: "domcontentloaded" });
+      const observed = await observeEprocPanel(page, getEprocPortalTarget("tjmg-1g")!);
+      expect(observed?.sections).toEqual(expect.arrayContaining([
+        expect.objectContaining({ label: "Processos com prazo em aberto", count: 4 }),
+        expect.objectContaining({ label: "Processos pendentes de citação/intimação", count: 2 }),
+        expect.objectContaining({ label: "Relação de Processos", count: null, path: "/eproc/controlador.php", queryKeys: ["acao", "num_processo_bi"] }),
+      ]));
+      expect(JSON.stringify(observed)).not.toContain("123456789");
+    }, { handler: (url) => (url.pathname === "/eproc/painel" ? { body: eprocPanelHtml } : undefined) });
   });
 
   it("recusa origem que não seja oficial (nunca vem de URL informada por usuário)", () => {
