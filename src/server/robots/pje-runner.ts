@@ -16,7 +16,7 @@ import { failureCodeForLogin } from "@/lib/judicial/robot-evidence";
 import { recordEvidence } from "@/server/judicial/evidence.service";
 import { probePjePanel } from "@/lib/robots/pje/panel";
 import { getPjeTarget, PJE_TARGETS } from "@/lib/robots/pje/targets";
-import { EPROC_PORTAL_TARGETS, getEprocPortalTarget } from "@/lib/robots/eproc/targets";
+import { EPROC_PORTAL_TARGETS, eprocAllowedOrigins, getEprocPortalTarget } from "@/lib/robots/eproc/targets";
 import { openBytes, certKey } from "@/lib/security/pfx";
 import { audit } from "@/server/services/audit.service";
 import { sanitizeError } from "@/server/job-runs";
@@ -166,7 +166,7 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
     }
     try {
       certMaterial = await getCertificateMaterial(tenant, access.certificateId, "portal:login", null, "portal");
-      await recordProgress("Certificado digital liberado para esta tentativa; dados privados ocultos.");
+      await recordProgress("Certificado digital carregado no navegador isolado desta tentativa (o tribunal ainda não o validou); dados privados ocultos.");
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Não foi possível usar o certificado digital selecionado.";
       await finishJob("FAILED", msg, { origin, code: "CERTIFICATE_REJECTED" });
@@ -182,9 +182,8 @@ export async function runJob(jobId: string, deps: RobotDeps): Promise<{ status: 
   let panel: Awaited<ReturnType<typeof probePjePanel>> | null = null;
   let rp: RobotPage | null = null;
   try {
-    const origins = isEvolutionEproc
-      ? [new URL(accessEprocTarget!.loginUrl).origin, ...(accessEprocTarget!.ssoOrigin ? [new URL(accessEprocTarget!.ssoOrigin).origin] : [])]
-      : [target!.origin, PJE_SSO_ORIGIN];
+    // O certificado do cofre só é apresentado às origens oficiais do próprio fluxo (catálogo fixo; nunca URL informada pelo usuário).
+    const origins = isEvolutionEproc ? eprocAllowedOrigins(accessEprocTarget!) : [target!.origin, PJE_SSO_ORIGIN];
     rp = await deps.openPage(certMaterial ? { pfx: certMaterial.pfx, passphrase: certMaterial.passphrase, origins } : undefined);
     await recordProgress(`Navegador isolado pronto; iniciando o fluxo ${portalLabel}.`);
     const steps = usedOtpSteps.get(access.id) ?? new Set<number>();
