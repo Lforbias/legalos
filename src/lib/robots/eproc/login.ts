@@ -1,6 +1,6 @@
 import type { Page } from "playwright-core";
 import { totpCode, totpStep, TOTP_PERIOD } from "@/lib/security/totp";
-import { sanitizeSignature, type PageSignature } from "../pje/signature";
+import { pageSerializable, sanitizeSignature, type PageSignature } from "../pje/signature";
 import type { LoginOutcome, LoginProgress, PjeCredentials } from "../pje/login";
 import type { EprocPortalTarget } from "./targets";
 
@@ -19,15 +19,15 @@ type EprocState = {
 };
 
 /** Classifica apenas a tela e seletores do desafio; não coleta valores dos campos. */
-export const detectEprocState = ({ targetHost, ssoHost }: { targetHost: string; ssoHost?: string }): EprocState => {
+export function detectEprocState({ targetHost, ssoHost }: { targetHost: string; ssoHost?: string }): EprocState {
   const OTP = /token|c[oó]digo|codigo|otp|totp|2fa|autentica[cç][aã]o/i;
-  const visible = (el: Element) => {
+  function visible(el: Element) {
     const h = el as HTMLElement;
     const style = getComputedStyle(h);
     return style.display !== "none" && style.visibility !== "hidden" && (h.offsetWidth > 0 || h.offsetHeight > 0 || h.getClientRects().length > 0);
-  };
-  const one = (selector: string) => Array.from(document.querySelectorAll(selector)).find(visible) ?? null;
-  const text = (el: Element | null) => (el?.textContent ?? "").replace(/\s+/g, " ").trim();
+  }
+  function one(selector: string) { return Array.from(document.querySelectorAll(selector)).find(visible) ?? null; }
+  function text(el: Element | null) { return (el?.textContent ?? "").replace(/\s+/g, " ").trim(); }
   const errorText = Array.from(document.querySelectorAll(".alert-danger, .alert-error, .invalid-feedback, [role='alert'], .text-danger"))
     .filter(visible).map(text).filter(Boolean).join(" | ").slice(0, 300);
   const host = location.host;
@@ -63,7 +63,7 @@ export const detectEprocState = ({ targetHost, ssoHost }: { targetHost: string; 
   if (/configur.{0,30}(2fa|dois fatores)|autentica[cç][aã]o em dois fatores/i.test(document.body.innerText)) return { kind: "OTP_SETUP", host, errorText };
   if (!one("#frmLogin") && !one("#pwdSenha") && document.body.innerText.trim().length > 0) return { kind: "APP", host, errorText };
   return { kind: "UNKNOWN", host, errorText };
-};
+}
 
 const sleepDefault = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -100,7 +100,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   };
   const readState = async () => {
     try {
-      return await page.evaluate(detectEprocState, {
+      return await page.evaluate(pageSerializable(detectEprocState), {
         targetHost: new URL(target.loginUrl).host,
         ...(target.ssoOrigin ? { ssoHost: new URL(target.ssoOrigin).host } : {}),
       });

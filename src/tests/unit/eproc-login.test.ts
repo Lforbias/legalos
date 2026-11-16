@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { chromium, type BrowserContext, type Page, type Route } from "playwright-core";
-import { loginEprocPortal, loginEprocTjmg } from "@/lib/robots/eproc/login";
+import { detectEprocState, loginEprocPortal, loginEprocTjmg } from "@/lib/robots/eproc/login";
+import { pageSerializable } from "@/lib/robots/pje/signature";
 import { getEprocPortalTarget } from "@/lib/robots/eproc/targets";
 import { base32Encode, totpCode, totpStep, verifyTotp } from "@/lib/security/totp";
 
@@ -46,6 +47,14 @@ const run = (page: Page) => {
 };
 
 describe.skipIf(!browser)("login eproc TJMG", () => {
+  it("classifica o formulário dentro do Chromium sem depender do runtime Node", async () => {
+    await fixture(async (page) => {
+      await page.goto(`${ORIGIN}/eproc/`, { waitUntil: "domcontentloaded" });
+      const state = await page.evaluate(pageSerializable(detectEprocState), { targetHost: new URL(ORIGIN).host });
+      expect(state.kind).toBe("LOGIN");
+    });
+  });
+
   it("envia usuário e senha e valida o TOTP antes de reconhecer a sessão", async () => {
     await fixture(async (page, posts) => {
       const result = await run(page);
