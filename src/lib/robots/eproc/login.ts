@@ -130,7 +130,7 @@ export type EprocLoginOptions = {
 };
 
 type Located = { state: EprocState; frame: Frame };
-type Scan = { best: Located | null; foreignHosts: string[]; foreignPages: number; notices: Set<string>; mainLoading: boolean };
+type Scan = { best: Located | null; foreignHosts: string[]; foreignPages: number; browserErrorPages: number; browserNavigationFailures: { code: string; host: string }[]; notices: Set<string>; mainLoading: boolean };
 type Outcome = { located: Located | null; scan: Scan; unknown: boolean };
 
 /** Quando abas/quadros mostram telas diferentes, vale a que pede ação ou prova o resultado. */
@@ -167,6 +167,24 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   const allowedHosts = eprocAllowedOrigins(target).map((origin) => new URL(origin).host);
   const targetHost = new URL(target.loginUrl).host;
   const detectArgs = { targetHost, allowedHosts };
+  // Chromium troca navegações TLS malsucedidas por `chrome-error://chromewebdata/`. Guarde só o código
+  // de erro de navegação principal e o host de destino; nunca a URL completa (pode conter tokens).
+  const navigationFailures: { code: string; host: string }[] = [];
+  const watchNavigationFailure = (candidate: Page) => candidate.on("requestfailed", (request) => {
+    if (!request.isNavigationRequest()) return;
+    const reason = request.failure()?.errorText ?? "";
+    if (/ERR_ABORTED/i.test(reason)) return;
+    let destination = "destino desconhecido";
+    try { destination = new URL(request.url()).host; } catch { /* URL interna */ }
+    const code = reason.match(/(?:net::)?(ERR_[A-Z0-9_]+)/i)?.[1]?.toUpperCase() ?? "ERR_NAVIGATION_FAILED";
+    navigationFailures.push({ code, host: safeHost(destination) || "destino desconhecido" });
+    if (navigationFailures.length > 8) navigationFailures.shift();
+  });
+  try {
+    for (const candidate of page.context().pages()) watchNavigationFailure(candidate);
+    page.context().on("page", watchNavigationFailure);
+  } catch { /* o contexto pode estar fechando */ }
+  let failureCursor = 0;
 
   const emptyFrame = (info: { host: string; path: string }) => ({ host: info.host, path: info.path, title: "", headings: [] as string[], fields: [] as string[], buttons: [] as string[] });
   const readFrameSignature = async (frame: Frame) => {
@@ -203,7 +221,10 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
   };
   const failUnknown = (outcome: Outcome | null, phase: "initial" | "certificate" | "login" | "otp") => {
     const foreignHost = outcome?.scan.foreignHosts[0];
-    const message = foreignHost
+    const navigationFailure = outcome?.scan.browserNavigationFailures.at(-1);
+    const message = navigationFailure
+      ? `A conexão segura do navegador com ${navigationFailure.host} falhou depois da autenticação por certificado (${navigationFailure.code}). O LegalOS parou sem enviar código ou senha; confira se o certificado está autorizado nesse portal.`
+      : foreignHost
       ? `O eproc levou para o endereço ${foreignHost}, que não está na lista oficial do LegalOS. O robô parou e nada foi enviado a esse endereço.`
       : phase === "certificate"
         ? "Depois do certificado digital, o eproc mostrou uma tela que o LegalOS não reconhece. O robô parou sem enviar nada; o diagnóstico da tela está no terminal."
@@ -221,7 +242,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
    * começar, e isso não pode impedir a leitura dos quadros (ex.: o aviso de lentidão do certificado).
    */
   const scan = async (): Promise<Scan> => {
-    const result: Scan = { best: null, foreignHosts: [], foreignPages: 0, notices: new Set(), mainLoading: false };
+    const result: Scan = { best: null, foreignHosts: [], foreignPages: 0, browserErrorPages: 0, browserNavigationFailures: navigationFailures.slice(failureCursor), notices: new Set(), mainLoading: false };
     const foreign = new Set<string>();
     let pages: Page[];
     try { pages = page.context().pages().filter((candidate) => !candidate.isClosed()); } catch { pages = [page]; }
@@ -230,9 +251,15 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
       for (const frame of candidate.frames()) {
         const host = hostAndPath(frame.url()).host;
         const isMain = frame === candidate.mainFrame();
-        if (host && !allowedHosts.includes(host)) {
+        const browserInternal = /^chrome-(?:error|webdata)$/i.test(host);
+        if (host && !browserInternal && !allowedHosts.includes(host)) {
           foreign.add(safeHost(host));
           if (isMain) result.foreignPages += 1;
+          continue;
+        }
+        // A chrome-error page is Chromium's shell for a failed navigation, not a tribunal redirect.
+        if (browserInternal) {
+          if (isMain) result.browserErrorPages += 1;
           continue;
         }
         // As páginas de ajuda do certificado do eproc são identificadas pela própria URL (só o valor de `acao` é lido, nada é
@@ -277,10 +304,10 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
       const recognized = best && best.state.kind !== "UNKNOWN" && best.state.kind !== "WAIT" && cfg.done(best.state);
       const tentative = Boolean(recognized && cfg.tentative?.includes(best!.state.kind));
       if (recognized && !tentative) return { located: best, scan: current, unknown: false };
-      const unknownCandidate = cfg.giveUpOnUnknown && (current.foreignPages > 0 || best?.state.kind === "UNKNOWN");
+      const unknownCandidate = cfg.giveUpOnUnknown && (current.foreignPages > 0 || current.browserErrorPages > 0 || best?.state.kind === "UNKNOWN");
       if ((tentative || unknownCandidate) && !current.mainLoading) {
         const where = best ? hostAndPath(best.frame.url()) : { host: "", path: "" };
-        const key = `${tentative ? "T" : "U"}|${current.foreignHosts.join(",")}|${best?.state.kind ?? ""}|${where.host}${where.path}`;
+        const key = `${tentative ? "T" : "U"}|${current.foreignHosts.join(",")}|${current.browserNavigationFailures.map(({ code, host }) => `${code}:${host}`).join(",")}|${best?.state.kind ?? ""}|${where.host}${where.path}`;
         if (key !== candidateKey) {
           candidateKey = key;
           candidateSince = Date.now();
@@ -322,6 +349,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
     if (!(await certificateButton.count())) return fail("CERTIFICATE_REQUIRED", "O eproc não ofereceu autenticação por certificado no fluxo do navegador remoto.", false, true);
     await opts.onProgress?.("Selecionando a opção de entrada por certificado digital.");
     // noWaitAfter: o clique não espera a navegação terminar; quem acompanha a resposta (e o aviso de lentidão do eproc) é a varredura abaixo.
+    failureCursor = navigationFailures.length;
     await certificateButton.click({ noWaitAfter: true });
     await opts.onProgress?.("Botão do certificado acionado. O LegalOS só considera o acesso válido quando o eproc mostrar a área autenticada ou pedir o código de dois fatores.");
     outcome = await waitOutcome({ done: (state) => state.kind !== "LOGIN" || Boolean(state.errorText), giveUpOnUnknown: true, tentative: ["APP", "OTP_SETUP"] });
@@ -382,7 +410,7 @@ export async function loginEprocPortal(page: Page, target: EprocPortalTarget, cr
     await opts.onProgress?.("O eproc não pediu o código de dois fatores neste acesso.");
   }
   const finalPage = located.frame.page();
-  if (s.kind !== "APP" || hostAndPath(finalPage.url()).host !== targetHost) return failUnknown({ located, scan: { best: located, foreignHosts: [], foreignPages: 0, notices: new Set(), mainLoading: false }, unknown: true }, "otp");
+  if (s.kind !== "APP" || hostAndPath(finalPage.url()).host !== targetHost) return failUnknown({ located, scan: { best: located, foreignHosts: [], foreignPages: 0, browserErrorPages: 0, browserNavigationFailures: [], notices: new Set(), mainLoading: false }, unknown: true }, "otp");
   const final = await signature(finalPage);
   await opts.onProgress?.("Login confirmado pelo portal; área autenticada detectada.", "SUCCESS");
   return { ok: true, signature: final ?? { host: s.host, path: "", title: "", headings: [], fields: [], buttons: [] } };

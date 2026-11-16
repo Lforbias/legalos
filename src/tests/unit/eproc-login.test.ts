@@ -35,6 +35,7 @@ type FixtureOptions = {
   afterCert?: Reply;
   /** Rotas extras (têm prioridade sobre as padrão). */
   handler?: (url: URL, method: string) => Reply | undefined;
+  abort?: (url: URL, method: string) => boolean;
   login?: Parameters<typeof loginHtml>[0];
   invalidPassword?: boolean;
 };
@@ -54,6 +55,7 @@ async function fixture(fn: (page: Page, log: Log) => Promise<void>, options: Fix
     const url = new URL(request.url());
     const method = request.method();
     log.requests.push(`${method} ${url.host}${url.pathname}`);
+    if (options.abort?.(url, method)) return route.abort("connectionfailed");
     const form = new URLSearchParams(request.postData() ?? "");
     let reply: Reply | undefined = options.handler?.(url, method);
     if (!reply && method === "POST" && url.origin === FOREIGN) log.foreignPosts.push(url.pathname);
@@ -262,6 +264,16 @@ describe.skipIf(!browser)("login eproc TJMG", () => {
         expect(stored).toContain("txtPrefill");
         expect(stored).not.toMatch(/SEGREDO-ABC123|segredo-hash|hash=|0001234|TALITA/i);
       }, { afterCert: redirect(`${EPROC}/externo_controlador.php?acao=manutencao&hash=segredo-hash`), handler: (url) => (url.pathname === "/eproc/externo_controlador.php" && url.searchParams.get("acao") === "manutencao" ? { body: maintenanceHtml } : undefined) });
+    }, 20_000);
+
+    it("identifica falha de navegação TLS do navegador sem tratá-la como redirecionamento externo", async () => {
+      await fixture(async (page) => {
+        const { outcome, events } = await runCertificate(page);
+        expect(outcome).toMatchObject({ ok: false, code: "UNKNOWN_PAGE" });
+        expect(outcome.ok ? "" : outcome.message).toMatch(/eproc1g\.tjmg\.jus\.br.*ERR_CONNECTION_FAILED/i);
+        expect(outcome.ok ? "" : outcome.message).not.toMatch(/não está na lista oficial/i);
+        expect(events.join("\n")).toContain("Diagnóstico da tela");
+      }, { abort: (url, method) => method === "POST" && url.searchParams.get("acao") === "login_cert" });
     }, 20_000);
   });
 
