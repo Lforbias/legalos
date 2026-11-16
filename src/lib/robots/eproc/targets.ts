@@ -31,3 +31,19 @@ export const EPROC_PORTAL_TARGETS: readonly EprocPortalTarget[] = [
 ];
 
 export const getEprocPortalTarget = (key: string) => EPROC_PORTAL_TARGETS.find((target) => target.key === key) ?? null;
+
+const OFFICIAL_ORIGIN = /^https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.jus\.br$/;
+
+/**
+ * Origens que o robô aceita abrir e para as quais o certificado do cofre pode ser apresentado: o próprio eproc e, quando o
+ * tribunal usa, o SSO oficial dele. Vem só do catálogo fixo acima (nunca de URL informada por usuário) e precisa ser
+ * https em domínio .jus.br, sem porta. No TJMG o login por certificado (`destino_v2_cert` =
+ * `https://eproc1g.tjmg.jus.br/eproc/externo_controlador.php?acao=login_cert`) fica no mesmo host do eproc.
+ */
+export function eprocAllowedOrigins(target: EprocPortalTarget): string[] {
+  const origins = [new URL(target.loginUrl).origin, ...(target.ssoOrigin ? [new URL(target.ssoOrigin).origin] : [])];
+  for (const origin of origins) {
+    if (!OFFICIAL_ORIGIN.test(origin)) throw new Error(`Origem não oficial para o eproc ${target.courtCode}: ${origin}`);
+  }
+  return [...new Set(origins)];
+}
