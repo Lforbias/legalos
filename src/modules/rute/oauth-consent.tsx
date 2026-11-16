@@ -1,29 +1,45 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Alert } from "@/components/ui/alert";
-import { useRun } from "@/modules/kanban/use-run";
 import { decideAuthorizationAction } from "./oauth-actions";
 
 type Scope = { key: string; label: string };
 
 export function OAuthConsent(p: { clientId: string; redirectUri: string; codeChallenge: string; state?: string; scopes: Scope[] }) {
-  const { run, pending, error } = useRun();
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
   const [picked, setPicked] = useState<string[]>(p.scopes.map((s) => s.key));
   const [done, setDone] = useState(false);
 
-  const go = (allow: boolean) =>
-    run(
-      () => decideAuthorizationAction({ clientId: p.clientId, redirectUri: p.redirectUri, codeChallenge: p.codeChallenge, state: p.state, scopes: picked.length ? picked : p.scopes.map((s) => s.key), allow }),
-      undefined,
-      (d) => {
-        if (d) {
-          setDone(true);
-          window.location.assign(d.redirect);
+  const go = (allow: boolean) => {
+    startTransition(async () => {
+      setError(null);
+      try {
+        const result = await decideAuthorizationAction({
+          clientId: p.clientId,
+          redirectUri: p.redirectUri,
+          codeChallenge: p.codeChallenge,
+          state: p.state,
+          scopes: allow ? picked : p.scopes.map((scope) => scope.key),
+          allow,
+        });
+        if (!result.ok) {
+          setError(Object.values(result.fieldErrors ?? {})[0]?.[0] ?? result.message ?? "Não foi possível concluir a autorização.");
+          return;
         }
-      },
-    );
+        if (!result.data) {
+          setError("O LegalOS não retornou o endereço para concluir a autorização.");
+          return;
+        }
+        window.location.assign(result.data.redirect);
+        setDone(true);
+      } catch {
+        setError("Não foi possível concluir a autorização. Tente conectar novamente pelo aplicativo.");
+      }
+    });
+  };
 
   return (
     <div className="space-y-4">
