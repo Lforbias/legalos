@@ -42,7 +42,7 @@ export function DocumentsPanel({
   const [error, setError] = React.useState<string | null>(null);
   const [query, setQuery] = React.useState("");
   const visibleDocuments = documents.filter((document) => document.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
-  const inputId = `document-file-${owner.caseId ?? owner.clientId ?? "repository"}`;
+  const inputId = owner.caseId ? "document-file" : `document-file-${owner.clientId ?? "repository"}`;
 
   const upload = (file: File) => {
     setError(null);
