@@ -17,7 +17,7 @@ export function normalizeDelimiter(text: string): string {
  * Leitor de CSV (RFC 4180): campos entre aspas, aspas duplicadas ("") e quebras de linha dentro de campos.
  * Remove BOM. Retorna objetos indexados pelo cabeçalho. Não interpreta tipos.
  */
-export function parseCsv(text: string): Record<string, string>[] {
+export function parseCsv(text: string, delimiter = ","): Record<string, string>[] {
   const src = text.charCodeAt(0) === 0xfeff ? text.slice(1) : text;
   const rows: string[][] = [];
   let row: string[] = [];
@@ -45,7 +45,7 @@ export function parseCsv(text: string): Record<string, string>[] {
     if (ch === '"') {
       quoted = true;
       i++;
-    } else if (ch === ",") {
+    } else if (ch === delimiter) {
       row.push(field);
       field = "";
       i++;

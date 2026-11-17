@@ -95,6 +95,29 @@ export async function listDocuments(ctx: TenantContext, owner: Owner) {
   });
 }
 
+/** Documentos dos processos visíveis de um cliente, carregados em lote para a pasta compartilhada. */
+export async function listDocumentsForClientCases(ctx: TenantContext, clientId: string) {
+  assertCan(ctx, "documents:read");
+  assertCan(ctx, "cases:read");
+  const cases = await db.case.findMany({
+    where: { AND: [{ organizationId: ctx.organizationId, deletedAt: null, parties: { some: { clientId } } }, caseVisibility(ctx)] },
+    select: { id: true },
+    take: 100,
+  });
+  if (!cases.length) return [];
+  return db.document.findMany({
+    where: {
+      organizationId: ctx.organizationId,
+      deletedAt: null,
+      caseId: { in: cases.map((item) => item.id) },
+      case: { is: { AND: [{ organizationId: ctx.organizationId, deletedAt: null, parties: { some: { clientId } } }, caseVisibility(ctx)] } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5000,
+    select: { ...LIST_SELECT, caseId: true },
+  });
+}
+
 export type RepositoryFilters = { q?: string; category?: string; scope?: "case" | "client" };
 
 /** Documentos que o usuário pode ver: de processos visíveis (sigilo) e de clientes (se puder ver clientes). Escopo opcional por origem. */
