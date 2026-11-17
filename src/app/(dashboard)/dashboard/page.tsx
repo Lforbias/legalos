@@ -8,6 +8,8 @@ import { formatDateTime } from "@/lib/dates/format";
 import { dateToYmd, formatYmd, todayYmd } from "@/lib/dates/ymd";
 import { formatMoneyBR } from "@/lib/validation/money";
 import { fromCents, toCents } from "@/lib/finance/money";
+import { getWelcomeActivationState } from "@/server/services/welcome-onboarding.service";
+import { ActivationChecklist } from "@/modules/welcome/activation-checklist";
 import { AwaitingReplyCard } from "@/modules/whatsapp/awaiting-reply-card";
 import { can } from "@/server/context";
 import { getOfficeOverview } from "@/server/services/office-overview.service";
@@ -30,7 +32,7 @@ const EVENT_LABELS = { HEARING: "Audiência", MEETING: "Reunião", DILIGENCE: "D
 
 export default async function OverviewPage() {
   const { ctx, session, organization } = await requireTenant();
-  const d = await getOfficeOverview(ctx);
+  const [d, activation] = await Promise.all([getOfficeOverview(ctx), getWelcomeActivationState(session.user.id, ctx.organizationId)]);
   const activeCases = d.portfolio?.statuses.find(s => s.status === "ACTIVE")?.count ?? 0;
   const taskBars = d.tasks ? [{ name: "A fazer", count: d.tasks.todo }, { name: "Em andamento", count: d.tasks.inProgress }, { name: "Aguardando", count: d.tasks.waiting }] : [];
   const finance = d.finance;
@@ -38,6 +40,8 @@ export default async function OverviewPage() {
   const noModules = !d.tasks && !d.deadlines && !d.notices && !d.clients && !d.portfolio && !finance && !can(ctx, "whatsapp:read");
   return <div className="mx-auto max-w-7xl space-y-8">
     <PageHeader title={`Bom dia, ${session.user.name.split(" ")[0]}`} description={`${organization.name} · ${formatYmd(d.today)}. Aqui está o que merece atenção hoje e como está o escritório.`} />
+
+    {activation.available && !activation.dismissed ? <ActivationChecklist completed={activation.completed} dismissed={activation.dismissed} showTeam={activation.showTeam} /> : null}
 
     <section aria-labelledby="overview-priorities">
       <div className="mb-4 flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-warning-bg"><CircleAlert aria-hidden className="h-4 w-4 text-warning" /></span><h2 id="overview-priorities" className="text-[15px] font-semibold tracking-[-0.01em]">O que precisa da sua atenção</h2></div>

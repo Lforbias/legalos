@@ -21,6 +21,7 @@ import { PAGE_SIZE } from "./client.service";
 import { isUniqueViolation } from "./db-errors";
 import { runWorkflows } from "./workflow.service";
 import { todayYmd } from "@/lib/dates/ymd";
+import { assertProcessCapacity } from "./plan.service";
 
 /**
  * Visibilidade de processos. Processos sigilosos só aparecem para membros da equipe do processo e para quem
@@ -235,6 +236,7 @@ export async function createCase(ctx: TenantContext, raw: CreateCaseInput) {
 
   try {
     const created = await db.$transaction(async (tx) => {
+      await assertProcessCapacity(tx, ctx.organizationId);
       const departmentId = await resolveDepartment(tx, ctx, data.area, input.departmentId);
       const c = await tx.case.create({ data: { ...data, nature: input.nature ?? (data.number ? "JUDICIAL" : "CASE"), departmentId, organizationId: ctx.organizationId, createdById: ctx.userId } });
       await tx.caseMember.create({ data: { caseId: c.id, organizationId: ctx.organizationId, userId: responsibleId, role: "RESPONSIBLE" } });

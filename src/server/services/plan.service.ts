@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
 import { ConflictError } from "@/lib/permissions/check";
 
@@ -16,19 +17,19 @@ export type Entitlements = {
   state: PlanState;
   /** Estado que bloqueia só o que AUMENTA o uso (enviar arquivo, IA, convidar). Leitura, download e exclusão nunca são bloqueados. */
   expansionBlocked: boolean;
-  limits: { maxUsers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null };
+  limits: { maxUsers: number | null; maxProcesses: number | null; maxWhatsappNumbers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null };
   features: string[];
 };
 
-export type Usage = { users: number; pendingInvites: number; storageBytes: number; aiTokensMonth: number };
+export type Usage = { users: number; pendingInvites: number; processes: number; whatsappNumbers: number; storageBytes: number; aiTokensMonth: number };
 
 /** Interpreta a assinatura (sem inventar: sem assinatura = sem bloqueio e sem limites do plano). */
 export function resolveEntitlements(
-  sub: { status: Entitlements["status"]; trialEndsAt: Date | null; currentPeriodEnd: Date | null; plan: { key: string; name: string; maxUsers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null; features: string[] } } | null,
+  sub: { status: Entitlements["status"]; trialEndsAt: Date | null; currentPeriodEnd: Date | null; plan: { key: string; name: string; maxUsers: number | null; maxProcesses: number | null; maxWhatsappNumbers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null; features: string[] } } | null,
   now = new Date(),
 ): Entitlements {
   if (!sub) {
-    return { planKey: null, planName: null, status: null, trialEndsAt: null, trialDaysLeft: null, currentPeriodEnd: null, state: "none", expansionBlocked: false, limits: { maxUsers: null, maxStorageMb: null, maxAiTokensMonth: null }, features: [] };
+    return { planKey: null, planName: null, status: null, trialEndsAt: null, trialDaysLeft: null, currentPeriodEnd: null, state: "none", expansionBlocked: false, limits: { maxUsers: null, maxProcesses: null, maxWhatsappNumbers: null, maxStorageMb: null, maxAiTokensMonth: null }, features: [] };
   }
   const daysLeft = sub.trialEndsAt ? Math.ceil((sub.trialEndsAt.getTime() - now.getTime()) / 86_400_000) : null;
   let state: PlanState = "ok";
@@ -47,7 +48,7 @@ export function resolveEntitlements(
     currentPeriodEnd: sub.currentPeriodEnd,
     state,
     expansionBlocked: state === "trial_expired" || state === "canceled",
-    limits: { maxUsers: sub.plan.maxUsers, maxStorageMb: sub.plan.maxStorageMb, maxAiTokensMonth: sub.plan.maxAiTokensMonth },
+    limits: { maxUsers: sub.plan.maxUsers, maxProcesses: sub.plan.maxProcesses, maxWhatsappNumbers: sub.plan.maxWhatsappNumbers, maxStorageMb: sub.plan.maxStorageMb, maxAiTokensMonth: sub.plan.maxAiTokensMonth },
     features: sub.plan.features,
   };
 }
@@ -63,14 +64,27 @@ function monthStart(): Date {
 }
 
 export async function getUsage(organizationId: string): Promise<Usage> {
-  const [users, pendingInvites, storage, ai, emailStorage] = await Promise.all([
+  const [users, pendingInvites, processes, whatsappNumbers, storage, ai, emailStorage] = await Promise.all([
     db.membership.count({ where: { organizationId, status: "ACTIVE" } }),
     db.invitation.count({ where: { organizationId, acceptedAt: null, revokedAt: null, expiresAt: { gt: new Date() } } }),
+    db.case.count({ where: { organizationId, deletedAt: null } }),
+    db.whatsappAccount.count({ where: { organizationId } }),
     db.documentVersion.aggregate({ where: { organizationId, document: { is: { deletedAt: null } } }, _sum: { sizeBytes: true } }),
     db.aiUsage.aggregate({ where: { organizationId, createdAt: { gte: monthStart() } }, _sum: { inputTokens: true, outputTokens: true } }),
     db.$queryRaw<{bytes:string}[]>`SELECT coalesce(sum((file->>'size')::bigint),0)::text bytes FROM chat_email_messages m CROSS JOIN LATERAL jsonb_array_elements(m.attachments) file WHERE m.organization_id=${organizationId}::uuid`,
   ]);
-  return { users, pendingInvites, storageBytes: (storage._sum.sizeBytes ?? 0) + Number(emailStorage[0]?.bytes ?? 0), aiTokensMonth: (ai._sum.inputTokens ?? 0) + (ai._sum.outputTokens ?? 0) };
+  return { users, pendingInvites, processes, whatsappNumbers, storageBytes: (storage._sum.sizeBytes ?? 0) + Number(emailStorage[0]?.bytes ?? 0), aiTokensMonth: (ai._sum.inputTokens ?? 0) + (ai._sum.outputTokens ?? 0) };
+}
+
+/** Serializa criação de casos para impedir que cadastros simultâneos ultrapassem a cota do plano. */
+export async function assertProcessCapacity(tx: Prisma.TransactionClient, organizationId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`plan-processes:${organizationId}`}, 0))`;
+  const sub = await tx.subscription.findUnique({ where: { organizationId }, select: { plan: { select: { name: true, maxProcesses: true } } } });
+  if (!sub) return;
+  const limit = sub.plan.maxProcesses;
+  if (limit == null) return;
+  const count = await tx.case.count({ where: { organizationId, deletedAt: null } });
+  if (count >= limit) throw new ConflictError(`O plano ${sub.plan.name} permite até ${limit.toLocaleString("pt-BR")} processos ou casos. Selecione um plano maior para cadastrar mais.`);
 }
 
 const STATE_MESSAGE: Record<string, string> = {

@@ -279,17 +279,17 @@ describe("cobrança automática (Asaas simulado)", () => {
 
   describe("administração de planos", () => {
     it("define preço e limites com validação e auditoria", async () => {
-      await updatePlan(pc, planFree.key, { priceCents: 4990, maxUsers: 3, maxStorageMb: null, maxAiTokensMonth: 0 });
+      await updatePlan(pc, planFree.key, { priceCents: 4990, maxUsers: 3, maxProcesses: null, maxWhatsappNumbers: null, maxStorageMb: null, maxAiTokensMonth: 0 });
       const p = await db.plan.findUniqueOrThrow({ where: { key: planFree.key } });
       expect(p.priceCents).toBe(4990);
       expect(p.maxAiTokensMonth).toBe(0);
       expect((await listPlans(pc)).find((x) => x.key === planFree.key)!.priceCents).toBe(4990);
-      await expect(updatePlan(pc, planFree.key, { priceCents: 5, maxUsers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toBeInstanceOf(ValidationError);
-      await expect(updatePlan(pc, planFree.key, { priceCents: 100.5, maxUsers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toBeInstanceOf(ValidationError);
-      await expect(updatePlan(pc, "nao-existe", { priceCents: null, maxUsers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toThrow(/não encontrado/);
+      await expect(updatePlan(pc, planFree.key, { priceCents: 5, maxUsers: null, maxProcesses: null, maxWhatsappNumbers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toBeInstanceOf(ValidationError);
+      await expect(updatePlan(pc, planFree.key, { priceCents: 100.5, maxUsers: null, maxProcesses: null, maxWhatsappNumbers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toBeInstanceOf(ValidationError);
+      await expect(updatePlan(pc, "nao-existe", { priceCents: null, maxUsers: null, maxProcesses: null, maxWhatsappNumbers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toThrow(/não encontrado/);
       expect(await db.auditLog.count({ where: { action: "platform.plan_update", resourceId: planFree.id } })).toBe(1);
       const nobody = await makeUser("not-platform");
-      await expect(updatePlan({ userId: nobody.id, meta: META }, planFree.key, { priceCents: null, maxUsers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toBeInstanceOf(Error);
+      await expect(updatePlan({ userId: nobody.id, meta: META }, planFree.key, { priceCents: null, maxUsers: null, maxProcesses: null, maxWhatsappNumbers: null, maxStorageMb: null, maxAiTokensMonth: null })).rejects.toBeInstanceOf(Error);
     });
   });
 });

@@ -8,6 +8,8 @@ const LINKS = [
   { href: "/admin/comercial", label: "Comercial" },
   { href: "/admin/escritorios", label: "Escritórios" },
   { href: "/admin/planos", label: "Planos e preços" },
+  { href: "/admin/onboarding", label: "Ativação Welcome" },
+  { href: "/admin/codigos", label: "Códigos-presente" },
   { href: "/admin/usuarios", label: "Usuários" },
   { href: "/admin/auditoria", label: "Auditoria" },
   { href: "/admin/saude", label: "Saúde e integrações" },

@@ -12,7 +12,9 @@ import { cancelSubscriptionAction, contractPlanAction, refreshBillingAction, sav
 export type BillingPanelData = {
   available: boolean;
   sandbox: boolean;
-  plans: { key: string; name: string; description: string | null; priceCents: number | null }[];
+  checkoutAllowed: boolean;
+  checkoutState: "not_started" | "checkout_started" | "payment_pending" | "payment_confirmed" | "free_trial" | "free_benefit" | "expired" | "canceled";
+  plans: { key: string; name: string; description: string; priceCents: number; maxUsers: number; maxProcesses: number; maxWhatsappNumbers: number | null }[];
   current: { planKey: string; planName: string; status: string } | null;
   automatic: boolean;
   cancelRequestedAt: string | null;
@@ -30,8 +32,18 @@ const INVOICE_STATUS: Record<string, [string, "success" | "warning" | "danger" |
   REFUNDED: ["Estornada", "warning"],
   DELETED: ["Cancelada", "neutral"],
 };
+const CHECKOUT_STATUS: Record<BillingPanelData["checkoutState"], [string, "success" | "warning" | "danger" | "neutral" | "info"]> = {
+  not_started: ["Sem contratação iniciada", "neutral"],
+  checkout_started: ["Contratação iniciada", "info"],
+  payment_pending: ["Pagamento pendente", "warning"],
+  payment_confirmed: ["Pagamento confirmado", "success"],
+  free_trial: ["Avaliação gratuita vigente", "info"],
+  free_benefit: ["Acesso concedido sem cobrança automática", "info"],
+  expired: ["Avaliação encerrada", "danger"],
+  canceled: ["Cancelada", "neutral"],
+};
 
-export function BillingPanel({ data }: { data: BillingPanelData }) {
+export function BillingPanel({ data, selectedPlanKey }: { data: BillingPanelData; selectedPlanKey?: string }) {
   const router = useRouter();
   const [pending, start] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
@@ -63,6 +75,8 @@ export function BillingPanel({ data }: { data: BillingPanelData }) {
   return (
     <div className="space-y-5 text-sm" data-testid="billing-panel">
       {data.sandbox ? <Alert tone="warning">Modo de teste (sandbox) do provedor de pagamento: nenhuma cobrança real é feita.</Alert> : null}
+      {!data.sandbox && !data.checkoutAllowed ? <Alert tone="warning">Novas contratações estão pausadas neste ambiente até a homologação do ciclo de cobrança no sandbox.</Alert> : null}
+      {(() => { const [label, tone] = CHECKOUT_STATUS[data.checkoutState]; return <Badge tone={tone}>{label}</Badge>; })()}
       {error ? <Alert tone="error">{error}</Alert> : null}
       {ok ? <Alert tone="success">{ok}</Alert> : null}
 
@@ -82,18 +96,22 @@ export function BillingPanel({ data }: { data: BillingPanelData }) {
         <ul className="grid gap-3 md:grid-cols-3">
           {data.plans.map((p) => {
             const isCurrent = data.current?.planKey === p.key && data.automatic;
+            const isSelected = selectedPlanKey === p.key;
             return (
-              <li key={p.key} className="rounded-md border border-border p-3" data-testid={`plan-${p.key}`}>
-                <div className="font-medium">{p.name}</div>
+              <li key={p.key} className={`rounded-md border p-3 ${isSelected ? "border-primary bg-surface-2" : "border-border"}`} data-testid={`plan-${p.key}`}>
+                <div className="flex items-center justify-between gap-2"><span className="font-medium">{p.name}</span>{isSelected ? <Badge tone="info">Selecionado no cadastro</Badge> : null}</div>
                 <div className="text-lg">{p.priceCents == null ? "Sob consulta" : `${brl(p.priceCents)}/mês`}</div>
                 {p.description ? <p className="mt-1 text-xs text-muted">{p.description}</p> : null}
+                <p className="mt-2 text-xs text-muted">
+                  Até {p.maxUsers} usuários e {p.maxProcesses.toLocaleString("pt-BR")} processos{p.maxWhatsappNumbers != null ? ` · ${p.maxWhatsappNumbers} número(s) de WhatsApp` : ""}.
+                </p>
                 <div className="mt-2">
                   {p.priceCents == null ? (
                     <span className="text-xs text-muted">Fale com a administração.</span>
                   ) : isCurrent ? (
                     <Badge tone="success">Plano atual</Badge>
                   ) : (
-                    <Button size="sm" loading={pending} disabled={!profileComplete || !!data.cancelRequestedAt} onClick={() => run(() => contractPlanAction(p.key), data.automatic ? "Plano alterado. As próximas faturas usam o novo valor." : "Assinatura criada. A fatura aparece abaixo; quem paga escolhe Pix, boleto ou cartão.")} data-testid={`contract-${p.key}`}>
+                    <Button size="sm" loading={pending} disabled={!profileComplete || !!data.cancelRequestedAt || !data.checkoutAllowed} onClick={() => run(() => contractPlanAction(p.key), data.automatic ? "Plano alterado. As próximas faturas usam o novo valor." : "Assinatura iniciada no sandbox. O pagamento é confirmado pelo provedor antes de ativar o plano.")} data-testid={`contract-${p.key}`}>
                       {data.automatic ? "Trocar para este plano" : "Contratar"}
                     </Button>
                   )}

@@ -47,6 +47,7 @@ export const limiters = {
   passwordReset: new RateLimiter(5 * mult, 60 * 60_000),
   mfa: new RateLimiter(20 * mult, 15 * 60_000),
   invitation: new RateLimiter(30 * mult, 60 * 60_000),
+  giftCode: new RateLimiter(10 * mult, 15 * 60_000),
   apiKey: new RateLimiter(120 * mult, 60_000),
   apiAuthFail: new RateLimiter(30 * mult, 60_000),
   mcp: new RateLimiter(90 * mult, 60_000),

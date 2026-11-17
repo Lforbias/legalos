@@ -37,7 +37,7 @@ describe("planos, limites e assinatura (9d)", () => {
   });
 
   describe("interpretação da assinatura", () => {
-    const plan = { key: "p", name: "P", maxUsers: 5, maxStorageMb: 10, maxAiTokensMonth: 100, features: ["x"] };
+    const plan = { key: "p", name: "P", maxUsers: 5, maxProcesses: null, maxWhatsappNumbers: null, maxStorageMb: 10, maxAiTokensMonth: 100, features: ["x"] };
     const now = new Date("2026-10-20T12:00:00Z");
     it("estados: em dia, teste terminando, teste encerrado, atraso e cancelada", () => {
       expect(resolveEntitlements(null).state).toBe("none");

@@ -7,7 +7,9 @@ import { can } from "@/server/context";
 import { billingAvailable, getBillingOverview } from "@/server/services/billing.service";
 import { getEntitlements, getUsage, type PlanState } from "@/server/services/plan.service";
 import { getOrganization } from "@/server/services/organization.service";
+import { MAX_NUMBERS } from "@/server/services/whatsapp-numbers.service";
 import { requireTenant } from "@/server/session";
+import { LEGALOS_PLANS, formatBRL } from "@/config/pricing";
 
 export const metadata: Metadata = { title: "Plano e uso" };
 
@@ -32,13 +34,24 @@ function Meter({ label, used, limit, fmt, none }: { label: string; used: number;
   );
 }
 
-export default async function PlanSettingsPage() {
+export default async function PlanSettingsPage({ searchParams }: { searchParams: Promise<{ checkout?: string }> }) {
+  const params = await searchParams;
+  const selectedPlan = LEGALOS_PLANS.find((plan) => plan.id === params.checkout);
   const { ctx } = await requireTenant();
   const org = await getOrganization(ctx);
   const [ent, usage] = await Promise.all([getEntitlements(ctx.organizationId), getUsage(ctx.organizationId)]);
   const billing = can(ctx, "billing:manage") ? await getBillingOverview(ctx) : null;
   return (
     <div className="mx-auto max-w-3xl space-y-4">
+      {selectedPlan ? (
+        <Card>
+          <CardHeader title={`Plano selecionado: ${selectedPlan.name}`} />
+          <CardBody className="space-y-2 text-sm">
+            <p>{formatBRL(selectedPlan.price)}/mês · até {selectedPlan.users} usuários e {selectedPlan.processes.toLocaleString("pt-BR")} processos{selectedPlan.whatsappNumbers ? ` · ${selectedPlan.whatsappNumbers} número(s) de WhatsApp` : ""}.</p>
+            <p className="text-muted">Nenhuma contratação ou cobrança foi iniciada. Confira os dados de cobrança e use o botão de contratação somente quando quiser prosseguir. Sua avaliação gratuita não será convertida automaticamente.</p>
+          </CardBody>
+        </Card>
+      ) : null}
       <Card data-testid="plan-card">
         <CardHeader title="Plano e uso" />
         <CardBody className="space-y-3 text-sm">
@@ -57,6 +70,8 @@ export default async function PlanSettingsPage() {
             <div className="flex items-center justify-between"><span className="text-muted">Período pago até</span><span>{formatDate(ent.currentPeriodEnd, org.timezone)}</span></div>
           ) : null}
           <Meter label="Usuários (com convites pendentes)" used={usage.users + usage.pendingInvites} limit={ent.limits.maxUsers} fmt={(n) => String(n)} />
+          <Meter label="Processos e casos cadastrados" used={usage.processes} limit={ent.limits.maxProcesses} fmt={(n) => n.toLocaleString("pt-BR")} />
+          <Meter label="Números de WhatsApp" used={usage.whatsappNumbers} limit={ent.limits.maxWhatsappNumbers ?? MAX_NUMBERS} fmt={(n) => String(n)} />
           <Meter label="Armazenamento" used={usage.storageBytes} limit={ent.limits.maxStorageMb == null ? null : ent.limits.maxStorageMb * 1048576} fmt={mb} />
           <Meter label="IA neste mês (tokens)" used={usage.aiTokensMonth} limit={ent.limits.maxAiTokensMonth == null ? null : ent.limits.maxAiTokensMonth} fmt={(n) => n.toLocaleString("pt-BR")} none={ent.limits.maxAiTokensMonth === 0 ? "Não incluída no plano" : undefined} />
           <p className="pt-1 text-xs text-muted">
@@ -72,13 +87,16 @@ export default async function PlanSettingsPage() {
               data={{
                 available: billing.available,
                 sandbox: billing.sandbox,
-                plans: billing.plans.map((p) => ({ key: p.key, name: p.name, description: p.description, priceCents: p.priceCents })),
+                checkoutAllowed: billing.checkoutAllowed,
+                checkoutState: billing.checkoutState,
+                plans: billing.plans,
                 current: billing.current,
                 automatic: billing.automatic,
                 cancelRequestedAt: billing.cancelRequestedAt ? billing.cancelRequestedAt.toISOString() : null,
                 profile: billing.profile,
                 invoices: billing.invoices.map((i) => ({ id: i.id, status: i.status, valueCents: i.valueCents, dueDate: i.dueDate.toISOString(), paidAt: i.paidAt ? i.paidAt.toISOString() : null, invoiceUrl: i.invoiceUrl })),
               }}
+              selectedPlanKey={selectedPlan?.id}
             />
           </CardBody>
         </Card>
