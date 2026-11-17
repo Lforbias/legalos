@@ -18,17 +18,13 @@ import { CASE_STATUS_LABEL } from "@/modules/cases/schemas";
 import { ArchiveClientButton } from "@/modules/clients/client-actions";
 import { ContactsManager } from "@/modules/clients/contacts-manager";
 import { CLIENT_STATUS_LABEL, CLIENT_TYPE_LABEL } from "@/modules/clients/schemas";
-import { DocumentsPanel } from "@/modules/documents/documents-panel";
+import { ClientDocuments } from "@/modules/documents/client-documents";
 import { can } from "@/server/context";
 import { listCasesForClient } from "@/server/services/case.service";
 import { getClient } from "@/server/services/client.service";
 import { PortalPanel } from "@/modules/portal/portal-panel";
 import { listPortalAccess } from "@/server/services/portal.service";
-import { listDocuments } from "@/server/services/document.service";
-import { ConversationsCard } from "@/modules/whatsapp/conversations-card";
-import { SendClientCard } from "@/modules/whatsapp/send-client-card";
-import { clientMessageTarget } from "@/server/services/chat-send.service";
-import { conversationsOfClient } from "@/server/services/chat-links.service";
+import { ClientWhatsappCard } from "@/modules/whatsapp/client-whatsapp-card";
 import { VaultPanel } from "@/modules/vault/vault-panel";
 import { listClientCredentials, VAULT_SYSTEMS } from "@/server/services/client-vault.service";
 import { ClientPendingsPanel } from "@/modules/portal/plus-ui";
@@ -95,8 +91,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       <TabsNav base={`/clientes/${client.id}`} current={tab} tabs={tabs} compactOnMobile />
 
       {tab === "resumo" ? (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card className="lg:col-span-2">
+        <div className={`grid items-start gap-4 ${can(ctx, "whatsapp:read") ? "lg:grid-cols-2" : "lg:grid-cols-[2fr_1fr]"}`}>
+          <Card className="min-w-0">
             <CardHeader title="Dados cadastrais" />
             <CardBody>
               <dl className="grid gap-4 sm:grid-cols-2">
@@ -115,9 +111,8 @@ export default async function ClientDetailPage({ params, searchParams }: { param
               </dl>
             </CardBody>
           </Card>
-          <div className="space-y-4">
-            <SendClientCard targets={await clientMessageTarget(ctx, client.id, organization.name).then((t) => (t ? [t] : []))} source="client" />
-            <ConversationsCard rows={await conversationsOfClient(ctx, client.id)} />
+          <div className="min-w-0 space-y-4">
+            <ClientWhatsappCard ctx={ctx} client={client} />
             <Card>
               <CardHeader title="Etiquetas" />
               <CardBody>
@@ -177,13 +172,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       })() : null}
 
       {tab === "documentos" ? (
-        <DocumentsPanel
-          owner={{ clientId: client.id }}
-          canWrite={can(ctx, "documents:write")}
-          timezone={tz}
-          revalidate={`/clientes/${client.id}`}
-          documents={(await listDocuments(ctx, { clientId: client.id })).map((d) => ({ id: d.id, name: d.name, sizeBytes: d.sizeBytes, createdAt: d.createdAt.toISOString(), currentVersion: d.currentVersion }))}
-        />
+        <ClientDocuments ctx={ctx} clientId={client.id} revalidate={`/clientes/${client.id}`} />
       ) : null}
     </div>
   );

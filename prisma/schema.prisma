@@ -452,8 +452,19 @@ model Client {
   agendaEvents          AgendaEvent[]
   whatsappConversations WhatsappConversation[]
   vaultCredentials      ClientCredential[]
+  driveFolder           ClientDriveFolder?
 
   @@map("clients")
+}
+
+model ClientDriveFolder {
+  clientId    String  @id @map("client_id") @db.Uuid
+  folderId    String  @map("folder_id")
+  name        String
+  resourceKey String? @map("resource_key")
+  client      Client  @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@map("client_drive_folders")
 }
 
 model ClientContact {
@@ -1983,6 +1994,7 @@ model WhatsappMessage {
   status         String
   error          String?
   authorId       String?  @map("author_id") @db.Uuid
+  historical     Boolean  @default(false)
   automatic      Boolean  @default(false)
   createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
 

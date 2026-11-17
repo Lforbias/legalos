@@ -8,6 +8,8 @@ import { formatDateTime } from "@/lib/dates/format";
 import { dateToYmd, formatYmd, todayYmd } from "@/lib/dates/ymd";
 import { formatMoneyBR } from "@/lib/validation/money";
 import { fromCents, toCents } from "@/lib/finance/money";
+import { AwaitingReplyCard } from "@/modules/whatsapp/awaiting-reply-card";
+import { can } from "@/server/context";
 import { getOfficeOverview } from "@/server/services/office-overview.service";
 import { requireTenant } from "@/server/session";
 
@@ -33,7 +35,7 @@ export default async function OverviewPage() {
   const taskBars = d.tasks ? [{ name: "A fazer", count: d.tasks.todo }, { name: "Em andamento", count: d.tasks.inProgress }, { name: "Aguardando", count: d.tasks.waiting }] : [];
   const finance = d.finance;
   const net = finance ? fromCents((toCents(finance.receivedThisMonth) ?? 0n) - (toCents(finance.paidThisMonth) ?? 0n)) : "0.00";
-  const noModules = !d.tasks && !d.deadlines && !d.notices && !d.clients && !d.portfolio && !finance;
+  const noModules = !d.tasks && !d.deadlines && !d.notices && !d.clients && !d.portfolio && !finance && !can(ctx, "whatsapp:read");
   return <div className="mx-auto max-w-7xl space-y-8">
     <PageHeader title={`Bom dia, ${session.user.name.split(" ")[0]}`} description={`${organization.name} · ${formatYmd(d.today)}. Aqui está o que merece atenção hoje e como está o escritório.`} />
 
@@ -49,6 +51,8 @@ export default async function OverviewPage() {
       </div>
       {noModules ? <Card className="p-6 text-sm text-muted">Seu perfil ainda não tem acesso aos módulos desta visão geral. Peça à administração os acessos necessários para o seu trabalho.</Card> : null}
     </section>
+
+    <AwaitingReplyCard ctx={ctx} />
 
     {finance ? <section aria-labelledby="overview-finance">
       <div className="mb-4 flex items-center gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10"><Wallet aria-hidden className="h-4 w-4 text-primary-text" /></span><h2 id="overview-finance" className="text-[15px] font-semibold tracking-[-0.01em]">Financeiro do escritório</h2><div className="ml-auto">{more("/financeiro", "Abrir financeiro")}</div></div>

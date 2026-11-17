@@ -262,7 +262,14 @@ textarea { font: inherit; }
   .chat-inbox-column { width: 350px; }
 }
 
-/* Keep the assistant launcher out of the desktop conversation controls. */
-[data-space="evolution"]:has([data-chat-info-panel]) .rute-launcher-chat {
-  right: calc(320px + 1.25rem);
+:root { --chat-details-width: 320px; }
+
+@media (min-width: 1280px) {
+  [data-space="evolution"]:has([data-chat-info-panel]) .rute-launcher-chat {
+    right: calc(var(--chat-details-width) + 1.25rem);
+  }
+}
+
+@media (min-width: 1536px) {
+  :root { --chat-details-width: 380px; }
 }

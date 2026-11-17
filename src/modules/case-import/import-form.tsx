@@ -9,7 +9,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Select, Textarea } from "@/components/ui/form";
 import { IMPORT_MAX } from "@/lib/case-import";
 import { ClientPicker } from "@/modules/clients/client-picker";
-import { createImportBatchAction } from "./actions";
+import { createImportBatchAction, previewProcessSheetAction } from "./actions";
 
 export function ImportForm({ datajudReady, mniReady, canDocs }: { datajudReady: boolean; mniReady: boolean; canDocs: boolean }) {
   const router = useRouter();
@@ -18,6 +18,11 @@ export function ImportForm({ datajudReady, mniReady, canDocs }: { datajudReady: 
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
   const [numbersErr, setNumbersErr] = React.useState<string | undefined>();
+  const [readingSheet, readSheet] = React.useTransition();
+  const [columns, setColumns] = React.useState<{ name: string; values: string[]; total: number }[]>([]);
+  const [columnIndex, setColumnIndex] = React.useState("0");
+  const selectedColumn = columns[Number(columnIndex)];
+
   return (
     <form
       className="space-y-4"
@@ -40,7 +45,46 @@ export function ImportForm({ datajudReady, mniReady, canDocs }: { datajudReady: 
       {error ? <Alert tone="error">{error}</Alert> : null}
       <Card>
         <CardHeader title="Números dos processos" description={`Um número CNJ por linha (ou separados por vírgula). Até ${IMPORT_MAX} por vez. Os que já existem não são duplicados.`} />
-        <CardBody>
+        <CardBody className="space-y-3">
+          <Field label="Carregar CSV ou Excel" htmlFor="imp-sheet" hint="Até 512 KB. Para Excel (.xlsx), use a primeira aba visível, com cabeçalho e CNJs como texto.">
+            <input id="imp-sheet" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={pending || readingSheet} onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.target.value = "";
+              if (!file) return;
+              setError(null);
+              setColumns([]);
+              setColumnIndex("0");
+              if (file.size > 512 * 1024) {
+                setError("Selecione um CSV ou Excel (.xlsx) de até 512 KB.");
+                return;
+              }
+              const form = new FormData();
+              form.set("file", file);
+              readSheet(async () => {
+                try {
+                  const result = await previewProcessSheetAction(form);
+                  if (result.ok && result.data) setColumns(result.data.columns);
+                  else setError(result.message ?? "Não foi possível ler o arquivo.");
+                } catch {
+                  setError("Não foi possível carregar o arquivo. Tente novamente.");
+                }
+              });
+            }} />
+          </Field>
+          {selectedColumn ? (
+            <div className="space-y-2">
+              <Field label="Coluna com o número CNJ" htmlFor="imp-sheet-column">
+                <Select id="imp-sheet-column" value={columnIndex} onChange={(event) => setColumnIndex(event.target.value)}>
+                  {columns.map((column, index) => <option key={column.name} value={index}>{column.name} ({column.total})</option>)}
+                </Select>
+              </Field>
+              {selectedColumn.total > IMPORT_MAX ? <p className="text-sm text-warning">A coluna tem {selectedColumn.total} valores. Divida a planilha em arquivos de até {IMPORT_MAX} processos.</p> : null}
+              <Button type="button" size="sm" variant="secondary" disabled={pending || selectedColumn.total > IMPORT_MAX} onClick={() => {
+                setV((current) => ({ ...current, numbers: selectedColumn.values.join("\n") }));
+                setNumbersErr(undefined);
+              }}>Carregar números para revisão</Button>
+            </div>
+          ) : null}
           <Field label="Números CNJ" htmlFor="imp-numbers" error={numbersErr}>
             <Textarea id="imp-numbers" rows={8} placeholder={"0000000-00.2024.8.05.0001\n0000001-00.2024.8.05.0001"} value={v.numbers} onChange={(e) => setV({ ...v, numbers: e.target.value })} />
           </Field>

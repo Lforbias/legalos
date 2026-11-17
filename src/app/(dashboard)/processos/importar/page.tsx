@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/layout/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/dates/format";
+import { AstreaBackupForm } from "@/modules/case-import/astrea-backup-form";
 import { ImportForm } from "@/modules/case-import/import-form";
 import { can } from "@/server/context";
 import { listImportBatches } from "@/server/services/case-import.service";
@@ -25,6 +26,7 @@ export default async function ImportPage() {
     <div className="mx-auto max-w-3xl space-y-4">
       <PageHeader title="Importar processos" description="Cadastre vários processos de uma vez pelo número CNJ." actions={<Link href="/processos" className={buttonVariants({ variant: "secondary" })}>Voltar aos processos</Link>} />
       <ImportForm datajudReady={dj.keyConfigured && dj.orgEnabled} mniReady={mniCount > 0} canDocs={can(ctx, "documents:write")} />
+      {ctx.isOwner ? <AstreaBackupForm /> : null}
       {batches.length ? (
         <Card>
           <CardHeader title="Importações anteriores" />

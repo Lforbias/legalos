@@ -17,9 +17,25 @@ import { sendToClient } from "@/server/services/chat-send.service";
 import { billingPreview, removeOptout, saveBillingSettings, sendBillingNow } from "@/server/services/chat-billing.service";
 import { deleteField, deleteLabel, saveField, saveLabel, setConversationLabels, setFieldValues } from "@/server/services/chat-meta.service";
 import { connectQr, disconnectQr, getQrStatus, restartQr, type QrStatus } from "@/server/services/whatsapp-qr.service";
-import { addNote, assignConversation, linkClient, searchClientsForLink, sendMessage, sendTemplateMessage, setConversationStatus, startConversation } from "@/server/services/whatsapp.service";
+import { addNote, assignConversation, linkClient, readOlderMessages, searchClientsForLink, sendMessage, sendTemplateMessage, setConversationStatus, startClientWhatsapp, startConversation, startLeadWhatsapp } from "@/server/services/whatsapp.service";
 
 const text = z.string().max(5000);
+
+export async function readOlderMessagesAction(conversationId: string, beforeId: string) {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const page = await readOlderMessages(ctx, parse(uuidSchema, conversationId), parse(uuidSchema, beforeId));
+    return {
+      historyCursor: page.historyCursor,
+      messages: page.messages.map(({ direction, author, createdAt, ...message }) => ({
+        ...message,
+        direction: direction === "IN" ? "IN" as const : direction === "OUT" ? "OUT" as const : "NOTE" as const,
+        authorName: author?.name ?? null,
+        createdAt: createdAt.toISOString(),
+      })),
+    };
+  });
+}
 
 export async function sendMessageAction(conversationId: string, body: string): Promise<ActionState<{ status: string; error: string | null }>> {
   return runAction(async () => {
@@ -88,6 +104,28 @@ export async function startConversationAction(phone: string, clientId: string | 
     const r = await startConversation(ctx, { phone: parse(z.string().min(8).max(30), phone), clientId: parse(uuidSchema.nullable(), clientId) });
     revalidatePath("/atendimento");
     return r;
+  });
+}
+
+export async function startClientWhatsappAction(clientId: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const id = parse(uuidSchema, clientId);
+    await startClientWhatsapp(ctx, id);
+    revalidatePath(`/clientes/${id}`);
+    revalidatePath("/atendimento");
+    return undefined;
+  });
+}
+
+export async function startLeadWhatsappAction(leadId: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const id = parse(uuidSchema, leadId);
+    await startLeadWhatsapp(ctx, id);
+    revalidatePath(`/crm/${id}`);
+    revalidatePath("/atendimento");
+    return undefined;
   });
 }
 

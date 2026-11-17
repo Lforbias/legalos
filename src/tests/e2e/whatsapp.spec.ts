@@ -120,11 +120,25 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await side.getByTestId("side-tab-historico").click();
   await expect(side.getByTestId("side-history")).toContainText("Lead criado no CRM");
   await side.getByTestId("side-tab-contato").click();
+  await page.getByRole("button", { name: "Fechar detalhes" }).click();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId("wa-side")).toBeHidden();
+  await expect(page.getByTestId("wa-messages")).toBeVisible();
+  await page.getByRole("button", { name: "Detalhes da conversa" }).click();
+  await expect(page.getByTestId("wa-side")).toBeVisible();
+  await expect(page.getByTestId("wa-messages")).toBeHidden();
+  await page.getByRole("button", { name: "Fechar detalhes" }).click();
+  await expect(page.getByTestId("wa-messages")).toBeVisible();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.getByRole("button", { name: "Detalhes da conversa" }).click();
+  await expect(page.getByTestId("wa-side")).toBeVisible();
+
   await page.goto("/tarefas");
   await expect(page.getByText("Ligar para a Maria sobre o processo").first()).toBeVisible();
   await page.goto("/crm");
   await page.getByText("Maria Teste").first().click();
-  await expect(page.getByTestId("chat-conversations")).toBeVisible(); // o caminho de volta: o lead mostra a conversa
+  const leadChat = page.getByTestId("client-whatsapp");
+  await expect(leadChat.getByTestId("wa-msg-in").getByText("Bom dia, preciso de ajuda com meu processo")).toBeVisible();
   await page.goto("/atendimento");
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
 
@@ -307,6 +321,32 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await page.getByRole("button", { name: "Encerrar" }).click();
   await page.getByRole("link", { name: "Encerradas" }).click();
   await expect(page.getByTestId("wa-list").getByText("Maria Teste")).toBeVisible();
+
+  await page.goto("/clientes/novo");
+  await page.getByLabel("Nome completo").fill("Cliente da ficha");
+  await page.getByLabel("Telefone / WhatsApp").fill("(71) 98888-0011");
+  await page.getByRole("button", { name: "Cadastrar cliente" }).click();
+  await expect(page.getByRole("heading", { name: "Cliente da ficha" })).toBeVisible();
+
+  const fiche = page.getByTestId("client-whatsapp");
+  const clientUrl = page.url();
+  await expect(fiche.getByText("+55 (71) 98888-0011")).toBeVisible();
+  await fiche.getByRole("button", { name: "Iniciar conversa" }).click();
+  await expect(fiche.getByTestId("wa-window-closed")).toBeVisible();
+
+  const reply = inbound(pnid, { id: `wamid.FICHA${id}`, from: "5571988880011", name: "Cliente da ficha", text: "Mensagem recebida na ficha" });
+  const received = await request.post("/api/whatsapp/webhook", { data: reply.body, headers: { "content-type": "application/json", "x-hub-signature-256": reply.signature } });
+  expect(received.status()).toBe(200);
+  await expect(fiche.getByTestId("wa-msg-in").getByText("Mensagem recebida na ficha")).toBeVisible({ timeout: 10_000 });
+  await fiche.getByRole("textbox", { name: "Mensagem", exact: true }).fill("Resposta enviada pela ficha");
+  await fiche.getByRole("button", { name: "Enviar", exact: true }).click();
+  await expect(fiche.getByTestId("wa-msg-out").getByText("Resposta enviada pela ficha")).toBeVisible();
+  await expect(page).toHaveURL(clientUrl);
+  expect(fake.requests.filter((r) => /\/messages$/.test(r.path) && r.body?.type === "text").at(-1)?.body).toMatchObject({ to: "5571988880011" });
+
+  await page.goto("/atendimento");
+  await page.getByTestId("wa-list").getByText("Cliente da ficha", { exact: true }).click();
+  await expect(page.getByTestId("wa-msg-out").getByText("Resposta enviada pela ficha")).toBeVisible();
 });
 
 test("WhatsApp: o menu mostra Atendimento e quem não tem permissão não entra nas configurações", async ({ page }) => {

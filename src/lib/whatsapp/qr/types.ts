@@ -22,11 +22,13 @@ export type QrEvent =
   | { type: "open"; phone: string | null }
   | { type: "close"; loggedOut: boolean; reason: string }
   | { type: "message"; msg: QrInbound }
+  | { type: "history"; messages: QrInbound[] }
   | { type: "status"; id: string; status: "sent" | "delivered" | "read" | "failed" };
 
 export type OutMedia = { kind: "image" | "document" | "audio" | "video"; buffer: Buffer; mime: string; filename: string; caption: string | null };
 
 export interface QrSession {
+  profilePictureUrl?(chat: string): Promise<string | undefined>;
   sendText(chat: string, body: string): Promise<string>;
   sendMedia(chat: string, m: OutMedia): Promise<string>;
   logout(): Promise<void>;

@@ -3,7 +3,7 @@ import { humanReplyLifecycle, setServiceStatus } from "./chat-lifecycle.service"
 import { interactivePayload,interactiveSchema } from "@/lib/whatsapp/interactive";
 import { sendInteractive } from "@/lib/whatsapp/client";
 import { randomUUID } from "node:crypto";
-import type { Prisma } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 import { assertChatContactAllowed } from "./chat-contact-control.service";
 import { emitChatEvent } from "./chat-workbench.service";
 import { db } from "@/lib/db/client";
@@ -11,7 +11,7 @@ import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions
 import { deleteObject, putObject } from "@/lib/storage/local-storage";
 import { markAsRead, sendTemplate as apiSendTemplate, WhatsappApiError, type OutKind } from "@/lib/whatsapp/client";
 import { isWindowOpen, MAX_TEXT, windowClosesAt } from "@/lib/whatsapp/constants";
-import { normalizeWaId } from "@/lib/whatsapp/phone";
+import { normalizeWaId, phoneCandidates } from "@/lib/whatsapp/phone";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { isUniqueViolation } from "./db-errors";
@@ -20,10 +20,10 @@ import { getTransport } from "./whatsapp-transport";
 import { assertStorageAvailable } from "./plan.service";
 import { sanitizeFileName } from "./document.service";
 
-export type ConversationFilter = "mine" | "unassigned" | "open" | "closed";
+export type ConversationFilter = "mine" | "unassigned" | "open" | "closed" | "waiting";
 
 const listSelect = {
-  id: true, serviceStatus:true, waId: true, contactName: true, status: true, lastMessageAt: true, lastInboundAt: true, lastPreview: true, unreadCount: true, accountId: true, account: { select: { label: true, isPrimary: true } },
+  id: true, serviceStatus:true, waId: true, contactName: true, status: true, lastMessageAt: true, lastInboundAt: true, lastPreview: true, unreadCount: true, accountId: true, account: { select: { label: true, isPrimary: true, provider: true } },
   client: { select: { id: true, name: true } }, case: { select: { id: true, number: true, title: true } }, lead: { select: { id: true, name: true } }, assignedTo: { select: { id: true, name: true } }, queue: { select: { id: true, name: true } },
   labels: { select: { label: { select: { id: true, name: true, color: true } } }, orderBy: { label: { name: "asc" } } },
 } satisfies Prisma.WhatsappConversationSelect;
@@ -40,12 +40,29 @@ export async function listConversations(ctx: TenantContext, filter: Conversation
   if (accountId) where.accountId = accountId;
   if (labelId) where.labels = { some: { labelId } };
   const q = search?.trim().slice(0, 80);
+  if (filter === "waiting") {
+    const waiting = await listConversationsAwaitingReply(ctx, { search: q, queueId, labelId, accountId, serviceStatus, limit: 200 });
+    if (!waiting.length) return [];
+    const items = await db.whatsappConversation.findMany({
+      where: {
+        ...where,
+        id: { in: waiting.map((row) => row.id) },
+        ...(ctx.isOwner || ctx.roleKey === "ADMIN" ? {} : { assignedToId: ctx.userId }),
+      },
+      select: listSelect,
+    });
+    const byId = new Map(items.map((item) => [item.id, item]));
+    return waiting.flatMap((row) => {
+      const item = byId.get(row.id);
+      return item ? [{ ...item, lastPreview: safeChatPreview(item.lastPreview), waitingMinutes: row.waitingMinutes }] : [];
+    });
+  }
   if (q) {
     const digits = q.replace(/\D/g, "");
     where.OR = [{ contactName: { contains: q, mode: "insensitive" } }, { client: { name: { contains: q, mode: "insensitive" } } }, ...(digits.length >= 4 ? [{ waId: { contains: digits } }] : []), { fieldValues: { some: { value: { contains: q, mode: "insensitive" } } } }];
   }
   const items = await db.whatsappConversation.findMany({ where, orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }], take: 200, select: listSelect });
-  return items.map(item => ({ ...item, lastPreview: safeChatPreview(item.lastPreview) }));
+  return items.map(item => ({ ...item, lastPreview: safeChatPreview(item.lastPreview), waitingMinutes: null }));
 }
 
 export async function unreadTotal(ctx: TenantContext): Promise<number> {
@@ -60,26 +77,203 @@ async function loadConversation(ctx: TenantContext, id: string) {
   return { ...c, lastPreview: safeChatPreview(c.lastPreview) };
 }
 
+const messageSelect = {
+  id: true, direction: true, type: true, body: true, mediaMime: true, mediaName: true, mediaKey: true,
+  status: true, error: true, automatic: true, historical: true, createdAt: true, author: { select: { name: true } },
+} satisfies Prisma.WhatsappMessageSelect;
+
+async function readConversationPage(ctx: TenantContext, id: string, limit: number, before?: { id: string; createdAt: Date }) {
+  const messages = await db.whatsappMessage.findMany({
+    where: {
+      conversationId: id,
+      organizationId: ctx.organizationId,
+      ...(before ? { OR: [{ createdAt: { lt: before.createdAt } }, { createdAt: before.createdAt, id: { lt: before.id } }] } : {}),
+    },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: limit + 1,
+    select: messageSelect,
+  });
+  const hasMore = messages.length > limit;
+  if (hasMore) messages.pop();
+  return {
+    historyCursor: hasMore ? messages.at(-1)?.id ?? null : null,
+    messages: messages.reverse().map(({ mediaKey, ...m }) => ({ ...m, hasMedia: !!mediaKey })),
+  };
+}
+
+export async function readOlderMessages(ctx: TenantContext, id: string, beforeId: string) {
+  assertCan(ctx, "whatsapp:read");
+  const before = await db.whatsappMessage.findFirst({
+    where: { id: beforeId, conversationId: id, organizationId: ctx.organizationId },
+    select: { id: true, createdAt: true },
+  });
+  if (!before) throw new NotFoundError("Mensagem não encontrada.");
+  return readConversationPage(ctx, id, 100, before);
+}
+
 /** Abre a conversa: devolve as últimas 300 mensagens e zera o contador de não lidas (e avisa a Meta, em melhor esforço). */
 export async function openConversation(ctx: TenantContext, id: string) {
   assertCan(ctx, "whatsapp:read");
   const c = await loadConversation(ctx, id);
-  const qr = (await providerOf(ctx.organizationId, c.accountId)) === "QR";
-  const messages = await db.whatsappMessage.findMany({
-    where: { conversationId: id, organizationId: ctx.organizationId },
-    orderBy: { createdAt: "desc" },
-    take: 300,
-    select: { id: true, direction: true, type: true, body: true, mediaMime: true, mediaName: true, mediaKey: true, status: true, error: true, automatic: true, createdAt: true, author: { select: { name: true } } },
-  });
-  messages.reverse();
+  const qr = c.account.provider === "QR";
+  const page = await readConversationPage(ctx, id, 300);
   if (c.unreadCount > 0) {
     await db.whatsappConversation.updateMany({ where: { id, organizationId: ctx.organizationId }, data: { unreadCount: 0 } });
     void markLastInboundRead(ctx.organizationId, id);
   }
   return {
     conversation: { ...c, unreadCount: 0, windowOpen: qr || isWindowOpen(c.lastInboundAt), windowClosesAt: qr ? null : windowClosesAt(c.lastInboundAt) },
-    messages: messages.map(({ mediaKey, ...m }) => ({ ...m, hasMedia: !!mediaKey })),
+    ...page,
   };
+}
+
+/** Localiza a conversa pelo telefone atual do cliente e pelo número principal do escritório. */
+export async function findClientWhatsapp(ctx: TenantContext, clientId: string, phone: string | null) {
+  assertCan(ctx, "clients:read");
+  return findContactWhatsapp(ctx, { clientId, leadId: null }, phone);
+}
+
+export async function findContactWhatsapp(ctx: TenantContext, owner: { clientId: string | null; leadId: string | null }, phone: string | null) {
+  assertCan(ctx, owner.leadId ? "crm:read" : "clients:read");
+  assertCan(ctx, "whatsapp:read");
+  const waId = phone ? normalizeWaId(phone) : null;
+  if (!waId) return { waId, account: null, conversation: null, blocked: false };
+
+  const account = await db.whatsappAccount.findFirst({
+    where: { organizationId: ctx.organizationId, isPrimary: true },
+    select: { id: true, enabled: true, displayPhone: true, label: true },
+  });
+  if (!account) return { waId, account, conversation: null, blocked: false };
+
+  const matches = await db.whatsappConversation.findMany({
+    where: { organizationId: ctx.organizationId, accountId: account.id, waId: { in: phoneCandidates(waId) } },
+    orderBy: [{ lastMessageAt: { sort: "desc", nulls: "last" } }, { id: "asc" }],
+    select: { id: true, waId: true, clientId: true, leadId: true },
+  });
+  const match = matches.find((row) => row.waId === waId) ?? matches[0];
+  const blocked = !!match && (
+    (!!match.clientId && match.clientId !== owner.clientId)
+    || (!!owner.leadId && !!match.leadId && match.leadId !== owner.leadId)
+  );
+  return { waId, account, conversation: blocked ? null : match ?? null, blocked };
+}
+
+/** Prepara a conversa na ficha para envio de texto ou de um modelo aprovado. */
+export async function startClientWhatsapp(ctx: TenantContext, clientId: string) {
+  assertCan(ctx, "whatsapp:write");
+  assertCan(ctx, "clients:read");
+  const client = await db.client.findFirst({
+    where: { id: clientId, organizationId: ctx.organizationId, deletedAt: null },
+    select: { phone: true },
+  });
+  if (!client) throw new NotFoundError("Cliente não encontrado.");
+
+  const { waId, account, conversation, blocked } = await findClientWhatsapp(ctx, clientId, client.phone);
+  if (!waId) throw new ConflictError("Cadastre um número de WhatsApp válido para o cliente.");
+  if (!account?.enabled) throw new ConflictError("Conecte o WhatsApp principal do escritório.");
+  if (blocked) throw new ConflictError("O número está vinculado à conversa de outro cliente.");
+  await linkContactWhatsapp(ctx, account.id, conversation?.waId ?? waId, { clientId, leadId: null });
+}
+
+export async function startLeadWhatsapp(ctx: TenantContext, leadId: string) {
+  assertCan(ctx, "whatsapp:write");
+  assertCan(ctx, "crm:read");
+  const lead = await db.lead.findFirst({
+    where: { id: leadId, organizationId: ctx.organizationId, deletedAt: null },
+    select: { phone: true, clientId: true },
+  });
+  if (!lead) throw new NotFoundError("Contato não encontrado.");
+  if (lead.clientId) assertCan(ctx, "clients:read");
+  const client = lead.clientId ? await db.client.findFirst({
+    where: { id: lead.clientId, organizationId: ctx.organizationId, deletedAt: null },
+    select: { phone: true },
+  }) : null;
+  if (lead.clientId && !client) throw new NotFoundError("Cliente não encontrado.");
+  const owner = { leadId, clientId: lead.clientId };
+  const { waId, account, conversation, blocked } = await findContactWhatsapp(ctx, owner, client ? client.phone : lead.phone);
+  if (!waId) throw new ConflictError("Cadastre um número de WhatsApp válido para o contato.");
+  if (!account?.enabled) throw new ConflictError("Conecte o WhatsApp principal do escritório.");
+  if (blocked) throw new ConflictError("O número está vinculado à conversa de outro contato.");
+
+  await linkContactWhatsapp(ctx, account.id, conversation?.waId ?? waId, owner);
+}
+
+async function linkContactWhatsapp(ctx: TenantContext, accountId: string, waId: string, owner: { clientId: string | null; leadId: string | null }) {
+  const { clientId, leadId } = owner;
+  await db.$transaction(async (tx) => {
+    await tx.whatsappConversation.createMany({
+      data: { organizationId: ctx.organizationId, accountId, waId, ...owner, assignedToId: ctx.userId },
+      skipDuplicates: true,
+    });
+    const linked = await tx.whatsappConversation.updateMany({
+      where: {
+        organizationId: ctx.organizationId,
+        accountId,
+        waId,
+        AND: [
+          { OR: [{ clientId: null }, { clientId }] },
+          ...(leadId ? [{ OR: [{ leadId: null }, { leadId }] }] : []),
+        ],
+      },
+      data: { ...(leadId ? { leadId } : {}), ...(clientId ? { clientId } : {}) },
+    });
+    if (!linked.count) throw new ConflictError("O número está vinculado à conversa de outro contato.");
+  });
+}
+
+export async function listConversationsAwaitingReply(ctx: TenantContext, options: {
+  search?: string; queueId?: string; labelId?: string; accountId?: string; serviceStatus?: string; limit?: 10 | 200;
+} = {}) {
+  assertCan(ctx, "whatsapp:read");
+  const scope = ctx.isOwner || ctx.roleKey === "ADMIN"
+    ? Prisma.empty
+    : Prisma.sql`AND c.assigned_to_id = ${ctx.userId}::uuid`;
+  const { search, queueId, labelId, accountId, serviceStatus, limit = 10 } = options;
+  const digits = search?.replace(/\D/g, "") ?? "";
+  const matches = search ? Prisma.sql`AND (
+    strpos(lower(c.contact_name), lower(${search})) > 0
+    OR strpos(lower(cl.name), lower(${search})) > 0
+    OR (${digits.length >= 4} AND strpos(c.wa_id, ${digits}) > 0)
+    OR EXISTS (
+      SELECT 1 FROM whatsapp_field_values fv
+      WHERE fv.conversation_id = c.id AND fv.organization_id = c.organization_id
+        AND strpos(lower(fv.value), lower(${search})) > 0
+    )
+  )` : Prisma.empty;
+  return db.$queryRaw<{ id: string; name: string; assignee: string | null; waitingSince: Date; waitingMinutes: number }[]>`
+    SELECT c.id, COALESCE(cl.name, c.contact_name, c.wa_id) AS name,
+           u.name AS assignee, pending.since AS "waitingSince",
+           GREATEST(0, FLOOR(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - pending.since)) / 60))::int AS "waitingMinutes"
+    FROM whatsapp_conversations c
+    LEFT JOIN clients cl ON cl.id = c.client_id AND cl.organization_id = c.organization_id
+    LEFT JOIN users u ON u.id = c.assigned_to_id
+    CROSS JOIN LATERAL (
+      SELECT MIN(m.created_at) AS since
+      FROM whatsapp_messages m
+      WHERE m.conversation_id = c.id AND m.organization_id = c.organization_id
+        AND m.direction = 'IN' AND NOT m.historical
+        AND m.created_at > COALESCE((
+          SELECT MAX(r.created_at)
+          FROM whatsapp_messages r
+          WHERE r.conversation_id = c.id AND r.organization_id = c.organization_id
+            AND r.direction = 'OUT' AND NOT r.automatic AND NOT r.historical
+            AND r.status IN ('SENT', 'DELIVERED', 'READ', 'PLAYED')
+        ), '-infinity'::timestamptz)
+    ) pending
+    WHERE c.organization_id = ${ctx.organizationId}::uuid AND c.status = 'OPEN'
+      AND c.last_inbound_at IS NOT NULL AND pending.since IS NOT NULL
+      ${scope}
+      ${matches}
+      ${queueId ? Prisma.sql`AND c.queue_id = ${queueId}::uuid` : Prisma.empty}
+      ${accountId ? Prisma.sql`AND c.account_id = ${accountId}::uuid` : Prisma.empty}
+      ${serviceStatus ? Prisma.sql`AND c.service_status = ${serviceStatus}` : Prisma.empty}
+      ${labelId ? Prisma.sql`AND EXISTS (
+        SELECT 1 FROM whatsapp_conversation_labels l
+        WHERE l.conversation_id = c.id AND l.organization_id = c.organization_id AND l.label_id = ${labelId}::uuid
+      )` : Prisma.empty}
+    ORDER BY pending.since, c.id
+    LIMIT ${limit}
+  `;
 }
 
 async function markLastInboundRead(organizationId: string, conversationId: string) {
@@ -127,7 +321,7 @@ async function saveOut(data: Prisma.WhatsappMessageUncheckedCreateInput) {
     if (!isUniqueViolation(e) || !data.waMessageId) throw e;
     const ex = await db.whatsappMessage.findFirst({ where: { waMessageId: data.waMessageId, organizationId: data.organizationId }, select: { id: true } });
     if (!ex) throw e;
-    m = await db.whatsappMessage.update({ where: { id: ex.id }, data: { authorId: data.authorId, body: data.body, mediaKey: data.mediaKey, mediaMime: data.mediaMime, mediaName: data.mediaName, mediaSize: data.mediaSize, status: data.status, error: data.error } });
+    m = await db.whatsappMessage.update({ where: { id: ex.id }, data: { authorId: data.authorId, automatic: data.automatic ?? false, historical: false, body: data.body, mediaKey: data.mediaKey, mediaMime: data.mediaMime, mediaName: data.mediaName, mediaSize: data.mediaSize, status: data.status, error: data.error } });
   }
   await emitChatEvent(data.organizationId,"chat.message.sent",{conversationId:data.conversationId,messageId:m.id,status:m.status}).catch(()=>0);
   return m;
@@ -190,7 +384,7 @@ const FILE_RULES: { test: (mime: string) => boolean; kind: OutKind; max: number 
   { test: (m) => ["audio/aac", "audio/mp4", "audio/mpeg", "audio/amr", "audio/ogg"].includes(m), kind: "audio", max: 16 * 1024 * 1024 },
 ];
 const DOC_MIMES: Record<string, string> = { pdf: "application/pdf", doc: "application/msword", docx: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", xls: "application/vnd.ms-excel", xlsx: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", ppt: "application/vnd.ms-powerpoint", pptx: "application/vnd.openxmlformats-officedocument.presentationml.presentation", txt: "text/plain" };
-const IMG_MIMES: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", mp4: "video/mp4", mp3: "audio/mpeg", ogg: "audio/ogg", aac: "audio/aac", amr: "audio/amr" };
+const IMG_MIMES: Record<string, string> = { jpg: "image/jpeg", jpeg: "image/jpeg", png: "image/png", mp4: "video/mp4", mp3: "audio/mpeg", m4a: "audio/mp4", ogg: "audio/ogg", aac: "audio/aac", amr: "audio/amr" };
 
 function sniffOk(mime: string, b: Buffer): boolean {
   if (mime === "application/pdf") return b.subarray(0, 5).toString("latin1") === "%PDF-";
@@ -208,7 +402,7 @@ export async function sendFile(ctx: TenantContext, conversationId: string, file:
   const name = sanitizeFileName(file.name);
   const ext = name.includes(".") ? name.split(".").pop()!.toLowerCase() : "";
   const mime = IMG_MIMES[ext] ?? DOC_MIMES[ext];
-  if (!mime) throw new ValidationError("Tipo de arquivo não aceito pelo WhatsApp.", { file: ["Aceitos: PDF, Word, Excel, PowerPoint, TXT, JPG, PNG, MP4, MP3, OGG, AAC, AMR."] });
+  if (!mime) throw new ValidationError("Tipo de arquivo não aceito pelo WhatsApp.", { file: ["Aceitos: PDF, Word, Excel, PowerPoint, TXT, JPG, PNG, MP4, MP3, M4A, OGG, AAC, AMR."] });
   if (file.buffer.length === 0) throw new ValidationError("O arquivo está vazio.", { file: ["O arquivo está vazio."] });
   if (!sniffOk(mime, file.buffer)) throw new ValidationError("O conteúdo do arquivo não corresponde à extensão.", { file: ["O conteúdo não corresponde ao formato."] });
   const rule = FILE_RULES.find((r) => r.test(mime));
