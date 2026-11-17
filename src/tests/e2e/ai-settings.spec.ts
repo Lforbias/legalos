@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 test("A configuração e os recursos da RUTE permanecem desativados", async ({ page }) => {
   const id = Math.random().toString(36).slice(2, 9);
@@ -7,8 +8,7 @@ test("A configuração e os recursos da RUTE permanecem desativados", async ({ p
   await page.getByLabel("E-mail").fill(`ai-config-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await page.getByLabel("Nome do escritório").fill(`Escritório IA ${id}`);
-  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  await completeWelcomeOnboarding(page, `Escritório IA ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await page.goto("/configuracoes");
   await expect(page.getByRole("link", { name: /^IA do escritório/ })).toHaveCount(0);

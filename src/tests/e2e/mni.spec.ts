@@ -1,5 +1,6 @@
 import { expectRetired, expectRetiredApi } from "./box-retired-checks";
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -11,8 +12,7 @@ test("Integrações oculta o conector PJe (MNI) retirado", async ({ page }) => {
   await page.getByLabel("E-mail").fill(`dona-mni-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca mni ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca mni ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");
@@ -28,8 +28,7 @@ test("Integrações permite cadastro público do DJEN e mantém a rota antiga de
   await page.getByLabel("E-mail").fill(`dona-captura-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca captura ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca captura ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");

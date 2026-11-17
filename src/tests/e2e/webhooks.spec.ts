@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { totpCode, totpStep } from "../../lib/security/totp";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -11,8 +12,7 @@ test("Webhooks: exige 2FA, recusa endereço inseguro, mostra o segredo uma vez, 
   await page.getByLabel("E-mail").fill(`dona-hook-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca hook ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca hook ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");

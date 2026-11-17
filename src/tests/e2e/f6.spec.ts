@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
 import { totpCode, totpStep } from "../../lib/security/totp";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -16,11 +17,12 @@ async function register(page: Page, label: string, withOrg: boolean) {
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
   if (withOrg) {
-    await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
-    await page.getByRole("button", { name: "Criar escritório" }).click();
+    await completeWelcomeOnboarding(page, `Banca ${label} ${id}`);
     await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   } else {
-    await expect(page.getByLabel("Nome do escritório")).toBeVisible();
+    // sem escritório, a pessoa para no início do onboarding Welcome (etapa Perfil)
+    await expect(page).toHaveURL(/\/onboarding(?:\?|$)/);
+    await expect(page.getByRole("heading", { name: "Como você trabalha?", exact: true })).toBeVisible();
   }
   return { id, email };
 }

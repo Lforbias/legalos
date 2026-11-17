@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { Client } from "pg";
 import { totpCode, totpStep } from "../../lib/security/totp";
+import { completeWelcomeOnboarding } from "./support/welcome";
 const DB = process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test";
 
 test('prospecção: acesso protegido, mapa, filtros e acompanhamento persistente', async ({ page }) => {
@@ -15,8 +16,7 @@ test('prospecção: acesso protegido, mapa, filtros e acompanhamento persistente
   await page.getByLabel('E-mail', { exact: true }).fill(email);
   await page.getByLabel('Senha', { exact: true }).fill('SenhaForte123');
   await page.getByRole('button', { name: 'Criar conta' }).click();
-  await page.getByLabel('Nome do escritório').fill(`Teste Prospecção ${id}`);
-  await page.getByRole('button', { name: 'Criar escritório' }).click();
+  await completeWelcomeOnboarding(page, `Teste Prospecção ${id}`);
   await expect(page.getByRole('link', { name: 'Resumo do escritório', exact: true })).toBeVisible();
   expect((await page.goto('/admin/comercial/prospeccao'))?.status()).toBe(404);
   const db = new Client({ connectionString: DB });

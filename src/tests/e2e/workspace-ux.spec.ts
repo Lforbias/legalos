@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 test("Navegação organizada, configurações por assunto e RUTE desativada", async ({ page }) => {
   const id = Math.random().toString(36).slice(2, 9);
   await page.goto("/register");
@@ -6,8 +7,7 @@ test("Navegação organizada, configurações por assunto e RUTE desativada", as
   await page.getByLabel("E-mail").fill(`ux-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await page.getByLabel("Nome do escritório").fill(`Escritório UX ${id}`);
-  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  await completeWelcomeOnboarding(page, `Escritório UX ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Navegação Evolution", exact: true });
   await nav.getByRole("button", { name: "Jurídico", exact: true }).click();

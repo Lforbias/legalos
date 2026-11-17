@@ -19,7 +19,7 @@ export async function createOrganization(
   userId: string,
   input: { name: string; timezone: string; legalName?: string | null; document?: string | null },
   meta: RequestMeta,
-  options?: { welcomeOnboarding?: Prisma.InputJsonValue; professionalIdentity?: { name: string; oabNumber: string; oabUf: string; notifyEmail?: string | null } },
+  options?: { welcomeOnboarding?: Prisma.InputJsonValue; requireGift?: boolean; professionalIdentity?: { name: string; oabNumber: string; oabUf: string; notifyEmail?: string | null } },
 ) {
   if (options?.welcomeOnboarding) {
     const previous = await db.welcomeOnboarding.findUnique({ where: { userId }, select: { completedOrganizationId: true } });
@@ -80,14 +80,20 @@ export async function createOrganization(
         if (options?.welcomeOnboarding) {
           const now = new Date();
           await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`gift-user:${userId}`}, 0))`;
+          // Reserva vencida (24 h) não vale mais nem bloqueia quem segue pela avaliação: só as vigentes entram.
           const reservedGifts = await tx.giftCodeRedemption.findMany({
-            where: { userId, status: "RESERVED" },
+            where: { userId, status: "RESERVED", reservationExpiresAt: { gt: now } },
             include: { giftCode: true },
           });
+          if (options.requireGift && reservedGifts.length === 0) {
+            throw new ConflictError("A reserva do código expirou. Confira o código novamente para renová-la ou escolha a avaliação gratuita.");
+          }
+          if (!options.requireGift && reservedGifts.length > 0) {
+            throw new ConflictError("Remova a reserva do código-presente antes de escolher outro caminho.");
+          }
           const validGifts = reservedGifts.map((redemption) => redemption.giftCode);
           for (const redemption of reservedGifts) {
             const gift = redemption.giftCode;
-            if (redemption.reservationExpiresAt <= now) throw new ConflictError("A reserva do código expirou. Confira o código novamente para renová-la ou remova o benefício.");
             if (!gift.active || gift.revokedAt || gift.startsAt > now || (gift.expiresAt && gift.expiresAt <= now)) {
               throw new ConflictError("O código de presente reservado expirou ou foi revogado. Confira outro benefício antes de criar o escritório.");
             }

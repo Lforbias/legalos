@@ -38,6 +38,7 @@ describe("LegalOS Welcome — piloto local", () => {
         office: { name: "Escritório piloto presente", legalName: "", document: "", timezone: "America/Sao_Paulo" },
         activationPath: "GIFT", planKey: null, activationChecklist: { completed: [], completedAt: {}, dismissed: false },
       },
+      requireGift: true,
       professionalIdentity: { name: owner.name, oabNumber: "123456", oabUf: "SP", notifyEmail: owner.email },
     });
 
@@ -72,5 +73,37 @@ describe("LegalOS Welcome — piloto local", () => {
     expect(refreshedChecklist.completedAt.client).toBeTruthy();
     expect(refreshedChecklist.completedAt.team).toBeTruthy();
     expect(await db.client.count({ where: { organizationId: otherOrganization.id } })).toBe(0);
+  });
+
+  it("reserva vencida não trava a avaliação gratuita e não é aplicada; caminho de presente exige reserva vigente", async () => {
+    const owner = await makeUser("welcome-expired-gift");
+    const gift = await createGiftCode(platform, { label: "Presente vencido", benefitType: GiftCodeBenefitType.TRIAL_EXTENSION, accessDays: 30, usageLimit: 5, stackable: false });
+    await reserveGiftCode(owner.id, gift.code);
+    await db.giftCodeRedemption.updateMany({ where: { giftCodeId: gift.id, userId: owner.id }, data: { reservationExpiresAt: new Date(Date.now() - 60_000) } });
+    const welcome = (activationPath: "TRIAL" | "GIFT") => ({
+      profile: { professionalType: "SOLO" }, office: { name: "Escritório reserva vencida", legalName: "", document: "", timezone: "America/Sao_Paulo" },
+      activationPath, planKey: null, activationChecklist: { completed: [], completedAt: {}, dismissed: false },
+    });
+
+    await expect(createOrganization(owner.id, { name: "Escritório reserva vencida", timezone: "America/Sao_Paulo" }, META, { welcomeOnboarding: welcome("GIFT"), requireGift: true })).rejects.toThrow(/reserva do código expirou/);
+    expect(await db.membership.count({ where: { userId: owner.id } })).toBe(0);
+
+    const organization = await createOrganization(owner.id, { name: "Escritório reserva vencida", timezone: "America/Sao_Paulo" }, META, { welcomeOnboarding: welcome("TRIAL") });
+    const subscription = await db.subscription.findUniqueOrThrow({ where: { organizationId: organization.id }, include: { plan: true } });
+    expect(subscription).toMatchObject({ status: "TRIALING", providerSubscriptionId: null, billingProvider: null });
+    expect(subscription.plan.key).toBe("welcome-trial");
+    expect(subscription.trialEndsAt!.getTime()).toBeLessThan(Date.now() + 15 * 86_400_000);
+    expect(await db.giftCodeRedemption.findUniqueOrThrow({ where: { giftCodeId_userId: { giftCodeId: gift.id, userId: owner.id } } })).toMatchObject({ status: "RESERVED", organizationId: null, appliedAt: null });
+    expect(await db.billingInvoice.count({ where: { organizationId: organization.id } })).toBe(0);
+  });
+
+  it("caminho de avaliação com reserva vigente é recusado no servidor, sem criar escritório", async () => {
+    const owner = await makeUser("welcome-trial-with-reservation");
+    const gift = await createGiftCode(platform, { label: "Presente vigente", benefitType: GiftCodeBenefitType.TRIAL_EXTENSION, accessDays: 10, usageLimit: 5, stackable: false });
+    await reserveGiftCode(owner.id, gift.code);
+    await expect(createOrganization(owner.id, { name: "Escritório com reserva", timezone: "America/Sao_Paulo" }, META, {
+      welcomeOnboarding: { profile: { professionalType: "SOLO" }, office: { name: "Escritório com reserva", legalName: "", document: "", timezone: "America/Sao_Paulo" }, activationPath: "TRIAL", planKey: null, activationChecklist: { completed: [], completedAt: {}, dismissed: false } },
+    })).rejects.toThrow(/Remova a reserva/);
+    expect(await db.membership.count({ where: { userId: owner.id } })).toBe(0);
   });
 });

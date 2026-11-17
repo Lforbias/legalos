@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 test("implantação mostra as três etapas e os novos gatilhos de automação", async ({ page }) => {
   const id = `${Date.now()}-${Math.random().toString(16).slice(2, 8)}`;
@@ -7,8 +8,7 @@ test("implantação mostra as três etapas e os novos gatilhos de automação", 
   await page.getByLabel("E-mail", { exact: true }).fill(`implantacao-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await page.getByLabel("Nome do escritório").fill(`Escritório de implantação ${id}`);
-  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  await completeWelcomeOnboarding(page, `Escritório de implantação ${id}`);
   await expect(page).toHaveURL(/\/dashboard(?:\?|$)/);
   await page.goto("/configuracoes");
   await page.getByRole("link", { name: /Implantação do escritório/ }).first().click();

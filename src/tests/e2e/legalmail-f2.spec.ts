@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -11,8 +12,7 @@ async function register(page: Page, label: string) {
   await page.getByLabel("E-mail").fill(`${label}-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca ${label} ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return id;
 }

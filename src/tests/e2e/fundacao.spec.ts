@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { Client } from "pg";
+import { completeWelcomeOnboarding, testDatabaseUrl } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -33,8 +35,7 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   // cadastro
   await register(page, "Talita Teste", ownerEmail);
   await expect(page).toHaveURL(/\/onboarding/);
-  await page.getByLabel("Nome do escritório").fill(`Escritório ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Escritório ${id}`);
 
   // dashboard conectado ao banco
   await expect(page.getByRole("heading", { name: /Bom dia, Talita/ })).toBeVisible();
@@ -69,7 +70,24 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   await guest.getByLabel("Nome completo").fill("Advogado Convidado");
   await guest.getByLabel("Senha", { exact: true }).fill(password);
   await guest.getByRole("button", { name: "Criar conta" }).click();
+  await expect(guest).toHaveURL(/\/dashboard(?:\?|$)/);
   await expect(guest.getByRole("heading", { name: /Bom dia, Advogado/ })).toBeVisible();
+  // convidado entra como membro do escritório existente: não passa pelo Welcome nem cria outro escritório
+  const db = new Client({ connectionString: testDatabaseUrl() });
+  await db.connect();
+  try {
+    const { rows } = await db.query(
+      `SELECT o.name, r.key AS role FROM users u JOIN memberships m ON m.user_id = u.id JOIN organizations o ON o.id = m.organization_id JOIN roles r ON r.id = m.role_id WHERE u.email = $1`,
+      [guestEmail],
+    );
+    expect(rows).toEqual([{ name: `Escritório ${id}`, role: "LAWYER" }]);
+    expect((await db.query("SELECT count(*)::int AS n FROM organizations o JOIN users u ON u.id = o.created_by_id WHERE u.email = $1", [guestEmail])).rows[0].n).toBe(0);
+    expect((await db.query("SELECT count(*)::int AS n FROM welcome_onboarding w JOIN users u ON u.id = w.user_id WHERE u.email = $1 AND w.completed_at IS NOT NULL", [guestEmail])).rows[0].n).toBe(0);
+  } finally {
+    await db.end();
+  }
+  await guest.goto("/onboarding");
+  await expect(guest.getByRole("heading", { name: "Como você trabalha?" })).toHaveCount(0);
 
   // permissões: advogado não vê auditoria nem gestão de equipe
   await guest.goto("/configuracoes/auditoria");
@@ -112,8 +130,7 @@ test("escritórios são isolados: um usuário não enxerga a equipe de outro esc
   const b = await ctxB.newPage();
   for (const [p, label] of [[a, "A"], [b, "B"]] as const) {
     await register(p, `Dono ${label}${id}`, `dono-${label.toLowerCase()}-${id}@example.test`);
-    await p.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
-    await p.getByRole("button", { name: "Criar escritório" }).click();
+    await completeWelcomeOnboarding(p, `Banca ${label} ${id}`);
     await expect(p.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   }
   await a.goto("/configuracoes/equipe");

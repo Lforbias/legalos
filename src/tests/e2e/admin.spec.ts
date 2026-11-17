@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { Client } from "pg";
 import { totpCode, totpStep } from "../../lib/security/totp";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -14,8 +15,7 @@ async function signUp(page: Page, label: string) {
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca ${label} ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   return { id, email };
 }
@@ -72,7 +72,7 @@ test("painel de admin: super-admin sem 2FA vai ativar o 2FA; com 2FA vê as tela
 
   // plano e assinatura: cancelar pela administração pausa só o que aumenta uso e avisa o escritório
   await alvo.goto("/configuracoes/plano");
-  await expect(alvo.getByTestId("plan-card")).toContainText("Profissional");
+  await expect(alvo.getByTestId("plan-card")).toContainText("Avaliação gratuita");
   await page.getByRole("button", { name: "Plano…" }).click();
   const form = page.locator("[data-testid^=sub-form-]");
   await form.getByLabel("Situação").selectOption("CANCELED");

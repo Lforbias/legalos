@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import { Client } from "pg";
 import { totpCode, totpStep } from "../../lib/security/totp";
+import { completeWelcomeOnboarding } from "./support/welcome";
 const DB = process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test";
 
 test('Comercial: amostra entra no funil, mapa e ficha sem duplicar', async ({ page }) => {
@@ -11,8 +12,7 @@ test('Comercial: amostra entra no funil, mapa e ficha sem duplicar', async ({ pa
   await page.getByLabel('E-mail', { exact: true }).fill(email);
   await page.getByLabel('Senha', { exact: true }).fill('SenhaForte123');
   await page.getByRole('button', { name: 'Criar conta' }).click();
-  await page.getByLabel('Nome do escritório').fill('Escritório de teste comercial');
-  await page.getByRole('button', { name: 'Criar escritório' }).click();
+  await completeWelcomeOnboarding(page, 'Escritório de teste comercial');
   await expect(page.getByRole('link', { name: 'Resumo do escritório', exact: true })).toBeVisible();
   expect((await page.goto('/comercial'))?.status()).toBe(404);
   const db = new Client({ connectionString: DB }); await db.connect();

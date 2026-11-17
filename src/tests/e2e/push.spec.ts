@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -10,8 +11,7 @@ test("avisos no celular: o cartão aparece em Minha conta; sem chaves no servido
   await page.getByLabel("E-mail").fill(`dona-push-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca push ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca push ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/conta");

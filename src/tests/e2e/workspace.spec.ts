@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import { Client } from "pg";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 test("workspace connects client folders to multiple cases and original records", async ({ page }) => {
   const unique = randomUUID().slice(0, 8);
@@ -10,8 +11,7 @@ test("workspace connects client folders to multiple cases and original records",
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await page.getByLabel("Nome do escritório").fill(`Desktop de demonstração ${unique}`);
-  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  await completeWelcomeOnboarding(page, `Desktop de demonstração ${unique}`);
   await expect(page.getByRole("heading", { name: /Bom dia|Boa tarde|Boa noite/ })).toBeVisible();
   const url = process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test";
   if (!/test/i.test(new URL(url).pathname)) throw Error("Fixture requires test database");

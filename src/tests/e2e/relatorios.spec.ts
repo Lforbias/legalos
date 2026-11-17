@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -10,8 +11,7 @@ test("Relatórios: abas por permissão, período inválido é explicado e a plan
   await page.getByLabel("E-mail").fill(`dona-rel-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca rel ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca rel ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/relatorios");

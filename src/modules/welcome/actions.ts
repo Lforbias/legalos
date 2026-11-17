@@ -65,6 +65,7 @@ export async function completeWelcomeOrganizationAction(input: unknown): Promise
       await getRequestMeta(),
       {
         welcomeOnboarding: { profile: data.data, office: { name: data.name, legalName: data.legalName, document: data.document, timezone: data.timezone }, activationPath: data.activationPath, planKey: data.planKey ?? null, activationChecklist: { completed: [], completedAt: {}, dismissed: false } } as Prisma.InputJsonValue,
+        requireGift: data.activationPath === "GIFT",
         ...(data.data.oabNumber && data.data.oabUf ? { professionalIdentity: { name: session.user.name, oabNumber: data.data.oabNumber, oabUf: data.data.oabUf, notifyEmail: session.user.email } } : {}),
       },
     );

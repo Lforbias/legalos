@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { totpCode, totpStep } from "../../lib/security/totp";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -11,8 +12,7 @@ test("Chaves de API: criar na tela (exige 2FA), usar a API sem cookie, token só
   await page.getByLabel("E-mail").fill(`dona-api-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca api ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca api ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // sem 2FA, criar chave é recusado com explicação

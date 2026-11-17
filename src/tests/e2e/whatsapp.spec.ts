@@ -2,6 +2,7 @@ import {Client} from "pg";
 import { expect, test } from "@playwright/test";
 import { totpCode, totpStep } from "../../lib/security/totp";
 import { APP_SECRET, inbound, startFakeWhatsapp, WA_TOKEN } from "../integration/fake-whatsapp";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -27,8 +28,7 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await page.getByLabel("E-mail").fill(`dona-zap-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca zap ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca zap ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   // Sem conexão: aviso honesto.
@@ -356,8 +356,7 @@ test("WhatsApp: o menu mostra Atendimento e quem não tem permissão não entra 
   await page.getByLabel("E-mail").fill(`dona-menu-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca menu ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca menu ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   const nav = page.getByRole("navigation", { name: "Navegação Evolution" });
   await nav.getByRole("button", { name: "Atendimento", exact: true }).click();
@@ -379,8 +378,7 @@ test("WhatsApp por QR-Code: exige 2FA e aceite do risco, mostra o QR, conecta e 
   await page.getByLabel("E-mail").fill(`dona-qr-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca qr ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca qr ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/atendimento/configuracoes");
@@ -424,7 +422,7 @@ test("WhatsApp por QR-Code: exige 2FA e aceite do risco, mostra o QR, conecta e 
 
 test("Campanha de 2.601 contatos: seleção completa, rascunho e relatório paginado sem disparar",async({page})=>{
  const id=uid(),email=`campanha-${id}@example.test`;
- await page.goto("/register");await page.getByLabel("Nome completo").fill(`Pessoa campanha ${id}`);await page.getByLabel("E-mail").fill(email);await page.getByLabel("Senha",{exact:true}).fill(password);await page.getByRole("button",{name:"Criar conta",exact:true}).click();await page.getByLabel("Nome do escritório").fill(`Banca campanhas ${id}`);await page.getByRole("button",{name:"Criar escritório",exact:true}).click();await expect(page.getByRole("heading",{name: /Bom dia/})).toBeVisible();
+ await page.goto("/register");await page.getByLabel("Nome completo").fill(`Pessoa campanha ${id}`);await page.getByLabel("E-mail").fill(email);await page.getByLabel("Senha",{exact:true}).fill(password);await page.getByRole("button",{name:"Criar conta",exact:true}).click();await completeWelcomeOnboarding(page, `Banca campanhas ${id}`);await expect(page.getByRole("heading",{name: /Bom dia/})).toBeVisible();
  const url=process.env.TEST_DATABASE_URL??"postgresql://legalos:legalos_dev@localhost:5432/legalos_test";if(!/test/i.test(new URL(url).pathname))throw Error("Fixture exige banco de testes");const database=new Client({connectionString:url});await database.connect();
  try{
  const {rows:[person]}=await database.query('SELECT m.organization_id FROM users u JOIN memberships m ON m.user_id=u.id WHERE u.email=$1',[email]);
