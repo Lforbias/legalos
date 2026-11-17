@@ -1,6 +1,6 @@
 "use client";
 
-import { Download, FileText, Upload } from "lucide-react";
+import { Download, FileText, Search, Upload } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -23,17 +23,26 @@ export function DocumentsPanel({
   canWrite,
   timezone,
   revalidate,
+  title = "Documentos",
+  description = "Arquivos privados do escritório. Formatos: PDF, imagens, Office/OpenDocument, TXT e CSV · até 8 MB.",
+  searchable = false,
 }: {
   owner: { caseId?: string; clientId?: string };
   documents: DocumentRow[];
   canWrite: boolean;
   timezone: string;
   revalidate: string;
+  title?: string;
+  description?: string;
+  searchable?: boolean;
 }) {
   const router = useRouter();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
+  const [query, setQuery] = React.useState("");
+  const visibleDocuments = documents.filter((document) => document.name.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()));
+  const inputId = owner.caseId ? "document-file" : `document-file-${owner.clientId ?? "repository"}`;
 
   const upload = (file: File) => {
     setError(null);
@@ -61,15 +70,15 @@ export function DocumentsPanel({
   return (
     <Card>
       <CardHeader
-        title="Documentos"
-        description="Arquivos privados do escritório. Formatos: PDF, imagens, Office/OpenDocument, TXT e CSV · até 8 MB."
+        title={title}
+        description={description}
         action={
           canWrite ? (
             <div className="flex items-center gap-2">
               <Link href={owner.caseId ? `/documentos/gerar?processo=${owner.caseId}` : `/documentos/gerar?cliente=${owner.clientId}`} className="inline-flex h-8 items-center rounded-md border border-border bg-surface-2 px-3 text-sm hover:bg-surface-3">Gerar de modelo</Link>
               <input
                 ref={inputRef}
-                id="document-file"
+                id={inputId}
                 type="file"
                 accept={ACCEPT}
                 className="sr-only"
@@ -87,9 +96,23 @@ export function DocumentsPanel({
       />
       <CardBody className="space-y-3">
         {error ? <Alert tone="error">{error}</Alert> : null}
+        {searchable && documents.length > 0 ? (
+          <label className="relative block max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" aria-hidden="true" />
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Buscar nesta pasta"
+              aria-label={`Buscar em ${title}`}
+              className="h-9 w-full rounded-md border border-border bg-surface pl-9 pr-3 text-sm outline-none focus:border-primary"
+            />
+          </label>
+        ) : null}
         {documents.length === 0 ? <p className="text-sm text-muted">Nenhum documento anexado.</p> : null}
+        {documents.length > 0 && visibleDocuments.length === 0 ? <p className="text-sm text-muted">Nenhum documento corresponde à busca.</p> : null}
         <ul className="divide-y divide-border">
-          {documents.map((d) => (
+          {visibleDocuments.map((d) => (
             <li key={d.id} className="flex flex-wrap items-center justify-between gap-3 py-2">
               <div className="flex min-w-0 items-center gap-2">
                 <FileText className="h-4 w-4 shrink-0 text-muted" aria-hidden />

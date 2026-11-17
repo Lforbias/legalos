@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { uuidSchema, type ActionState } from "@/lib/validation/common";
 import { parse, runAction } from "@/server/action-helpers";
-import { deleteDriveIntegration, disconnectDrive, pullDocumentFromDrive, saveDriveCredentials, sendDocumentToDrive, setClientDriveFolder, setDriveEnabled, unlinkDocumentDrive } from "@/server/services/google-drive.service";
+import { createClientDriveFolder, deleteDriveIntegration, disconnectDrive, pullDocumentFromDrive, saveDriveCredentials, sendDocumentToDrive, setClientDriveFolder, setDriveEnabled, unlinkDocumentDrive } from "@/server/services/google-drive.service";
 import { requireTenant } from "@/server/session";
 
 const credSchema = z.object({ clientId: z.string().max(300), clientSecret: z.string().max(300), folderName: z.string().max(100).nullable().optional() });
@@ -73,6 +73,17 @@ export async function setClientDriveFolderAction(clientId: string, folder: strin
     const id = parse(uuidSchema, clientId);
     await setClientDriveFolder(ctx, id, parse(z.string().trim().min(1).max(1000).nullable(), folder));
     revalidatePath(`/clientes/${id}`);
+    return undefined;
+  });
+}
+
+export async function createClientDriveFolderAction(clientId: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const id = parse(uuidSchema, clientId);
+    await createClientDriveFolder(ctx, id);
+    revalidatePath(`/clientes/${id}`);
+    revalidatePath(`/crm`);
     return undefined;
   });
 }

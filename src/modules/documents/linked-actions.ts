@@ -25,3 +25,24 @@ export async function removeLinkedDocumentAction(caseId: string, id: string): Pr
     return undefined;
   });
 }
+
+export async function addClientLinkedDocumentAction(clientId: string, input: unknown): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    const v = parse(z.object({ name: z.string().trim().min(2, "Informe o nome do documento.").max(200), url: z.string().trim().min(8, "Cole o link.").max(1000) }), input);
+    await addLinkedDocument(ctx, { clientId: parse(uuidSchema, clientId) }, v);
+    revalidatePath(`/clientes/${clientId}`);
+    revalidatePath("/crm");
+    return undefined;
+  });
+}
+
+export async function removeClientLinkedDocumentAction(clientId: string, id: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    await removeLinkedDocument(ctx, parse(uuidSchema, id));
+    revalidatePath(`/clientes/${clientId}`);
+    revalidatePath("/crm");
+    return undefined;
+  });
+}

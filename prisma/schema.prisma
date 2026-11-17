@@ -202,6 +202,8 @@ model Organization {
   portalAccounts          PortalAccount[]
   importMaps              ImportMap[]
   financeAccounts         FinanceAccount[]
+  bankStatementImports   BankStatementImport[]
+  bankStatementLines     BankStatementLine[]
   financeCategories       FinanceCategory[]
   costCenters             CostCenter[]
   financeEntries          FinanceEntry[]
@@ -1369,6 +1371,7 @@ model FinanceAccount {
   deletedAt      DateTime?          @map("deleted_at") @db.Timestamptz(3)
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  statementImports BankStatementImport[]
 
   @@map("finance_accounts")
 }
@@ -1435,6 +1438,7 @@ model FinanceEntry {
 
   organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   payments     FinancePayment[]
+  statementMatches BankStatementLine[] @relation("StatementMatchedEntry")
   invoice      FeeInvoice?      @relation(fields: [invoiceId], references: [id], onDelete: SetNull)
 
   @@index([organizationId, dueDate])
@@ -1479,9 +1483,61 @@ model FinancePayment {
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   entry        FinanceEntry @relation(fields: [entryId], references: [id], onDelete: Restrict)
+  statementLine BankStatementLine?
 
   @@index([entryId])
   @@map("finance_payments")
+}
+
+enum BankStatementLineStatus {
+  PENDING
+  MATCHED
+  IGNORED
+}
+
+model BankStatementImport {
+  id             String   @id @default(uuid()) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  accountId      String   @map("account_id") @db.Uuid
+  fileName       String   @map("file_name")
+  rowCount       Int      @default(0) @map("row_count")
+  duplicateCount Int      @default(0) @map("duplicate_count")
+  invalidCount   Int      @default(0) @map("invalid_count")
+  importedById   String   @map("imported_by_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  account      FinanceAccount         @relation(fields: [accountId], references: [id], onDelete: Restrict)
+  lines        BankStatementLine[]
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("bank_statement_imports")
+}
+
+model BankStatementLine {
+  id             String                  @id @default(uuid()) @db.Uuid
+  organizationId String                  @map("organization_id") @db.Uuid
+  importId       String                  @map("import_id") @db.Uuid
+  fingerprint    String
+  postedOn       DateTime                @map("posted_on") @db.Date
+  description    String
+  amount         Decimal                 @db.Decimal(14, 2)
+  direction      FinanceEntryKind
+  status         BankStatementLineStatus @default(PENDING)
+  matchedEntryId String?                 @map("matched_entry_id") @db.Uuid
+  paymentId      String?                 @unique @map("payment_id") @db.Uuid
+  matchedAt      DateTime?               @map("matched_at") @db.Timestamptz(3)
+  createdAt      DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  organization Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  import       BankStatementImport    @relation(fields: [importId], references: [id], onDelete: Cascade)
+  matchedEntry FinanceEntry?          @relation("StatementMatchedEntry", fields: [matchedEntryId], references: [id], onDelete: SetNull)
+  payment      FinancePayment?        @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, fingerprint])
+  @@index([organizationId, status, postedOn])
+  @@index([importId, status])
+  @@map("bank_statement_lines")
 }
 
 model AiUsage {

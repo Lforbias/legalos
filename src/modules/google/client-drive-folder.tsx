@@ -6,7 +6,7 @@ import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { Field, Input } from "@/components/ui/form";
-import { setClientDriveFolderAction } from "./actions";
+import { createClientDriveFolderAction, setClientDriveFolderAction } from "./actions";
 
 export function ClientDriveFolder({ clientId, folder, canManage }: {
   clientId: string;
@@ -35,6 +35,20 @@ export function ClientDriveFolder({ clientId, folder, canManage }: {
     }
   });
 
+  const create = () => start(async () => {
+    setError(null);
+    try {
+      const result = await createClientDriveFolderAction(clientId);
+      if (!result.ok) {
+        setError(result.message ?? "Não foi possível criar a pasta.");
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError("Não foi possível criar a pasta. Tente novamente.");
+    }
+  });
+
   if (!folder && !canManage) return null;
   return (
     <Card>
@@ -44,6 +58,7 @@ export function ClientDriveFolder({ clientId, folder, canManage }: {
         {folder ? <a className="block break-words text-sm text-primary-text underline" href={folder.href} target="_blank" rel="noopener noreferrer">{folder.name}</a> : null}
         {canManage ? (
           <div className="flex flex-wrap gap-2">
+            {!folder && !editing ? <Button size="sm" loading={pending} onClick={create}>Criar pasta no Drive</Button> : null}
             <Button size="sm" variant="secondary" disabled={pending} onClick={() => setEditing(!editing)}>{editing ? "Cancelar" : folder ? "Trocar pasta" : "Vincular pasta existente"}</Button>
             {folder && !editing ? <Button size="sm" variant="secondary" loading={pending} onClick={() => save(null)}>Desvincular</Button> : null}
           </div>

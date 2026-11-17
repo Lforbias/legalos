@@ -18,6 +18,10 @@ export function parseHttpsUrl(raw: string): { url: string; kind: string } {
 export async function listLinkedDocuments(ctx: TenantContext, owner: { caseId?: string; clientId?: string }) {
   assertCan(ctx, "documents:read");
   if (owner.caseId) await assertCaseVisible(ctx, owner.caseId);
+  if (owner.clientId) {
+    assertCan(ctx, "clients:read");
+    if (!(await db.client.findFirst({ where: { id: owner.clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true } }))) throw new NotFoundError("Cliente não encontrado.");
+  }
   return db.linkedDocument.findMany({
     where: { organizationId: ctx.organizationId, deletedAt: null, isModel: false, ...(owner.caseId ? { caseId: owner.caseId } : {}), ...(owner.clientId ? { clientId: owner.clientId } : {}) },
     orderBy: [{ originalAt: "desc" }, { createdAt: "desc" }],
@@ -49,9 +53,13 @@ export async function addLinkedDocument(ctx: TenantContext, owner: { caseId?: st
 
 export async function removeLinkedDocument(ctx: TenantContext, id: string) {
   assertCan(ctx, "documents:write");
-  const doc = await db.linkedDocument.findFirst({ where: { id, organizationId: ctx.organizationId, deletedAt: null }, select: { caseId: true } });
+  const doc = await db.linkedDocument.findFirst({ where: { id, organizationId: ctx.organizationId, deletedAt: null }, select: { caseId: true, clientId: true } });
   if (!doc) throw new NotFoundError("Documento não encontrado.");
   if (doc.caseId) await assertCaseVisible(ctx, doc.caseId);
+  if (doc.clientId) {
+    assertCan(ctx, "clients:read");
+    if (!(await db.client.findFirst({ where: { id: doc.clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true } }))) throw new NotFoundError("Documento não encontrado.");
+  }
   await db.linkedDocument.update({ where: { id }, data: { deletedAt: new Date() } });
   await audit({ action: "document.link_remove", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "linked_document", resourceId: id, meta: ctx.meta });
 }

@@ -200,6 +200,43 @@ export async function setClientDriveFolder(ctx: TenantContext, clientId: string,
   });
 }
 
+export async function createClientDriveFolder(ctx: TenantContext, clientId: string, f: FetchFn = fetch) {
+  assertCan(ctx, "integrations:manage");
+  assertCan(ctx, "documents:write");
+  assertCan(ctx, "clients:read");
+  const client = await db.client.findFirst({
+    where: { id: clientId, organizationId: ctx.organizationId, deletedAt: null },
+    select: { id: true, name: true, driveFolder: { select: { folderId: true, name: true, resourceKey: true } } },
+  });
+  if (!client) throw new NotFoundError("Cliente não encontrado.");
+  if (client.driveFolder) return client.driveFolder;
+
+  const { g, access } = await accessFor(ctx, f);
+  try {
+    const rootId = g.folderId ?? await ensureFolder(access, g.folderName, f);
+    if (!g.folderId) await db.googleIntegration.update({ where: { organizationId: ctx.organizationId }, data: { folderId: rootId } });
+    return await db.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`drive-client:${ctx.organizationId}:${client.id}`}, 0))`;
+      const existing = await tx.clientDriveFolder.findUnique({ where: { clientId }, select: { folderId: true, name: true, resourceKey: true } });
+      if (existing) return existing;
+      const folderId = await ensureFolder(access, client.name, f, { parentId: rootId, id: client.id });
+      const folder = { folderId, name: client.name, resourceKey: null };
+      await tx.clientDriveFolder.create({ data: { clientId, ...folder } });
+      await audit({
+        action: "google.client_folder_create",
+        organizationId: ctx.organizationId,
+        userId: ctx.userId,
+        resourceType: "client",
+        resourceId: clientId,
+        meta: ctx.meta,
+      }, tx);
+      return folder;
+    }, { timeout: 30_000 });
+  } catch (e) {
+    return wrap(e);
+  }
+}
+
 async function readStored(key: string): Promise<Buffer> {
   const chunks: Buffer[] = [];
   const reader = (await getObjectStream(key)).getReader();
