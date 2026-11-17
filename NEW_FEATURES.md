@@ -194,6 +194,67 @@
 
 **Status:** A fazer.
 
+## Iniciativa transversal — LegalOS Cowork (colaboração entre pessoas e agentes)
+
+**Nome aprovado:** LegalOS Cowork — Collaborative Workspace.  
+**Decisão:** substitui integralmente o conceito anterior de **LegalOS Team**. Não é somente um chat interno: é o ambiente de trabalho compartilhado do escritório, preparado para colaboração futura entre profissionais e agentes de IA.  
+**Natureza:** iniciativa estrutural própria do LegalOS Evolution, independente do Welcome e das quatro prioridades externas acima.  
+**Status:** **Planejado — não implementado nem validado.**  
+**Princípio:** primeiro estabilizar a experiência humana e os fluxos entre departamentos; somente depois adicionar agentes consultivos e evoluir gradualmente sua autonomia.
+
+### Visão e experiência
+
+- Um **workspace por escritório/organização**, com isolamento multiempresa e identidade unificada da conta existente.
+- Canais públicos e restritos por departamento (Geral, Comercial, Atendimento, Jurídico, Financeiro, Gestão etc.), conversas individuais, grupos e salas ligadas a processos ou projetos.
+- Usuários exibidos pelo nome profissional/de exibição associado à conta, com papel e departamento; **não** criar credenciais paralelas nem usar necessariamente o nome de login como nome público.
+- Chat interno separado do atendimento/WhatsApp com clientes, com navegação integrada e sem cruzar mensagens privadas ou destinatários.
+- Mensagens em tempo real, respostas em threads, @menções, notificações, pesquisa, anexos e compartilhamento contextual de recursos.
+- Encaminhamento de **links/cartões de clientes, processos, pastas, documentos, tarefas e atividades** em vez de duplicar registros. Acesso ao conteúdo continua sujeito às permissões originais e ao sigilo de processos.
+- Reuniões internas (meetings) agendadas e vinculadas a canais, tarefas, processos e calendário; áudio/vídeo e compartilhamento de tela entram mediante avaliação de solução técnica, segurança, custos e capacidade, sem presumir implementação existente.
+- Reuniões podem gerar atas, encaminhamentos e tarefas com responsáveis, prazos, aceite e histórico.
+- Um espaço pode reunir profissionais humanos e, **em etapa futura**, agentes departamentais claramente identificados como IA.
+
+### Colaboração com agentes de IA (visão futura, não implementar antes da base estável)
+
+- **Comercial/CRM:** agente especializado em leads, propostas, triagem e apoio às respostas; eventual atendimento por mensagem/voz condicionado a integração habilitada, consentimento e regras de operação.
+- **Atendimento:** agente especializado em canais, encaminhamento e rascunhos de respostas.
+- **Jurídico:** agente especializado em documentos, casos, pesquisa e preparação de minutas, com fontes rastreáveis e revisão profissional.
+- **Financeiro:** agente especializado em cobranças, honorários, pendências e relatórios, respeitando permissões de finanças.
+- Interação natural por @menções: pessoas podem consultar agentes específicos; um agente pode requisitar colaboração a outro, **sem ampliar automaticamente seu acesso**.
+- Agentes são atores diferentes de usuários humanos: identificador, escopo, permissões mínimas, trilha de auditoria, limites e possibilidade de suspensão/revogação próprios.
+- Operações externas ou de escrita (responder cliente, alterar cadastro, movimentar documentos, enviar cobrança, agendar ou peticionar) exigem políticas explícitas de autorização e, quando pertinente, aprovação humana.
+- Mensagens, ações, propostas, aprovações, resultados e falhas ficam rastreáveis; nenhuma alegação de execução sem confirmação real.
+
+### Gestão e acompanhamento de trabalho (tracking)
+
+- O gestor visualiza **o trabalho**, não apenas o volume de mensagens: responsáveis, tarefas em curso, atrasos, bloqueios, entregas, horas registradas, reuniões e pendências por departamento.
+- Integração com o que já existe no LegalOS: tarefas, agenda, apontamentos de tempo, relatórios de produtividade, permissões, auditoria e documentos.
+- Converter uma mensagem/reunião em tarefa e relacionar uma tarefa a uma conversa sem gerar cadastros duplicados.
+- Estados de trabalho com atualização vinculada a eventos reais; diferenciar `Em andamento`, `Aguardando`, `Concluído` e `Não informado`. Não inferir atividade real só por presença online.
+- Painel gerencial com filtros por equipe/período/processo e critérios explicáveis. Nenhuma leitura indiscriminada de mensagens diretas privadas, vigilância oculta ou pontuação de produtividade baseada em quantidade de chats.
+- Canais e arquivos confidenciais são visíveis apenas a membros autorizados; administradores não recebem acesso irrestrito por padrão.
+
+### Implantação incremental aprovada
+
+1. **Cowork 1.0 — Humanos:** comunicação interna em tempo real, canais, grupos, DMs, menções, links a recursos existentes, anexos, permissões e reuniões básicas (integração de conferência após estudo técnico).
+2. **Cowork 2.0 — Gestão e operação:** mensagens/reuniões vinculadas a tarefas e processos, atas e encaminhamentos, registros de progresso, visões por departamento e indicadores administrativos baseados em entregas verificáveis.
+3. **Cowork 3.0 — Inteligência consultiva:** adicionar agentes por departamento para responder perguntas e preparar propostas, com acesso restrito, fontes verificáveis e intervenção humana.
+4. **Cowork 4.0 — Colaboração híbrida:** agentes colaboram com pessoas e outros agentes em fluxos entre departamentos, com orquestração controlada, aprovações, observabilidade, reversibilidade e limites explícitos.
+
+**Dependência obrigatória:** seguir a estratégia Evolution — departamentos/UX → funcionalidades → integração de fluxos → testes e estabilização → agentes/IA. A IA não deve bloquear a entrega e adoção do Cowork humano.
+
+### Arquitetura, segurança e critérios de aceite
+
+- Preservar o monólito modular, entidades de organização/membros, controle de acesso e trilhas existentes; não recriar plataforma, chat externo, calendário, tarefas, CRM ou GED.
+- Serviços e modelos específicos do Cowork para canais, participantes, mensagens, reuniões e referências; vincular a `organizationId` e checar permissão também no acesso direto a anexos/cartões.
+- Comunicação em tempo real com entrega ordenada, reconexão, notificação, histórico persistente e controles antiabuso; definir transporte conforme estudo técnico da infraestrutura atual.
+- Limites de armazenamento/transferência, verificação de arquivos, retenção adequada, proteção de dados e logs sem conteúdo sensível desnecessário.
+- **MVP com dados fictícios:** dois usuários autorizados conversam em um canal, compartilham uma pasta/processo sem vazamento de sigilo, criam tarefa de uma mensagem, realizam ou agendam reunião e geram encaminhamento; gestor acompanha a entrega sem acesso indevido à DM privada.
+- **Fase de agentes posterior:** um agente consultivo responde apenas dentro de seu escopo; solicita autorização para qualquer ação modificadora e gera trilha íntegra.
+- Não anunciar áudio/vídeo, colaboração interagentes ou automação de mensagens como disponíveis antes de testes end-to-end e validação da infraestrutura.
+
+**Status:** A fazer.
+
 ## Regras de execução
 
 1. Preservar o repositório e as funcionalidades existentes; não reconstruir o LegalOS do zero.
@@ -201,7 +262,7 @@
 3. Validar no ambiente de desenvolvimento com dados fictícios e fluxo ponta a ponta antes de publicar.
 4. Tratar licenciamento, segurança, segregação multiempresa, LGPD, auditoria e aprovação humana como requisitos obrigatórios.
 5. Não confundir "planejado" com "implementado"; atualizar o status aqui apenas após entrega e testes verificáveis.
-6. Ao perguntar **"o que temos para fazer?"**, recuperar este arquivo e apresentar os quatro projetos nesta ordem, além do **LegalOS Welcome** como iniciativa transversal e das demais pendências do LegalOS quando solicitado.
+6. Ao perguntar **"o que temos para fazer?"**, recuperar este arquivo e apresentar os quatro projetos nesta ordem, além do **LegalOS Welcome** e do **LegalOS Cowork** como iniciativas transversais e das demais pendências do LegalOS quando solicitado.
 
 ## Resumo rápido
 
@@ -212,4 +273,6 @@
 | 3 | Juriscraper | Arquitetura robusta para conectores e monitoramento do Box | A fazer |
 | 4 | E-Discovery | OCR, busca, deduplicação e cadeia de custódia | A fazer |
 
-**Iniciativa adicional (fora da ordem dos quatro projetos):** LegalOS Welcome — cadastro premium, assinatura/código de presente e ativação guiada — A fazer.
+**Iniciativas adicionais (fora da ordem dos quatro projetos):**
+- LegalOS Welcome — cadastro premium, assinatura/código de presente e ativação guiada — A fazer.
+- LegalOS Cowork — espaço de colaboração interno com pessoas, reuniões, gestão do trabalho e agentes departamentais no futuro — A fazer.
