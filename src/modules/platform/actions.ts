@@ -71,6 +71,8 @@ export async function setSubscriptionAction(orgId: string, input: unknown): Prom
 const planEditSchema = z.object({
   priceCents: z.number().nullable(),
   maxUsers: z.number().nullable(),
+  maxProcesses: z.number().nullable(),
+  maxWhatsappNumbers: z.number().nullable(),
   maxStorageMb: z.number().nullable(),
   maxAiTokensMonth: z.number().nullable(),
 });

@@ -7,6 +7,7 @@
  *  - sem "entrar como" outro usuário.
  */
 import type { Prisma } from "@prisma/client";
+import { LEGALOS_PLANS } from "@/config/pricing";
 import { asaasConfigFromEnv } from "@/lib/billing/asaas";
 import { db } from "@/lib/db/client";
 import { smtpConfigFromEnv } from "@/lib/mail/mailer";
@@ -266,10 +267,11 @@ export async function integrationsHealth(pc: PlatformCtx): Promise<IntegrationHe
 
 export async function listPlans(pc: PlatformCtx) {
   await assertPlatform(pc);
-  return db.plan.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, key: true, name: true, maxUsers: true, maxStorageMb: true, maxAiTokensMonth: true, priceCents: true } });
+  const plans = await db.plan.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, key: true, name: true, isPublic: true, maxUsers: true, maxProcesses: true, maxWhatsappNumbers: true, maxStorageMb: true, maxAiTokensMonth: true, priceCents: true } });
+  return plans.map((plan) => ({ ...plan, official: LEGALOS_PLANS.some((item) => item.id === plan.key) }));
 }
 
-export type PlanEditInput = { priceCents: number | null; maxUsers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null };
+export type PlanEditInput = { priceCents: number | null; maxUsers: number | null; maxProcesses: number | null; maxWhatsappNumbers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null };
 
 /** Edita preço mensal (centavos de real) e limites de um plano. Vazio = sem preço (não contratável) / sem limite. Afeta já os escritórios no plano. */
 export async function updatePlan(pc: PlatformCtx, key: string, input: PlanEditInput) {
@@ -282,11 +284,14 @@ export async function updatePlan(pc: PlatformCtx, key: string, input: PlanEditIn
   const data = {
     priceCents: intOrNull(input.priceCents, 100, 100_000_000, "priceCents"),
     maxUsers: intOrNull(input.maxUsers, 1, 100_000, "maxUsers"),
+    maxProcesses: intOrNull(input.maxProcesses, 1, 1_000_000, "maxProcesses"),
+    maxWhatsappNumbers: intOrNull(input.maxWhatsappNumbers, 0, 100, "maxWhatsappNumbers"),
     maxStorageMb: intOrNull(input.maxStorageMb, 1, 100_000_000, "maxStorageMb"),
     maxAiTokensMonth: intOrNull(input.maxAiTokensMonth, 0, 2_000_000_000, "maxAiTokensMonth"),
   };
   const plan = await db.plan.findUnique({ where: { key } });
   if (!plan) throw new NotFoundError("Plano não encontrado.");
+  if (LEGALOS_PLANS.some((item) => item.id === key)) throw new ConflictError("Os planos oficiais são definidos em src/config/pricing.ts e aplicados por migração para manter preço, checkout e limites alinhados.");
   await db.$transaction(async (tx) => {
     await tx.plan.update({ where: { key }, data });
     await audit({ action: "platform.plan_update", userId: pc.userId, resourceType: "plan", resourceId: plan.id, metadata: { key, from: { priceCents: plan.priceCents, maxUsers: plan.maxUsers, maxStorageMb: plan.maxStorageMb, maxAiTokensMonth: plan.maxAiTokensMonth }, to: data }, meta: pc.meta }, tx);

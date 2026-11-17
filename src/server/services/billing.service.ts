@@ -2,6 +2,7 @@ import { timingSafeEqual } from "node:crypto";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db/client";
+import { LEGALOS_PLANS } from "@/config/pricing";
 import { addOneMonth, asaas, asaasConfigFromEnv, BillingProviderError, centsToReais, paymentOutcome, reaisToCents, type AsaasConfig, type AsaasPayment } from "@/lib/billing/asaas";
 import { logger } from "@/lib/logging/logger";
 import { renderMail } from "@/lib/mail/layout";
@@ -14,6 +15,7 @@ import { enqueueMail } from "./mail-outbox.service";
 
 const PENDING_PREFIX = "pending:";
 const isRealSub = (id: string | null | undefined): id is string => !!id && !id.startsWith(PENDING_PREFIX);
+type BillingCheckoutState = "not_started" | "checkout_started" | "payment_pending" | "payment_confirmed" | "free_trial" | "free_benefit" | "expired" | "canceled";
 
 export function billingConfig(): { config?: AsaasConfig; error?: string } {
   return asaasConfigFromEnv();
@@ -70,13 +72,33 @@ export async function getBillingOverview(ctx: TenantContext) {
   const cfg = billingConfig();
   const [sub, plans, invoices] = await Promise.all([
     db.subscription.findUnique({ where: { organizationId: ctx.organizationId }, include: { plan: true } }),
-    db.plan.findMany({ where: { isPublic: true }, orderBy: { priceCents: "asc" } }),
+    db.plan.findMany({ where: { isPublic: true, key: { in: LEGALOS_PLANS.map((p) => p.id) } }, orderBy: { priceCents: "asc" } }),
     db.billingInvoice.findMany({ where: { organizationId: ctx.organizationId }, orderBy: { dueDate: "desc" }, take: 12 }),
   ]);
+  const latestInvoice = invoices[0];
+  const checkoutState: BillingCheckoutState = !sub
+    ? "not_started"
+    : sub.status === "CANCELED"
+      ? "canceled"
+      : sub.providerSubscriptionId?.startsWith(PENDING_PREFIX)
+        ? "checkout_started"
+      : sub.status === "PAST_DUE"
+        ? "payment_pending"
+        : sub.status === "TRIALING"
+          ? sub.trialEndsAt && sub.trialEndsAt <= new Date() ? "expired" : "free_trial"
+          : isRealSub(sub.providerSubscriptionId)
+            ? latestInvoice && paymentOutcome(latestInvoice.status) === "paid" ? "payment_confirmed" : latestInvoice ? "payment_pending" : "checkout_started"
+            : "free_benefit";
   return {
     available: cfg.config !== undefined,
     sandbox: cfg.config?.sandbox ?? false,
-    plans: plans.map((p) => ({ key: p.key, name: p.name, description: p.description, priceCents: p.priceCents, maxUsers: p.maxUsers, maxStorageMb: p.maxStorageMb, maxAiTokensMonth: p.maxAiTokensMonth })),
+    checkoutAllowed: !!cfg.config?.sandbox || isRealSub(sub?.providerSubscriptionId),
+    checkoutState,
+    plans: plans.flatMap((p) => {
+      const canonical = LEGALOS_PLANS.find((item) => item.id === p.key);
+      if (!canonical || p.priceCents !== canonical.price * 100 || p.maxUsers !== canonical.users || p.maxProcesses !== canonical.processes || p.maxWhatsappNumbers !== canonical.whatsappNumbers) return [];
+      return [{ key: p.key, name: canonical.name, description: canonical.subtitle, priceCents: canonical.price * 100, maxUsers: canonical.users, maxProcesses: canonical.processes, maxWhatsappNumbers: canonical.whatsappNumbers }];
+    }),
     current: sub ? { planKey: sub.plan.key, planName: sub.plan.name, status: sub.status } : null,
     automatic: !!sub && !!sub.providerSubscriptionId,
     cancelRequestedAt: sub?.cancelRequestedAt ?? null,
@@ -94,6 +116,10 @@ export async function contractPlan(ctx: TenantContext, planKey: string) {
   await requireMfa(ctx.userId);
   const plan = await db.plan.findFirst({ where: { key: planKey, isPublic: true } });
   if (!plan) throw new ValidationError("Plano inexistente.", { planKey: ["Plano inexistente."] });
+  const canonical = LEGALOS_PLANS.find((item) => item.id === plan.key);
+  if (!canonical || plan.priceCents !== canonical.price * 100 || plan.maxUsers !== canonical.users || plan.maxProcesses !== canonical.processes || plan.maxWhatsappNumbers !== canonical.whatsappNumbers) {
+    throw new ConflictError("Este plano está sendo atualizado. Tente novamente mais tarde.");
+  }
   if (plan.priceCents == null) throw new ConflictError(`O plano ${plan.name} ainda não tem preço definido para contratação automática. Fale com a administração da plataforma.`);
   const sub = await db.subscription.findUnique({ where: { organizationId: ctx.organizationId } });
   if (!sub) throw new ConflictError("O escritório ainda não tem uma assinatura. Fale com a administração da plataforma.");
@@ -110,6 +136,8 @@ export async function contractPlan(ctx: TenantContext, planKey: string) {
     });
     return { created: false };
   }
+
+  if (!cfg.sandbox) throw new ConflictError("Novas contratações estão liberadas somente no sandbox até a homologação do ciclo real de cobrança.");
 
   // Reserva atômica: dois cliques simultâneos não criam duas assinaturas no provedor.
   const claim = `${PENDING_PREFIX}${randomUUID()}`;

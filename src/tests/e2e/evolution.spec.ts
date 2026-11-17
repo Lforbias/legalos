@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { Client } from "pg";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 test("Evolution: cinco departamentos com Jurídico integrado, navegação, Desktop e permissões", async ({ page }, testInfo) => {
   const id = crypto.randomUUID().slice(0, 8);
@@ -9,8 +10,7 @@ test("Evolution: cinco departamentos com Jurídico integrado, navegação, Deskt
   await page.getByLabel("E-mail").fill(email);
   await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await page.getByLabel("Nome do escritório").fill(`Escritório Evolution ${id}`);
-  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  await completeWelcomeOnboarding(page, `Escritório Evolution ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.setViewportSize({ width: 390, height: 900 });

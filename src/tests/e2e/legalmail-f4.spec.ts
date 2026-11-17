@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -15,8 +16,7 @@ async function register(page: Page, label: string) {
   await page.getByLabel("E-mail").fill(`${label}-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca ${label} ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca ${label} ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 }
 
@@ -32,7 +32,13 @@ test("3.0-F4: importar processos por número, com inválidos e repetidos anotado
   await expect(page.getByLabel(/Buscar os andamentos públicos/)).toHaveCount(0);
   await expect(page.getByLabel(/Baixar os autos pelo MNI/)).toHaveCount(0);
   await page.getByLabel("Números CNJ").fill(`${n1}\n${n2}\n${n1}\n123\n0000001-99.2024.8.05.0001`);
-  await page.getByRole("button", { name: "Importar processos" }).click();
+  // revisão antes de importar: nada é criado até confirmar
+  const confirm = page.getByRole("button", { name: "Confirmar e importar", exact: true });
+  await expect(confirm).toBeDisabled();
+  await page.getByRole("button", { name: "Revisar importação", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Revisão da importação" })).toBeVisible();
+  await expect(page.getByText("5 lidos · 2 novos · 0 já cadastrados · 1 repetidos na lista · 2 inválidos")).toBeVisible();
+  await confirm.click();
   await expect(page.getByRole("heading", { name: "Importação de processos" })).toBeVisible();
   const rows = page.getByTestId("import-items");
   await expect(rows).toContainText(n1);
@@ -49,6 +55,8 @@ test("3.0-F4: importar processos por número, com inválidos e repetidos anotado
   // reimportar não duplica
   await page.goto("/processos/importar");
   await page.getByLabel("Números CNJ").fill(n1);
-  await page.getByRole("button", { name: "Importar processos" }).click();
-  await expect(page.getByTestId("import-items").getByText("Já existia", { exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: "Revisar importação", exact: true }).click();
+  await expect(page.getByText("1 lidos · 0 novos · 1 já cadastrados · 0 repetidos na lista · 0 inválidos")).toBeVisible();
+  await expect(page.getByText("Já cadastrado", { exact: true })).toHaveCount(1);
+  await expect(page.getByRole("button", { name: "Confirmar e importar", exact: true })).toBeDisabled();
 });

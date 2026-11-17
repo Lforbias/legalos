@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 test("visão geral orienta a gestão do escritório e funciona no celular", async ({ page }) => {
   const id = Math.random().toString(36).slice(2, 9);
@@ -7,8 +8,7 @@ test("visão geral orienta a gestão do escritório e funciona no celular", asyn
   await page.getByLabel("E-mail").fill(`gestao-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await page.getByLabel("Nome do escritório").fill(`Escritório gestão ${id}`);
-  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  await completeWelcomeOnboarding(page, `Escritório gestão ${id}`);
   await expect(page.getByRole("heading", { name: "O que precisa da sua atenção" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Financeiro do escritório" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Distribuição de trabalho da equipe" })).toBeVisible();

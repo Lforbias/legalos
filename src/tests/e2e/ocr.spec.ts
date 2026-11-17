@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -12,8 +13,7 @@ test("OCR: envia imagem, extrai o texto, busca pelo conteúdo e isola entre escr
   await page.getByLabel("E-mail").fill(`dona-ocr-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca ocr ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca ocr ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/processos/novo");
@@ -50,8 +50,7 @@ test("OCR: envia imagem, extrai o texto, busca pelo conteúdo e isola entre escr
   await p2.getByLabel("E-mail").fill(`dona-o2-${id2}@example.test`);
   await p2.getByLabel("Senha", { exact: true }).fill(password);
   await p2.getByRole("button", { name: "Criar conta" }).click();
-  await p2.getByLabel("Nome do escritório").fill(`Banca o2 ${id2}`);
-  await p2.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(p2, `Banca o2 ${id2}`);
   await expect(p2.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
   await p2.goto("/documentos?conteudo=hearing");
   await expect(p2.getByText(/Nada encontrado/)).toBeVisible();

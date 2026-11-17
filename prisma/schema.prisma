@@ -30,6 +30,17 @@ enum SubscriptionStatus {
   CANCELED
 }
 
+enum GiftCodeBenefitType {
+  TRIAL_EXTENSION
+  PLAN_ACCESS
+}
+
+enum GiftCodeRedemptionStatus {
+  RESERVED
+  APPLIED
+  REVOKED
+}
+
 enum AuditResult {
   SUCCESS
   FAILURE
@@ -75,6 +86,9 @@ model User {
   pushSubscriptions PushSubscription[]
   pushPreferences   PushPreference[]
   pushDeliveries    PushDelivery[]
+  welcomeOnboarding WelcomeOnboarding?
+  createdGiftCodes  GiftCode[] @relation("GiftCodeCreator")
+  giftRedemptions   GiftCodeRedemption[]
 
   @@map("users")
 }
@@ -123,6 +137,8 @@ model LegalMailPilot {
 }
 
 model Organization {
+  welcomeOnboarding WelcomeOnboarding?
+  giftRedemptions GiftCodeRedemption[]
   legalMailPilots LegalMailPilot[]
   courtOtpAuthenticators CourtOtpAuthenticator[]
   pjeDiscoveries PjeDiscovery[]
@@ -254,6 +270,66 @@ model Organization {
   @@map("organizations")
 }
 
+model WelcomeOnboarding {
+  userId                  String        @id @map("user_id") @db.Uuid
+  completedOrganizationId String?       @unique @map("completed_organization_id") @db.Uuid
+  currentStep             Int           @default(1) @map("current_step")
+  data                    Json          @default("{}")
+  completedAt             DateTime?     @map("completed_at") @db.Timestamptz(3)
+  createdAt               DateTime      @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime      @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user                  User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  completedOrganization Organization? @relation(fields: [completedOrganizationId], references: [id], onDelete: SetNull)
+
+  @@map("welcome_onboarding")
+}
+
+model GiftCode {
+  id             String             @id @default(uuid()) @db.Uuid
+  codeHash       String             @unique @map("code_hash")
+  codePrefix     String             @map("code_prefix")
+  label          String
+  benefitType    GiftCodeBenefitType @map("benefit_type")
+  planKey        String?            @map("plan_key")
+  accessDays     Int                @map("access_days")
+  usageLimit     Int                @map("usage_limit")
+  startsAt       DateTime           @default(now()) @map("starts_at") @db.Timestamptz(3)
+  expiresAt      DateTime?          @map("expires_at") @db.Timestamptz(3)
+  stackable      Boolean            @default(false)
+  active         Boolean            @default(true)
+  revokedAt      DateTime?          @map("revoked_at") @db.Timestamptz(3)
+  createdById    String             @map("created_by_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  createdBy User                @relation("GiftCodeCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  redemptions GiftCodeRedemption[]
+
+  @@index([active, startsAt, expiresAt])
+  @@map("gift_codes")
+}
+
+model GiftCodeRedemption {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  giftCodeId            String                   @map("gift_code_id") @db.Uuid
+  userId                String                   @map("user_id") @db.Uuid
+  organizationId        String?                  @map("organization_id") @db.Uuid
+  status                GiftCodeRedemptionStatus @default(RESERVED)
+  reservedAt            DateTime                 @default(now()) @map("reserved_at") @db.Timestamptz(3)
+  reservationExpiresAt  DateTime                 @map("reservation_expires_at") @db.Timestamptz(3)
+  appliedAt             DateTime?                @map("applied_at") @db.Timestamptz(3)
+
+  giftCode     GiftCode      @relation(fields: [giftCodeId], references: [id], onDelete: Restrict)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@unique([giftCodeId, userId])
+  @@index([giftCodeId, status, reservationExpiresAt])
+  @@index([userId, status, reservationExpiresAt])
+  @@map("gift_code_redemptions")
+}
+
 model Role {
   id             String   @id @default(uuid()) @db.Uuid
   organizationId String   @map("organization_id") @db.Uuid
@@ -320,6 +396,8 @@ model Plan {
   name             String
   description      String?
   maxUsers         Int?     @map("max_users")
+  maxProcesses       Int?     @map("max_processes")
+  maxWhatsappNumbers Int?     @map("max_whatsapp_numbers")
   maxStorageMb     Int?     @map("max_storage_mb")
   maxAiTokensMonth Int?     @map("max_ai_tokens_month")
   features         String[]

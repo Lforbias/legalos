@@ -130,7 +130,7 @@ export function SubscriptionControl({ orgId, plans, current }: { orgId: string; 
   );
 }
 
-type PlanRow = { key: string; name: string; priceCents: number | null; maxUsers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null };
+type PlanRow = { key: string; name: string; priceCents: number | null; maxUsers: number | null; maxProcesses: number | null; maxWhatsappNumbers: number | null; maxStorageMb: number | null; maxAiTokensMonth: number | null; official: boolean };
 
 /** Edita preço (em reais) e limites de um plano. Campo vazio = sem preço / sem limite. */
 export function PlanEditor({ plan }: { plan: PlanRow }) {
@@ -138,6 +138,8 @@ export function PlanEditor({ plan }: { plan: PlanRow }) {
   const [saved, setSaved] = React.useState(false);
   const [price, setPrice] = React.useState(plan.priceCents == null ? "" : (plan.priceCents / 100).toFixed(2).replace(".", ","));
   const [users, setUsers] = React.useState(plan.maxUsers == null ? "" : String(plan.maxUsers));
+  const [processes, setProcesses] = React.useState(plan.maxProcesses == null ? "" : String(plan.maxProcesses));
+  const [numbers, setNumbers] = React.useState(plan.maxWhatsappNumbers == null ? "" : String(plan.maxWhatsappNumbers));
   const [storage, setStorage] = React.useState(plan.maxStorageMb == null ? "" : String(plan.maxStorageMb));
   const [ai, setAi] = React.useState(plan.maxAiTokensMonth == null ? "" : String(plan.maxAiTokensMonth));
   const toInt = (v: string) => (v.trim() === "" ? null : Number(v.trim()));
@@ -145,17 +147,22 @@ export function PlanEditor({ plan }: { plan: PlanRow }) {
     const t = v.trim().replace(/\./g, "").replace(",", ".");
     return t === "" ? null : Math.round(Number(t) * 100);
   };
+  if (plan.official) {
+    return <div className="space-y-2 text-sm"><p>Plano comercial oficial. Preço e limites vêm do catálogo público central e não podem ser alterados por aqui.</p><p className="text-xs text-muted">Preço: {plan.priceCents == null ? "não definido" : (plan.priceCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}/mês · {plan.maxUsers ?? "Ilimitado"} usuários · {plan.maxProcesses?.toLocaleString("pt-BR") ?? "Ilimitado"} processos · {plan.maxWhatsappNumbers ?? "limite técnico atual"} números de WhatsApp.</p></div>;
+  }
   return (
     <div className="space-y-2" data-testid={`plan-edit-${plan.key}`}>
       {error ? <Alert tone="error">{error}</Alert> : null}
       {saved && !error ? <Alert tone="success">Plano salvo.</Alert> : null}
-      <div className="grid gap-2 sm:grid-cols-4">
+      <div className="grid gap-2 sm:grid-cols-3">
         <div><label htmlFor={`price-${plan.key}`} className="mb-1 block text-xs text-muted">Preço mensal (R$)</label><Input id={`price-${plan.key}`} inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="sem preço" /></div>
         <div><label htmlFor={`users-${plan.key}`} className="mb-1 block text-xs text-muted">Usuários</label><Input id={`users-${plan.key}`} inputMode="numeric" value={users} onChange={(e) => setUsers(e.target.value)} placeholder="ilimitado" /></div>
+        <div><label htmlFor={`processes-${plan.key}`} className="mb-1 block text-xs text-muted">Processos</label><Input id={`processes-${plan.key}`} inputMode="numeric" value={processes} onChange={(e) => setProcesses(e.target.value)} placeholder="ilimitado" /></div>
+        <div><label htmlFor={`numbers-${plan.key}`} className="mb-1 block text-xs text-muted">Números de WhatsApp</label><Input id={`numbers-${plan.key}`} inputMode="numeric" value={numbers} onChange={(e) => setNumbers(e.target.value)} placeholder="limite técnico atual" /></div>
         <div><label htmlFor={`storage-${plan.key}`} className="mb-1 block text-xs text-muted">Armazenamento (MB)</label><Input id={`storage-${plan.key}`} inputMode="numeric" value={storage} onChange={(e) => setStorage(e.target.value)} placeholder="ilimitado" /></div>
         <div><label htmlFor={`ai-${plan.key}`} className="mb-1 block text-xs text-muted">IA (tokens/mês; 0 = sem IA)</label><Input id={`ai-${plan.key}`} inputMode="numeric" value={ai} onChange={(e) => setAi(e.target.value)} placeholder="ilimitado" /></div>
       </div>
-      <Button size="sm" loading={pending} onClick={() => { setSaved(false); run(() => updatePlanAction(plan.key, { priceCents: toCents(price), maxUsers: toInt(users), maxStorageMb: toInt(storage), maxAiTokensMonth: toInt(ai) }), () => setSaved(true)); }} data-testid={`plan-save-${plan.key}`}>Salvar plano</Button>
+      <Button size="sm" loading={pending} onClick={() => { setSaved(false); run(() => updatePlanAction(plan.key, { priceCents: toCents(price), maxUsers: toInt(users), maxProcesses: toInt(processes), maxWhatsappNumbers: toInt(numbers), maxStorageMb: toInt(storage), maxAiTokensMonth: toInt(ai) }), () => setSaved(true)); }} data-testid={`plan-save-${plan.key}`}>Salvar plano</Button>
     </div>
   );
 }

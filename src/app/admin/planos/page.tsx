@@ -13,7 +13,7 @@ export default async function PlansPage() {
   const plans = await listPlans(pc);
   return (
     <div className="space-y-4">
-      <PageHeader title="Planos e preços" description="O preço é cobrado por mês na cobrança automática. Plano sem preço não pode ser contratado pelo escritório (continua possível definir à mão em Escritórios). Mudanças de limite valem já para quem está no plano; nada é apagado." />
+      <PageHeader title="Planos e preços" description="Os quatro planos públicos são sincronizados com o catálogo comercial central. Os registros internos continuam disponíveis para administrar assinaturas antigas. Mudanças de limites podem afetar o uso de quem já está no plano." />
       {plans.map((p) => (
         <Card key={p.key}>
           <CardHeader title={p.name} />

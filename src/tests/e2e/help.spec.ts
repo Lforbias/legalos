@@ -1,5 +1,6 @@
 import { HELP_GUIDES } from "../../modules/help/guides";
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", async ({ page }) => {
   const id = Math.random().toString(36).slice(2, 9);
@@ -8,8 +9,7 @@ test("Ajuda acessível nos espaços, busca por assunto e leitura no celular", as
   await page.getByLabel("E-mail").fill(`help-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill("SenhaForte123");
   await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-  await page.getByLabel("Nome do escritório").fill(`Escritório Ajuda ${id}`);
-  await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+  await completeWelcomeOnboarding(page, `Escritório Ajuda ${id}`);
   const footer = page.getByRole("navigation", { name: "Navegação Evolution" });
   await footer.getByRole("button", { name: "Administração & Gestão", exact: true }).click();
   await footer.getByRole("link", { name: "Ajuda", exact: true }).click();

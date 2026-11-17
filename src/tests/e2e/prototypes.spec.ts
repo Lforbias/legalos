@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import { PROTOTYPES } from "@/modules/prototypes/registry";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -11,8 +12,7 @@ test("protótipos: índice e todas as telas abrem com a faixa de aviso", async (
   await page.getByLabel("E-mail").fill(`proto-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca proto ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca proto ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/prototipos");

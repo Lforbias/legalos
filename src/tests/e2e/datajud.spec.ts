@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { completeWelcomeOnboarding } from "./support/welcome";
 
 const password = "SenhaForte123";
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -10,8 +11,7 @@ test("DataJud sem chave: página de integrações avisa, não oferece ligar e o 
   await page.getByLabel("E-mail").fill(`dona-dj-${id}@example.test`);
   await page.getByLabel("Senha", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Criar conta" }).click();
-  await page.getByLabel("Nome do escritório").fill(`Banca dj ${id}`);
-  await page.getByRole("button", { name: "Criar escritório" }).click();
+  await completeWelcomeOnboarding(page, `Banca dj ${id}`);
   await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
 
   await page.goto("/integracoes");
@@ -43,8 +43,7 @@ test("DataJud: falha externa aparece sem referência genérica e último teste p
     await page.getByLabel("E-mail").fill(`datajud-conexao-${id}@example.test`);
     await page.getByLabel("Senha", { exact: true }).fill(password);
     await page.getByRole("button", { name: "Criar conta", exact: true }).click();
-    await page.getByLabel("Nome do escritório").fill(`Conexão ${id}`);
-    await page.getByRole("button", { name: "Criar escritório", exact: true }).click();
+    await completeWelcomeOnboarding(page, `Conexão ${id}`);
     await expect(page.getByRole("heading", { name: /Bom dia/ })).toBeVisible();
     await page.goto("/integracoes");
     await page.getByLabel("Chave pública do DataJud", { exact: true }).fill("chave-publica-ficticia-para-teste-123");
