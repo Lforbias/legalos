@@ -10,7 +10,7 @@ import type { AuthKv, QrEvent, QrInbound } from "@/lib/whatsapp/qr/types";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
 import { assertMfaEnabled } from "./mfa.service";
-import { applyStatusUpdate, ingestMessage } from "./whatsapp-ingest.service";
+import { applyStatusUpdate, ingestHistoricalMessage, ingestMessage } from "./whatsapp-ingest.service";
 import { requireCertKey } from "./whatsapp-auth";
 import { qrMessageId } from "./whatsapp-transport";
 
@@ -76,6 +76,26 @@ async function handleEvent(accountId: string, live: NonNullable<ReturnType<typeo
   } else if (e.type === "message") {
     // Em fila por conta: mantém a ordem das mensagens.
     live.events = live.events.then(() => toIngest(accountId, e.msg)).catch((err) => logger.error("whatsapp.qr_ingest_failed", { error: err instanceof Error ? err.message : String(err) }));
+  } else if (e.type === "history") {
+    live.history = live.history.then(async () => {
+      const account = await db.whatsappAccount.findFirst({
+        where: { id: accountId, provider: "QR", enabled: true },
+        select: { id: true, organizationId: true },
+      });
+      if (!account) return;
+      for (const msg of e.messages) {
+        if (live.stopped) return;
+        await ingestHistoricalMessage(account, {
+          waMessageId: qrMessageId(accountId, msg.id),
+          waId: msg.chat,
+          contactName: msg.name,
+          type: msg.media?.kind ?? "text",
+          text: msg.text,
+          timestamp: msg.timestamp,
+          fromMe: msg.fromMe,
+        }).catch((err) => logger.error("whatsapp.qr_history_message_failed", { accountId, error: err instanceof Error ? err.message : String(err) }));
+      }
+    }).catch((err) => logger.error("whatsapp.qr_history_failed", { accountId, error: err instanceof Error ? err.message : String(err) }));
   } else if (e.type === "status") {
     const acc = await db.whatsappAccount.findUnique({ where: { id: accountId }, select: { organizationId: true } });
     if (acc) await applyStatusUpdate(acc.organizationId, qrMessageId(accountId, e.id), e.status, null);
@@ -118,7 +138,7 @@ async function connectOnce(accountId: string, live: LiveEntry): Promise<void> {
 export async function startQrSession(accountId: string): Promise<void> {
   const cur = liveSessions.get(accountId);
   if (cur && !cur.stopped) return;
-  const live: LiveEntry = { session: null, stopped: false, attempts: 0, timer: null, chain: Promise.resolve(), events: Promise.resolve(), lastSendAt: 0 };
+  const live: LiveEntry = { session: null, stopped: false, attempts: 0, timer: null, chain: Promise.resolve(), events: Promise.resolve(), history: Promise.resolve(), lastSendAt: 0 };
   liveSessions.set(accountId, live);
   await connectOnce(accountId, live);
 }
@@ -132,7 +152,7 @@ export async function stopQrSession(accountId: string, opts: { logout: boolean }
     live.session?.close();
     live.session = null;
     liveSessions.delete(accountId);
-    await live.events;
+    await Promise.all([live.events, live.history]);
   }
   if (opts.logout) await dbKv(accountId).clear();
   await setState(accountId, { qrState: "DISCONNECTED", qrCode: null });

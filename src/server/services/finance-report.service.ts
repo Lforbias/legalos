@@ -104,3 +104,64 @@ export async function dayBalance(ctx: TenantContext, date?: string) {
     duePayable: { total: d("PAYABLE")?.total ?? "0.00", count: d("PAYABLE")?.n ?? 0 },
   };
 }
+
+export async function overdueAging(ctx: TenantContext) {
+  assertCan(ctx, "finance:read");
+  const today = todayYmd(ctx.timezone);
+  return db.$queryRaw<{ label: string; receivable: string; payable: string }[]>`
+    WITH buckets (position, label, min_days, max_days) AS (
+      VALUES (1, '1–30 dias', 1, 30), (2, '31–60 dias', 31, 60),
+             (3, '61–90 dias', 61, 90), (4, 'Mais de 90 dias', 91, NULL)
+    ), overdue AS (
+      SELECT kind, amount - paid_amount AS balance, ${today}::date - due_date AS days
+      FROM finance_entries
+      WHERE organization_id = ${ctx.organizationId}::uuid
+        AND status IN ('OPEN', 'PARTIAL') AND due_date < ${today}::date
+    )
+    SELECT b.label,
+           COALESCE(SUM(o.balance) FILTER (WHERE o.kind = 'RECEIVABLE'), 0)::text AS receivable,
+           COALESCE(SUM(o.balance) FILTER (WHERE o.kind = 'PAYABLE'), 0)::text AS payable
+    FROM buckets b
+    LEFT JOIN overdue o ON o.days >= b.min_days AND (b.max_days IS NULL OR o.days <= b.max_days)
+    GROUP BY b.position, b.label
+    ORDER BY b.position
+  `;
+}
+
+export async function monthlyCostCenterResult(ctx: TenantContext, month: string) {
+  assertCan(ctx, "finance:read");
+  const from = `${month}-01`;
+  if (!/^\d{4}-\d{2}$/.test(month) || !isYmd(from)) throw new ValidationError("Mês inválido.");
+  return db.$queryRaw<{
+    id: string | null; name: string; issuedIn: string; issuedOut: string; issuedNet: string;
+    received: string; paid: string; cashNet: string;
+  }[]>`
+    WITH movements AS (
+      SELECT cost_center_id, kind, amount, 'issued' AS basis
+      FROM finance_entries
+      WHERE organization_id = ${ctx.organizationId}::uuid AND status <> 'CANCELED'
+        AND issue_date >= ${from}::date AND issue_date < ${from}::date + INTERVAL '1 month'
+      UNION ALL
+      SELECT e.cost_center_id, e.kind, p.amount, 'cash' AS basis
+      FROM finance_payments p
+      JOIN finance_entries e ON e.id = p.entry_id AND e.organization_id = p.organization_id
+      WHERE p.organization_id = ${ctx.organizationId}::uuid AND p.reversed_at IS NULL
+        AND p.paid_on >= ${from}::date AND p.paid_on < ${from}::date + INTERVAL '1 month'
+    ), totals AS (
+      SELECT cost_center_id,
+             COALESCE(SUM(amount) FILTER (WHERE basis = 'issued' AND kind = 'RECEIVABLE'), 0) AS issued_in,
+             COALESCE(SUM(amount) FILTER (WHERE basis = 'issued' AND kind = 'PAYABLE'), 0) AS issued_out,
+             COALESCE(SUM(amount) FILTER (WHERE basis = 'cash' AND kind = 'RECEIVABLE'), 0) AS received,
+             COALESCE(SUM(amount) FILTER (WHERE basis = 'cash' AND kind = 'PAYABLE'), 0) AS paid
+      FROM movements GROUP BY cost_center_id
+    )
+    SELECT t.cost_center_id AS id,
+           COALESCE(c.name, CASE WHEN t.cost_center_id IS NULL THEN 'Sem centro de custo' ELSE 'Centro indisponível' END) AS name,
+           t.issued_in::text AS "issuedIn", t.issued_out::text AS "issuedOut",
+           (t.issued_in - t.issued_out)::text AS "issuedNet",
+           t.received::text, t.paid::text, (t.received - t.paid)::text AS "cashNet"
+    FROM totals t
+    LEFT JOIN cost_centers c ON c.id = t.cost_center_id AND c.organization_id = ${ctx.organizationId}::uuid
+    ORDER BY t.cost_center_id IS NULL, name, id
+  `;
+}

@@ -1,4 +1,5 @@
-import { parseCsv } from "@/lib/import/csv";
+import { normalizeDelimiter, parseCsv } from "@/lib/import/csv";
+export { normalizeDelimiter } from "@/lib/import/csv";
 import { isValidCnpj, normalizeCnpj } from "@/lib/validation/br-documents";
 
 export type ImportRow = {
@@ -18,19 +19,6 @@ export type ImportRow = {
   zip: string | null;
 };
 export type ImportParse = { rows: ImportRow[]; errors: string[] };
-
-/** Excel brasileiro salva com ";". Troca o separador fora de aspas só quando o cabeçalho não tem ",". */
-export function normalizeDelimiter(text: string): string {
-  const first = text.split(/\r?\n/, 1)[0] ?? "";
-  if (!first.includes(";") || first.includes(",")) return text;
-  let out = "";
-  let q = false;
-  for (const ch of text) {
-    if (ch === '"') q = !q;
-    out += ch === ";" && !q ? "," : ch;
-  }
-  return out;
-}
 
 const norm = (k: string) => k.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/[^a-z0-9]/g, "");
 const ALIAS: Record<string, string> = {

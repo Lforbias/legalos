@@ -2,7 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
-import { db } from "@/lib/db/client";
+import { db, type Tx } from "@/lib/db/client";
 import { zonedToUtc } from "@/lib/dates/zoned";
 import { iterCsv, parseCsv } from "@/lib/import/csv";
 import {
@@ -48,6 +48,7 @@ export type ImportOptions = {
   only?: ImportEntity[];
   timezone?: string;
   log?: (msg: string) => void;
+  transaction?: Tx;
 };
 
 const nfc = (s: string) => s.normalize("NFC");
@@ -72,8 +73,8 @@ function chunks<T>(arr: T[], size: number): T[][] {
   return out;
 }
 
-async function loadMap(organizationId: string, entity: string): Promise<Map<string, string>> {
-  const rows = await db.importMap.findMany({ where: { organizationId, source: SOURCE, entity }, select: { externalId: true, internalId: true } });
+async function loadMap(client: Tx, organizationId: string, entity: string): Promise<Map<string, string>> {
+  const rows = await client.importMap.findMany({ where: { organizationId, source: SOURCE, entity }, select: { externalId: true, internalId: true } });
   return new Map(rows.map((r) => [r.externalId, r.internalId]));
 }
 
@@ -83,17 +84,25 @@ async function loadMap(organizationId: string, entity: string): Promise<Map<stri
  * Não importa: documentos (o backup só traz links), histórico/andamentos e comentários soltos.
  */
 export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport> {
+  const client = opts.transaction ?? db;
+  const writeBatch = async (operations: Prisma.PrismaPromise<unknown>[]) => {
+    if (opts.transaction) {
+      for (const operation of operations) await operation;
+    } else {
+      await db.$transaction(operations);
+    }
+  };
   const { organizationId, importerUserId, dir, dryRun = false } = opts;
   const tz = opts.timezone ?? "America/Sao_Paulo";
   const log = opts.log ?? (() => undefined);
   const only = new Set<ImportEntity>(opts.only?.length ? opts.only : ENTITIES);
   const report: ImportReport = { dryRun, organizationId, entidades: {}, naoImportado: [], usuariosSemVinculo: 0 };
 
-  const member = await db.membership.findFirst({ where: { organizationId, userId: importerUserId, status: "ACTIVE" }, select: { id: true } });
+  const member = await client.membership.findFirst({ where: { organizationId, userId: importerUserId, status: "ACTIVE" }, select: { id: true } });
   if (!member) throw new Error("O usuário informado não é membro ativo do escritório.");
 
   // ---- usuários do Astrea → membros do escritório (pelo e-mail de login) ----
-  const members = await db.membership.findMany({ where: { organizationId, status: "ACTIVE" }, select: { userId: true, user: { select: { email: true } } } });
+  const members = await client.membership.findMany({ where: { organizationId, status: "ACTIVE" }, select: { userId: true, user: { select: { email: true } } } });
   const byEmail = new Map(members.map((m) => [m.user.email.toLowerCase(), m.userId]));
   const userByCode = new Map<string, string>();
   let unlinked = 0;
@@ -113,7 +122,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
   const caseRows = readCsv(dir, "Processos");
 
   // ======================= CLIENTES =======================
-  const clientMap = await loadMap(organizationId, "client");
+  const clientMap = await loadMap(client, organizationId, "client");
   if (only.has("clientes") || only.has("processos")) {
     const r = rep();
     report.entidades.clientes = r;
@@ -124,7 +133,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     }
     const wanted = contactRows.filter((c) => clean(c["Classificação"]) === "Cliente" || referenced.has(clean(c["Código"])));
     r.lidos = wanted.length;
-    const existingDocs = new Set((await db.client.findMany({ where: { organizationId, deletedAt: null, document: { not: null } }, select: { document: true } })).map((c) => c.document as string));
+    const existingDocs = new Set((await client.client.findMany({ where: { organizationId, deletedAt: null, document: { not: null } }, select: { document: true } })).map((c) => c.document as string));
     const clientRows: Prisma.ClientCreateManyInput[] = [];
     const mapRows: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
     for (const row of wanted) {
@@ -176,19 +185,19 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     if (!dryRun) {
       for (const part of chunks(clientRows, 500)) {
         const ids = new Set(part.map((p) => p.id as string));
-        await db.$transaction([db.client.createMany({ data: part }), db.importMap.createMany({ data: mapRows.filter((m) => ids.has(m.internalId)) })]);
+        await writeBatch([client.client.createMany({ data: part }), client.importMap.createMany({ data: mapRows.filter((m) => ids.has(m.internalId)) })]);
       }
     }
     log(`clientes: ${r.importados} novos, ${r.jaImportados} já importados`);
   }
 
   // ======================= PROCESSOS =======================
-  const caseMap = await loadMap(organizationId, "case");
+  const caseMap = await loadMap(client, organizationId, "case");
   if (only.has("processos")) {
     const r = rep();
     report.entidades.processos = r;
     r.lidos = caseRows.length;
-    const existingNumbers = new Set((await db.case.findMany({ where: { organizationId, deletedAt: null, number: { not: null } }, select: { number: true } })).map((c) => c.number as string));
+    const existingNumbers = new Set((await client.case.findMany({ where: { organizationId, deletedAt: null, number: { not: null } }, select: { number: true } })).map((c) => c.number as string));
     type Pack = { id: string; ext: string; data: Record<string, unknown>; parties: Record<string, unknown>[]; members: Record<string, unknown>[]; createdAt: Date };
     const packs: Pack[] = [];
     for (const row of caseRows) {
@@ -264,14 +273,14 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     }
     if (!dryRun) {
       for (const part of chunks(packs, 300)) {
-        await db.$transaction([
-          db.case.createMany({ data: part.map((p) => p.data) as never }),
-          db.caseParty.createMany({ data: part.flatMap((p) => p.parties) as never }),
-          db.caseMember.createMany({ data: part.flatMap((p) => p.members) as never }),
-          db.caseEvent.createMany({
+        await writeBatch([
+          client.case.createMany({ data: part.map((p) => p.data) as never }),
+          client.caseParty.createMany({ data: part.flatMap((p) => p.parties) as never }),
+          client.caseMember.createMany({ data: part.flatMap((p) => p.members) as never }),
+          client.caseEvent.createMany({
             data: part.map((p) => ({ organizationId, caseId: p.id, source: "IMPORTED" as const, kind: "IMPORT", title: "Importado do Astrea", occurredAt: p.createdAt, createdById: importerUserId })),
           }),
-          db.importMap.createMany({ data: part.map((p) => ({ organizationId, source: SOURCE, entity: "case", externalId: p.ext, internalId: p.id })) }),
+          client.importMap.createMany({ data: part.map((p) => ({ organizationId, source: SOURCE, entity: "case", externalId: p.ext, internalId: p.id })) }),
         ]);
       }
     }
@@ -284,7 +293,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     report.entidades.prazos = r;
     const rows = readCsv(dir, "Prazos");
     r.lidos = rows.length;
-    const done = await loadMap(organizationId, "deadline");
+    const done = await loadMap(client, organizationId, "deadline");
     const data: Record<string, unknown>[] = [];
     const maps: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
     for (const row of rows) {
@@ -325,7 +334,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     }
     if (!dryRun) for (const part of chunks(data, 500)) {
       const ids = new Set(part.map((p) => p.id as string));
-      await db.$transaction([db.deadline.createMany({ data: part as never }), db.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
+      await writeBatch([client.deadline.createMany({ data: part as never }), client.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
     }
     log(`prazos: ${r.importados} novos`);
   }
@@ -336,7 +345,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     report.entidades.tarefas = r;
     const rows = readCsv(dir, "Tarefas");
     r.lidos = rows.length;
-    const done = await loadMap(organizationId, "task");
+    const done = await loadMap(client, organizationId, "task");
     const data: Record<string, unknown>[] = [];
     const maps: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
     for (const row of rows) {
@@ -375,7 +384,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     }
     if (!dryRun) for (const part of chunks(data, 1000)) {
       const ids = new Set(part.map((p) => p.id as string));
-      await db.$transaction([db.task.createMany({ data: part as never }), db.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
+      await writeBatch([client.task.createMany({ data: part as never }), client.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
     }
     log(`tarefas: ${r.importados} novas`);
   }
@@ -389,7 +398,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
       ...readCsv(dir, "Eventos").map((x) => ({ entity: "event", d: mapEvent(x) })),
     ];
     r.lidos = rows.length;
-    const doneKeys = new Set((await db.importMap.findMany({ where: { organizationId, source: SOURCE, entity: { in: ["hearing", "event"] } }, select: { entity: true, externalId: true } })).map((x) => `${x.entity}:${x.externalId}`));
+    const doneKeys = new Set((await client.importMap.findMany({ where: { organizationId, source: SOURCE, entity: { in: ["hearing", "event"] } }, select: { entity: true, externalId: true } })).map((x) => `${x.entity}:${x.externalId}`));
     const data: Record<string, unknown>[] = [];
     const maps: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
     for (const { entity, d } of rows) {
@@ -427,7 +436,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     }
     if (!dryRun) for (const part of chunks(data, 1000)) {
       const ids = new Set(part.map((p) => p.id as string));
-      await db.$transaction([db.agendaEvent.createMany({ data: part as never }), db.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
+      await writeBatch([client.agendaEvent.createMany({ data: part as never }), client.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
     }
     log(`agenda: ${r.importados} novos`);
   }
@@ -438,7 +447,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     report.entidades.intimacoes = r;
     const rows = readCsv(dir, "Publicações");
     r.lidos = rows.length;
-    const done = await loadMap(organizationId, "notice");
+    const done = await loadMap(client, organizationId, "notice");
     const data: Record<string, unknown>[] = [];
     const maps: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
     const today = new Date().toISOString().slice(0, 10);
@@ -479,7 +488,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     }
     if (!dryRun) for (const part of chunks(data, 300)) {
       const ids = new Set(part.map((p) => p.id as string));
-      await db.$transaction([db.courtNotice.createMany({ data: part as never }), db.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
+      await writeBatch([client.courtNotice.createMany({ data: part as never }), client.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
     }
     log(`intimações: ${r.importados} novas`);
   }
@@ -490,7 +499,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     const r = rep();
     report.entidades.andamentos = r;
     const histFile = fs.readdirSync(dir).find((f) => nfc(f) === nfc("Históricos.csv"));
-    const done = await loadMap(organizationId, "history");
+    const done = await loadMap(client, organizationId, "history");
     type EventRow = Prisma.CaseEventCreateManyInput;
     let events: EventRow[] = [];
     let maps: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
@@ -498,7 +507,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     const flush = async () => {
       if (!events.length) return;
       if (!dryRun) {
-        await db.$transaction([db.caseEvent.createMany({ data: events }), db.importMap.createMany({ data: maps })]);
+        await writeBatch([client.caseEvent.createMany({ data: events }), client.importMap.createMany({ data: maps })]);
         gravados += events.length;
         log(`andamentos: ${gravados} gravados`);
       }
@@ -553,7 +562,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
   if (only.has("documentos")) {
     const r = rep();
     report.entidades.documentos = r;
-    const done = await loadMap(organizationId, "linked_doc");
+    const done = await loadMap(client, organizationId, "linked_doc");
     const rows: Prisma.LinkedDocumentCreateManyInput[] = [];
     const maps: { organizationId: string; source: string; entity: string; externalId: string; internalId: string }[] = [];
     for (const row of readCsv(dir, "Documentos")) {
@@ -581,7 +590,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     if (!dryRun) {
       for (const part of chunks(rows, 500)) {
         const ids = new Set(part.map((p) => p.id));
-        await db.$transaction([db.linkedDocument.createMany({ data: part }), db.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
+        await writeBatch([client.linkedDocument.createMany({ data: part }), client.importMap.createMany({ data: maps.filter((m) => ids.has(m.internalId)) })]);
       }
     }
     log(`documentos: ${r.importados} links novos`);
@@ -595,8 +604,8 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     type MapRow = { organizationId: string; source: string; entity: string; externalId: string; internalId: string };
 
     // --- contas ---
-    const accountMap = await loadMap(organizationId, "fin_account");
-    const existingAccounts = new Map((await db.financeAccount.findMany({ where: { organizationId, deletedAt: null }, select: { id: true, name: true } })).map((a) => [a.name.toLowerCase(), a.id]));
+    const accountMap = await loadMap(client, organizationId, "fin_account");
+    const existingAccounts = new Map((await client.financeAccount.findMany({ where: { organizationId, deletedAt: null }, select: { id: true, name: true } })).map((a) => [a.name.toLowerCase(), a.id]));
     const accData: Prisma.FinanceAccountCreateManyInput[] = [];
     const accMaps: MapRow[] = [];
     for (const row of readCsv(dir, "Contas")) {
@@ -617,8 +626,8 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
       accMaps.push({ ...base, entity: "fin_account", externalId: d.externalId, internalId: id });
     }
     // --- categorias ---
-    const categoryMap = await loadMap(organizationId, "fin_category");
-    const existingCats = new Map((await db.financeCategory.findMany({ where: { organizationId, deletedAt: null }, select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
+    const categoryMap = await loadMap(client, organizationId, "fin_category");
+    const existingCats = new Map((await client.financeCategory.findMany({ where: { organizationId, deletedAt: null }, select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
     const catRows = readCsv(dir, "Categorias").map(mapCategory).filter((c): c is NonNullable<ReturnType<typeof mapCategory>> => !!c);
     const catName = new Map(catRows.map((c) => [c.externalId, c.name]));
     const catData: Prisma.FinanceCategoryCreateManyInput[] = [];
@@ -640,8 +649,8 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
       catMaps.push({ ...base, entity: "fin_category", externalId: d.externalId, internalId: id });
     }
     // --- centros de custo ---
-    const ccMap = await loadMap(organizationId, "fin_cost_center");
-    const existingCc = new Map((await db.costCenter.findMany({ where: { organizationId, deletedAt: null }, select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
+    const ccMap = await loadMap(client, organizationId, "fin_cost_center");
+    const existingCc = new Map((await client.costCenter.findMany({ where: { organizationId, deletedAt: null }, select: { id: true, name: true } })).map((c) => [c.name.toLowerCase(), c.id]));
     const ccData: Prisma.CostCenterCreateManyInput[] = [];
     const ccMaps: MapRow[] = [];
     for (const row of readCsv(dir, "Centros de custo")) {
@@ -661,17 +670,17 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
       ccMaps.push({ ...base, entity: "fin_cost_center", externalId: code, internalId: id });
     }
     if (!dryRun) {
-      await db.$transaction([
-        db.financeAccount.createMany({ data: accData }),
-        db.financeCategory.createMany({ data: catData }),
-        db.costCenter.createMany({ data: ccData }),
-        db.importMap.createMany({ data: [...accMaps, ...catMaps, ...ccMaps] }),
+      await writeBatch([
+        client.financeAccount.createMany({ data: accData }),
+        client.financeCategory.createMany({ data: catData }),
+        client.costCenter.createMany({ data: ccData }),
+        client.importMap.createMany({ data: [...accMaps, ...catMaps, ...ccMaps] }),
       ]);
     }
     log(`financeiro: ${accData.length} contas, ${catData.length} categorias, ${ccData.length} centros de custo novos`);
 
     // --- lançamentos + baixas ---
-    const entryMap = await loadMap(organizationId, "fin_entry");
+    const entryMap = await loadMap(client, organizationId, "fin_entry");
     const entryRows = readCsv(dir, "Entradas");
     r.lidos = entryRows.length;
     const onlyAccount = accountMap.size === 1 ? [...accountMap.values()][0]! : null;
@@ -735,10 +744,10 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     }
     if (!dryRun) {
       for (const part of chunks(packs, 500)) {
-        await db.$transaction([
-          db.financeEntry.createMany({ data: part.map((p) => p.entry) }),
-          db.financePayment.createMany({ data: part.flatMap((p) => (p.payment ? [p.payment] : [])) }),
-          db.importMap.createMany({ data: part.map((p) => p.map) }),
+        await writeBatch([
+          client.financeEntry.createMany({ data: part.map((p) => p.entry) }),
+          client.financePayment.createMany({ data: part.flatMap((p) => (p.payment ? [p.payment] : [])) }),
+          client.importMap.createMany({ data: part.map((p) => p.map) }),
         ]);
       }
     }
@@ -752,7 +761,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
     "Contatos que não são clientes nem partes de processos importados.",
   ];
   if (!dryRun) {
-    await audit({ action: "import.astrea", organizationId, userId: importerUserId, resourceType: "organization", resourceId: organizationId, metadata: { entidades: Object.fromEntries(Object.entries(report.entidades).map(([k, v]) => [k, { importados: v.importados, jaImportados: v.jaImportados }])) } });
+    await audit({ action: "import.astrea", organizationId, userId: importerUserId, resourceType: "organization", resourceId: organizationId, metadata: { entidades: Object.fromEntries(Object.entries(report.entidades).map(([k, v]) => [k, { importados: v.importados, jaImportados: v.jaImportados }])) } }, opts.transaction);
   }
   return report;
 }

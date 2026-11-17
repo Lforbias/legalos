@@ -51,12 +51,12 @@ export function SidePanel({ title, phone, data, meta, actions, controls, extras 
     financeiro: d.finance?.overdueCount,
   };
   return (
-    <aside className="flex h-full min-h-0 w-full flex-col border-border xl:border-l" data-testid="wa-side">
+    <aside className="flex h-full min-h-0 w-full flex-col" data-testid="wa-side">
       <div role="tablist" aria-label="Informações da conversa" className="flex overflow-x-auto border-b border-border">
         {TABS.map((t) => (
-          <button key={t.key} role="tab" type="button" title={t.label} aria-label={t.label} aria-selected={tab === t.key} data-testid={`side-tab-${t.key}`} onClick={() => setTab(t.key)} className={`relative flex min-w-0 flex-1 items-center justify-center gap-2 px-2 py-3 text-xs font-medium transition-colors sm:text-sm ${tab === t.key ? "border-b-[3px] border-primary bg-surface text-primary-text" : "border-b-[3px] border-transparent text-muted hover:bg-surface-2 hover:text-fg"}`}>
+          <button key={t.key} role="tab" type="button" title={t.label} aria-label={t.label} aria-selected={tab === t.key} data-testid={`side-tab-${t.key}`} onClick={() => setTab(t.key)} className={`relative flex min-w-0 flex-1 items-center justify-center gap-1 px-2 py-3 text-xs font-medium transition-colors sm:text-sm ${tab === t.key ? "border-b-[3px] border-primary bg-surface text-primary-text" : "border-b-[3px] border-transparent text-muted hover:bg-surface-2 hover:text-fg"}`}>
             <t.Icon className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="hidden truncate sm:inline">{t.label}</span>
+            <span className="hidden truncate sm:inline xl:hidden 2xl:inline">{t.label}</span>
             {counts[t.key] ? <span className="rounded-full bg-danger px-1.5 text-[10px] text-white" data-testid={`side-count-${t.key}`}>{counts[t.key]}</span> : null}
           </button>
         ))}

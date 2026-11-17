@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import { safeChatPreview } from "@/lib/whatsapp/safe-preview";
 import { chatContactBlocked } from "./chat-contact-control.service";
 import { emitChatEvent } from "./chat-workbench.service";
@@ -35,10 +36,10 @@ export type IngestMessage = {
   media: { mime: string | null; filename: string | null; fetch: () => Promise<{ buffer: Buffer; mime: string }> } | null;
 };
 
-async function matchClient(organizationId: string, waId: string): Promise<string | null> {
+async function matchClient(organizationId: string, waId: string, client: Pick<Prisma.TransactionClient, "$queryRaw"> = db): Promise<string | null> {
   if (waId.startsWith("lid:")) return null;
   const cands = phoneCandidates(waId);
-  const rows = await db.$queryRaw<{ id: string }[]>`
+  const rows = await client.$queryRaw<{ id: string }[]>`
     SELECT id FROM clients
      WHERE organization_id = ${organizationId}::uuid AND deleted_at IS NULL
        AND regexp_replace(coalesce(phone, ''), '\\D', '', 'g') = ANY(${cands}::text[])
@@ -58,6 +59,46 @@ async function storeMedia(organizationId: string, m: IngestMessage) {
     logger.warn("whatsapp.media_failed", { error: e instanceof Error ? e.message : String(e) });
     return { error: e instanceof WhatsappApiError ? e.message : "A mídia não pôde ser baixada." };
   }
+}
+
+/** Registra a cópia histórica sem mexer em atendimento, contadores ou automações. */
+export async function ingestHistoricalMessage(account: Pick<IngestAccount, "id" | "organizationId">, m: Omit<IngestMessage, "media" | "referral">) {
+  if (Number.isNaN(m.timestamp.getTime())) return;
+  const { organizationId } = account;
+  const key = { accountId: account.id, waId: m.waId };
+  const label = TYPE_LABEL[m.type] ?? "Mensagem";
+  const body = m.text ?? (m.type === "text" ? null : `[${label}]`);
+  const preview = (safeChatPreview(body) ?? `[${label}]`).replace(/\s+/g, " ").slice(0, 120);
+
+  await db.$transaction(async (tx) => {
+    const duplicate = await tx.whatsappMessage.findFirst({ where: { waMessageId: m.waMessageId }, select: { id: true } });
+    if (duplicate) return;
+
+    let conversation = await tx.whatsappConversation.findUnique({ where: { accountId_waId: key }, select: { id: true } });
+    if (!conversation) {
+      const clientId = await matchClient(organizationId, m.waId, tx);
+      await tx.whatsappConversation.createMany({
+        data: { ...key, organizationId, clientId, contactName: m.contactName, status: "CLOSED", serviceStatus: "CLOSED", createdAt: m.timestamp, closedAt: m.timestamp },
+        skipDuplicates: true,
+      });
+      conversation = await tx.whatsappConversation.findUniqueOrThrow({ where: { accountId_waId: key }, select: { id: true } });
+    }
+
+    const result = await tx.whatsappMessage.createMany({
+      data: {
+        organizationId, conversationId: conversation.id, waMessageId: m.waMessageId, historical: true,
+        direction: m.fromMe ? "OUT" : "IN", status: m.fromMe ? "SENT" : "RECEIVED",
+        type: m.type, body, createdAt: m.timestamp,
+      },
+      skipDuplicates: true,
+    });
+    if (result.count) {
+      await tx.whatsappConversation.updateMany({
+        where: { id: conversation.id, OR: [{ lastMessageAt: null }, { lastMessageAt: { lt: m.timestamp } }] },
+        data: { lastMessageAt: m.timestamp, lastPreview: preview },
+      });
+    }
+  });
 }
 
 /** Grava uma mensagem recebida (ou enviada pelo próprio aparelho) uma única vez. */

@@ -77,29 +77,59 @@ async function api(f: FetchFn, accessToken: string, url: string, init: RequestIn
 
 const escapeQ = (s: string) => s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 
-/** Acha (entre as pastas que o app criou) ou cria a pasta do escritório. */
-export async function ensureFolder(accessToken: string, name: string, f: FetchFn = fetch): Promise<string> {
-  const q = `name='${escapeQ(name)}' and mimeType='${GOOGLE_FOLDER_MIME}' and trashed=false`;
+/** Localiza uma pasta acessível ao aplicativo ou cria uma nova no mesmo local. */
+export async function ensureFolder(accessToken: string, name: string, f: FetchFn = fetch, client?: { parentId: string; id: string }): Promise<string> {
+  const location = client
+    ? `'${escapeQ(client.parentId)}' in parents and appProperties has { key='legalosClientId' and value='${escapeQ(client.id)}' }`
+    : `'root' in parents and name='${escapeQ(name)}'`;
+  const q = `${location} and mimeType='${GOOGLE_FOLDER_MIME}' and trashed=false`;
   const found = (await (await api(f, accessToken, `${API}/files?q=${encodeURIComponent(q)}&fields=files(id)&pageSize=1&spaces=drive`)).json()) as { files?: { id: string }[] };
   if (found.files?.[0]) return found.files[0].id;
-  const made = (await (await api(f, accessToken, `${API}/files?fields=id`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, mimeType: GOOGLE_FOLDER_MIME }) })).json()) as { id: string };
+  const made = (await (await api(f, accessToken, `${API}/files?fields=id`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name, mimeType: GOOGLE_FOLDER_MIME, ...(client ? { parents: [client.parentId], appProperties: { legalosClientId: client.id } } : {}) }) })).json()) as { id: string };
   return made.id;
 }
 
-export async function uploadFile(accessToken: string, p: { name: string; mimeType: string; parentId: string; buffer: Buffer; convertToDoc: boolean }, f: FetchFn = fetch): Promise<{ id: string; webViewLink: string; isGoogleDoc: boolean }> {
+export function parseDriveFolder(input: string): { id: string; resourceKey: string | null } | null {
+  const value = input.trim();
+  const token = /^[a-zA-Z0-9_-]{1,200}$/;
+  if (token.test(value)) return { id: value, resourceKey: null };
+  try {
+    const url = new URL(value);
+    if (url.origin !== "https://drive.google.com" || url.username || url.password) return null;
+    const id = /^(?:\/drive)?(?:\/u\/\d+)?\/folders\/([^/]+)\/?$/.exec(url.pathname)?.[1];
+    const resourceKey = url.searchParams.get("resourcekey");
+    if (!id || !token.test(id) || (resourceKey !== null && !token.test(resourceKey))) return null;
+    return { id, resourceKey };
+  } catch {
+    return null;
+  }
+}
+
+export async function getWritableDriveFolder(accessToken: string, folder: { id: string; resourceKey: string | null }, f: FetchFn = fetch) {
+  const response = await api(f, accessToken, `${API}/files/${encodeURIComponent(folder.id)}?supportsAllDrives=true&fields=name,mimeType,trashed,capabilities(canAddChildren)`, {
+    headers: folder.resourceKey ? { "X-Goog-Drive-Resource-Keys": `${folder.id}/${folder.resourceKey}` } : {},
+  });
+  const data = await response.json() as { name?: string; mimeType?: string; trashed?: boolean; capabilities?: { canAddChildren?: boolean } };
+  if (data.mimeType !== GOOGLE_FOLDER_MIME || data.trashed || !data.capabilities?.canAddChildren || !data.name) {
+    throw new DriveError("Escolha uma pasta ativa em que a conta conectada possa adicionar arquivos.");
+  }
+  return data.name;
+}
+
+export async function uploadFile(accessToken: string, p: { name: string; mimeType: string; parentId: string; parentResourceKey?: string | null; buffer: Buffer; convertToDoc: boolean }, f: FetchFn = fetch): Promise<{ id: string; webViewLink: string; isGoogleDoc: boolean }> {
   if (p.buffer.length > MAX_DRIVE_BYTES) throw new DriveError("Arquivo grande demais para enviar ao Drive (máximo de 25 MB).");
   const boundary = `legalos-${Math.random().toString(36).slice(2)}`;
   const meta = { name: p.name, parents: [p.parentId], ...(p.convertToDoc ? { mimeType: GOOGLE_DOC_MIME } : {}) };
   const head = Buffer.from(`--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n--${boundary}\r\nContent-Type: ${p.mimeType}\r\n\r\n`);
   const body = Buffer.concat([head, p.buffer, Buffer.from(`\r\n--${boundary}--`)]);
-  const res = await api(f, accessToken, `${UPLOAD}/files?uploadType=multipart&fields=id,webViewLink,mimeType`, { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}` }, body });
+  const res = await api(f, accessToken, `${UPLOAD}/files?uploadType=multipart&supportsAllDrives=true&fields=id,webViewLink,mimeType`, { method: "POST", headers: { "Content-Type": `multipart/related; boundary=${boundary}`, ...(p.parentResourceKey ? { "X-Goog-Drive-Resource-Keys": `${p.parentId}/${p.parentResourceKey}` } : {}) }, body });
   const j = (await res.json()) as { id: string; webViewLink?: string; mimeType?: string };
   return { id: j.id, webViewLink: j.webViewLink ?? `https://drive.google.com/file/d/${j.id}/view`, isGoogleDoc: j.mimeType === GOOGLE_DOC_MIME };
 }
 
 /** Baixa o conteúdo: Documento Google → exporta como .docx; outros arquivos → conteúdo original. */
 export async function downloadFile(accessToken: string, fileId: string, isGoogleDoc: boolean, f: FetchFn = fetch): Promise<Buffer> {
-  const url = isGoogleDoc ? `${API}/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent(DOCX_MIME)}` : `${API}/files/${encodeURIComponent(fileId)}?alt=media`;
+  const url = isGoogleDoc ? `${API}/files/${encodeURIComponent(fileId)}/export?mimeType=${encodeURIComponent(DOCX_MIME)}` : `${API}/files/${encodeURIComponent(fileId)}?alt=media&supportsAllDrives=true`;
   const buf = Buffer.from(await (await api(f, accessToken, url)).arrayBuffer());
   if (buf.length > MAX_DRIVE_BYTES) throw new DriveError("O arquivo no Drive é grande demais para trazer (máximo de 25 MB).");
   return buf;

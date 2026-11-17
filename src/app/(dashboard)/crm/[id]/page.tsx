@@ -19,8 +19,9 @@ import { ProposalControls } from "@/modules/crm/proposal-controls";
 import { ACTIVITY_LABEL, LEAD_STAGE_LABEL, LEAD_STAGE_TONE, PROPOSAL_STATUS_LABEL, type LeadStageKey, type ProposalStatusKey } from "@/modules/crm/schemas";
 import { can } from "@/server/context";
 import { getLead } from "@/server/services/crm.service";
-import { ConversationsCard } from "@/modules/whatsapp/conversations-card";
-import { conversationsOfLead } from "@/server/services/chat-links.service";
+import { ClientWhatsappCard } from "@/modules/whatsapp/client-whatsapp-card";
+import { ClientDocuments } from "@/modules/documents/client-documents";
+import { db } from "@/lib/db/client";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Lead" };
@@ -33,6 +34,10 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
   const data = await getLead(ctx, id.data).catch((e) => (e instanceof NotFoundError ? null : Promise.reject(e)));
   if (!data) notFound();
   const { lead: l, names } = data;
+  const client = l.clientId && can(ctx, "clients:read") ? await db.client.findFirst({
+    where: { id: l.clientId, organizationId: ctx.organizationId, deletedAt: null },
+    select: { id: true, name: true, phone: true },
+  }) : null;
   const tz = organization.timezone;
   const stage = l.stage as LeadStageKey;
   const open = stage !== "WON" && stage !== "LOST";
@@ -56,7 +61,7 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
       {stage === "LOST" ? <Alert tone="warning" className="mb-4">Perdido: {l.lostReason}</Alert> : null}
 
       <div className="grid gap-4 lg:grid-cols-[1fr_20rem]">
-        <div className="space-y-4">
+        <div className="min-w-0 space-y-4">
           <Card>
             <CardHeader title="Dados" />
             <CardBody className="grid gap-2 text-sm md:grid-cols-2">
@@ -70,7 +75,8 @@ export default async function LeadPage({ params }: { params: Promise<{ id: strin
             </CardBody>
           </Card>
 
-          <ConversationsCard rows={await conversationsOfLead(ctx, l.id)} />
+          {!l.clientId || client ? <ClientWhatsappCard ctx={ctx} leadId={l.id} client={client ?? { id: null, name: l.name, phone: l.phone }} /> : null}
+          {client ? <ClientDocuments ctx={ctx} clientId={client.id} revalidate={`/crm/${l.id}`} /> : null}
 
           <Card>
             <CardHeader

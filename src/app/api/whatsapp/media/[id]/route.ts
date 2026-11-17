@@ -19,11 +19,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const f = await getMessageMedia(tenant.ctx, parsed.data);
     const stream = await getObjectStream(f.key).catch(() => null);
     if (!stream) return NextResponse.json({ error: "Arquivo indisponível no armazenamento." }, { status: 410 });
-    const inline = INLINE.has(f.mime);
+    const mime = f.mime.split(";")[0]!.trim().toLowerCase();
+    const inline = INLINE.has(mime);
     const ascii = f.name.replace(/[^\x20-\x7e]/g, "_").replace(/"/g, "");
     return new NextResponse(stream, {
       headers: {
-        "Content-Type": inline ? f.mime : "application/octet-stream",
+        "Content-Type": inline ? mime : "application/octet-stream",
         ...(f.size ? { "Content-Length": String(f.size) } : {}),
         "Content-Disposition": `${inline ? "inline" : "attachment"}; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(f.name)}`,
         "X-Content-Type-Options": "nosniff",

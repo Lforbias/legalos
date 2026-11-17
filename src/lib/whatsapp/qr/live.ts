@@ -1,7 +1,7 @@
 import type { QrSession } from "./types";
 
 /** Sessões de QR-Code vivas NESTE processo (um app só deve rodar por vez, senão o WhatsApp derruba uma das conexões). */
-type Live = { session: QrSession | null; stopped: boolean; attempts: number; timer: ReturnType<typeof setTimeout> | null; chain: Promise<unknown>; events: Promise<unknown>; lastSendAt: number };
+type Live = { session: QrSession | null; stopped: boolean; attempts: number; timer: ReturnType<typeof setTimeout> | null; chain: Promise<unknown>; events: Promise<unknown>; history: Promise<unknown>; lastSendAt: number };
 const g = globalThis as unknown as { __waQrLive?: Map<string, Live> };
 export const liveSessions: Map<string, Live> = (g.__waQrLive ??= new Map<string, Live>());
 

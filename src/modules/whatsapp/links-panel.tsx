@@ -119,8 +119,10 @@ export function ChatActions({ chatId, title, links, can, team, me, panel, setPan
 /** Ações de uma mensagem: criar tarefa a partir dela e guardar o arquivo recebido em Documentos. */
 export function MessageActions({ messageId, excerpt, hasMedia, links, can, onPanel, onDone }: { messageId: string; excerpt: string; hasMedia: boolean; links: Links; can: Can; onPanel: (p: Panel) => void; onDone: (m: { tone: "error" | "success"; text: string }) => void }) {
   const [pending, start] = React.useTransition();
+  const router = useRouter();
   const attach = (target: "case" | "client") => start(async () => {
     const r = await attachToDocumentsAction(messageId, target);
+    if (r.ok) router.refresh();
     onDone(r.ok ? { tone: "success", text: `Arquivo guardado em Documentos (${target === "case" ? "processo" : "cliente"}).` } : { tone: "error", text: errText(r, "Não foi possível guardar o arquivo.") });
   });
   const seed = excerpt.replace(/\s+/g, " ").slice(0, 80);
