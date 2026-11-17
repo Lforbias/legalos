@@ -133,6 +133,46 @@
 - Não bloquear uso normal até finalizar o checklist; evitar pop-ups excessivos.
 - Medir início/conclusão de cadastro, abandono por etapa, seleção de plano, pagamento confirmado, código resgatado, primeira ação relevante e ativação da equipe.
 
+### Welcome 2.0 — complementos aprovados (seleção: ideias 4, 3, 5, 6, 7 e 8)
+
+**Status:** aprovados para o backlog; **ainda não implementados**. São melhorias da iniciativa transversal LegalOS Welcome, **não** novos itens na ordem das quatro prioridades principais. A proposta de *Setup AI* (ideia 1) e de nova *migração inteligente* (ideia 2) desta rodada **não foi selecionada**. Isso não elimina melhorias de importação já planejadas no produto.
+
+**4. Central de presentes e convites especiais**
+- Administração cria códigos individuais e campanhas com benefícios explícitos: dias/meses gratuitos, acesso a plano específico, desconto por período e parceria; modalidades especiais somente com autorização.
+- Painel para criar, suspender, revogar e consultar códigos; vigência, máximo de resgates, elegibilidade por e-mail/organização, limite de usos por escritório, regras de acúmulo e histórico auditável.
+- No cadastro, prévia do que o código concede e de quando expira; resgate atômico e idempotente, prevenindo fraude, reutilização e corridas.
+- Separar convites de colaboradores, código que permite cadastrar (`REGISTRATION_MODE`) e código que concede benefícios de assinatura. Nenhuma cobrança posterior sem consentimento.
+
+**3. Escritório de demonstração interativo**
+- A pessoa experimenta o LegalOS com clientes, processos, tarefas, documentos e relatórios **inteiramente fictícios** e claramente sinalizados.
+- Ambiente isolado do escritório real (base/tenant demo segregado e sem acesso cruzado), sem disparar WhatsApp, e-mail, cobrança, monitoramento judicial ou efeitos externos.
+- Alternância simples entre demonstração e ambiente real; oferecer um roteiro de tarefas e permitir sair sem deixar dados fictícios na operação produtiva.
+- Expiração/limpeza segura e controle de consumo de recursos para impedir abuso.
+
+**5. Implantação colaborativa**
+- O proprietário convida os membros do escritório no onboarding e delega etapas por área: Jurídico (processos), Financeiro (cobrança), Atendimento (canais), Administração (equipe).
+- Reutilizar convites, papéis e permissões existentes; convidado não contrata outra assinatura.
+- Checklist compartilhado com responsável, situação, data de conclusão, bloqueios e auditoria; sem dar poderes administrativos automaticamente a convidados.
+
+**6. Índice de prontidão do escritório**
+- Indicador de implantação calculado a partir de evidências reais (cadastros, documentos, membros, configurações e testes de conexão) com estados **Não iniciado / Pendente / Configurado / Verificado / Requer atenção**.
+- Não chamar uma integração de “funcionando” apenas por existir cadastro/credencial; checagem real de conectividade e resultados quando suportada.
+- Mostrar o próximo passo recomendado, critérios explícitos e detalhes por departamento; evitar percentual artificial ou afirmações de prontidão sem validação.
+
+**7. Concierge de implantação**
+- Ajuda contextual para dúvidas de cadastro, contratação, importação e conexão de serviços, com abertura de pedido de suporte e opção de agendar acompanhamento **quando houver canal/equipe disponível**.
+- Relatório diagnóstico compartilhável com consentimento, contendo estados, códigos de erro e contexto necessário, **nunca** senhas, tokens, certificados privados ou documentos sigilosos.
+- Histórico de atendimento e encaminhamento para o departamento responsável; suporte não obtém acesso irrestrito aos dados do escritório.
+
+**8. Painel de conversão e ativação**
+- Funil administrativo: visitantes que iniciaram cadastro → conta verificada → escritório criado → caminho comercial escolhido → pagamento confirmado/código resgatado → primeira ação de valor → equipe ativada.
+- Métricas de desistência por etapa, tempo até primeiro valor, planos escolhidos, códigos/campanhas utilizados e conclusão do onboarding, com filtros temporais e segmentação agregada.
+- Eventos confiáveis e deduplicados; distinguir teste, presente e assinatura paga; controles de acesso e privacidade, retenção proporcional e não registrar senhas, conteúdo jurídico ou dados de pagamento sensíveis.
+
+**Integração com as fases já planejadas:** o escritório demo e convites colaborativos entram no desenho da **Fase A**; a central de presentes amplia a **Fase B**; prontidão, concierge e painel de métricas integram a **Fase C**. Priorizar experiências reais e verificadas, com testes isolados e sem interromper os fluxos de cadastro atuais.
+
+**Aceite adicional:** um usuário novo explora demo sem tocar dados reais; outro resgata um presente com histórico auditável; proprietário convida equipe e delega configuração; índice não marca conexão falsa como verificada; suporte recebe diagnóstico sem segredos; painel mostra métricas coerentes com eventos de teste.
+
 ### Estado da base e adaptações previstas
 
 - Fluxo existente: `/register`, `/onboarding`, autenticação de conta, criação de organização e convites.
