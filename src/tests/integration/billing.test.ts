@@ -36,8 +36,8 @@ describe("cobrança automática (Asaas simulado)", () => {
     const url = await fake.start();
     Object.assign(process.env, { ASAAS_API_URL: url, ASAAS_API_KEY: "chave-de-teste", ASAAS_WEBHOOK_TOKEN: TOKEN, ASAAS_ENV: "sandbox" });
     const s = randomUUID().slice(0, 6);
-    planPro = await db.plan.create({ data: { key: `pro-${s}`, name: "Pro", priceCents: 9900, maxUsers: 10, features: [], isPublic: true } });
-    planMax = await db.plan.create({ data: { key: `max-${s}`, name: "Max", priceCents: 19900, features: [], isPublic: true } });
+    planPro = await db.plan.findUniqueOrThrow({ where: { key: "intermediario" }, select: { id: true, key: true } });
+    planMax = await db.plan.findUniqueOrThrow({ where: { key: "avancado" }, select: { id: true, key: true } });
     planFree = await db.plan.create({ data: { key: `semprecp-${s}`, name: "Sob consulta", features: [], isPublic: true } });
     const admin = await makeUser("bill-admin");
     await withMfa(admin.id, admin.email);
@@ -86,7 +86,7 @@ describe("cobrança automática (Asaas simulado)", () => {
       await expect(contractPlan(A.ctx, planPro.key)).rejects.toThrow(/dados de cobrança/);
       await saveBillingProfile(A.ctx, profile);
       expect((await sub(A.org.id)).billingDocument).toBe("52998224725");
-      await expect(contractPlan(A.ctx, planFree.key)).rejects.toThrow(/ainda não tem preço/);
+      await expect(contractPlan(A.ctx, planFree.key)).rejects.toThrow(/Este plano está sendo atualizado/);
       await expect(contractPlan(A.ctx, "nao-existe")).rejects.toBeInstanceOf(ValidationError);
       const noMfa = await makeOrgWithOwner("bill-nomfa");
       await saveBillingProfile(noMfa.ctx, profile);
@@ -111,7 +111,7 @@ describe("cobrança automática (Asaas simulado)", () => {
       expect(cust.token).toBe("chave-de-teste");
       expect(cust.body).toMatchObject({ name: profile.name, cpfCnpj: "52998224725", email: profile.email, externalReference: O.org.id });
       const created = fake.requests.findLast((r) => r.method === "POST" && r.path === "/subscriptions")!;
-      expect(created.body).toMatchObject({ value: 99, billingType: "UNDEFINED", cycle: "MONTHLY", externalReference: O.org.id, nextDueDate: ymd(new Date(Date.now() + 10 * DAY)) });
+      expect(created.body).toMatchObject({ value: 349, billingType: "UNDEFINED", cycle: "MONTHLY", externalReference: O.org.id, nextDueDate: ymd(new Date(Date.now() + 10 * DAY)) });
       const s = await sub(O.org.id);
       expect(s.providerSubscriptionId).toMatch(/^sub_/);
       expect(s.billingProvider).toBe("asaas");
@@ -129,7 +129,7 @@ describe("cobrança automática (Asaas simulado)", () => {
       await contractPlan(O.ctx, planMax.key);
       expect(fake.count("POST", /^\/subscriptions$/)).toBe(subs);
       const put = fake.requests.findLast((r) => r.method === "PUT" && r.path.startsWith("/subscriptions/"))!;
-      expect(put.body).toMatchObject({ value: 199, updatePendingPayments: true });
+      expect(put.body).toMatchObject({ value: 599, updatePendingPayments: true });
       expect((await sub(O.org.id)).planId).toBe(planMax.id);
     });
 
