@@ -137,7 +137,8 @@ test("WhatsApp: conectar o número, receber pelo webhook assinado, responder, an
   await expect(page.getByText("Ligar para a Maria sobre o processo").first()).toBeVisible();
   await page.goto("/crm");
   await page.getByText("Maria Teste").first().click();
-  await expect(page.getByTestId("chat-conversations")).toBeVisible(); // o caminho de volta: o lead mostra a conversa
+  const leadChat = page.getByTestId("client-whatsapp");
+  await expect(leadChat.getByTestId("wa-msg-in").getByText("Bom dia, preciso de ajuda com meu processo")).toBeVisible();
   await page.goto("/atendimento");
   await page.getByTestId("wa-list").getByText("Maria Teste").click();
 
