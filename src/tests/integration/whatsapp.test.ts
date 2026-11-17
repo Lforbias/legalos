@@ -8,7 +8,7 @@ import { rotateKeys } from "@/lib/security/rotate-keys";
 import { totpCode, totpStep } from "@/lib/security/totp";
 import { confirmEnrollment, startEnrollment } from "@/server/services/mfa.service";
 import { connectAccount, deleteQuickReply, getAccount, listQuickReplies, removeAccount, saveQuickReply, syncTemplates, updateSettings } from "@/server/services/whatsapp-account.service";
-import { addNote, assignConversation, getMessageMedia, linkClient, listConversations, openConversation, sendFile, sendMessage, sendTemplateMessage, setConversationStatus, startConversation, unreadTotal } from "@/server/services/whatsapp.service";
+import { addNote, assignConversation, getMessageMedia, linkClient, listConversations, listConversationsAwaitingReply, openConversation, sendFile, sendMessage, sendTemplateMessage, setConversationStatus, startConversation, unreadTotal } from "@/server/services/whatsapp.service";
 import { handleWebhook, verifyChallenge, WhatsappWebhookAuthError } from "@/server/services/whatsapp-webhook.service";
 import { APP_SECRET, inbound, startFakeWhatsapp, statusEvent, WA_TOKEN } from "./fake-whatsapp";
 import { addMember, META, makeOrgWithOwner } from "./helpers";
@@ -94,6 +94,31 @@ describe("atendimento por WhatsApp (Meta simulada)", () => {
     expect(o.conversation.windowOpen).toBe(true);
     expect(o.messages[0]!.direction).toBe("IN");
     expect(await unreadTotal(A.ctx)).toBe(0);
+  });
+
+  it("mantém a primeira mensagem na fila mesmo depois de ler ou receber outra mensagem", async () => {
+    const rows = await listConversationsAwaitingReply(A.ctx);
+    expect(rows).toEqual([expect.objectContaining({ id: convId, name: "Maria da Silva", waitingSince: expect.any(Date) })]);
+    expect(await listConversationsAwaitingReply({ ...A.ctx, isOwner: false, roleKey: "LAWYER" })).toEqual([]);
+    expect(await listConversationsAwaitingReply({ ...A.ctx, organizationId: B.org.id })).toEqual([]);
+
+    expect((await listConversations(A.ctx, "waiting", "Maria")).map((row) => row.id)).toEqual([convId]);
+    expect(await listConversations(A.ctx, "waiting", "Outro contato")).toEqual([]);
+    expect(await listConversations({ ...A.ctx, isOwner: false, roleKey: "LAWYER" }, "waiting")).toEqual([]);
+
+    const first = rows[0]!.waitingSince;
+    await db.whatsappMessage.createMany({ data: [
+      { organizationId: A.org.id, conversationId: convId, direction: "IN", status: "RECEIVED", createdAt: new Date(first.getTime() + 1000) },
+      { organizationId: A.org.id, conversationId: convId, direction: "OUT", status: "SENT", automatic: true, createdAt: new Date(first.getTime() + 2000) },
+      { organizationId: A.org.id, conversationId: convId, direction: "OUT", status: "FAILED", createdAt: new Date(first.getTime() + 3000) },
+    ] });
+    try {
+      expect((await listConversationsAwaitingReply(A.ctx))[0]?.waitingSince).toEqual(first);
+      await db.whatsappMessage.create({ data: { organizationId: A.org.id, conversationId: convId, direction: "OUT", status: "SENT", authorId: A.owner.id, createdAt: new Date(first.getTime() + 4000) } });
+      expect(await listConversationsAwaitingReply(A.ctx)).toEqual([]);
+    } finally {
+      await db.whatsappMessage.deleteMany({ where: { conversationId: convId, createdAt: { gt: first }, waMessageId: null } });
+    }
   });
 
   it("número que não pertence a nenhum escritório é ignorado sem erro", async () => {

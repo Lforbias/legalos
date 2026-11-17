@@ -21,13 +21,15 @@ export const baileysDriver: QrDriver = {
     } catch {
       /* usa a versão embutida na biblioteca */
     }
+    const syncStartedAt = Math.floor(Date.now() / 1000) * 1000;
     const sock = B.makeWASocket({
       auth: { creds: state.creds, keys: B.makeCacheableSignalKeyStore(state.keys, silent) },
       ...(version ? { version } : {}),
       logger: silent,
-      browser: ["LegalOS", "Chrome", "1.0.0"],
+      browser: B.Browsers.macOS("Desktop"),
       markOnlineOnConnect: false,
-      syncFullHistory: false,
+      syncFullHistory: true,
+      shouldSyncHistoryMessage: () => true,
       generateHighQualityLinkPreview: false,
     });
     let closed = false;
@@ -57,39 +59,60 @@ export const baileysDriver: QrDriver = {
         if (s) emit({ type: "status", id: key.id, status: s });
       }
     });
+    function readMessage(m: import("@whiskeysockets/baileys").WAMessage, historical = false): QrInbound | null {
+      try {
+        const chat = chatFromKey(m.key as { remoteJid?: string | null; remoteJidAlt?: string | null });
+        if (!chat || !m.key.id || !m.message) return null;
+        const content = B.normalizeMessageContent(m.message) as Record<string, unknown> | undefined;
+        if (!content) return null;
+        if (content.protocolMessage || content.reactionMessage || content.senderKeyDistributionMessage) return null;
+        let text: string | null = null;
+        let media: QrInbound["media"] = null;
+        const kind = KINDS.find(([k]) => content[k]);
+        if (kind) {
+          const x = content[kind[0]] as { mimetype?: string; fileName?: string; caption?: string };
+          text = x.caption ?? null;
+          media = { kind: kind[1], mime: x.mimetype ?? null, filename: x.fileName ?? null, download: async () => (await B.downloadMediaMessage(m, "buffer", {}, { logger: silent, reuploadRequest: sock.updateMediaMessage })) as Buffer };
+        } else if (typeof content.conversation === "string") text = content.conversation;
+        else if (content.extendedTextMessage) text = (content.extendedTextMessage as { text?: string }).text ?? null;
+        else if (content.buttonsResponseMessage) text = (content.buttonsResponseMessage as { selectedDisplayText?: string }).selectedDisplayText ?? null;
+        else if (content.listResponseMessage) text = (content.listResponseMessage as { title?: string }).title ?? null;
+        else if (content.locationMessage) {
+          const l = content.locationMessage as { degreesLatitude?: number; degreesLongitude?: number };
+          text = `Localização: ${l.degreesLatitude}, ${l.degreesLongitude}`;
+        } else return null; // tipo não suportado
+        const ts = typeof m.messageTimestamp === "number" ? m.messageTimestamp : Number(m.messageTimestamp ?? 0);
+        if (historical && (!Number.isFinite(ts) || ts <= 0)) return null;
+        return { id: m.key.id, chat, fromMe: !!m.key.fromMe, name: m.key.fromMe ? null : (m.pushName ?? null), text, timestamp: ts > 0 ? new Date(ts * 1000) : new Date(), media };
+      } catch (e) {
+        logger.warn("whatsapp.qr_message_skipped", { error: e instanceof Error ? e.message : String(e) });
+        return null;
+      }
+    }
+
     sock.ev.on("messages.upsert", ({ messages, type }) => {
-      if (type !== "notify") return; // histórico sincronizado não é importado
-      for (const m of messages) {
-        try {
-          const chat = chatFromKey(m.key as { remoteJid?: string | null; remoteJidAlt?: string | null });
-          if (!chat || !m.key.id || !m.message) continue;
-          const content = B.normalizeMessageContent(m.message) as Record<string, unknown> | undefined;
-          if (!content) continue;
-          if (content.protocolMessage || content.reactionMessage || content.senderKeyDistributionMessage) continue;
-          let text: string | null = null;
-          let media: QrInbound["media"] = null;
-          const kind = KINDS.find(([k]) => content[k]);
-          if (kind) {
-            const x = content[kind[0]] as { mimetype?: string; fileName?: string; caption?: string };
-            text = x.caption ?? null;
-            media = { kind: kind[1], mime: x.mimetype ?? null, filename: x.fileName ?? null, download: async () => (await B.downloadMediaMessage(m, "buffer", {}, { logger: silent, reuploadRequest: sock.updateMediaMessage })) as Buffer };
-          } else if (typeof content.conversation === "string") text = content.conversation;
-          else if (content.extendedTextMessage) text = (content.extendedTextMessage as { text?: string }).text ?? null;
-          else if (content.buttonsResponseMessage) text = (content.buttonsResponseMessage as { selectedDisplayText?: string }).selectedDisplayText ?? null;
-          else if (content.listResponseMessage) text = (content.listResponseMessage as { title?: string }).title ?? null;
-          else if (content.locationMessage) {
-            const l = content.locationMessage as { degreesLatitude?: number; degreesLongitude?: number };
-            text = `Localização: ${l.degreesLatitude}, ${l.degreesLongitude}`;
-          } else continue; // tipo não suportado
-          const ts = typeof m.messageTimestamp === "number" ? m.messageTimestamp : Number(m.messageTimestamp ?? 0);
-          emit({ type: "message", msg: { id: m.key.id, chat, fromMe: !!m.key.fromMe, name: m.key.fromMe ? null : (m.pushName ?? null), text, timestamp: ts > 0 ? new Date(ts * 1000) : new Date(), media } });
-        } catch (e) {
-          logger.warn("whatsapp.qr_message_skipped", { error: e instanceof Error ? e.message : String(e) });
-        }
+      if (type !== "notify") return;
+      for (const message of messages) {
+        const msg = readMessage(message);
+        if (msg) emit({ type: "message", msg });
       }
     });
 
+    const historicalIds = new Set<string>();
+    sock.ev.on("messaging-history.set", ({ messages }) => {
+      const batch: QrInbound[] = [];
+      for (const message of messages) {
+        if (historicalIds.size >= 1000) break;
+        const parsed = readMessage(message, true);
+        if (!parsed || parsed.timestamp.getTime() >= syncStartedAt || historicalIds.has(parsed.id)) continue;
+        historicalIds.add(parsed.id);
+        batch.push(parsed);
+      }
+      if (batch.length) emit({ type: "history", messages: batch });
+    });
+
     const session: QrSession = {
+      profilePictureUrl: (chat) => sock.profilePictureUrl(jidOfChat(chat), "preview", 4000),
       async sendText(chat, body) {
         const r = await sock.sendMessage(jidOfChat(chat), { text: body });
         if (!r?.key.id) throw new Error("O WhatsApp não confirmou o envio.");

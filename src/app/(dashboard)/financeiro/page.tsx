@@ -12,6 +12,7 @@ import { formatMoneyBR } from "@/lib/validation/money";
 import { FinanceNav } from "@/modules/finance/finance-nav";
 import { can } from "@/server/context";
 import { accountBalances, cashflow, financeSummary, listEntries } from "@/server/services/finance.service";
+import { overdueAging } from "@/server/services/finance-report.service";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Financeiro" };
@@ -33,11 +34,12 @@ function Stat({ label, value, tone, id }: { label: string; value: string; tone?:
 export default async function FinancePage() {
   const { ctx } = await requireTenant();
   if (!can(ctx, "finance:read")) return <AccessDenied />;
-  const [summary, balances, flow, upcoming] = await Promise.all([
+  const [summary, balances, flow, upcoming, aging] = await Promise.all([
     financeSummary(ctx),
     accountBalances(ctx),
     cashflow(ctx, 6),
     listEntries(ctx, { status: "aberto" }),
+    overdueAging(ctx),
   ]);
   const next = upcoming.items.slice(0, 8);
   return (
@@ -56,6 +58,28 @@ export default async function FinancePage() {
         <Stat id="stat-payable-overdue" label="A pagar vencido" value={summary.payableOverdue} tone={summary.payableOverdue !== "0.00" ? "danger" : undefined} />
         <Stat id="stat-paid-month" label="Pago no mês" value={summary.paidThisMonth} />
       </div>
+
+      <Card className="mt-4">
+        <CardHeader title="Atrasos por faixa de vencimento" description="Saldo em aberto de contas vencidas, considerando baixas parciais." />
+        <table className="w-full text-sm">
+          <thead className="text-xs text-muted">
+            <tr>
+              <th scope="col" className="px-4 py-2 text-left">Tempo em atraso</th>
+              <th scope="col" className="px-4 py-2 text-right"><Link href="/financeiro/lancamentos?tipo=receber&status=vencido" className="hover:underline">A receber</Link></th>
+              <th scope="col" className="px-4 py-2 text-right"><Link href="/financeiro/lancamentos?tipo=pagar&status=vencido" className="hover:underline">A pagar</Link></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border tabular-nums">
+            {aging.map((row) => (
+              <tr key={row.label}>
+                <th scope="row" className="px-4 py-2 text-left font-medium">{row.label}</th>
+                <td className="px-4 py-2 text-right">{formatMoneyBR(row.receivable)}</td>
+                <td className="px-4 py-2 text-right">{formatMoneyBR(row.payable)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">

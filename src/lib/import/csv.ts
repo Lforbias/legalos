@@ -1,5 +1,18 @@
 import fs from "node:fs";
 
+/** Excel brasileiro salva com ";". Troca o separador fora de aspas só quando o cabeçalho não tem ",". */
+export function normalizeDelimiter(text: string): string {
+  const first = text.split(/\r?\n/, 1)[0] ?? "";
+  if (!first.includes(";") || first.includes(",")) return text;
+  let out = "";
+  let q = false;
+  for (const ch of text) {
+    if (ch === '"') q = !q;
+    out += ch === ";" && !q ? "," : ch;
+  }
+  return out;
+}
+
 /**
  * Leitor de CSV (RFC 4180): campos entre aspas, aspas duplicadas ("") e quebras de linha dentro de campos.
  * Remove BOM. Retorna objetos indexados pelo cabeçalho. Não interpreta tipos.

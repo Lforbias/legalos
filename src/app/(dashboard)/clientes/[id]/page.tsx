@@ -18,13 +18,12 @@ import { CASE_STATUS_LABEL } from "@/modules/cases/schemas";
 import { ArchiveClientButton } from "@/modules/clients/client-actions";
 import { ContactsManager } from "@/modules/clients/contacts-manager";
 import { CLIENT_STATUS_LABEL, CLIENT_TYPE_LABEL } from "@/modules/clients/schemas";
-import { DocumentsPanel } from "@/modules/documents/documents-panel";
+import { ClientDocuments } from "@/modules/documents/client-documents";
 import { can } from "@/server/context";
 import { listCasesForClient } from "@/server/services/case.service";
 import { getClient } from "@/server/services/client.service";
 import { PortalPanel } from "@/modules/portal/portal-panel";
 import { listPortalAccess } from "@/server/services/portal.service";
-import { listDocuments } from "@/server/services/document.service";
 import { ClientWhatsappCard } from "@/modules/whatsapp/client-whatsapp-card";
 import { VaultPanel } from "@/modules/vault/vault-panel";
 import { listClientCredentials, VAULT_SYSTEMS } from "@/server/services/client-vault.service";
@@ -173,13 +172,7 @@ export default async function ClientDetailPage({ params, searchParams }: { param
       })() : null}
 
       {tab === "documentos" ? (
-        <DocumentsPanel
-          owner={{ clientId: client.id }}
-          canWrite={can(ctx, "documents:write")}
-          timezone={tz}
-          revalidate={`/clientes/${client.id}`}
-          documents={(await listDocuments(ctx, { clientId: client.id })).map((d) => ({ id: d.id, name: d.name, sizeBytes: d.sizeBytes, createdAt: d.createdAt.toISOString(), currentVersion: d.currentVersion }))}
-        />
+        <ClientDocuments ctx={ctx} clientId={client.id} revalidate={`/clientes/${client.id}`} />
       ) : null}
     </div>
   );

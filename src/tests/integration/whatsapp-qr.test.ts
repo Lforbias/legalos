@@ -10,7 +10,7 @@ import { liveSessions } from "@/lib/whatsapp/qr/live";
 import { confirmEnrollment, startEnrollment } from "@/server/services/mfa.service";
 import { connectAccount, getAccount, removeAccount, setAccountEnabled, syncTemplates } from "@/server/services/whatsapp-account.service";
 import { connectQr, disconnectQr, getQrStatus, restartQr, stopQrSession } from "@/server/services/whatsapp-qr.service";
-import { listConversations, openConversation, sendFile, sendMessage, sendTemplateMessage } from "@/server/services/whatsapp.service";
+import { listConversations, listConversationsAwaitingReply, openConversation, readOlderMessages, sendFile, sendMessage, sendTemplateMessage } from "@/server/services/whatsapp.service";
 import { APP_SECRET, startFakeWhatsapp, WA_TOKEN } from "./fake-whatsapp";
 import { META, makeOrgWithOwner } from "./helpers";
 
@@ -102,6 +102,29 @@ describe("atendimento por WhatsApp — conexão por QR-Code (driver FALSO)", () 
     const o = await openConversation(A.ctx, conv.id);
     expect(o.conversation.windowOpen).toBe(true);
     expect(o.conversation.unreadCount).toBe(0);
+  });
+
+  it("importa e pagina mensagens antigas sem alterar a fila de respostas", async () => {
+    const before = await db.whatsappConversation.findFirstOrThrow({ where: { accountId, waId: MARIA } });
+    const live = await db.whatsappMessage.findFirstOrThrow({ where: { conversationId: before.id, historical: false } });
+    const earliest = (await listConversationsAwaitingReply(A.ctx)).find((row) => row.id === before.id)?.waitingSince;
+    const historical = { ...inboundMsg("HISTORY1", MARIA, "Mensagem antiga"), timestamp: new Date(live.createdAt.getTime() - 86_400_000) };
+    const waMessageId = `qr:${accountId}:${historical.id}`;
+
+    fakeQr.emit(accountId, { type: "history", messages: [historical, historical] });
+    await liveSessions.get(accountId)?.history;
+    try {
+      const page = await readOlderMessages(A.ctx, before.id, live.id);
+      expect(page.messages).toEqual([expect.objectContaining({ historical: true, createdAt: historical.timestamp, body: historical.text })]);
+      expect(await db.whatsappMessage.count({ where: { waMessageId } })).toBe(1);
+      expect(await db.whatsappConversation.findUnique({ where: { id: before.id } })).toMatchObject({
+        status: before.status, lastInboundAt: before.lastInboundAt, lastMessageAt: before.lastMessageAt, unreadCount: before.unreadCount,
+      });
+      expect((await listConversationsAwaitingReply(A.ctx)).find((row) => row.id === before.id)?.waitingSince).toEqual(earliest);
+      await expect(readOlderMessages(B.ctx, before.id, live.id)).rejects.toBeInstanceOf(NotFoundError);
+    } finally {
+      await db.whatsappMessage.deleteMany({ where: { waMessageId } });
+    }
   });
 
   it("envia texto e arquivo pela sessão; o eco do envio não duplica a mensagem", async () => {
