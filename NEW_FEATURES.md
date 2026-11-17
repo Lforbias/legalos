@@ -3,7 +3,7 @@
 > Backlog de novas funcionalidades aprovado em 17/11/2026.
 > **Status geral: PLANEJADO — não implementado nem validado em produção.**
 > Fonte de referência para respostas futuras a "o que temos para fazer no LegalOS?".
-> Este arquivo registra apenas os quatro projetos aprovados, na ordem de prioridade escolhida.
+> Os quatro projetos de referência mantêm a ordem aprovada. Novas iniciativas próprias do LegalOS são registradas separadamente, sem alterar essa ordem.
 
 ## 1. Docassemble — automação de documentos (prioridade 1)
 
@@ -91,6 +91,69 @@
 
 **Status:** A fazer.
 
+## Iniciativa transversal — LegalOS Welcome (cadastro, assinatura e ativação)
+
+**Natureza:** melhoria própria do LegalOS, separada das quatro prioridades de repositórios externos listadas acima.  
+**Status:** Planejado — não implementado nem publicado.  
+**Objetivo:** oferecer a melhor primeira experiência possível para novos usuários, desde a apresentação da plataforma até contratação, personalização do escritório e primeira ação de valor, aproveitando o cadastro, o sistema de organizações e a cobrança existentes.
+
+### Jornada proposta (cinco etapas)
+
+**1. Boas-vindas e identificação do profissional**
+- Tela de apresentação clara, profissional, com indicação do progresso.
+- Nome completo, e-mail, senha segura e verificação de e-mail; telefone se necessário para contato/ativação.
+- Perfil: advogado autônomo, escritório ou departamento jurídico empresarial.
+- Entrada de colaboradores por convite existente, sem exigir nova contratação.
+- Possibilidade futura de login social, somente após implementar e validar OAuth.
+
+**2. Perfil e diagnóstico do escritório**
+- Nome fantasia, razão social, CPF/CNPJ quando necessário, OAB/UF quando aplicável, localização e fuso.
+- Áreas de atuação, equipe, volume estimado de clientes/processos, ferramenta anterior e principais dores.
+- Perguntas condicionais e dados não essenciais opcionais; pedir informações sensíveis só quando justificadas.
+- Pré-configurar módulos e sugestões de importação conforme o perfil.
+- Salvar progresso entre sessões para permitir retomar o cadastro.
+
+**3. Ativação comercial: três caminhos distintos**
+- **Assinatura:** escolher um dos planos oficiais, conferir valores e limites, preencher faturamento, contratar por Asaas (Pix, boleto ou cartão via provedor) e acompanhar confirmação.
+- **Código de presente/acesso:** código individual ou campanha que concede plano, dias de acesso, descontos temporários, benefício de parceria ou acesso especial; consultar e mostrar claramente benefícios e vencimento *antes* de resgatar.
+- **Teste gratuito:** avaliação de 14 dias conforme política publicada, com condições transparentes e sem cobrança automática inesperada.
+- Separar **código de permissão para cadastrar** (REGISTRATION_MODE/code atual) de **código comercial de benefício**, que ainda precisa ser desenvolvido.
+- Códigos comerciais devem ter limite de usos, vigência, escopo, regras de cumulatividade, exclusão de resgate duplicado, trilha de auditoria, revogação e validação no servidor.
+- Nunca ativar assinatura paga ao término de um presente/teste sem consentimento claro de contratação.
+
+**4. Configuração inicial personalizada**
+- Apresentar opções guiadas: organizar processos, configurar atendimento/WhatsApp, financeiro, importar dados, convidar equipe.
+- Reaproveitar os departamentos e recursos existentes; não criar um segundo cadastro de cliente, processo ou escritório.
+- Orientar integração de serviços sem apresentá-los como ativos antes de uma conexão verificada.
+- Permitir pular etapas não essenciais.
+
+**5. Primeiro acesso e checklist de ativação**
+- Desktop personalizado com checklist contextual: primeiro cliente, primeiro processo, primeiro colaborador, documentos e atendimento, conforme o perfil.
+- Tutoriais curtos, ajuda contextual e indicadores de progresso persistidos no banco.
+- Não bloquear uso normal até finalizar o checklist; evitar pop-ups excessivos.
+- Medir início/conclusão de cadastro, abandono por etapa, seleção de plano, pagamento confirmado, código resgatado, primeira ação relevante e ativação da equipe.
+
+### Estado da base e adaptações previstas
+
+- Fluxo existente: `/register`, `/onboarding`, autenticação de conta, criação de organização e convites.
+- Atualmente `createOrganization` abre assinatura `TRIALING` de 14 dias com `TRIAL_PLAN_KEY="profissional"`; reconciliar esse padrão com os planos comerciais oficiais Simples, Básico, Intermediário e Avançado, sem mudar benefícios implicitamente.
+- O código de cadastro sob `REGISTRATION_MODE=code` é apenas um controle de acesso, não um cupom.
+- Asaas já tem código de integração para assinatura/faturas e webhooks, mas a documentação relata ausência de comprovação de ciclo real no sandbox/provedor; homologar antes de cobrar em produção.
+- Fonte de preços/benefícios deve ser única para landing page, checkout, cobrança e limites efetivos; não exibir plano indisponível como contratável.
+- Cobrança deve distinguir `checkout iniciado`, `pagamento pendente`, `pagamento confirmado`, `benefício gratuito vigente`, `expirado` e `cancelado`. Webhooks idempotentes e reconciliação com o provedor são obrigatórios.
+- Segurança: autenticação, rate limiting, e-mail validado, 2FA conforme políticas, antiabuso de códigos, multiempresa, LGPD, auditoria e recuperação de sessões.
+- A implementação não pode interromper escritórios e assinaturas existentes.
+
+### Ordem recomendada de entrega
+
+1. **Fase A — Cadastro Premium:** UI em etapas, diagnóstico do escritório, persistência de progresso, personalização e convites sem fricção.
+2. **Fase B — Checkout e Presentes:** consolidar planos, validar Asaas em sandbox, checkout guiado, regras de cupons e resgates, e cobertura de falhas/reentradas.
+3. **Fase C — Ativação Guiada:** checklist contextual, importação assistida, tutoriais, métricas de conclusão e melhoria da conversão.
+
+**Piloto de aceite:** dois escritórios fictícios percorrem os caminhos de assinatura sandbox e presente; um terceiro entra como membro convidado. Conferir isolamento, retomada de sessão, ausência de cobrança não autorizada, assinatura/código aplicados corretamente e conclusão de uma primeira ação relevante.
+
+**Status:** A fazer.
+
 ## Regras de execução
 
 1. Preservar o repositório e as funcionalidades existentes; não reconstruir o LegalOS do zero.
@@ -98,7 +161,7 @@
 3. Validar no ambiente de desenvolvimento com dados fictícios e fluxo ponta a ponta antes de publicar.
 4. Tratar licenciamento, segurança, segregação multiempresa, LGPD, auditoria e aprovação humana como requisitos obrigatórios.
 5. Não confundir "planejado" com "implementado"; atualizar o status aqui apenas após entrega e testes verificáveis.
-6. Ao perguntar **"o que temos para fazer?"**, recuperar este arquivo e apresentar estes quatro itens, nessa ordem, junto com as demais pendências atuais do LegalOS quando solicitado.
+6. Ao perguntar **"o que temos para fazer?"**, recuperar este arquivo e apresentar os quatro projetos nesta ordem, além do **LegalOS Welcome** como iniciativa transversal e das demais pendências do LegalOS quando solicitado.
 
 ## Resumo rápido
 
@@ -108,3 +171,5 @@
 | 2 | Mike | IA jurídica fundamentada em documentos e com aprovações | A fazer |
 | 3 | Juriscraper | Arquitetura robusta para conectores e monitoramento do Box | A fazer |
 | 4 | E-Discovery | OCR, busca, deduplicação e cadeia de custódia | A fazer |
+
+**Iniciativa adicional (fora da ordem dos quatro projetos):** LegalOS Welcome — cadastro premium, assinatura/código de presente e ativação guiada — A fazer.
