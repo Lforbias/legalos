@@ -7,11 +7,11 @@ import Link from "next/link";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { Alert } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
 import { Input, Select } from "@/components/ui/form";
 import { db } from "@/lib/db/client";
+import { formatWait } from "@/lib/whatsapp/wait-time";
 import { formatWaId } from "@/lib/whatsapp/phone";
 import { can } from "@/server/context";
 import { requireTenant } from "@/server/session";
@@ -38,6 +38,7 @@ export const dynamic = "force-dynamic";
 
 const FILTERS: { key: ConversationFilter; label: string }[] = [
   { key: "open", label: "Abertas" },
+  { key: "waiting", label: "Sem resposta" },
   { key: "mine", label: "Minhas" },
   { key: "unassigned", label: "Sem responsável" },
   { key: "closed", label: "Encerradas" },
@@ -137,11 +138,11 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
   const activeFilters = (queueId ? 1 : 0) + (labelId ? 1 : 0);
   const chat = opened;
   return (
-    <div className="flex h-full min-h-0 flex-col" data-testid="atendimento">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-surface" data-testid="atendimento">
       <AutoRefresh />
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-5 py-4">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-border bg-surface px-3 py-2.5 sm:px-5">
         <div className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2"><MessageSquare className="h-5 w-5" aria-hidden /></span>
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl border border-border bg-surface-2"><MessageSquare className="h-5 w-5 text-primary-text" aria-hidden /></span>
           <div><h1 className="text-base font-semibold tracking-tight">Atendimento</h1><p className="mt-0.5 text-xs text-muted">LegalOS Chat · {multi ? `${numbers.length} números` : account.displayPhone ?? account.label}</p></div>
         </div>
         <div className="flex items-center gap-2">
@@ -174,9 +175,9 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
             </div>
             <details className="mt-3"><summary className="cursor-pointer text-xs text-muted">Situação do atendimento{serviceStatus ? ` · ${SERVICE_STATUS_LABEL[serviceStatus]}` : ""}</summary><div className="mt-2 flex items-center gap-2"><Select name="s" aria-label="Filtrar situação do atendimento" defaultValue={serviceStatus??""} className="h-9 min-w-0 flex-1 text-xs"><option value="">Todas as situações</option>{SERVICE_STATUSES.map(s=><option key={s} value={s}>{SERVICE_STATUS_LABEL[s]}</option>)}</Select><button type="submit" className="h-9 rounded-lg border border-border px-3 text-xs hover:bg-surface-2">Aplicar</button></div></details>
           </form>
-          <nav aria-label="Caixas de conversa" className="grid grid-cols-2 gap-1 border-b border-border px-4 pb-3">
+          <nav aria-label="Caixas de conversa" className="flex flex-wrap gap-1.5 border-b border-border px-4 pb-3">
             {FILTERS.map((f) => (
-              <Link key={f.key} aria-current={f.key === filter ? "page" : undefined} href={qs({ f: f.key, q: sp.q, fila: queueId, etq: labelId, num: numId })} className={`rounded-lg px-2.5 py-2 text-xs ${f.key === filter ? "bg-primary/10 font-semibold text-primary-text" : "text-muted hover:bg-surface-2 hover:text-fg"}`}>{f.label}</Link>
+              <Link key={f.key} aria-current={f.key === filter ? "page" : undefined} href={qs({ f: f.key, q: sp.q, fila: queueId, etq: labelId, num: numId })} className={`rounded-full border px-2.5 py-1.5 text-xs ${f.key === filter ? "border-primary/20 bg-primary/10 font-semibold text-primary-text" : "border-transparent text-muted hover:bg-surface-2 hover:text-fg"}`}>{f.label}</Link>
             ))}
           </nav>
           {multi ? (
@@ -210,13 +211,13 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
           ) : null}
           <div className="border-b border-border px-3 py-1 text-[11px] text-muted" aria-live="polite">Exibindo {list.length} {list.length === 1 ? "conversa" : "conversas"}</div>
           <ul className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2" data-testid="wa-list">
-            {list.length === 0 ? <li className="px-5 py-12 text-center"><Search className="mx-auto mb-3 h-6 w-6 text-muted" aria-hidden /><p className="text-sm font-medium">Nenhuma conversa encontrada</p><p className="mt-1 text-xs text-muted">Tente outro nome ou ajuste os filtros.</p></li> : null}
+            {list.length === 0 ? <li className="px-5 py-12 text-center"><Search className="mx-auto mb-3 h-6 w-6 text-muted" aria-hidden /><p className="text-sm font-medium">Nenhuma conversa encontrada</p><p className="mt-1 text-xs text-muted">{filter === "waiting" ? "Nenhum atendimento sem resposta com estes filtros." : "Tente outro nome ou ajuste os filtros."}</p></li> : null}
             {list.map((c) => {
               const name = c.client?.name ?? c.contactName ?? formatWaId(c.waId);
               return (
                 <li key={c.id}>
-                  <Link aria-current={c.id === selectedId ? "page" : undefined} href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId, c: c.id })} className={`flex gap-3 rounded-xl border border-transparent px-3 py-3.5 text-sm transition-colors hover:bg-surface-2 ${c.id === selectedId ? "border-primary/20 bg-primary/5" : ""}`}>
-                    <Avatar name={name} size={40} />
+                  <Link aria-current={c.id === selectedId ? "page" : undefined} href={qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId, c: c.id })} className={`flex gap-3 rounded-lg border-l-2 px-3 py-3 text-sm transition-colors ${c.id === selectedId ? "border-primary bg-primary/10" : "border-transparent hover:bg-surface-2"}`}>
+                    <Avatar name={name} size={36} conversationId={c.account.provider === "QR" ? c.id : undefined} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center justify-between gap-2">
                         <span className={`truncate ${c.unreadCount > 0 ? "font-semibold" : "font-medium"}`}>{name}</span>
@@ -229,6 +230,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
                       <div className="mt-1.5 flex flex-wrap items-center gap-1 text-[10px]">
                         <span className={`rounded px-1.5 py-0.5 font-medium ${c.status === "OPEN" ? "bg-primary/10 text-primary-text" : "bg-surface-2 text-muted"}`}>{SERVICE_STATUS_LABEL[c.serviceStatus as ServiceStatus] ?? (c.status === "OPEN" ? "Aberto" : "Fechado")}</span>
                         {multi ? <span className="rounded bg-surface-2 px-1.5 py-0.5 text-muted" data-testid="wa-number-chip">{c.account.label}</span> : null}
+                        {c.waitingMinutes !== null ? <span className="rounded bg-warning/10 px-1.5 py-0.5 font-semibold text-warning">Em espera há {formatWait(c.waitingMinutes).toLowerCase()}</span> : null}
                         <span className="truncate text-muted">{c.assignedTo?.name ?? "Sem responsável"}{c.queue ? ` · ${c.queue.name}` : ""}</span>
                         {c.labels.map(({ label }) => <span key={label.id} className="rounded-full border px-1.5" style={labelStyle(label.color)}>{label.name}</span>)}
                       </div>
@@ -242,8 +244,11 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
         <section className={`${chat ? "flex" : "hidden lg:flex"} min-h-0 min-w-0 flex-1`} aria-label="Conversa">
           {opened ? (
             <ChatPane
+              key={opened.conversation.id}
+              historyCursor={opened.historyCursor}
               chat={{
                 id: opened.conversation.id,
+                profilePhoto: opened.conversation.account.provider === "QR",
                 backHref: qs({ f: filter, q: sp.q, fila: queueId, etq: labelId, num: numId }),
                 title: opened.conversation.client?.name ?? opened.conversation.contactName ?? formatWaId(opened.conversation.waId),
                 phone: formatWaId(opened.conversation.waId),
@@ -260,7 +265,7 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
                 me: ctx.userId,
                 queueId: opened.conversation.queue?.id ?? null,
               }}
-              messages={opened.messages.map((m) => ({ id: m.id, direction: m.direction as "IN" | "OUT" | "NOTE", type: m.type, body: m.body, mediaMime: m.mediaMime, mediaName: m.mediaName, hasMedia: m.hasMedia, status: m.status, error: m.error, automatic: m.automatic, createdAt: m.createdAt.toISOString(), authorName: m.author?.name ?? null }))}
+              messages={opened.messages.map((m) => ({ id: m.id, direction: m.direction as "IN" | "OUT" | "NOTE", type: m.type, body: m.body, mediaMime: m.mediaMime, mediaName: m.mediaName, hasMedia: m.hasMedia, status: m.status, error: m.error, automatic: m.automatic, historical: m.historical, createdAt: m.createdAt.toISOString(), authorName: m.author?.name ?? null }))}
               team={team}
               meta={{ labels: labels.map((l) => ({ id: l.id, name: l.name, color: l.color })), selected: cmeta.labelIds, fields: fields.map((f) => ({ id: f.id, name: f.name, kind: f.kind, options: f.options })), values: cmeta.values }}
               queues={queues.filter((x) => x.active).map((x) => ({ id: x.id, name: x.name }))}
@@ -273,13 +278,12 @@ export default async function AtendimentoPage({ searchParams }: { searchParams: 
               templates={templates.map((t) => ({ id: t.id, name: t.name, language: t.language, body: t.body, variableCount: t.variableCount }))}
             />
           ) : (
-            <div className="flex h-full w-full items-center justify-center bg-surface-2/50 p-8">
-              <div className="max-w-sm text-center">
-                <span className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl border border-border bg-surface shadow-sm"><MessageSquare className="h-8 w-8 text-muted" aria-hidden /></span>
-                <p className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-muted">Seu espaço de atendimento</p>
-                <h2 className="text-2xl font-semibold tracking-tight">Cada conversa, com contexto.</h2>
-                <p className="mt-3 text-sm leading-6 text-muted">Selecione um atendimento para conversar, consultar o cliente e organizar os próximos passos.</p>
-                <div className="mt-7 flex justify-center gap-2 text-xs text-muted"><Badge>Cliente</Badge><Badge>Processos</Badge><Badge>Tarefas</Badge></div>
+            <div className="wa-wallpaper flex h-full w-full items-center justify-center p-8">
+              <div className="max-w-sm rounded-2xl border border-border bg-surface px-8 py-7 text-center shadow-sm">
+                <MessageSquare className="mx-auto mb-3 size-6 text-primary-text" aria-hidden />
+                <h2 className="text-lg font-semibold">Abra uma conversa</h2>
+                <p className="mt-1 text-sm text-muted">Selecione um contato na lista para ver as mensagens e os dados do atendimento.</p>
+                {filter !== "waiting" ? <Link href={qs({ f: "waiting" })} className="mt-4 inline-block text-sm font-medium text-primary-text hover:underline">Ver conversas sem resposta</Link> : null}
               </div>
             </div>
           )}

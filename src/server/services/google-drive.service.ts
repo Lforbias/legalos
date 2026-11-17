@@ -1,5 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
-import { buildAuthUrl, downloadFile, DriveError, ensureFolder, exchangeCode, isConvertible, refreshAccessToken, revokeToken, uploadFile, type FetchFn } from "@/lib/google/drive";
+import { buildAuthUrl, downloadFile, DriveError, ensureFolder, exchangeCode, getWritableDriveFolder, isConvertible, parseDriveFolder, refreshAccessToken, revokeToken, uploadFile, type FetchFn } from "@/lib/google/drive";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
@@ -158,6 +158,48 @@ async function accessFor(ctx: TenantContext, f: FetchFn) {
   }
 }
 
+export async function getClientDriveFolder(ctx: TenantContext, clientId: string) {
+  assertCan(ctx, "documents:read");
+  assertCan(ctx, "clients:read");
+  return db.clientDriveFolder.findFirst({
+    where: { clientId, client: { organizationId: ctx.organizationId, deletedAt: null } },
+    select: { folderId: true, name: true, resourceKey: true },
+  });
+}
+
+export async function setClientDriveFolder(ctx: TenantContext, clientId: string, input: string | null, f: FetchFn = fetch) {
+  assertCan(ctx, "integrations:manage");
+  assertCan(ctx, "documents:write");
+  assertCan(ctx, "clients:read");
+  const client = await db.client.findFirst({ where: { id: clientId, organizationId: ctx.organizationId, deletedAt: null }, select: { id: true } });
+  if (!client) throw new NotFoundError("Cliente não encontrado.");
+
+  let folder: { folderId: string; name: string; resourceKey: string | null } | null = null;
+  if (input !== null) {
+    const parsed = parseDriveFolder(input);
+    if (!parsed) throw new ValidationError("Informe o link ou o ID de uma pasta do Google Drive.");
+    const { access } = await accessFor(ctx, f);
+    try {
+      const name = await getWritableDriveFolder(access, parsed, f);
+      folder = { name, folderId: parsed.id, resourceKey: parsed.resourceKey };
+    } catch (e) {
+      if (e instanceof DriveError && (e.status === 403 || e.status === 404)) {
+        throw new ConflictError("A integração não tem acesso a esta pasta. Use uma pasta já autorizada para o LegalOS e confira se a conta conectada pode adicionar arquivos.");
+      }
+      return wrap(e);
+    }
+  }
+
+  await db.$transaction(async (tx) => {
+    if (folder) await tx.clientDriveFolder.upsert({ where: { clientId }, create: { clientId, ...folder }, update: folder });
+    else await tx.clientDriveFolder.deleteMany({ where: { clientId } });
+    await audit({
+      action: folder ? "google.client_folder_link" : "google.client_folder_unlink",
+      organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "client", resourceId: clientId, meta: ctx.meta,
+    }, tx);
+  });
+}
+
 async function readStored(key: string): Promise<Buffer> {
   const chunks: Buffer[] = [];
   const reader = (await getObjectStream(key)).getReader();
@@ -196,9 +238,22 @@ export async function sendDocumentToDrive(ctx: TenantContext, documentId: string
   const buffer = await readStored(version.storageKey);
   let sent;
   try {
-    const folderId = g.folderId ?? (await ensureFolder(access, g.folderName, f));
-    if (!g.folderId) await db.googleIntegration.update({ where: { organizationId: ctx.organizationId }, data: { folderId } });
-    sent = await uploadFile(access, { name: version.fileName, mimeType: version.mimeType, parentId: folderId, buffer, convertToDoc: convert }, f);
+    const client = doc.clientId ? await db.client.findFirst({
+      where: { id: doc.clientId, organizationId: ctx.organizationId, deletedAt: null },
+      select: { id: true, name: true, driveFolder: { select: { folderId: true, resourceKey: true } } },
+    }) : null;
+    let parentId = client?.driveFolder?.folderId;
+    if (!parentId) {
+      const rootId = g.folderId ?? (await ensureFolder(access, g.folderName, f));
+      if (!g.folderId) await db.googleIntegration.update({ where: { organizationId: ctx.organizationId }, data: { folderId: rootId } });
+      parentId = client ? await db.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`drive-client:${ctx.organizationId}:${client.id}`}, 0))`;
+        return ensureFolder(access, client.name, f, { parentId: rootId, id: client.id });
+      }, { timeout: 30_000 }) : rootId;
+    }
+    sent = await uploadFile(access, {
+      name: version.fileName, mimeType: version.mimeType, parentId, parentResourceKey: client?.driveFolder?.resourceKey, buffer, convertToDoc: convert,
+    }, f);
   } catch (e) {
     return wrap(e);
   }

@@ -20,6 +20,10 @@ const nextConfig: NextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      ...["/atendimento", "/clientes/:id", "/crm/:id"].map((source) => ({
+        source,
+        headers: [{ key: "Permissions-Policy", value: "camera=(), microphone=(self), geolocation=()" }],
+      })),
       // Só o endpoint autenticado e limitado a PDF/PNG/JPEG pode ser embutido pelo próprio app.
       { source: "/api/documents/:id", has: [{ type: "query", key: "inline", value: "1" }], headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
       // O service worker nunca pode ficar preso em cache: atualizações precisam chegar na próxima abertura.

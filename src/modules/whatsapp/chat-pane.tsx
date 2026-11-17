@@ -3,7 +3,8 @@
 import { SERVICE_STATUSES, SERVICE_STATUS_LABEL, type ServiceStatus } from "@/lib/whatsapp/lifecycle";
 import { serviceStatusAction } from "./operations-actions";
 import { ManualCallForm } from "./operations-ui";
-import { ArrowLeft, Check, CheckCheck, Clock, Paperclip, SendHorizontal, TriangleAlert, Zap } from "lucide-react";
+import { VoiceRecorder } from "./voice-recorder";
+import { ArrowLeft, Check, CheckCheck, Clock, PanelRight, Paperclip, SendHorizontal, TriangleAlert, X, Zap } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import * as React from "react";
@@ -19,12 +20,13 @@ import { ConversationExtras, type ConversationExtrasData } from "./extras-ui";
 import { ConversationTools, TranscribeButton, type ConvToolsData } from "./tools-ui";
 import { MetaPanel, type FieldOpt, type LabelOpt } from "./meta-panel";
 import { ChatActions, MessageActions, type Can, type Links, type Panel } from "./links-panel";
-import { addNoteAction, assignAction, linkClientAction, searchClientsAction, sendMessageAction, sendTemplateAction, setStatusAction, transferQueueAction } from "./actions";
+import { addNoteAction, assignAction, linkClientAction, readOlderMessagesAction, searchClientsAction, sendMessageAction, sendTemplateAction, setStatusAction, transferQueueAction } from "./actions";
 
-export type MessageView = { id: string; direction: "IN" | "OUT" | "NOTE"; type: string; body: string | null; mediaMime: string | null; mediaName: string | null; hasMedia: boolean; status: string; error: string | null; automatic: boolean; createdAt: string; authorName: string | null };
+export type MessageView = { id: string; direction: "IN" | "OUT" | "NOTE"; type: string; body: string | null; mediaMime: string | null; mediaName: string | null; hasMedia: boolean; status: string; error: string | null; automatic: boolean; historical?: boolean; createdAt: string; authorName: string | null };
 export type TemplateView = { id: string; name: string; language: string; body: string; variableCount: number };
 export type ChatView = {
   backHref?: string;
+  profilePhoto?: boolean;
   id: string; title: string; phone: string; status: string; serviceStatus?:string; client: { id: string; name: string } | null; assignedToId: string | null;
   case: Links["case"]; lead: Links["lead"]; can: Can;
   windowOpen: boolean; windowClosesAt: string | null; canWrite: boolean; canLinkClient: boolean; me: string;
@@ -58,8 +60,8 @@ function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; act
   const box = note
     ? "mx-auto max-w-[85%] border border-warning/40 bg-warning-bg text-warning"
     : mine
-      ? "ml-auto max-w-[80%] bg-[var(--wa-out)] text-[var(--wa-out-fg)] shadow-sm"
-      : "mr-auto max-w-[80%] bg-[var(--wa-in)] text-[var(--wa-in-fg)] shadow-sm";
+      ? "ml-auto w-fit max-w-[86%] rounded-tr-sm bg-[var(--wa-out)] text-[var(--wa-out-fg)] shadow-sm"
+      : "mr-auto w-fit max-w-[86%] rounded-tl-sm bg-[var(--wa-in)] text-[var(--wa-in-fg)] shadow-sm";
   return (
     <div className={`group relative rounded-lg px-2.5 py-1.5 text-sm ${box}`} data-testid={`wa-msg-${m.direction.toLowerCase()}`}>
       {actions ? <div className="absolute right-1 top-1 z-10 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">{actions}</div> : null}
@@ -69,6 +71,8 @@ function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; act
       {isImage ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={`/api/whatsapp/media/${m.id}`} alt={m.mediaName ?? "Imagem recebida"} className="mb-1 max-h-64 rounded" />
+      ) : m.hasMedia && m.type === "audio" ? (
+        <audio aria-label="Mensagem de áudio" className="mb-1 max-w-full" controls preload="none" src={`/api/whatsapp/media/${m.id}`} />
       ) : m.hasMedia ? (
         <a href={`/api/whatsapp/media/${m.id}`} className="mb-1 block underline" download>📎 {m.mediaName ?? "arquivo"}</a>
       ) : null}
@@ -77,7 +81,8 @@ function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; act
       {m.body ? <p className="whitespace-pre-wrap break-words">{m.body}</p> : null}
       {m.direction === "IN" && m.error ? <p className="mt-1 text-[11px] text-warning">{m.error}</p> : null}
       <div className={`mt-0.5 flex items-center justify-end gap-1 text-[11px] ${note ? "" : "text-[var(--wa-meta)]"}`}>
-        <span>{hm(m.createdAt)}</span>
+        {m.historical ? <span>Importada</span> : null}
+        <time dateTime={m.createdAt}>{hm(m.createdAt)}</time>
         {mine ? <span className="inline-flex items-center gap-1" title={STATUS_LABEL[m.status] ?? m.status}><Ticks status={m.status} /><span className="sr-only">{STATUS_LABEL[m.status] ?? m.status}</span></span> : null}
       </div>
       {mine && m.status === "FAILED" && m.error ? <p className="mt-1 text-[11px] font-medium text-danger">{m.error}</p> : null}
@@ -85,8 +90,11 @@ function Bubble({ m, actions, transcript, canTranscribe }: { m: MessageView; act
   );
 }
 
-export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras, tools, transcripts, canTranscribe, embedded = false }: { chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData; tools?: ConvToolsData; transcripts?: Record<string, string>; canTranscribe?: boolean; embedded?: boolean }) {
+export function ChatPane({ chat, messages, team, queues = [], meta, quick, templates, side, extras, tools, transcripts, canTranscribe, historyCursor, embedded = false }: { historyCursor?: string | null; chat: ChatView; messages: MessageView[]; team: { id: string; name: string }[]; queues?: { id: string; name: string }[]; meta?: { labels: LabelOpt[]; selected: string[]; fields: FieldOpt[]; values: Record<string, string> }; quick: { id: string; shortcut: string; title: string; body: string }[]; templates: TemplateView[]; side?: PanelView; extras?: ConversationExtrasData; tools?: ConvToolsData; transcripts?: Record<string, string>; canTranscribe?: boolean; embedded?: boolean }) {
   const router = useRouter();
+  const [history, setHistory] = React.useState<{ messages: MessageView[]; cursor: string | null }>();
+  const [loadingHistory, loadHistory] = React.useTransition();
+  const cursor = history ? history.cursor : historyCursor;
   const [text, setText] = React.useState("");
   const [note, setNote] = React.useState(false);
   const [msg, setMsg] = React.useState<{ tone: "error" | "success"; text: string } | null>(null);
@@ -96,7 +104,23 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
   const [tpl, setTpl] = React.useState("");
   const [panel, setPanel] = React.useState<Panel>(null);
   const [panelN, setPanelN] = React.useState(0);
-  const openPanel = (p: Panel) => { setPanelN((n) => n + 1); setPanel(p); };
+  const [detailsOpen, setDetailsOpen] = React.useState<boolean>();
+  const detailsId = React.useId();
+  const showDetails = React.useRef<HTMLButtonElement>(null);
+  const closeDetails = React.useRef<HTMLButtonElement>(null);
+  const toggleDesktopDetails = React.useRef<HTMLButtonElement>(null);
+  const hideDetails = () => {
+    setDetailsOpen(false);
+    requestAnimationFrame(() => {
+      const mobileButton = showDetails.current;
+      (mobileButton?.offsetParent ? mobileButton : toggleDesktopDetails.current)?.focus();
+    });
+  };
+  const openPanel = (p: Panel) => {
+    setPanelN((n) => n + 1);
+    setPanel(p);
+    if (p && side) setDetailsOpen(true);
+  };
   const links: Links = { client: chat.client, case: chat.case, lead: chat.lead };
   const [params, setParams] = React.useState<string[]>([]);
   const [q, setQ] = React.useState("");
@@ -135,10 +159,10 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
       });
   }
 
-  async function upload(file: File) {
+  async function upload(file: File, voice = false) {
     const fd = new FormData();
     fd.set("file", file);
-    if (text.trim()) fd.set("caption", text.trim());
+    if (!voice && text.trim()) fd.set("caption", text.trim());
     start(async () => {
       const res = await fetch(`/api/whatsapp/conversations/${chat.id}/file`, { method: "POST", body: fd });
       const j = (await res.json().catch(() => ({}))) as { error?: string; status?: string; fieldErrors?: Record<string, string[]> };
@@ -146,15 +170,40 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
       else if (j.status === "FAILED") setMsg({ tone: "error", text: `A Meta não aceitou o arquivo: ${j.error ?? "sem detalhe"}` });
       else {
         setMsg(null);
-        setText("");
+        if (!voice) setText("");
       }
       if (fileRef.current) fileRef.current.value = "";
       router.refresh();
     });
   }
 
+  function loadEarlier() {
+    if (!cursor || loadingHistory) return;
+    loadHistory(async () => {
+      try {
+        const result = await readOlderMessagesAction(chat.id, cursor);
+        if (!result.ok || !result.data) {
+          setMsg({ tone: "error", text: result.message ?? "Não foi possível carregar o histórico." });
+          return;
+        }
+        const page = result.data;
+        setHistory({
+          messages: Array.from(new Map([...page.messages, ...(history?.messages ?? []), ...messages].map((message) => [message.id, message])).values()),
+          cursor: page.historyCursor,
+        });
+        setMsg(null);
+      } catch {
+        setMsg({ tone: "error", text: "Não foi possível carregar o histórico. Tente novamente." });
+      }
+    });
+  }
+
+  const visibleMessages = history
+    ? Array.from(new Map([...history.messages, ...messages].map((message) => [message.id, message])).values())
+    : messages;
   const grouped: { key: string; label: string; items: MessageView[] }[] = [];
-  for (const m of messages) {
+  for (const m of visibleMessages) {
+    if (embedded && m.direction === "NOTE") continue;
     const k = dayKey(m.createdAt);
     const last = grouped[grouped.length - 1];
     if (last && last.key === k) last.items.push(m);
@@ -204,11 +253,11 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
   ) : null;
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col xl:flex-row" data-testid="wa-chat-wrap">
-      <div className={`flex min-h-0 min-w-0 flex-1 flex-col ${side ? "h-[62%] shrink-0 xl:h-full" : "h-full"}`} data-testid="wa-chat">
-        <div className="flex items-center gap-3 border-b border-border bg-surface px-4 py-4">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-1" data-testid="wa-chat-wrap">
+      <div className={`h-full min-h-0 min-w-0 flex-1 flex-col ${detailsOpen && side ? "hidden xl:flex" : "flex"}`} data-testid="wa-chat">
+        <div className="flex min-h-16 shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-2.5 sm:gap-3 sm:px-4">
           {!embedded ? <Link href={chat.backHref ?? "/atendimento"} aria-label="Voltar às conversas" className="rounded-full p-1.5 hover:bg-surface-2 lg:hidden"><ArrowLeft className="h-5 w-5" aria-hidden /></Link> : null}
-          <Avatar name={chat.title} size={40} />
+          <Avatar name={chat.title} size={40} conversationId={chat.profilePhoto ? chat.id : undefined} />
           <div className="min-w-0 flex-1">
             <div className="truncate font-semibold">{chat.title}</div>
             <div className="truncate text-xs text-muted">
@@ -218,6 +267,16 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
             </div>
           </div>
           {!embedded ? <span className={`hidden rounded px-2 py-1 text-[11px] font-bold uppercase tracking-wide sm:inline ${open ? "bg-primary text-primary-fg" : "bg-surface-3 text-muted"}`} data-testid="wa-status">{SERVICE_STATUS_LABEL[(chat.serviceStatus??chat.status) as ServiceStatus]??chat.status}</span> : null}
+          {side ? (
+            <>
+              <Button size="sm" variant="ghost" ref={showDetails} className="xl:hidden" aria-controls={detailsId} aria-expanded={detailsOpen === true} aria-label="Detalhes da conversa" onClick={() => { setDetailsOpen(true); requestAnimationFrame(() => closeDetails.current?.focus()); }}>
+                <PanelRight className="size-4" aria-hidden />
+              </Button>
+              <Button size="sm" variant="ghost" ref={toggleDesktopDetails} className="hidden xl:inline-flex" aria-controls={detailsId} aria-expanded={detailsOpen !== false} aria-label="Detalhes da conversa" onClick={() => setDetailsOpen(detailsOpen === false)}>
+                <PanelRight className="size-4" aria-hidden />
+              </Button>
+            </>
+          ) : null}
           {!embedded && chat.canWrite ? (
             <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => setStatusAction(chat.id, open ? "CLOSED" : "OPEN"))}>
               {open ? "Encerrar" : "Reabrir"}
@@ -244,12 +303,13 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           </>
         ) : null}
 
-        <div ref={historyRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-surface-2/60 px-4 py-5 md:px-8" data-testid="wa-messages">
-          {messages.length === 0 ? <p className="mx-auto w-fit rounded-md bg-surface/80 px-3 py-1 text-sm text-muted">Sem mensagens ainda.</p> : null}
+        <div ref={historyRef} className="min-h-0 flex-1 space-y-3 overflow-y-auto wa-wallpaper px-4 py-5 md:px-8" data-testid="wa-messages">
+          {cursor ? <div className="flex justify-center"><Button size="sm" variant="secondary" loading={loadingHistory} onClick={loadEarlier}>Carregar mensagens anteriores</Button></div> : null}
+          {grouped.length === 0 ? <p className="mx-auto w-fit rounded-md bg-surface/80 px-3 py-1 text-sm text-muted">Sem mensagens ainda.</p> : null}
           {grouped.map((g) => (
             <div key={g.key} className="space-y-1.5">
               <div className="sticky top-0 z-[1] flex justify-center py-1"><span className="rounded-md bg-surface/90 px-3 py-0.5 text-xs font-medium text-muted shadow-sm">{g.label}</span></div>
-              {g.items.map((m) => <Bubble key={m.id} m={m} transcript={transcripts?.[m.id]} canTranscribe={canTranscribe} actions={!embedded && chat.canWrite && m.direction !== "NOTE" ? <MessageActions messageId={m.id} excerpt={m.body ?? ""} hasMedia={m.hasMedia} links={links} can={chat.can} onPanel={openPanel} onDone={setMsg} /> : undefined} />)}
+              {g.items.map((m) => <Bubble key={m.id} m={m} transcript={transcripts?.[m.id]} canTranscribe={canTranscribe} actions={(!embedded || chat.can.documents) && chat.canWrite && m.direction !== "NOTE" ? <MessageActions messageId={m.id} excerpt={m.body ?? ""} hasMedia={m.hasMedia} links={links} can={chat.can} onPanel={openPanel} onDone={setMsg} /> : undefined} />)}
             </div>
           ))}
         </div>
@@ -299,6 +359,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
                 ) : null}
                 {!note ? (
                   <>
+                    <VoiceRecorder disabled={pending} onSend={(file) => void upload(file, true)} onError={(text) => setMsg({ tone: "error", text })} />
                     <input ref={fileRef} type="file" className="hidden" aria-label="Anexar arquivo" onChange={(e) => { const f = e.target.files?.[0]; if (f) void upload(f); }} />
                     <button type="button" aria-label="Anexar" title="Anexar arquivo" disabled={pending} onClick={() => fileRef.current?.click()} className="flex h-9 w-9 items-center justify-center rounded-full text-muted hover:bg-surface-3 disabled:opacity-50"><Paperclip className="h-5 w-5" aria-hidden /></button>
                   </>
@@ -308,7 +369,7 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
                   aria-label={note ? "Nota interna" : "Mensagem"}
                   rows={1}
                   className="max-h-40 min-h-9 min-w-0 flex-1 resize-none bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted"
-                  placeholder={note ? "Nota interna (o cliente não vê)" : "Escreva a mensagem… (/ para respostas rápidas; Enter envia, Shift+Enter quebra a linha)"}
+                  placeholder={note ? "Nota interna (o cliente não vê)" : "Escreva uma mensagem…"}
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit(); } }}
@@ -319,7 +380,17 @@ export function ChatPane({ chat, messages, team, queues = [], meta, quick, templ
           </div>
         ) : null}
       </div>
-      {side ? <div data-chat-info-panel className="h-[38%] min-h-0 w-full shrink-0 border-t border-border bg-surface xl:h-full xl:w-[400px] xl:border-l xl:border-t-0 2xl:w-[440px]">{informationPanel}</div> : null}
+      {side ? (
+        <div id={detailsId} data-chat-info-panel={detailsOpen !== false ? "" : undefined} className={`h-full min-h-0 w-full shrink-0 flex-col bg-surface xl:w-[var(--chat-details-width)] xl:border-l xl:border-border ${detailsOpen === false ? "hidden" : detailsOpen ? "flex" : "hidden xl:flex"}`}>
+          <div className="flex min-h-16 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
+            <h2 className="text-sm font-semibold">Detalhes da conversa</h2>
+            <Button ref={closeDetails} variant="ghost" size="sm" aria-label="Fechar detalhes" onClick={hideDetails}>
+              <X className="size-4" aria-hidden />
+            </Button>
+          </div>
+          <div className="min-h-0 flex-1">{informationPanel}</div>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -2,27 +2,30 @@ import Link from "next/link";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatWaId } from "@/lib/whatsapp/phone";
 import { can, type TenantContext } from "@/server/context";
-import { conversationsOfClient } from "@/server/services/chat-links.service";
+import { conversationsOfClient, conversationsOfLead } from "@/server/services/chat-links.service";
 import { listQuickReplies, listTemplatesLocal } from "@/server/services/whatsapp-account.service";
-import { findClientWhatsapp, openConversation } from "@/server/services/whatsapp.service";
+import { findContactWhatsapp, openConversation } from "@/server/services/whatsapp.service";
 import { AutoRefresh } from "./auto-refresh";
 import { ChatPane } from "./chat-pane";
 import { ConversationsCard } from "./conversations-card";
 import { StartClientWhatsapp } from "./start-client-whatsapp";
 
-export async function ClientWhatsappCard({ ctx, client }: {
+export async function ClientWhatsappCard({ ctx, client, leadId }: {
   ctx: TenantContext;
-  client: { id: string; name: string; phone: string | null };
+  leadId?: string;
+  client: { id: string | null; name: string; phone: string | null };
 }) {
-  if (!can(ctx, "whatsapp:read")) return null;
+  if (!can(ctx, "whatsapp:read") || !can(ctx, leadId ? "crm:read" : "clients:read") || (client.id && !can(ctx, "clients:read"))) return null;
 
-  const { waId, account, conversation, blocked } = await findClientWhatsapp(ctx, client.id, client.phone);
+  const { waId, account, conversation, blocked } = await findContactWhatsapp(ctx, { clientId: client.id, leadId: leadId ?? null }, client.phone);
+  const contact = leadId ? { leadId } : client.id ? { clientId: client.id } : null;
+  const needsLink = conversation && (leadId ? conversation.leadId !== leadId || conversation.clientId !== client.id : !conversation.clientId);
   const canWrite = !!account?.enabled && can(ctx, "whatsapp:write");
   const sender = account?.displayPhone ?? account?.label;
   const description = sender ? `WhatsApp do escritório · ${sender}` : "WhatsApp do escritório";
   const [opened, linked] = await Promise.all([
     conversation ? openConversation(ctx, conversation.id) : null,
-    conversationsOfClient(ctx, client.id),
+    leadId ? conversationsOfLead(ctx, leadId) : client.id ? conversationsOfClient(ctx, client.id) : [],
   ]);
   const [quick, templates] = opened && canWrite
     ? await Promise.all([
@@ -41,19 +44,24 @@ export async function ClientWhatsappCard({ ctx, client }: {
             {account && !account.enabled ? (
               <p className="border-b border-border px-5 py-2 text-sm text-muted">O WhatsApp do escritório está desligado.</p>
             ) : null}
+            {canWrite && contact && needsLink ? (
+              <CardBody><StartClientWhatsapp contact={contact} label="Vincular conversa ao cadastro" /></CardBody>
+            ) : null}
             <div className="h-[32rem]">
               <ChatPane
                 key={opened.conversation.id}
+                historyCursor={opened.historyCursor}
                 embedded
                 chat={{
                   id: opened.conversation.id,
+                  profilePhoto: opened.conversation.account.provider === "QR",
                   title: client.name,
                   phone: formatWaId(opened.conversation.waId),
                   client: opened.conversation.client,
                   status: opened.conversation.status,
                   case: null,
                   lead: null,
-                  can: { cases: false, tasks: false, events: false, deadlines: false, leads: false, documents: false },
+                  can: { cases: false, tasks: false, events: false, deadlines: false, leads: false, documents: opened.conversation.client?.id === client.id && can(ctx, "documents:write") },
                   assignedToId: null,
                   queueId: null,
                   windowOpen: opened.conversation.windowOpen,
@@ -80,7 +88,7 @@ export async function ClientWhatsappCard({ ctx, client }: {
             {!waId ? (
               <p className="text-muted">
                 Cadastre um número de WhatsApp válido para conversar com o cliente.
-                {can(ctx, "clients:write") ? <> <Link className="underline" href={`/clientes/${client.id}/editar`}>Editar cadastro</Link></> : null}
+                {client.id && can(ctx, "clients:write") ? <> <Link className="underline" href={`/clientes/${client.id}/editar`}>Editar cadastro</Link></> : null}
               </p>
             ) : blocked ? (
               <p className="text-muted">O número está vinculado à conversa de outro cliente.</p>
@@ -92,7 +100,7 @@ export async function ClientWhatsappCard({ ctx, client }: {
             ) : (
               <>
                 <p className="text-muted">Ainda não há mensagens com este número.</p>
-                {canWrite ? <StartClientWhatsapp clientId={client.id} /> : null}
+                {canWrite && contact ? <StartClientWhatsapp contact={contact} /> : null}
               </>
             )}
           </CardBody>
