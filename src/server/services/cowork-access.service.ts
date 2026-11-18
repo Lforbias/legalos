@@ -4,6 +4,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from "@/lib/permission
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { COWORK_DEPARTMENTS, COWORK_DEPARTMENT_LABEL, isCoworkDepartment, type CoworkDepartment } from "@/modules/cowork/constants";
 import { audit } from "./audit.service";
+import { assertCaseVisible } from "./case.service";
 
 /**
  * Acesso ao Cowork. Regras (aplicadas no servidor, em toda leitura e escrita):
@@ -207,4 +208,13 @@ export async function listMembersForAdmin(ctx: TenantContext) {
       blocked: Boolean(p?.blockedAt),
     };
   });
+}
+
+/**
+ * Acesso a um processo para fins do Cowork (salas, reuniões, busca): exige `cases:read` E a visibilidade do processo
+ * (sigilo). Sem acesso, "não encontrado" — nunca revela que o processo existe.
+ */
+export async function assertCoworkCaseVisible(ctx: TenantContext, caseId: string): Promise<void> {
+  if (!can(ctx, "cases:read")) throw new NotFoundError("Processo não encontrado.");
+  await assertCaseVisible(ctx, caseId);
 }

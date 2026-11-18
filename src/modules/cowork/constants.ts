@@ -67,6 +67,8 @@ export const MESSAGE_MAX_LENGTH = 4000;
 export const MESSAGE_PAGE_SIZE = 50;
 export const ATTACHMENT_MAX_BYTES = 8 * 1024 * 1024;
 export const ATTACHMENTS_PER_MESSAGE = 5;
+/** Soma dos anexos de uma mensagem: abaixo do teto de 10 MB que o proxy do Next aceita no corpo da requisição. */
+export const ATTACHMENTS_TOTAL_MAX_BYTES = 9 * 1024 * 1024;
 /** Janela em que o autor pode editar a própria mensagem. */
 export const EDIT_WINDOW_MS = 24 * 60 * 60 * 1000;
 

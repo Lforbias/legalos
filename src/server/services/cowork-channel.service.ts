@@ -7,8 +7,8 @@ import { appendMessageTx, directKeyOf } from "@/server/cowork/core";
 import { publishInTx } from "@/server/cowork/realtime";
 import { COWORK_DEPARTMENT_LABEL, isCoworkDepartment, type CoworkDepartment } from "@/modules/cowork/constants";
 import { audit } from "./audit.service";
-import { assertCaseVisible } from "./case.service";
 import { assertCoworkAccess, assertCoworkUsers, displayNames, getCoworkSettings } from "./cowork-access.service";
+import { assertCoworkCaseVisible } from "./cowork-access.service";
 import { isUniqueViolation } from "./db-errors";
 import { resolveTenantContext } from "./tenant.service";
 
@@ -35,7 +35,9 @@ export async function ensureWorkspace(ctx: TenantContext): Promise<void> {
   }
   const channels = missing.length ? await db.coworkChannel.findMany({ where: { organizationId: ctx.organizationId, slug: { in: wanted.map((w) => w.slug) } }, select: { id: true, slug: true, autoJoin: true, department: true, archivedAt: true } }) : existing;
   const profile = await db.coworkMemberProfile.findUnique({ where: { organizationId_userId: { organizationId: ctx.organizationId, userId: ctx.userId } }, select: { department: true } });
-  const join = channels.filter((c) => !c.archivedAt && (c.autoJoin || (profile?.department && c.department === profile.department)));
+  // Primeira visita sem departamento definido: entra em todos os canais padrão (pode sair depois).
+  const firstVisit = !profile?.department && !(await db.coworkChannelMember.count({ where: { organizationId: ctx.organizationId, userId: ctx.userId } }));
+  const join = channels.filter((c) => !c.archivedAt && (c.autoJoin || firstVisit || (profile?.department && c.department === profile.department)));
   if (join.length) {
     const already = await db.coworkChannelMember.findMany({ where: { userId: ctx.userId, channelId: { in: join.map((c) => c.id) } }, select: { channelId: true } });
     const toJoin = join.filter((c) => !already.some((a) => a.channelId === c.id));
@@ -62,7 +64,7 @@ export async function loadChannelForMember(ctx: TenantContext, channelId: string
   if (!channel || !member) throw new NotFoundError("Conversa não encontrada.");
   if (channel.caseId) {
     try {
-      await assertCaseVisible(ctx, channel.caseId);
+      await assertCoworkCaseVisible(ctx, channel.caseId);
     } catch {
       throw new NotFoundError("Conversa não encontrada.");
     }
@@ -121,7 +123,7 @@ export async function listMyChannels(ctx: TenantContext, opts: { includeArchived
   const visibleCases = new Set<string>();
   for (const id of caseIds) {
     try {
-      await assertCaseVisible(ctx, id);
+      await assertCoworkCaseVisible(ctx, id);
       visibleCases.add(id);
     } catch {
       /* invisível */
@@ -201,7 +203,7 @@ export async function listJoinableChannels(ctx: TenantContext) {
   for (const r of rows) {
     if (r.caseId) {
       try {
-        await assertCaseVisible(ctx, r.caseId);
+        await assertCoworkCaseVisible(ctx, r.caseId);
       } catch {
         continue;
       }
@@ -226,7 +228,7 @@ async function assertUsersSeeCase(ctx: TenantContext, caseId: string, userIds: s
     const other = uid === ctx.userId ? ctx : await resolveTenantContext(uid, ctx.organizationId);
     if (!other) throw new ValidationError("Participante inválido.");
     try {
-      await assertCaseVisible(other, caseId);
+      await assertCoworkCaseVisible(other, caseId);
     } catch {
       throw new ValidationError("Há participantes sem acesso a este processo (sigilo). Inclua apenas quem integra a equipe do processo.");
     }
@@ -243,7 +245,7 @@ export async function createChannel(ctx: TenantContext, raw: z.input<typeof crea
   await assertCoworkUsers(ctx, memberIds);
   if (caseId) {
     assertCan(ctx, "cases:read");
-    await assertCaseVisible(ctx, caseId);
+    await assertCoworkCaseVisible(ctx, caseId);
     await assertUsersSeeCase(ctx, caseId, memberIds);
   }
   return db.$transaction(async (tx) => {
@@ -310,7 +312,7 @@ export async function joinChannel(ctx: TenantContext, channelId: string) {
   assertCan(ctx, "cowork:write");
   const ch = await db.coworkChannel.findFirst({ where: { id: channelId, organizationId: ctx.organizationId, kind: "CHANNEL", visibility: "PUBLIC", archivedAt: null } });
   if (!ch) throw new NotFoundError("Canal não encontrado.");
-  if (ch.caseId) await assertCaseVisible(ctx, ch.caseId);
+  if (ch.caseId) await assertCoworkCaseVisible(ctx, ch.caseId);
   await db.$transaction(async (tx) => {
     const res = await tx.coworkChannelMember.createMany({ data: [{ channelId, organizationId: ctx.organizationId, userId: ctx.userId, lastReadSeq: Math.max(0, ch.lastSeq - 20) }], skipDuplicates: true });
     if (res.count) {
@@ -347,7 +349,7 @@ async function loadForManage(ctx: TenantContext, channelId: string) {
   const member = ch.members[0] ?? null;
   // Sem participação, só administradores do Cowork veem canais públicos; o restante é "não encontrado".
   if (!member && !(ch.kind === "CHANNEL" && ch.visibility === "PUBLIC" && can(ctx, "cowork:members"))) throw new NotFoundError("Conversa não encontrada.");
-  if (ch.caseId) await assertCaseVisible(ctx, ch.caseId).catch(() => { throw new NotFoundError("Conversa não encontrada."); });
+  if (ch.caseId) await assertCoworkCaseVisible(ctx, ch.caseId).catch(() => { throw new NotFoundError("Conversa não encontrada."); });
   if (!canManageChannel(ctx, ch, member)) throw new ForbiddenError("Você não administra esta conversa.");
   return ch;
 }
@@ -430,7 +432,7 @@ export async function listChannelMembers(ctx: TenantContext, channelId: string) 
 /** Canal ligado a processo: devolve o existente se já houver um para o processo e a pessoa participar. */
 export async function findCaseChannels(ctx: TenantContext, caseId: string) {
   await assertCoworkAccess(ctx);
-  await assertCaseVisible(ctx, caseId);
+  await assertCoworkCaseVisible(ctx, caseId);
   return db.coworkChannel.findMany({ where: { organizationId: ctx.organizationId, caseId, archivedAt: null, members: { some: { userId: ctx.userId } } }, select: { id: true, name: true } });
 }
 

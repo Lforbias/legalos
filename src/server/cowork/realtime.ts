@@ -51,6 +51,7 @@ type Bus = {
   connecting: Promise<void> | null;
   retry: number;
   subscribers: number;
+  everConnected: boolean;
 };
 
 const g = globalThis as unknown as { __coworkBus?: Bus };
@@ -58,7 +59,7 @@ function bus(): Bus {
   if (!g.__coworkBus) {
     const emitter = new EventEmitter();
     emitter.setMaxListeners(0);
-    g.__coworkBus = { emitter, client: null, connecting: null, retry: 0, subscribers: 0 };
+    g.__coworkBus = { emitter, client: null, connecting: null, retry: 0, subscribers: 0, everConnected: false };
   }
   return g.__coworkBus;
 }
@@ -101,6 +102,9 @@ async function connect(b: Bus): Promise<void> {
   await client.query(`LISTEN ${COWORK_PG_CHANNEL}`);
   b.client = client;
   b.retry = 0;
+  // Reconectou: avisos emitidos durante a queda se perderam; os navegadores recuperam pela sequência.
+  if (b.everConnected) b.emitter.emit("event", { o: "*", t: "resync" } satisfies CoworkEvent);
+  b.everConnected = true;
 }
 
 /** Garante uma única conexão de escuta por processo. */

@@ -4,6 +4,9 @@ import { logger } from "@/lib/logging/logger";
 import { limiters } from "@/lib/security/rate-limit";
 import { ensureListener, subscribe, type CoworkEvent } from "@/server/cowork/realtime";
 import { coworkRouteContext } from "@/server/cowork/route-auth";
+import { can } from "@/server/context";
+import { caseVisibility } from "@/server/services/case.service";
+import { coworkAvailability } from "@/server/services/cowork-access.service";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -28,7 +31,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Tempo real indisponível no momento." }, { status: 503 });
   }
 
-  const loadChannels = async () => new Set((await db.coworkChannelMember.findMany({ where: { userId: ctx.userId, organizationId: ctx.organizationId }, select: { channelId: true } })).map((r) => r.channelId));
+  // Só canais de que a pessoa participa; salas de processo, só se ela ainda enxerga o processo (sigilo).
+  const loadChannels = async () =>
+    new Set(
+      (
+        await db.coworkChannelMember.findMany({
+          where: { userId: ctx.userId, organizationId: ctx.organizationId, channel: can(ctx, "cases:read") ? { OR: [{ caseId: null }, { case: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } }] } : { caseId: null } },
+          select: { channelId: true },
+        })
+      ).map((r) => r.channelId),
+    );
   let channels = await loadChannels();
   const encoder = new TextEncoder();
   let cleanup = () => {};
@@ -50,6 +62,7 @@ export async function GET(req: NextRequest) {
         closed = true;
         unsubscribe();
         clearInterval(ping);
+        clearInterval(recheck);
         clearTimeout(lifetime);
         try {
           controller.close();
@@ -88,6 +101,13 @@ export async function GET(req: NextRequest) {
         }
       });
       const ping = setInterval(() => send(`: ping\n\n`), HEARTBEAT_MS);
+      // A cada minuto: bloqueio no Cowork encerra a conexão; perda de acesso a processo tira a sala do filtro.
+      const recheck = setInterval(() => {
+        void coworkAvailability(ctx).then(async (a) => {
+          if (!a.ok) return close();
+          channels = await loadChannels();
+        }, () => undefined);
+      }, 60_000);
       const lifetime = setTimeout(close, MAX_LIFETIME_MS);
       req.signal.addEventListener("abort", close);
       send(`retry: 3000\n\n`);

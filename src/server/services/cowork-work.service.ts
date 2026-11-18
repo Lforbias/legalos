@@ -10,6 +10,7 @@ import { audit } from "./audit.service";
 import { displayNames } from "./cowork-access.service";
 import { loadChannelForMember } from "./cowork-channel.service";
 import { createTask } from "./task.service";
+import { isUniqueViolation } from "./db-errors";
 
 /**
  * Mensagem → trabalho. Reaproveita os serviços originais (tarefas e agenda): responsável, prazo, situação, processo,
@@ -45,35 +46,41 @@ export async function createWorkFromOrigin(ctx: TenantContext, origin: Origin, r
   const input = convertSchema.parse(raw);
   const dup = await db.coworkWorkItem.findUnique({ where: { organizationId_requestKey: { organizationId: ctx.organizationId, requestKey: input.requestKey } } });
   if (dup) return dup;
+  if (input.purpose === "APPOINTMENT") {
+    if (!can(ctx, "deadlines:write") && !can(ctx, "tasks:write")) assertCan(ctx, "deadlines:write");
+  } else assertCan(ctx, "tasks:write");
+  // Reserva a chave ANTES de criar no módulo original: pedidos simultâneos com a mesma chave não geram duas tarefas.
+  let claim;
+  try {
+    claim = await db.coworkWorkItem.create({
+      data: { organizationId: ctx.organizationId, purpose: input.purpose, channelId: context.channelId, messageId: origin.kind === "message" ? origin.messageId : null, meetingId: origin.kind === "meeting" ? origin.meetingId : null, department: context.department, createdById: ctx.userId, requestKey: input.requestKey },
+    });
+  } catch (err) {
+    if (isUniqueViolation(err)) {
+      const existing = await db.coworkWorkItem.findUnique({ where: { organizationId_requestKey: { organizationId: ctx.organizationId, requestKey: input.requestKey } } });
+      if (existing) return existing;
+    }
+    throw err;
+  }
   const prefix = TITLE_PREFIX[input.purpose];
   const title = prefix && !input.title.toLowerCase().startsWith(prefix.toLowerCase()) ? `${prefix}: ${input.title}`.slice(0, 200) : input.title;
   const description = [input.description, `Origem: ${context.originLabel} no Cowork (${context.originLink}).`].filter(Boolean).join("\n\n").slice(0, 4000);
   let taskId: string | null = null;
   let agendaEventId: string | null = null;
+  try {
   if (input.purpose === "APPOINTMENT") {
-    if (!can(ctx, "deadlines:write") && !can(ctx, "tasks:write")) assertCan(ctx, "deadlines:write");
     const e = await createEvent(ctx, { title, kind: "OTHER", date: input.dueDate, allDay: !input.startTime, startTime: input.startTime, endTime: input.endTime, location: "", description, caseId: input.caseId, clientId: input.clientId, assigneeId: input.assigneeId });
     agendaEventId = e.id;
   } else {
-    assertCan(ctx, "tasks:write");
     const t = await createTask(ctx, { title, description, status: TASK_STATUS_BY_PURPOSE[input.purpose], priority: input.priority, dueDate: input.dueDate, assigneeId: input.assigneeId, caseId: input.caseId, clientId: input.clientId });
     taskId = t.id;
   }
+  } catch (err) {
+    await db.coworkWorkItem.delete({ where: { id: claim.id } }).catch(() => undefined);
+    throw err;
+  }
   return db.$transaction(async (tx) => {
-    const item = await tx.coworkWorkItem.create({
-      data: {
-        organizationId: ctx.organizationId,
-        purpose: input.purpose,
-        channelId: context.channelId,
-        messageId: origin.kind === "message" ? origin.messageId : null,
-        meetingId: origin.kind === "meeting" ? origin.meetingId : null,
-        taskId,
-        agendaEventId,
-        department: context.department,
-        createdById: ctx.userId,
-        requestKey: input.requestKey,
-      },
-    });
+    const item = await tx.coworkWorkItem.update({ where: { id: claim.id }, data: { taskId, agendaEventId } });
     await audit({ action: "cowork.work.create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: taskId ? "task" : "agenda_event", resourceId: (taskId ?? agendaEventId)!, metadata: { purpose: input.purpose, origin: origin.kind, workItemId: item.id }, meta: ctx.meta }, tx);
     if (context.channelId) {
       const names = await displayNames(ctx.organizationId, [ctx.userId]);

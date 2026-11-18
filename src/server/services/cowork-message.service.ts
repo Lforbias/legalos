@@ -8,10 +8,10 @@ import { deleteObject, putObject } from "@/lib/storage/local-storage";
 import { can, type TenantContext } from "@/server/context";
 import { appendMessageTx } from "@/server/cowork/core";
 import { publishInTx } from "@/server/cowork/realtime";
-import { ATTACHMENTS_PER_MESSAGE, EDIT_WINDOW_MS, MESSAGE_MAX_LENGTH, MESSAGE_PAGE_SIZE, RESOURCE_KINDS, type ResourceKind } from "@/modules/cowork/constants";
+import { ATTACHMENTS_PER_MESSAGE, ATTACHMENTS_TOTAL_MAX_BYTES, EDIT_WINDOW_MS, MESSAGE_MAX_LENGTH, MESSAGE_PAGE_SIZE, RESOURCE_KINDS, type ResourceKind } from "@/modules/cowork/constants";
 import { audit } from "./audit.service";
-import { assertCaseVisible } from "./case.service";
 import { assertCoworkAccess, displayNames } from "./cowork-access.service";
+import { assertCoworkCaseVisible } from "./cowork-access.service";
 import { isChannelManager, loadChannelForMember } from "./cowork-channel.service";
 import { assertCanShare, resolveCards, type ResourceCard } from "./cowork-resource.service";
 import { classifyFile } from "./document.service";
@@ -164,6 +164,7 @@ export async function sendMessage(ctx: TenantContext, channelId: string, raw: Se
   if (!body && !files.length && !input.resources.length) throw new ValidationError("Escreva uma mensagem, anexe um arquivo ou compartilhe um item.");
   if (!limiters.coworkMessage.check(`${ctx.organizationId}:${ctx.userId}`)) throw new ValidationError("Muitas mensagens em pouco tempo. Aguarde alguns segundos.");
   if (files.length > ATTACHMENTS_PER_MESSAGE) throw new ValidationError(`Envie no máximo ${ATTACHMENTS_PER_MESSAGE} arquivos por mensagem.`);
+  if (files.reduce((n, f) => n + f.buffer.length, 0) > ATTACHMENTS_TOTAL_MAX_BYTES) throw new ValidationError("Os anexos de uma mensagem podem somar no máximo 9 MB.");
   if (files.length && !can(ctx, "cowork:share")) throw new ForbiddenError("Você não tem permissão para compartilhar arquivos no Cowork.");
   const resources = input.resources as { kind: ResourceKind; resourceId: string }[];
   await assertCanShare(ctx, resources);
@@ -183,6 +184,7 @@ export async function sendMessage(ctx: TenantContext, channelId: string, raw: Se
   });
   if (prepared.length) await assertStorageAvailable(ctx.organizationId, prepared.reduce((n, f) => n + f.buffer.length, 0));
   const stored: string[] = [];
+  let committed = false;
   try {
     for (const f of prepared) {
       await putObject(f.key, f.buffer);
@@ -199,11 +201,12 @@ export async function sendMessage(ctx: TenantContext, channelId: string, raw: Se
       if (resources.length) await audit({ action: "cowork.resource.share", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "cowork_message", resourceId: msg.id, metadata: { kinds: resources.map((r) => r.kind) }, meta: ctx.meta }, tx);
       return msg;
     });
+    committed = true;
     await notifyRecipients(ctx, ch, message, mentionedIds, members).catch(() => 0);
     const row = await db.coworkMessage.findUniqueOrThrow({ where: { id: message.id }, include: INCLUDE });
     return one(ctx, row, isChannelManager(ctx, ch, ch.member));
   } catch (err) {
-    for (const k of stored) await deleteObject(k);
+    if (!committed) for (const k of stored) await deleteObject(k);
     if (isUniqueViolation(err)) {
       const again = await db.coworkMessage.findFirst({ where: { channelId, authorId: ctx.userId, clientNonce: input.clientNonce }, include: INCLUDE });
       if (again) return one(ctx, again, isChannelManager(ctx, ch, ch.member));
@@ -291,7 +294,7 @@ export async function searchMessages(ctx: TenantContext, q: string) {
   const names = await displayNames(ctx.organizationId, [...rows.map((r) => r.authorId), ...rows.flatMap((r) => (r.channel.kind === "DIRECT" ? r.channel.members.map((m) => m.userId) : []))]);
   for (const r of rows) {
     if (r.channel.caseId) {
-      if (!okCase.has(r.channel.caseId)) okCase.set(r.channel.caseId, await assertCaseVisible(ctx, r.channel.caseId).then(() => true, () => false));
+      if (!okCase.has(r.channel.caseId)) okCase.set(r.channel.caseId, await assertCoworkCaseVisible(ctx, r.channel.caseId).then(() => true, () => false));
       if (!okCase.get(r.channel.caseId)) continue;
     }
     const peer = r.channel.kind === "DIRECT" ? r.channel.members.find((m) => m.userId !== ctx.userId)?.userId : null;

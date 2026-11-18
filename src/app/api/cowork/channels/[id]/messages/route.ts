@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { ValidationError } from "@/lib/permissions/check";
-import { ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_MESSAGE } from "@/modules/cowork/constants";
+import { ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_MESSAGE, ATTACHMENTS_TOTAL_MAX_BYTES } from "@/modules/cowork/constants";
 import { errorResponse, isSameOrigin } from "@/server/http";
 import { coworkRouteContext, NO_STORE } from "@/server/cowork/route-auth";
 import { listMessages, sendMessage } from "@/server/services/cowork-message.service";
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const type = req.headers.get("content-type") ?? "";
     if (type.startsWith("multipart/form-data")) {
       const len = Number(req.headers.get("content-length") ?? "0");
-      if (len > ATTACHMENTS_PER_MESSAGE * ATTACHMENT_MAX_BYTES + 256 * 1024) throw new ValidationError("Arquivos grandes demais para uma única mensagem.");
+      if (!len || len > ATTACHMENTS_TOTAL_MAX_BYTES + 256 * 1024) throw new ValidationError("Os anexos de uma mensagem podem somar no máximo 9 MB.");
       const form = await req.formData();
       const payload = JSON.parse(String(form.get("payload") ?? "{}")) as Record<string, unknown>;
       const files = form.getAll("files").filter((f): f is File => typeof f === "object" && f !== null && "arrayBuffer" in f);

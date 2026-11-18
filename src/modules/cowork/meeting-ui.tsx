@@ -91,8 +91,8 @@ export function MeetingControls({ id, status, isParticipant, myRsvp, canAdmin }:
     <div className="flex flex-wrap items-center gap-2">
       {isParticipant && open ? (
         <>
-          <Button size="sm" variant={myRsvp === "ACCEPTED" ? "primary" : "secondary"} loading={pending} onClick={() => run(() => respondMeetingAction(id, "ACCEPTED"))} data-testid="meeting-accept">Confirmar presença</Button>
-          <Button size="sm" variant={myRsvp === "DECLINED" ? "danger" : "secondary"} loading={pending} onClick={() => run(() => respondMeetingAction(id, "DECLINED"))}>Recusar</Button>
+          <Button size="sm" aria-pressed={myRsvp === "ACCEPTED"} variant={myRsvp === "ACCEPTED" ? "primary" : "secondary"} loading={pending} onClick={() => run(() => respondMeetingAction(id, "ACCEPTED"))} data-testid="meeting-accept">Confirmar presença</Button>
+          <Button size="sm" aria-pressed={myRsvp === "DECLINED"} variant={myRsvp === "DECLINED" ? "danger" : "secondary"} loading={pending} onClick={() => run(() => respondMeetingAction(id, "DECLINED"))}>Recusar</Button>
         </>
       ) : null}
       {canAdmin && status === "SCHEDULED" ? <Button size="sm" variant="secondary" loading={pending} onClick={() => run(() => meetingStatusAction(id, "start"))} data-testid="meeting-start">Iniciar</Button> : null}

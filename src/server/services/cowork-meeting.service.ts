@@ -7,13 +7,16 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { appendMessageTx } from "@/server/cowork/core";
 import { publishInTx } from "@/server/cowork/realtime";
+import { addActivityCollaborator, removeActivityCollaborator } from "./activity-details.service";
 import { changeEventStatus, createEvent } from "./agenda.service";
 import { audit } from "./audit.service";
-import { assertCaseVisible, caseVisibility } from "./case.service";
+import { caseVisibility } from "./case.service";
 import { assertCoworkAccess, assertCoworkUsers, displayNames } from "./cowork-access.service";
+import { assertCoworkCaseVisible } from "./cowork-access.service";
 import { loadChannelForMember } from "./cowork-channel.service";
 import { createWorkFromOrigin, type ConvertInput } from "./cowork-work.service";
 import { notify } from "./notification.service";
+import { isUniqueViolation } from "./db-errors";
 import { resolveTenantContext } from "./tenant.service";
 import { taskVisibility } from "./task.service";
 
@@ -50,7 +53,7 @@ export type MeetingInput = z.input<typeof meetingSchema>;
 async function assertParticipantsSeeCase(ctx: TenantContext, caseId: string, ids: string[]) {
   for (const uid of ids) {
     const other = uid === ctx.userId ? ctx : await resolveTenantContext(uid, ctx.organizationId);
-    const ok = other ? await assertCaseVisible(other, caseId).then(() => true, () => false) : false;
+    const ok = other ? await assertCoworkCaseVisible(other, caseId).then(() => true, () => false) : false;
     if (!ok) throw new ValidationError("Há participantes sem acesso ao processo vinculado (sigilo).");
   }
 }
@@ -64,8 +67,13 @@ export async function createMeeting(ctx: TenantContext, raw: MeetingInput) {
   const participantIds = [...new Set([ctx.userId, ...input.participantIds])];
   await assertCoworkUsers(ctx, participantIds);
   const channel = input.channelId ? await loadChannelForMember(ctx, input.channelId, { write: true }) : null;
+  // Reunião em sala de processo herda o processo (e o sigilo dele).
+  if (channel?.caseId) {
+    if (input.caseId && input.caseId !== channel.caseId) throw new ValidationError("Esta conversa é a sala de outro processo.");
+    input.caseId = channel.caseId;
+  }
   if (input.caseId) {
-    await assertCaseVisible(ctx, input.caseId);
+    await assertCoworkCaseVisible(ctx, input.caseId);
     await assertParticipantsSeeCase(ctx, input.caseId, participantIds);
   }
   if (input.taskId) {
@@ -85,11 +93,20 @@ export async function createMeeting(ctx: TenantContext, raw: MeetingInput) {
     await audit({ action: "cowork.meeting.create", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "cowork_meeting", resourceId: m.id, metadata: { participants: participantIds.length, channelLinked: Boolean(channel), caseLinked: Boolean(input.caseId) }, meta: ctx.meta }, tx);
     await publishInTx(tx, { o: ctx.organizationId, t: "meeting", u: participantIds });
     return m;
+  }).catch(async (err) => {
+    if (isUniqueViolation(err)) {
+      const existing = await db.coworkMeeting.findUnique({ where: { organizationId_requestKey: { organizationId: ctx.organizationId, requestKey: input.requestKey } }, select: { id: true } });
+      if (existing) return { ...existing, duplicate: true as const };
+    }
+    throw err;
   });
+  if ("duplicate" in meeting) return { id: meeting.id };
   // Agenda do escritório: usa o serviço original da agenda (com as permissões dele).
   if (input.addToAgenda && (can(ctx, "deadlines:write") || can(ctx, "tasks:write"))) {
     const e = await createEvent(ctx, { title: `Reunião: ${input.title}`.slice(0, 200), kind: "MEETING", date: input.date, allDay: false, startTime: input.startTime, endTime: input.endTime, location: "Cowork (reunião interna)", description: `Reunião interna agendada no Cowork com ${participantIds.length} participante(s). Detalhes: /cowork/reunioes/${meeting.id}`, caseId: input.caseId, clientId: "", assigneeId: ctx.userId });
     await db.coworkMeeting.update({ where: { id: meeting.id }, data: { agendaEventId: e.id } });
+    // Participantes entram como colaboradores do compromisso (mesmo recurso da Agenda/Atividades).
+    for (const uid of participantIds.filter((u) => u !== ctx.userId)) await addActivityCollaborator(ctx, "EVENT", e.id, uid);
   }
   await notify(participantIds.filter((u) => u !== ctx.userId).map((uid) => ({ organizationId: ctx.organizationId, userId: uid, kind: "cowork.meeting", title: `${names.get(ctx.userId) ?? "Alguém"} convidou você para uma reunião`, link: `/cowork/reunioes/${meeting.id}`, dedupeKey: `cowork-meeting-invite:${meeting.id}:${uid}` }))).catch(() => 0);
   return { id: meeting.id };
@@ -104,8 +121,12 @@ async function loadMeeting(ctx: TenantContext, id: string) {
     include: { participants: true },
   });
   if (!m) throw new NotFoundError("Reunião não encontrada.");
-  if (m.caseId) await assertCaseVisible(ctx, m.caseId).catch(() => { throw new NotFoundError("Reunião não encontrada."); });
+  if (m.caseId) await assertCoworkCaseVisible(ctx, m.caseId).catch(() => { throw new NotFoundError("Reunião não encontrada."); });
   const me = m.participants.find((p) => p.userId === ctx.userId) ?? null;
+  if (!me) {
+    if (!m.channelId) throw new NotFoundError("Reunião não encontrada.");
+    await loadChannelForMember(ctx, m.channelId).catch(() => { throw new NotFoundError("Reunião não encontrada."); });
+  }
   const isHost = m.hostId === ctx.userId;
   const canAdmin = isHost || (Boolean(me) && can(ctx, "cowork:meetings"));
   return { m, me, isHost, canAdmin };
@@ -160,10 +181,11 @@ export async function listMeetings(ctx: TenantContext, scope: "upcoming" | "past
   const now = new Date();
   const dayStart = new Date(now.getTime() - 12 * 3600_000);
   const where: Prisma.CoworkMeetingWhereInput = {
-    organizationId: ctx.organizationId,
-    participants: { some: { userId: ctx.userId } },
-    OR: [{ caseId: null }, { case: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } }],
-    ...(scope === "upcoming" ? { status: { in: ["SCHEDULED", "IN_PROGRESS"] }, startsAt: { gte: dayStart } } : { OR: [{ status: { in: ["ENDED", "CANCELED"] } }, { startsAt: { lt: dayStart } }] }),
+    AND: [
+      { organizationId: ctx.organizationId, participants: { some: { userId: ctx.userId } } },
+      can(ctx, "cases:read") ? { OR: [{ caseId: null }, { case: { AND: [{ deletedAt: null }, caseVisibility(ctx)] } }] } : { caseId: null },
+      scope === "upcoming" ? { status: { in: ["SCHEDULED", "IN_PROGRESS"] }, startsAt: { gte: dayStart } } : { OR: [{ status: { in: ["ENDED", "CANCELED"] } }, { startsAt: { lt: dayStart } }] },
+    ],
   };
   const rows = await db.coworkMeeting.findMany({ where, orderBy: { startsAt: scope === "upcoming" ? "asc" : "desc" }, take: 100, include: { participants: { select: { userId: true, rsvp: true } } } });
   const names = await displayNames(ctx.organizationId, rows.map((r) => r.hostId));
@@ -232,6 +254,10 @@ export async function updateParticipants(ctx: TenantContext, id: string, userIds
     await audit({ action: "cowork.meeting.participants", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "cowork_meeting", resourceId: id, metadata: { added: added.length, removed: removed.length }, meta: ctx.meta }, tx);
     await publishInTx(tx, { o: ctx.organizationId, t: "meeting", u: [...ids, ...removed] });
   });
+  if (m.agendaEventId && (can(ctx, "deadlines:write") || can(ctx, "tasks:write"))) {
+    for (const uid of added) await addActivityCollaborator(ctx, "EVENT", m.agendaEventId, uid).catch(() => undefined);
+    for (const uid of removed) await removeActivityCollaborator(ctx, "EVENT", m.agendaEventId, uid).catch(() => undefined);
+  }
   const names = await displayNames(ctx.organizationId, [ctx.userId]);
   await notify(added.map((uid) => ({ organizationId: ctx.organizationId, userId: uid, kind: "cowork.meeting", title: `${names.get(ctx.userId) ?? "Alguém"} convidou você para uma reunião`, link: `/cowork/reunioes/${id}`, dedupeKey: `cowork-meeting-invite:${id}:${uid}` }))).catch(() => 0);
 }
@@ -278,5 +304,5 @@ export async function usersInMeetingNow(organizationId: string): Promise<Set<str
 }
 
 export async function meetingCaseAccessible(ctx: TenantContext, caseId: string) {
-  return assertCaseVisible(ctx, caseId).then(() => true, () => false);
+  return assertCoworkCaseVisible(ctx, caseId).then(() => true, () => false);
 }

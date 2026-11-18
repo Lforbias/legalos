@@ -75,10 +75,11 @@ export async function resolveCards(ctx: TenantContext, refs: { kind: ResourceKin
   if (meetingIds.length && can(ctx, "cowork:read")) {
     const rows = await db.coworkMeeting.findMany({
       where: { id: { in: meetingIds }, organizationId: org, OR: [{ participants: { some: { userId: ctx.userId } } }, { channel: { members: { some: { userId: ctx.userId } } } }] },
-      select: { id: true, title: true, startsAt: true, caseId: true },
+      select: { id: true, title: true, startsAt: true, caseId: true, channel: { select: { caseId: true } } },
     });
     for (const r of rows) {
-      if (r.caseId && !(await db.case.count({ where: { AND: [caseWhere(ctx), { id: r.caseId }] } }))) continue;
+      const caseIds = [r.caseId, r.channel?.caseId].filter((x): x is string => !!x);
+      if (caseIds.length && (!can(ctx, "cases:read") || (await db.case.count({ where: { AND: [caseWhere(ctx), { id: { in: caseIds } }] } })) !== new Set(caseIds).size)) continue;
       const z = utcToZoned(r.startsAt, ctx.timezone);
       found.set(key("MEETING", r.id), { title: r.title, subtitle: `${formatYmd(z.ymd)} às ${z.hhmm}`, href: `/cowork/reunioes/${r.id}` });
     }
@@ -141,7 +142,7 @@ export async function searchShareable(ctx: TenantContext, kind: ResourceKind, q:
       return rows.map((r) => ({ kind, id: r.id, title: r.title, subtitle: formatYmd(utcToZoned(r.startsAt, ctx.timezone).ymd) }));
     }
     case "MEETING": {
-      const rows = await db.coworkMeeting.findMany({ where: { organizationId: org, participants: { some: { userId: ctx.userId } }, ...(contains ? { title: contains } : {}) }, orderBy: { startsAt: "desc" }, take: 8, select: { id: true, title: true, startsAt: true } });
+      const rows = await db.coworkMeeting.findMany({ where: { organizationId: org, participants: { some: { userId: ctx.userId } }, ...(can(ctx, "cases:read") ? { OR: [{ caseId: null }, { case: caseWhere(ctx) }] } : { caseId: null }), ...(contains ? { title: contains } : {}) }, orderBy: { startsAt: "desc" }, take: 8, select: { id: true, title: true, startsAt: true } });
       return rows.map((r) => ({ kind, id: r.id, title: r.title, subtitle: formatYmd(utcToZoned(r.startsAt, ctx.timezone).ymd) }));
     }
   }

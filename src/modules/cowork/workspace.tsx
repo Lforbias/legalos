@@ -256,11 +256,15 @@ export function CoworkWorkspace(props: {
     return () => window.removeEventListener("online", onOnline);
   }, [deliver]);
 
+  // Envio em fila por conversa: a ordem em que a pessoa escreveu é a ordem gravada (sequência) no servidor.
+  const queues = React.useRef(new Map<string, Promise<void>>());
   const send = (channelId: string, parentId: string | null, s: ComposerSubmit) => {
     atBottom.current = true;
     const p: PendingMessage = { nonce: newNonce(), channelId, parentId, body: s.body, files: s.files, resources: s.resources, mentionedIds: s.mentionedIds, status: "sending", createdAt: new Date().toISOString() };
     setPending((list) => [...list, p]);
-    void deliver(p);
+    const prev = queues.current.get(channelId) ?? Promise.resolve();
+    const next = prev.then(() => deliver(p));
+    queues.current.set(channelId, next);
   };
 
   const onEdit = async (m: CoworkMessageDTO, body: string) => {

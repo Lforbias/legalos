@@ -191,6 +191,8 @@ describe("LegalOS Cowork", () => {
     const events = await listEvents(ana.ctx, "2030-02-04", "2030-02-04");
     expect(events.find((e) => e.id === meeting.agendaEventId)).toMatchObject({ title: "Reunião: Distribuição semanal", kind: "MEETING", startTime: "09:00" });
     expect((await listMeetings(bia.ctx, "upcoming")).some((m) => m.id === id)).toBe(true);
+    const collaborators = await db.activityCollaborator.findMany({ where: { activityKind: "EVENT", activityId: meeting.agendaEventId! } });
+    expect(collaborators.map((c) => c.userId).sort()).toEqual([ana.user.id, bia.user.id].sort());
     await expect(getMeeting(caio.ctx, id)).rejects.toBeInstanceOf(NotFoundError);
     await expect(getMeeting(B.ctx, id)).rejects.toBeInstanceOf(NotFoundError);
     await respondMeeting(ana.ctx, id, "ACCEPTED");
@@ -304,6 +306,55 @@ describe("LegalOS Cowork", () => {
       off();
       offB();
     }
+  });
+
+  it("revisão: conversões simultâneas com a mesma chave criam uma única tarefa", async () => {
+    const m = await sendMessage(ana.ctx, generalId, { body: "Tarefa disputada", clientNonce: nonce() });
+    const key = nonce();
+    const input = { purpose: "TASK" as const, title: `Disputada ${key}`, assigneeId: bia.user.id, requestKey: key };
+    const results = await Promise.allSettled([convertMessage(ana.ctx, m.id, input), convertMessage(ana.ctx, m.id, input), convertMessage(ana.ctx, m.id, input)]);
+    expect(results.every((r) => r.status === "fulfilled")).toBe(true);
+    expect(await db.task.count({ where: { organizationId: A.org.id, title: `Disputada ${key}` } })).toBe(1);
+    expect(await db.coworkWorkItem.count({ where: { organizationId: A.org.id, requestKey: key } })).toBe(1);
+    const k2 = nonce();
+    const meetings = await Promise.all([1, 2].map(() => createMeeting(ana.ctx, { title: "Concorrente", date: "2030-05-01", startTime: "09:00", requestKey: k2 })));
+    expect(meetings[0]!.id).toBe(meetings[1]!.id);
+  });
+
+  it("revisão: reunião em sala de processo herda o sigilo; reuniões passadas e painel respeitam o processo", async () => {
+    await db.caseMember.create({ data: { organizationId: A.org.id, caseId: secretCaseId, userId: gestor.user.id } });
+    const room = await createChannel(ana.ctx, { name: "Sala Ômega 2", visibility: "PRIVATE", caseId: secretCaseId, memberIds: [gestor.user.id] });
+    await expect(createMeeting(ana.ctx, { title: "Estratégia Ômega", date: "2020-01-02", startTime: "09:00", channelId: room.id, participantIds: [bia.user.id], requestKey: nonce() })).rejects.toBeInstanceOf(ValidationError);
+    const { id } = await createMeeting(ana.ctx, { title: "Estratégia Ômega", date: "2020-01-02", startTime: "09:00", channelId: room.id, participantIds: [gestor.user.id], requestKey: nonce() });
+    expect((await db.coworkMeeting.findUniqueOrThrow({ where: { id } })).caseId).toBe(secretCaseId);
+    expect((await listMeetings(gestor.ctx, "past")).some((m) => m.id === id)).toBe(true);
+    const before = await getInsights(A.ctx, { caseId: secretCaseId, from: "2020-01-01", to: "2020-01-31" });
+    expect(before.rows.find((r) => r.userId === gestor.user.id)!.meetings).toBe(1);
+    // Gestor sai da equipe do processo sigiloso: reunião some do histórico e da contagem que ele vê.
+    await db.caseMember.deleteMany({ where: { caseId: secretCaseId, userId: gestor.user.id } });
+    expect((await listMeetings(gestor.ctx, "past")).some((m) => m.id === id)).toBe(false);
+    await expect(getMeeting(gestor.ctx, id)).rejects.toBeInstanceOf(NotFoundError);
+    const after = await getInsights(gestor.ctx, { caseId: secretCaseId, from: "2020-01-01", to: "2020-01-31" });
+    expect(after.rows.every((r) => r.meetings === 0)).toBe(true);
+  });
+
+  it("revisão: perfil sem permissão de processos não lê sala de processo", async () => {
+    const open = await db.case.create({ data: { organizationId: A.org.id, title: "Processo aberto Delta", confidential: false } });
+    const role = await db.role.create({ data: { organizationId: A.org.id, key: `CUSTOM_${nonce()}`, name: "Só Cowork", permissions: ["cowork:read", "cowork:write"] } });
+    const u = await addMember(A.org.id, "ASSISTANT", "cw-sem-processo");
+    await db.membership.update({ where: { id: u.membership.id }, data: { roleId: role.id } });
+    const ctx = await fresh(u.ctx);
+    await ensureWorkspace(ctx);
+    await expect(createChannel(ana.ctx, { name: "Sala Delta", visibility: "PRIVATE", caseId: open.id, memberIds: [u.user.id] })).rejects.toBeInstanceOf(ValidationError);
+    const room = await createChannel(ana.ctx, { name: "Sala Delta", visibility: "PRIVATE", caseId: open.id });
+    await db.coworkChannelMember.create({ data: { channelId: room.id, organizationId: A.org.id, userId: u.user.id } });
+    await expect(listMessages(ctx, room.id)).rejects.toBeInstanceOf(NotFoundError);
+    expect((await listMyChannels(ctx)).some((c) => c.id === room.id)).toBe(false);
+  });
+
+  it("revisão: anexos de uma mensagem somam no máximo 9 MB", async () => {
+    const big = Buffer.concat([PDF, Buffer.alloc(5 * 1024 * 1024)]);
+    await expect(sendMessage(ana.ctx, generalId, { body: "dois grandes", clientNonce: nonce() }, [{ name: "a.pdf", buffer: big }, { name: "b.pdf", buffer: big }])).rejects.toBeInstanceOf(ValidationError);
   });
 
   it("validações de envio: anexos fora da lista e mensagens vazias são recusados", async () => {

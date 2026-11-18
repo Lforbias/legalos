@@ -3,7 +3,7 @@
 import { Link2, Paperclip, Send, X } from "lucide-react";
 import * as React from "react";
 import { cn } from "@/lib/utils";
-import { ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_MESSAGE, MESSAGE_MAX_LENGTH, RESOURCE_KIND_LABEL, RESOURCE_KINDS, type ResourceKind } from "./constants";
+import { ATTACHMENT_MAX_BYTES, ATTACHMENTS_PER_MESSAGE, ATTACHMENTS_TOTAL_MAX_BYTES, MESSAGE_MAX_LENGTH, RESOURCE_KIND_LABEL, RESOURCE_KINDS, type ResourceKind } from "./constants";
 import { fetchJson, formatBytes, Modal } from "./ui";
 
 export type ComposerSubmit = { body: string; files: File[]; resources: { kind: string; resourceId: string; title: string }[]; mentionedIds: string[] };
@@ -91,6 +91,10 @@ export function Composer({
       return;
     }
     const all = [...files, ...incoming].slice(0, ATTACHMENTS_PER_MESSAGE);
+    if (all.reduce((n, f) => n + f.size, 0) > ATTACHMENTS_TOTAL_MAX_BYTES) {
+      setError("Os anexos de uma mensagem podem somar no máximo 9 MB.");
+      return;
+    }
     if (files.length + incoming.length > ATTACHMENTS_PER_MESSAGE) setError(`Até ${ATTACHMENTS_PER_MESSAGE} arquivos por mensagem.`);
     else setError(null);
     setFiles(all);
@@ -138,7 +142,7 @@ export function Composer({
           maxLength={MESSAGE_MAX_LENGTH + 100}
           aria-label={placeholder}
           placeholder={placeholder}
-          className="block max-h-48 min-h-11 w-full resize-none bg-transparent px-3.5 py-2.5 text-sm outline-none placeholder:text-muted/70"
+          className="block max-h-48 min-h-11 w-full resize-none bg-transparent px-3.5 py-2.5 text-sm outline-none placeholder:text-muted/70 focus-visible:outline-none"
           onChange={(e) => {
             setText(e.target.value);
             updateQuery(e.target.value, e.target.selectionStart);
@@ -163,7 +167,7 @@ export function Composer({
             {canShare ? (
               <>
                 <input ref={fileRef} type="file" multiple className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} data-testid="cowork-file-input" />
-                <button type="button" onClick={() => fileRef.current?.click()} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-fg" aria-label="Anexar arquivo" title="Anexar arquivo (até 8 MB)">
+                <button type="button" onClick={() => fileRef.current?.click()} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-fg" aria-label="Anexar arquivo" title="Anexar arquivo (até 8 MB cada, 9 MB por mensagem)">
                   <Paperclip className="h-4 w-4" aria-hidden />
                 </button>
                 <button type="button" onClick={() => setSharing(true)} className="rounded-md p-1.5 text-muted hover:bg-surface-2 hover:text-fg" aria-label="Compartilhar cliente, processo, documento ou tarefa" title="Compartilhar item do LegalOS" data-testid="cowork-share-button">
