@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { PanelLeftClose, PanelLeftOpen, ChevronDown, X } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, ChevronDown, MessagesSquare, X } from "lucide-react";
 import * as React from "react";
 import { DEPARTMENTS, EVOLUTION_NAV, type Department } from "@/config/evolution-navigation";
 import { NAV_ITEMS } from "@/config/navigation";
@@ -20,12 +20,14 @@ export function EvolutionSidebar({
   visibleKeys,
   menuKeys,
   chatBadge,
+  coworkBadge = 0,
   mobileOpen,
   onCloseMobile,
 }: {
   visibleKeys: string[];
   menuKeys: string[];
   chatBadge: number;
+  coworkBadge?: number;
   mobileOpen: boolean;
   onCloseMobile: () => void;
 }) {
@@ -68,6 +70,24 @@ export function EvolutionSidebar({
           <span className={isCollapsed ? "sr-only" : "truncate"}>Resumo do escritório</span>
         </Link>
       ))}
+
+      {menuKeys.includes("cowork") ? (
+        <Link
+          href="/cowork"
+          aria-current={pathname === "/cowork" || pathname.startsWith("/cowork/") ? "page" : undefined}
+          title={isCollapsed ? "Cowork" : undefined}
+          data-testid="nav-cowork"
+          className={cn(
+            "group relative flex h-10 items-center gap-3 rounded-lg px-3 text-[13px] transition-colors",
+            pathname === "/cowork" || pathname.startsWith("/cowork/") ? "bg-surface-2 font-medium text-fg" : "text-muted hover:bg-surface-2 hover:text-fg",
+            isCollapsed && "justify-center px-0",
+          )}
+        >
+          <MessagesSquare className="h-[18px] w-[18px] shrink-0" aria-hidden />
+          {isCollapsed ? <span className="sr-only">Cowork</span> : <span className="flex-1 truncate">Cowork</span>}
+          {!isCollapsed && coworkBadge > 0 ? <span title={`${coworkBadge} mensagens não lidas`} className="rounded-full bg-primary/10 px-1.5 text-[11px] tabular-nums text-primary-text" data-testid="nav-cowork-badge">{coworkBadge}</span> : null}
+        </Link>
+      ) : null}
 
       {!isCollapsed && <div className="!mt-4 px-3 text-[11px] font-semibold uppercase tracking-wider text-muted/70">Departamentos</div>}
 

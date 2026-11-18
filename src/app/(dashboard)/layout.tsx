@@ -11,6 +11,7 @@ import { listUserOrganizations } from "@/server/services/organization.service";
 import { getEntitlements } from "@/server/services/plan.service";
 import { requireTenant } from "@/server/session";
 import { unreadTotal } from "@/server/services/whatsapp.service";
+import { coworkUnreadTotal } from "@/server/services/cowork-channel.service";
 
 const PLAN_NOTICE: Partial<Record<string, (days: number | null) => string>> = {
   trial_ending: (d) => `Seu período de teste termina ${d === 0 ? "hoje" : d === 1 ? "amanhã" : `em ${d} dias`}. Fale com a administração para contratar um plano.`,
@@ -28,6 +29,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   await syncDueNotifications(ctx).catch(() => 0);
   const [unread, latest] = await Promise.all([unreadCount(ctx), listNotifications(ctx, { take: 8 })]);
   const chatBadge = can(ctx, "whatsapp:read") ? await unreadTotal(ctx).catch(() => 0) : 0;
+  const coworkBadge = can(ctx, "cowork:read") ? await coworkUnreadTotal(ctx).catch(() => 0) : 0;
   const ent = await getEntitlements(ctx.organizationId).catch(() => null);
   const planNotice = ent ? PLAN_NOTICE[ent.state]?.(ent.trialDaysLeft) ?? null : null;
   const visibleKeys = NAV_ITEMS.filter((n) => {
@@ -46,6 +48,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       activeOrganizationId={ctx.organizationId}
       visibleKeys={visibleKeys}
       chatBadge={chatBadge}
+      coworkBadge={coworkBadge}
       evolutionKeys={evolutionKeys}
       canInvite={can(ctx, "members:invite")}
       canCreateClient={can(ctx, "clients:write")}

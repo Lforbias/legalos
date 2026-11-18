@@ -89,6 +89,10 @@ model User {
   welcomeOnboarding WelcomeOnboarding?
   createdGiftCodes  GiftCode[] @relation("GiftCodeCreator")
   giftRedemptions   GiftCodeRedemption[]
+  coworkProfiles    CoworkMemberProfile[]
+  coworkChannelMemberships CoworkChannelMember[]
+  coworkMessages    CoworkMessage[] @relation("CoworkAuthor")
+  coworkMeetingParticipations CoworkMeetingParticipant[]
 
   @@map("users")
 }
@@ -266,6 +270,10 @@ model Organization {
   assistantConversations  AssistantConversation[]
   officeInstructions      OfficeInstruction[]
   aiSendLogs              AiSendLog[]
+  coworkSettings          CoworkSettings?
+  coworkMemberProfiles    CoworkMemberProfile[]
+  coworkChannels          CoworkChannel[]
+  coworkMeetings          CoworkMeeting[]
 
   @@map("organizations")
 }
@@ -633,6 +641,8 @@ model Case {
   correctionIndex       String?                @map("correction_index")
   fees                  CaseFee[]
   appeals               CaseAppeal[]
+  coworkChannels        CoworkChannel[]
+  coworkMeetings        CoworkMeeting[]
 
   @@index([organizationId, departmentId, nature])
   @@index([organizationId, archivedAt])
@@ -812,6 +822,7 @@ model Task {
   labels       TaskLabelLink[]
   events       TaskEvent[]
   attachments  TaskAttachment[]
+  coworkWorkItems CoworkWorkItem[]
 
   @@index([organizationId])
   @@map("tasks")
@@ -4365,4 +4376,334 @@ model DocumentReview {
   @@index([organizationId, status])
   @@index([documentId, createdAt])
   @@map("document_reviews")
+}
+
+// ============================ LegalOS Cowork (ambiente colaborativo interno) ============================
+// Comunicação interna entre a equipe do escritório. É separada do atendimento externo (WhatsApp/portal).
+// Isolamento: toda tabela carrega organization_id; filhos de canal/reunião usam FK composta (id, organization_id).
+// Cartões de recursos guardam só (tipo, id): título e conteúdo são resolvidos na leitura, com a permissão de quem lê.
+
+enum CoworkChannelKind {
+  CHANNEL
+  DIRECT
+  GROUP
+}
+
+enum CoworkVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum CoworkMemberRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+/// Autor da mensagem. AGENT fica reservado para a fase de agentes (Cowork 3.0): nenhum agente existe hoje.
+enum CoworkAuthorKind {
+  HUMAN
+  SYSTEM
+  AGENT
+}
+
+enum CoworkResourceKind {
+  CLIENT
+  CASE
+  DOCUMENT
+  FOLDER
+  TASK
+  DEADLINE
+  EVENT
+  MEETING
+}
+
+enum CoworkMeetingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  ENDED
+  CANCELED
+}
+
+enum CoworkRsvp {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum CoworkAttendance {
+  UNKNOWN
+  PRESENT
+  ABSENT
+}
+
+enum CoworkWorkPurpose {
+  TASK
+  ACTIVITY
+  FORWARD
+  APPOINTMENT
+  REVIEW
+  PENDING
+}
+
+enum CoworkAvailability {
+  AVAILABLE
+  BUSY
+  AWAY
+}
+
+model CoworkSettings {
+  organizationId  String   @id @map("organization_id") @db.Uuid
+  enabled         Boolean  @default(true)
+  /// Canais departamentais criados automaticamente (chaves de departamento do Evolution).
+  defaultChannels String[] @default(["juridico", "atendimento", "comercial", "financeiro", "administracao"]) @map("default_channels")
+  /// Quem pode criar mensagens diretas (todas as pessoas com cowork:write por padrão).
+  allowDirect     Boolean  @default(true) @map("allow_direct")
+  updatedById     String?  @map("updated_by_id") @db.Uuid
+  updatedAt       DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("cowork_settings")
+}
+
+/// Perfil de exibição no Cowork (não cria credencial nem identidade paralela: é a mesma conta).
+model CoworkMemberProfile {
+  organizationId   String              @map("organization_id") @db.Uuid
+  userId           String              @map("user_id") @db.Uuid
+  displayName      String?             @map("display_name")
+  jobTitle         String?             @map("job_title")
+  department       String?
+  availability     CoworkAvailability?
+  availabilityNote String?             @map("availability_note")
+  availabilityAt   DateTime?           @map("availability_at") @db.Timestamptz(3)
+  /// Bloqueio administrativo do Cowork para esta pessoa (as demais permissões continuam).
+  blockedAt        DateTime?           @map("blocked_at") @db.Timestamptz(3)
+  blockedById      String?             @map("blocked_by_id") @db.Uuid
+  updatedAt        DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([organizationId, userId])
+  @@map("cowork_member_profiles")
+}
+
+model CoworkChannel {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  kind           CoworkChannelKind @default(CHANNEL)
+  visibility     CoworkVisibility  @default(PUBLIC)
+  name           String
+  /// Identificador estável dos canais padrão (geral, juridico...). Nulo nos demais.
+  slug           String?
+  topic          String?
+  /// Departamento do Evolution (juridico, atendimento, comercial, financeiro, administracao).
+  department     String?
+  /// Sala ligada a processo/caso: o acesso exige também enxergar o processo (sigilo).
+  caseId         String?           @map("case_id") @db.Uuid
+  /// Canal em que todas as pessoas entram automaticamente (Geral).
+  autoJoin       Boolean           @default(false) @map("auto_join")
+  /// Chave das conversas diretas (ids ordenados) — impede DM duplicada entre as mesmas pessoas.
+  directKey      String?           @map("direct_key")
+  lastSeq        Int               @default(0) @map("last_seq")
+  lastMessageAt  DateTime?         @map("last_message_at") @db.Timestamptz(3)
+  archivedAt     DateTime?         @map("archived_at") @db.Timestamptz(3)
+  archivedById   String?           @map("archived_by_id") @db.Uuid
+  createdById    String?           @map("created_by_id") @db.Uuid
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization          @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  case         Case?                 @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  members      CoworkChannelMember[]
+  messages     CoworkMessage[]
+  attachments  CoworkAttachment[]
+  meetings     CoworkMeeting[]
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, slug])
+  @@unique([organizationId, directKey])
+  @@index([organizationId, kind, archivedAt])
+  @@index([caseId])
+  @@map("cowork_channels")
+}
+
+model CoworkChannelMember {
+  channelId      String           @map("channel_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  role           CoworkMemberRole @default(MEMBER)
+  lastReadSeq    Int              @default(0) @map("last_read_seq")
+  mutedAt        DateTime?        @map("muted_at") @db.Timestamptz(3)
+  joinedAt       DateTime         @default(now()) @map("joined_at") @db.Timestamptz(3)
+
+  channel CoworkChannel @relation(fields: [channelId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([channelId, userId])
+  @@index([organizationId, userId])
+  @@map("cowork_channel_members")
+}
+
+model CoworkMessage {
+  id             String           @id @default(uuid()) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  channelId      String           @map("channel_id") @db.Uuid
+  /// Ordem total dentro do canal (atribuída na transação; base da sincronização e da reconexão).
+  seq            Int
+  authorId       String?          @map("author_id") @db.Uuid
+  authorKind     CoworkAuthorKind @default(HUMAN) @map("author_kind")
+  /// Reservado para agentes (Cowork 3.0). Sempre nulo enquanto não houver agentes.
+  agentKey       String?          @map("agent_key")
+  /// Mensagem raiz da thread (respostas não aparecem na linha principal).
+  parentId       String?          @map("parent_id") @db.Uuid
+  body           String
+  mentionedIds   String[]         @default([]) @map("mentioned_ids") @db.Uuid
+  /// Identificador gerado pelo navegador: reenvio da mesma mensagem não duplica.
+  clientNonce    String?          @map("client_nonce")
+  replyCount     Int              @default(0) @map("reply_count")
+  lastReplyAt    DateTime?        @map("last_reply_at") @db.Timestamptz(3)
+  editedAt       DateTime?        @map("edited_at") @db.Timestamptz(3)
+  deletedAt      DateTime?        @map("deleted_at") @db.Timestamptz(3)
+  deletedById    String?          @map("deleted_by_id") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  channel     CoworkChannel       @relation(fields: [channelId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  author      User?               @relation("CoworkAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  parent      CoworkMessage?      @relation("CoworkThread", fields: [parentId], references: [id], onDelete: Cascade)
+  replies     CoworkMessage[]     @relation("CoworkThread")
+  attachments CoworkAttachment[]
+  resources   CoworkResourceRef[]
+  workItems   CoworkWorkItem[]
+
+  @@unique([id, organizationId])
+  @@unique([channelId, seq])
+  @@unique([channelId, authorId, clientNonce])
+  @@index([organizationId, createdAt])
+  @@index([parentId, seq])
+  @@map("cowork_messages")
+}
+
+model CoworkAttachment {
+  id             String    @id @default(uuid()) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  channelId      String    @map("channel_id") @db.Uuid
+  messageId      String    @map("message_id") @db.Uuid
+  name           String
+  mimeType       String    @map("mime_type")
+  sizeBytes      Int       @map("size_bytes")
+  sha256         String
+  storageKey     String    @unique @map("storage_key")
+  uploadedById   String?   @map("uploaded_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(3)
+
+  channel CoworkChannel @relation(fields: [channelId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  message CoworkMessage @relation(fields: [messageId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([organizationId, channelId])
+  @@map("cowork_attachments")
+}
+
+/// Cartão de recurso compartilhado: só o ponteiro. Nunca guarda título, número ou conteúdo do recurso.
+model CoworkResourceRef {
+  id             String             @id @default(uuid()) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  messageId      String             @map("message_id") @db.Uuid
+  kind           CoworkResourceKind
+  resourceId     String             @map("resource_id") @db.Uuid
+  createdAt      DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  message CoworkMessage @relation(fields: [messageId, organizationId], references: [id, organizationId], onDelete: Cascade)
+
+  @@unique([messageId, kind, resourceId])
+  @@index([organizationId, kind, resourceId])
+  @@map("cowork_resource_refs")
+}
+
+model CoworkMeeting {
+  id             String              @id @default(uuid()) @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  channelId      String?             @map("channel_id") @db.Uuid
+  title          String
+  description    String?
+  startsAt       DateTime            @map("starts_at") @db.Timestamptz(3)
+  endsAt         DateTime?           @map("ends_at") @db.Timestamptz(3)
+  status         CoworkMeetingStatus @default(SCHEDULED)
+  hostId         String              @map("host_id") @db.Uuid
+  caseId         String?             @map("case_id") @db.Uuid
+  taskId         String?             @map("task_id") @db.Uuid
+  /// Compromisso correspondente na agenda do escritório (criado pelo serviço da agenda).
+  agendaEventId  String?             @unique @map("agenda_event_id") @db.Uuid
+  minutes        String?
+  decisions      String?
+  minutesById    String?             @map("minutes_by_id") @db.Uuid
+  minutesAt      DateTime?           @map("minutes_at") @db.Timestamptz(3)
+  startedAt      DateTime?           @map("started_at") @db.Timestamptz(3)
+  endedAt        DateTime?           @map("ended_at") @db.Timestamptz(3)
+  createdById    String?             @map("created_by_id") @db.Uuid
+  /// Idempotência do agendamento (duplo clique / reenvio).
+  requestKey     String?             @map("request_key")
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  organization Organization               @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel      CoworkChannel?             @relation(fields: [channelId], references: [id], onDelete: SetNull)
+  case         Case?                      @relation(fields: [caseId], references: [id], onDelete: SetNull)
+  participants CoworkMeetingParticipant[]
+  workItems    CoworkWorkItem[]
+
+  @@unique([id, organizationId])
+  @@unique([organizationId, requestKey])
+  @@index([organizationId, startsAt])
+  @@map("cowork_meetings")
+}
+
+model CoworkMeetingParticipant {
+  meetingId      String           @map("meeting_id") @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  isHost         Boolean          @default(false) @map("is_host")
+  rsvp           CoworkRsvp       @default(PENDING)
+  respondedAt    DateTime?        @map("responded_at") @db.Timestamptz(3)
+  /// Presença registrada pelo anfitrião (não é inferida por estar online).
+  attendance     CoworkAttendance @default(UNKNOWN)
+  attendanceById String?          @map("attendance_by_id") @db.Uuid
+
+  meeting CoworkMeeting @relation(fields: [meetingId, organizationId], references: [id, organizationId], onDelete: Cascade)
+  user    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([meetingId, userId])
+  @@index([organizationId, userId])
+  @@map("cowork_meeting_participants")
+}
+
+/// Vínculo entre conversa/reunião e o trabalho criado nos módulos originais (tarefas e agenda).
+/// Não é um segundo gerenciador de tarefas: responsável, prazo, situação e histórico ficam na tarefa/compromisso.
+model CoworkWorkItem {
+  id             String            @id @default(uuid()) @db.Uuid
+  organizationId String            @map("organization_id") @db.Uuid
+  purpose        CoworkWorkPurpose
+  channelId      String?           @map("channel_id") @db.Uuid
+  messageId      String?           @map("message_id") @db.Uuid
+  meetingId      String?           @map("meeting_id") @db.Uuid
+  taskId         String?           @map("task_id") @db.Uuid
+  agendaEventId  String?           @map("agenda_event_id") @db.Uuid
+  department     String?
+  createdById    String?           @map("created_by_id") @db.Uuid
+  requestKey     String?           @map("request_key")
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  message CoworkMessage? @relation(fields: [messageId], references: [id], onDelete: SetNull)
+  meeting CoworkMeeting? @relation(fields: [meetingId], references: [id], onDelete: SetNull)
+  task    Task?          @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@unique([organizationId, requestKey])
+  @@index([organizationId, createdAt])
+  @@index([messageId])
+  @@index([meetingId])
+  @@index([taskId])
+  @@map("cowork_work_items")
 }

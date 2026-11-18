@@ -52,4 +52,8 @@ export const limiters = {
   apiAuthFail: new RateLimiter(30 * mult, 60_000),
   mcp: new RateLimiter(90 * mult, 60_000),
   oauth: new RateLimiter(30 * mult, 60_000),
+  /** Cowork: envio de mensagens (antiabuso; por pessoa). */
+  coworkMessage: new RateLimiter(40 * mult, 30_000),
+  /** Cowork: conexões de tempo real abertas por pessoa (reconexões em laço). */
+  coworkStream: new RateLimiter(30 * mult, 60_000),
 };

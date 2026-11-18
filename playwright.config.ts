@@ -5,6 +5,8 @@ import path from "node:path";
 
 const PORT = 3100;
 const WA_PORT = 3101; // servidor com cofre e WhatsApp configurados (o outro propositalmente fica SEM chave de cifra)
+const VIDEO_PORT = 3102; // servidor com a videoconferência do Cowork configurada (LiveKit local em LIVEKIT_E2E_URL, se houver)
+const LIVEKIT_E2E_URL = process.env.LIVEKIT_E2E_URL ?? "ws://localhost:7880";
 const TEST_DB = process.env.TEST_DATABASE_URL ?? "postgresql://legalos:legalos_dev@localhost:5432/legalos_test";
 // Em ambientes padrão o Playwright usa o Chromium que ele mesmo instala; no sandbox usamos o pré-instalado.
 const sandboxChromium = "/opt/pw-browsers/chromium";
@@ -25,7 +27,12 @@ export default defineConfig({
     launchOptions: fs.existsSync(sandboxChromium) ? { executablePath: sandboxChromium, args: ["--no-sandbox"] } : {},
   },
   projects: [
-    { name: "chromium", testIgnore: /whatsapp\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    { name: "chromium", testIgnore: /(whatsapp|cowork-video)\.spec\.ts/, use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "video",
+      testMatch: /cowork-video\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${VIDEO_PORT}`, permissions: ["camera", "microphone"], launchOptions: { ...(fs.existsSync(sandboxChromium) ? { executablePath: sandboxChromium } : {}), args: ["--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream", ...(fs.existsSync(sandboxChromium) ? ["--no-sandbox"] : [])] } },
+    },
     { name: "whatsapp", testMatch: /whatsapp\.spec\.ts/, use: { ...devices["Desktop Chrome"], baseURL: `http://localhost:${WA_PORT}` } },
   ],
   // Servidores locais com banco de testes: não herdar a restrição de cadastro da instalação real.
@@ -43,6 +50,15 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 60_000,
       env: { REGISTRATION_MODE: "open", DATABASE_URL: TEST_DB, LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${WA_PORT}`, CERT_ENCRYPTION_KEY: Buffer.alloc(32, 6).toString("base64"), WHATSAPP_APP_SECRET: "segredo-do-app-de-teste", WHATSAPP_VERIFY_TOKEN: "verifica-e2e-0123456789", WHATSAPP_API_URL: "http://127.0.0.1:3199", WHATSAPP_ALLOW_LOCAL: "1", WHATSAPP_QR_FAKE: "1", WHATSAPP_QR_FAKE_SCAN_MS: "1500", WHATSAPP_QR_MIN_GAP_MS: "0", WHATSAPP_QR_DISABLE_RESUME: "1" },
+    },
+    {
+      command: `npx next start -p ${VIDEO_PORT}`,
+      url: `http://localhost:${VIDEO_PORT}/api/health`,
+      reuseExistingServer: false,
+      timeout: 60_000,
+      // Servidor local: livekit-server --dev --bind 127.0.0.1 --keys "devkey: legalos-e2e-livekit-secret-0123456789abc". Sem servidor de mídia rodando, o teste
+      // confere a configuração e o erro de conexão; com ele (LIVEKIT_E2E_REAL=1), a chamada real entre navegadores.
+      env: { REGISTRATION_MODE: "open", DATABASE_URL: TEST_DB, LOG_LEVEL: "warn", RATE_LIMIT_MULTIPLIER: "100", MFA_ENCRYPTION_KEY: Buffer.alloc(32, 5).toString("base64"), STORAGE_DIR: path.join(os.tmpdir(), "legalos-e2e-storage"), APP_URL: `http://localhost:${VIDEO_PORT}`, LIVEKIT_URL: LIVEKIT_E2E_URL, LIVEKIT_API_KEY: process.env.LIVEKIT_E2E_KEY ?? "devkey", LIVEKIT_API_SECRET: process.env.LIVEKIT_E2E_SECRET ?? "legalos-e2e-livekit-secret-0123456789abc", COWORK_VIDEO_ENABLED: "1" },
     },
   ],
 });

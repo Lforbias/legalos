@@ -199,7 +199,7 @@
 **Nome aprovado:** LegalOS Cowork — Collaborative Workspace.  
 **Decisão:** substitui integralmente o conceito anterior de **LegalOS Team**. Não é somente um chat interno: é o ambiente de trabalho compartilhado do escritório, preparado para colaboração futura entre profissionais e agentes de IA.  
 **Natureza:** iniciativa estrutural própria do LegalOS Evolution, independente do Welcome e das quatro prioridades externas acima.  
-**Status:** **Planejado — não implementado nem validado.**  
+**Status:** **Cowork 1.0 e 2.0 implementados e testados na branch `claude/cowork` (PR aberto, não publicado). Videoconferência desativada por falta de infraestrutura/credenciais; agentes de IA não implementados.** Detalhes técnicos em `docs/cowork.md`.  
 **Princípio:** primeiro estabilizar a experiência humana e os fluxos entre departamentos; somente depois adicionar agentes consultivos e evoluir gradualmente sua autonomia.
 
 ### Visão e experiência
@@ -253,7 +253,7 @@
 - **Fase de agentes posterior:** um agente consultivo responde apenas dentro de seu escopo; solicita autorização para qualquer ação modificadora e gera trilha íntegra.
 - Não anunciar áudio/vídeo, colaboração interagentes ou automação de mensagens como disponíveis antes de testes end-to-end e validação da infraestrutura.
 
-**Status:** A fazer.
+**Status:** Em revisão — 1.0/2.0 implementados (PR), vídeo desativado, agentes não iniciados.
 
 ## Regras de execução
 
@@ -275,4 +275,4 @@
 
 **Iniciativas adicionais (fora da ordem dos quatro projetos):**
 - LegalOS Welcome — cadastro premium, assinatura/código de presente e ativação guiada — A fazer.
-- LegalOS Cowork — espaço de colaboração interno com pessoas, reuniões, gestão do trabalho e agentes departamentais no futuro — A fazer.
+- LegalOS Cowork — espaço de colaboração interno com pessoas, reuniões, gestão do trabalho e agentes departamentais no futuro — Em revisão (1.0/2.0 implementados e testados; vídeo e agentes pendentes).

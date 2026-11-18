@@ -89,6 +89,20 @@ export const PERMISSION_GROUPS = [
     ],
   },
   {
+    key: "cowork",
+    label: "Cowork (comunicação interna da equipe)",
+    permissions: [
+      { key: "cowork:read", label: "Usar o Cowork: ver canais e conversas de que participa" },
+      { key: "cowork:write", label: "Enviar mensagens, responder em threads e iniciar conversas diretas" },
+      { key: "cowork:channels", label: "Criar canais e grupos" },
+      { key: "cowork:members", label: "Gerenciar participantes e arquivar canais de qualquer pessoa" },
+      { key: "cowork:share", label: "Compartilhar arquivos e cartões de clientes, processos, documentos e tarefas" },
+      { key: "cowork:meetings", label: "Criar e administrar reuniões internas" },
+      { key: "cowork:insights", label: "Ver o painel de acompanhamento do trabalho da equipe" },
+      { key: "cowork:manage", label: "Administrar configurações do Cowork e bloquear o acesso de pessoas" },
+    ],
+  },
+  {
     key: "whatsapp",
     label: "Atendimento por WhatsApp",
     permissions: [
