@@ -32,8 +32,8 @@ test("Welcome: perfil, diagnóstico respondido, retomada salva, presente validad
 
   // Etapa 2 — Diagnóstico respondido (não pulado)
   await expect(page.getByRole("heading", { name: "Um diagnóstico rápido", exact: true })).toBeVisible();
-  await page.getByLabel("Tamanho da equipe").selectOption({ label: "2 a 5 pessoas" });
-  await page.getByLabel("Clientes na carteira (estimativa)").selectOption({ label: "101 a 500" });
+  await page.getByRole("group", { name: /Tamanho da equipe/ }).getByRole("radio", { name: "2 a 5 pessoas", exact: true }).check();
+  await page.getByRole("group", { name: /Clientes na carteira/ }).getByRole("radio", { name: "101 a 500", exact: true }).check();
   await page.getByLabel("Ferramenta usada anteriormente (opcional)").fill("Planilhas");
   await page.getByRole("checkbox", { name: "Organizar processos e prazos", exact: true }).check();
   await page.getByRole("button", { name: "Continuar", exact: true }).click();
@@ -47,7 +47,8 @@ test("Welcome: perfil, diagnóstico respondido, retomada salva, presente validad
   await page.reload();
   await expect(page.getByRole("heading", { name: "Configure seu escritório", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Voltar", exact: true }).click();
-  await expect(page.getByLabel("Tamanho da equipe")).toHaveValue("2_5");
+  await expect(page.getByRole("group", { name: /Tamanho da equipe/ }).getByRole("radio", { name: "2 a 5 pessoas", exact: true })).toBeChecked();
+  await expect(page.getByRole("group", { name: /Clientes na carteira/ }).getByRole("radio", { name: "101 a 500", exact: true })).toBeChecked();
   await expect(page.getByLabel("Ferramenta usada anteriormente (opcional)")).toHaveValue("Planilhas");
   await page.getByRole("button", { name: "Voltar", exact: true }).click();
   await expect(page.getByRole("radio", { name: /Advogado\(a\) autônomo\(a\)/ })).toBeChecked();
@@ -59,6 +60,7 @@ test("Welcome: perfil, diagnóstico respondido, retomada salva, presente validad
   await expect(page.getByRole("heading", { name: "Configure seu escritório", exact: true })).toBeVisible();
 
   // Código-presente inexistente é recusado pelo servidor; a contratação paga fica bloqueada fora do sandbox
+  await page.getByRole("button", { name: "Tenho um código-presente" }).click();
   await page.getByLabel("Código", { exact: true }).fill("LOS-0000-0000-0000-0000");
   await page.getByRole("button", { name: "Ver benefício", exact: true }).click();
   await expect(page.getByText("Código inválido ou indisponível.")).toBeVisible();

@@ -273,3 +273,47 @@ textarea { font: inherit; }
 @media (min-width: 1536px) {
   :root { --chat-details-width: 380px; }
 }
+
+/* ───── LegalOS Welcome (onboarding) ───── */
+.welcome-backdrop {
+  background:
+    radial-gradient(ellipse 60% 45% at 12% -5%, color-mix(in srgb, var(--primary) 16%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 100% 10%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    var(--bg);
+}
+.welcome-backdrop::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(color-mix(in srgb, var(--fg) 7%, transparent) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 55%);
+}
+@keyframes welcome-in-forward {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes welcome-in-back {
+  from { opacity: 0; transform: translateX(-24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes welcome-pop {
+  0% { opacity: 0; transform: scale(.85); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes welcome-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+.welcome-step-forward { animation: welcome-in-forward .45s cubic-bezier(.16, 1, .3, 1) both; }
+.welcome-step-back { animation: welcome-in-back .45s cubic-bezier(.16, 1, .3, 1) both; }
+.welcome-pop { animation: welcome-pop .35s cubic-bezier(.16, 1, .3, 1) both; }
+.welcome-rise { animation: welcome-rise .5s cubic-bezier(.16, 1, .3, 1) both; }
+.welcome-tile { transition: transform .2s ease, border-color .2s ease, background-color .2s ease, box-shadow .2s ease; }
+.welcome-tile:hover:not(:has(input:disabled)) { transform: translateY(-2px); }
+.welcome-avatar { background: linear-gradient(135deg, var(--primary), var(--accent)); }
+@media (prefers-reduced-motion: reduce) {
+  .welcome-step-forward, .welcome-step-back, .welcome-pop, .welcome-rise { animation: none; }
+  .welcome-tile, .welcome-tile:hover { transition: none; transform: none; }
+}
