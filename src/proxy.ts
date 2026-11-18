@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 import { BOX_AVAILABLE, BOX_UNAVAILABLE_MESSAGE, isBoxPath } from "@/lib/box-retirement";
+import { liveKitCspOrigins } from "@/server/cowork/livekit";
 
 // /api/cron e /api/v1 não usam cookie de sessão: autenticam por conta própria (segredo do agendador / chave de API).
-const PUBLIC_PREFIXES = ["/blog", "/ferramentas", "/comunidade", "/acesso", "/minha-conta", "/transparencia", "/sair-das-novidades", "/api/audience", "/sitemap.xml", "/robots.txt", "/brand", "/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook"];
+const PUBLIC_PREFIXES = ["/blog", "/ferramentas", "/comunidade", "/acesso", "/minha-conta", "/transparencia", "/sair-das-novidades", "/api/audience", "/sitemap.xml", "/robots.txt", "/brand", "/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook", "/api/cowork/livekit/webhook"];
 
 /**
  * Proxy (middleware do Next 16): correlation id + redirecionamento rápido de visitantes sem cookie.
@@ -20,7 +21,7 @@ function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://tile.openstreetmap.org",
     "font-src 'self' data:",
-    "connect-src 'self'",
+    `connect-src 'self'${liveKitCspOrigins().map((o) => ` ${o}`).join("")}`,
     "worker-src 'self'",
     "manifest-src 'self'",
     "object-src 'none'",
@@ -72,7 +73,12 @@ export function proxy(request: NextRequest) {
   }
 
   const res = NextResponse.next({ request: { headers } });
-  if (!isPublic && !pathname.startsWith("/api/") && request.cookies.has(SESSION_COOKIE)) res.headers.set("permissions-policy", "camera=(), microphone=(self), geolocation=()");
+  if (!isPublic && !pathname.startsWith("/api/") && request.cookies.has(SESSION_COOKIE)) {
+    // Câmera e tela só no Cowork (onde ficam as reuniões), e só quando a videoconferência está habilitada.
+    // Vale para o documento inteiro: a navegação interna do Next mantém a política da página em que o documento abriu.
+    const video = (pathname === "/cowork" || pathname.startsWith("/cowork/")) && liveKitCspOrigins().length > 0;
+    res.headers.set("permissions-policy", video ? "camera=(self), microphone=(self), display-capture=(self), geolocation=()" : "camera=(), microphone=(self), geolocation=()");
+  }
   res.headers.set("x-request-id", requestId);
   res.headers.set("content-security-policy", csp);
   return res;

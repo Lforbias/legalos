@@ -20,7 +20,7 @@ import {
   updateChannel,
 } from "@/server/services/cowork-channel.service";
 import { deleteMessage, editMessage } from "@/server/services/cowork-message.service";
-import { addMeetingActionItem, createMeeting, respondMeeting, saveMinutes, setAttendance, setMeetingStatus, updateParticipants } from "@/server/services/cowork-meeting.service";
+import { addMeetingActionItem, createMeeting, joinVideo, removeFromVideo, respondMeeting, saveMinutes, setAttendance, setMeetingStatus, updateParticipants } from "@/server/services/cowork-meeting.service";
 import { convertMessage } from "@/server/services/cowork-work.service";
 
 /** Ações do Cowork. Todas resolvem o escritório e a pessoa pela sessão no servidor (nunca por ids do navegador). */
@@ -229,6 +229,21 @@ export async function updateCoworkSettingsAction(input: unknown): Promise<Action
     await updateCoworkSettings(ctx, parse(z.object({ enabled: z.boolean().optional(), allowDirect: z.boolean().optional(), defaultChannels: z.array(z.string().max(40)).max(10).optional() }), input));
     revalidatePath("/cowork/configuracoes");
     revalidatePath("/cowork");
+    return undefined;
+  });
+}
+
+export async function joinVideoAction(id: string): Promise<ActionState<{ url: string; token: string; room: string; isHost: boolean }>> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    return joinVideo(ctx, parse(uuidSchema, id));
+  });
+}
+
+export async function removeFromVideoAction(id: string, userId: string): Promise<ActionState> {
+  return runAction(async () => {
+    const { ctx } = await requireTenant();
+    await removeFromVideo(ctx, parse(uuidSchema, id), parse(uuidSchema, userId));
     return undefined;
   });
 }

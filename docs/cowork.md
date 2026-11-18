@@ -1,7 +1,7 @@
 # LegalOS Cowork — relatório técnico e arquitetura
 
-**Escopo desta entrega:** Cowork 1.0 (comunicação humana) e Cowork 2.0 (gestão do trabalho), com reuniões sem vídeo e a arquitetura preparada para agentes. Os agentes de IA não foram implementados.
-**Situação:** implementado e testado na branch `claude/cowork`, ainda não publicado. A videoconferência está **desativada de forma explícita** (ver §5).
+**Escopo desta entrega:** Cowork 1.0 (comunicação humana) e Cowork 2.0 (gestão do trabalho), com reuniões e videoconferência LiveKit (ligada só quando configurada) e a arquitetura preparada para agentes. Os agentes de IA não foram implementados.
+**Situação:** implementado e testado na branch `claude/cowork`, ainda não publicado. A videoconferência com LiveKit está implementada e validada com servidor local, mas **fica desligada** até a implantação do servidor de mídia em produção (ver §5.4).
 
 ---
 
@@ -99,13 +99,13 @@ Regras aplicadas no servidor, em toda leitura e escrita:
 
 ## 5. Reuniões e videoconferência
 
-### 5.1 Entregue (sem vídeo)
+### 5.1 Gestão de reuniões (com ou sem vídeo)
 
 - Criar, agendar, convidar (só pessoas aptas ao Cowork) e vincular a conversa, processo ou tarefa.
 - Registro na **Agenda do escritório** pelo serviço original, com os participantes como **colaboradores** do compromisso.
 - Próximas e histórico, RSVP, iniciar, encerrar e cancelar (sincroniza a situação do compromisso), e presença registrada pelo anfitrião.
 - Ata, decisões e encaminhamentos que viram tarefa ou compromisso com responsável e prazo.
-- **Nenhum botão de áudio, vídeo, microfone, câmera ou tela** é exibido. A página informa que a videoconferência não está habilitada (`videoConferenceStatus()` retorna `enabled: false`, o que o E2E verifica).
+- **Com o vídeo desligado** (padrão até a implantação), **nenhum botão de áudio, vídeo, microfone, câmera ou tela** é exibido. A página informa que a videoconferência não está habilitada (`videoConferenceStatus()` retorna `enabled: false`, o que o E2E verifica).
 
 ### 5.2 Comparativo LiveKit × Jitsi
 
@@ -124,14 +124,67 @@ Regras aplicadas no servidor, em toda leitura e escrita:
 
 **Recomendação:** LiveKit em hospedagem própria (ou LiveKit Cloud numa fase de piloto), com emissão de token por `/api/cowork/meetings/[id]/token` restrita a participantes e com o mesmo sigilo de processo. O **Meetly** foi usado apenas como referência visual: o projeto está incompleto e não teve código copiado.
 
-### 5.3 O que falta para habilitar o vídeo (bloqueado por infraestrutura e credenciais)
+### 5.3 Integração LiveKit implementada (desligada até a implantação)
 
-1. Servidor LiveKit (ou conta Cloud), domínio com TLS, portas UDP e TURN.
-2. Variáveis `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET` no servidor.
-3. Rota de token, sala vinculada à reunião, permissões de anfitrião (admitir, remover, encerrar) e `Permissions-Policy` para câmera e microfone em `/cowork/reunioes/*`.
-4. Validação E2E com vários participantes (entrar e sair, microfone, câmera, tela, anfitrião, desconexão).
+**Código:**
+- **Servidor** (`src/server/cowork/livekit.ts`, sem SDK de servidor):
+  - token JWT HS256 no formato oficial do LiveKit, com validade de 10 min;
+  - API administrativa Twirp (`RemoveParticipant`, `DeleteRoom`);
+  - verificação do webhook (JWT + `sha256` do corpo).
+- **Regras** (`cowork-meeting.service.ts`):
+  - **entrada só para participantes convidados** que não recusaram e só com a reunião **em andamento**;
+  - só a **anfitriã** recebe `roomAdmin` e pode remover pessoas da chamada;
+  - **encerrar ou cancelar** a reunião encerra a sala no servidor de mídia;
+  - quem é tirado da lista de participantes sai da sala;
+  - o nome da sala é opaco (não leva título nem processo);
+  - entrada e remoção são auditadas.
+- **Presença verificável:** o webhook `participant_joined`, assinado com a API secret, marca o participante como presente. Ele só vale para participante da reunião daquela sala, com a reunião em andamento.
+- **Navegador** (`video-room.tsx`, `livekit-client@2.23.0` carregado só ao entrar):
+  - microfone, câmera e compartilhamento de tela;
+  - grade de participantes com indicador de fala;
+  - áudio remoto;
+  - anfitriã remove participante;
+  - estados de reconexão e motivo da saída (removido ou reunião encerrada);
+  - erros de permissão do navegador.
+- **Segurança do navegador:**
+  - o CSP (`connect-src`) só libera a origem do `LIVEKIT_URL` quando ele está configurado;
+  - `Permissions-Policy` com câmera, microfone e tela só nas páginas do Cowork e só com o vídeo habilitado. Fora delas a câmera continua bloqueada.
+- **Sem configuração completa** (incluindo `COWORK_VIDEO_ENABLED=1`), nada muda: a página informa que o vídeo não está habilitado e não mostra nenhum controle de mídia.
 
-Gravação e transcrição ficam para depois.
+**Validação comprovada:**
+- **Servidor de mídia real:** com `livekit-server` 1.13.11 local (Homebrew, em 127.0.0.1), o E2E `cowork-video.spec.ts` (projeto `video`) usou dois navegadores Chromium com mídia simulada. Ele confirmou:
+  - entrada das duas pessoas;
+  - vídeo da câmera chegando ao outro lado (`videoWidth > 0`);
+  - microfone desligado refletido no outro lado;
+  - compartilhamento e parada da tela;
+  - anfitriã removendo a convidada;
+  - reentrada;
+  - encerramento derrubando a chamada;
+  - presença marcada pelo webhook real.
+
+  Passou 3 vezes seguidas.
+- **Sem servidor de mídia:** o mesmo projeto confere os cabeçalhos e o erro honesto de conexão, sem estado "conectado" falso.
+- **Integração** (`cowork-video.test.ts`): permissões de entrada, `roomAdmin` só para a anfitriã, chamadas Twirp assinadas, webhook e presença.
+
+**Para rodar a chamada real localmente:**
+
+```bash
+brew install livekit
+livekit-server --dev --bind 127.0.0.1 --keys "devkey: legalos-e2e-livekit-secret-0123456789abc"
+LIVEKIT_E2E_REAL=1 npx playwright test src/tests/e2e/cowork-video.spec.ts
+```
+
+Para a presença pelo webhook, o servidor precisa de `webhook.urls: [http://localhost:3102/api/cowork/livekit/webhook]` num arquivo de configuração.
+
+### 5.4 Implantação em produção (pendente de infraestrutura e decisão)
+
+1. **Servidor LiveKit:**
+   - **Hospedagem própria:** VM com 2 vCPU e 4 GB para salas pequenas; domínio `video.<domínio>` com TLS; portas 7881/TCP e UDP 50000–60000 (ou faixa menor); TURN/TLS na 443 para redes restritas.
+   - **Alternativa:** LiveKit Cloud.
+2. **No servidor do LegalOS:** `LIVEKIT_URL`, `LIVEKIT_API_KEY` e `LIVEKIT_API_SECRET`.
+3. **No LiveKit:** webhook para `https://legalossync.tech/api/cowork/livekit/webhook`, assinado com a mesma API key.
+4. **Antes de ligar:** fazer uma chamada real com dois participantes em redes diferentes (incluindo celular 4G) e só então definir `COWORK_VIDEO_ENABLED=1`.
+5. **Fica para depois:** gravação e transcrição (Egress), além da sala de espera com admissão manual. Hoje a "permissão de entrada" é o convite da reunião.
 
 ---
 
@@ -201,4 +254,4 @@ A tela de configurações informa que **nenhum agente está disponível**.
 - **Busca:** `ILIKE` nas conversas da pessoa. Para volumes grandes, criar índice `pg_trgm` ou full-text em `cowork_messages.body`.
 - **Armazenamento local:** igual ao restante do LegalOS. Para várias instâncias, migrar para object storage (já documentado em `local-storage.ts`).
 - **Retenção:** a exclusão de mensagem apaga texto e arquivos e mantém o registro auditado. A política de retenção por escritório ainda precisa ser definida.
-- **Vídeo:** bloqueado até haver infraestrutura e credenciais (§5.3).
+- **Vídeo:** implementado e validado com servidor local. A ativação em produção depende de servidor LiveKit, TLS, portas UDP/TURN e de uma chamada real entre redes diferentes (§5.4).

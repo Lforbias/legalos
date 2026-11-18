@@ -6,6 +6,8 @@ import { utcToZoned, zonedToUtc } from "@/lib/dates/zoned";
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { appendMessageTx } from "@/server/cowork/core";
+import { accessToken, deleteRoom, liveKitConfig, removeParticipant, roomName } from "@/server/cowork/livekit";
+import { logger } from "@/lib/logging/logger";
 import { publishInTx } from "@/server/cowork/realtime";
 import { addActivityCollaborator, removeActivityCollaborator } from "./activity-details.service";
 import { changeEventStatus, createEvent } from "./agenda.service";
@@ -21,11 +23,12 @@ import { resolveTenantContext } from "./tenant.service";
 import { taskVisibility } from "./task.service";
 
 /**
- * Videoconferência: NÃO configurada. Não há servidor de mídia (LiveKit/Jitsi) validado nesta instalação, então o
- * Cowork oferece gestão e agendamento de reuniões e NUNCA mostra controles de áudio/vídeo que simulem funcionamento.
- * Ver docs/cowork.md (comparativo LiveKit × Jitsi e requisitos para habilitar).
+ * Videoconferência (LiveKit). Fica DESLIGADA enquanto o servidor não estiver configurado e validado
+ * (ver `liveKitConfig`): nesse caso o Cowork oferece gestão e agendamento e NUNCA mostra controles de áudio/vídeo.
  */
-export function videoConferenceStatus(): { enabled: false; reason: string } {
+export function videoConferenceStatus(): { enabled: boolean; reason: string } {
+  const c = liveKitConfig();
+  if (c.ok) return { enabled: true, reason: "Videoconferência disponível para os participantes convidados enquanto a reunião estiver em andamento." };
   return { enabled: false, reason: "Videoconferência ainda não habilitada: nenhum servidor de áudio e vídeo foi configurado e validado para este escritório." };
 }
 
@@ -219,6 +222,8 @@ export async function setMeetingStatus(ctx: TenantContext, id: string, action: "
     await audit({ action: `cowork.meeting.${action}`, organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "cowork_meeting", resourceId: id, meta: ctx.meta }, tx);
     await publishInTx(tx, { o: ctx.organizationId, t: "meeting", u: m.participants.map((p) => p.userId) });
   });
+  const lk = liveKitConfig();
+  if (lk.ok && action !== "start") await deleteRoom(lk.config, roomName(ctx.organizationId, id)).catch((err) => logger.warn("cowork.video.delete_room_failed", { meetingId: id, error: err instanceof Error ? err.message : String(err) }));
   if (m.agendaEventId && (can(ctx, "deadlines:write") || can(ctx, "tasks:write"))) {
     const status = action === "start" ? "IN_PROGRESS" : action === "end" ? "DONE" : "CANCELED";
     await changeEventStatus(ctx, m.agendaEventId, status).catch(() => undefined);
@@ -254,6 +259,8 @@ export async function updateParticipants(ctx: TenantContext, id: string, userIds
     await audit({ action: "cowork.meeting.participants", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "cowork_meeting", resourceId: id, metadata: { added: added.length, removed: removed.length }, meta: ctx.meta }, tx);
     await publishInTx(tx, { o: ctx.organizationId, t: "meeting", u: [...ids, ...removed] });
   });
+  const lk = liveKitConfig();
+  if (lk.ok) for (const uid of removed) await removeParticipant(lk.config, roomName(ctx.organizationId, id), uid).catch(() => undefined);
   if (m.agendaEventId && (can(ctx, "deadlines:write") || can(ctx, "tasks:write"))) {
     for (const uid of added) await addActivityCollaborator(ctx, "EVENT", m.agendaEventId, uid).catch(() => undefined);
     for (const uid of removed) await removeActivityCollaborator(ctx, "EVENT", m.agendaEventId, uid).catch(() => undefined);
@@ -305,4 +312,59 @@ export async function usersInMeetingNow(organizationId: string): Promise<Set<str
 
 export async function meetingCaseAccessible(ctx: TenantContext, caseId: string) {
   return assertCoworkCaseVisible(ctx, caseId).then(() => true, () => false);
+}
+
+/**
+ * Entrada na videoconferência. Só para participantes convidados (permissão de entrada = convite), com a reunião em
+ * andamento. O anfitrião (ou quem administra a reunião) recebe poderes de administrador da sala.
+ */
+export async function joinVideo(ctx: TenantContext, id: string) {
+  const lk = liveKitConfig();
+  if (!lk.ok) throw new ConflictError("A videoconferência não está habilitada nesta instalação.");
+  const { m, me, isHost } = await loadMeeting(ctx, id);
+  if (!me) throw new ForbiddenError("Só participantes convidados entram na chamada.");
+  if (me.rsvp === "DECLINED") throw new ConflictError("Você recusou esta reunião. Confirme a presença para entrar.");
+  if (m.status !== "IN_PROGRESS") throw new ConflictError(m.status === "SCHEDULED" ? "A chamada abre quando a reunião for iniciada." : "A reunião já foi encerrada.");
+  const names = await displayNames(ctx.organizationId, [ctx.userId]);
+  const room = roomName(ctx.organizationId, id);
+  const token = accessToken(lk.config, {
+    identity: ctx.userId,
+    name: names.get(ctx.userId) ?? "Participante",
+    metadata: JSON.stringify({ host: isHost }),
+    // Poderes de sala (remover pessoas, encerrar) só para o anfitrião.
+    grant: { room, roomJoin: true, canPublish: true, canSubscribe: true, canPublishData: true, canPublishSources: ["camera", "microphone", "screen_share", "screen_share_audio"], roomAdmin: isHost },
+    ttlSeconds: 600,
+  });
+  await audit({ action: "cowork.meeting.video_join", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "cowork_meeting", resourceId: id, metadata: { host: isHost }, meta: ctx.meta });
+  return { url: lk.config.url, token, room, isHost };
+}
+
+/** Anfitrião remove alguém da chamada (sem tirá-lo da lista de convidados). */
+export async function removeFromVideo(ctx: TenantContext, id: string, userId: string) {
+  const lk = liveKitConfig();
+  if (!lk.ok) throw new ConflictError("A videoconferência não está habilitada nesta instalação.");
+  const { m, isHost } = await loadMeeting(ctx, id);
+  if (!isHost) throw new ForbiddenError("Só o anfitrião remove participantes da chamada.");
+  if (!m.participants.some((p) => p.userId === userId)) throw new NotFoundError("Participante não encontrado.");
+  await removeParticipant(lk.config, roomName(ctx.organizationId, id), userId);
+  await audit({ action: "cowork.meeting.video_remove", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "cowork_meeting", resourceId: id, metadata: { removedUserId: userId }, meta: ctx.meta });
+}
+
+/**
+ * Webhook do LiveKit: `participant_joined` é evidência verificável de presença (a pessoa entrou na sala com o token
+ * emitido por nós). Só marca quem é participante da reunião daquela sala; nunca cria participante.
+ */
+export async function recordVideoEvent(event: { event?: string; room?: { name?: string }; participant?: { identity?: string } }) {
+  if (event.event !== "participant_joined") return { updated: 0 };
+  const room = event.room?.name ?? "";
+  const identity = event.participant?.identity ?? "";
+  const match = /^cw_([0-9a-f]{12})_([0-9a-f]{32})$/.exec(room);
+  if (!match || !z.uuid().safeParse(identity).success) return { updated: 0 };
+  const hex = match[2]!;
+  const meetingId = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+  const meeting = await db.coworkMeeting.findUnique({ where: { id: meetingId }, select: { id: true, organizationId: true, status: true } });
+  if (!meeting || meeting.organizationId.replace(/-/g, "").slice(0, 12) !== match[1] || meeting.status !== "IN_PROGRESS") return { updated: 0 };
+  const res = await db.coworkMeetingParticipant.updateMany({ where: { meetingId, organizationId: meeting.organizationId, userId: identity, attendance: { not: "PRESENT" } }, data: { attendance: "PRESENT", attendanceById: null } });
+  if (res.count) await audit({ action: "cowork.meeting.video_presence", organizationId: meeting.organizationId, userId: identity, resourceType: "cowork_meeting", resourceId: meetingId });
+  return { updated: res.count };
 }

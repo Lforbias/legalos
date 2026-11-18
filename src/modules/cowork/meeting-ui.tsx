@@ -15,7 +15,6 @@ const inputCls = "h-10 w-full rounded-lg border border-border bg-bg/45 px-3 text
 const labelCls = "mb-1 block text-xs font-medium text-muted";
 
 export function MeetingForm({ people, meId, channels, defaultChannelId, canAgenda, canCases, today }: { people: Person[]; meId: string; channels: { id: string; name: string }[]; defaultChannelId: string; canAgenda: boolean; canCases: boolean; today: string }) {
-  const router = useRouter();
   const [title, setTitle] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [date, setDate] = React.useState(today);
@@ -36,7 +35,9 @@ export function MeetingForm({ people, meId, channels, defaultChannelId, canAgend
         e.preventDefault();
         start(async () => {
           const r = await createMeetingAction({ title, description, date, startTime, endTime, participantIds: participants, channelId, caseId: caseRef?.id ?? "", addToAgenda, requestKey });
-          if (r.ok && r.data) router.push(`/cowork/reunioes/${r.data.id}`);
+          // Carregamento completo: a página da reunião precisa da política de câmera/tela do próprio documento.
+          // eslint-disable-next-line @next/next/no-location-assign-relative-destination -- navegação completa intencional (política de câmera do documento)
+          if (r.ok && r.data) window.location.assign(`/cowork/reunioes/${r.data.id}`);
           else setError(r.message ?? "Não foi possível agendar.");
         });
       }}

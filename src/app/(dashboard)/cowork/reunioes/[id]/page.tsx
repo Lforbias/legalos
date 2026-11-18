@@ -18,6 +18,7 @@ import { getMeeting } from "@/server/services/cowork-meeting.service";
 import { MEETING_STATUS_LABEL, WORK_PURPOSE_LABEL, type ResourceKind, type WorkPurpose } from "@/modules/cowork/constants";
 import { ResourceCardView } from "@/modules/cowork/message-item";
 import { ActionItemForm, AttendanceList, MeetingControls, MinutesForm } from "@/modules/cowork/meeting-ui";
+import { VideoRoom } from "@/modules/cowork/video-room";
 
 export const metadata: Metadata = { title: "Reunião — Cowork" };
 export const dynamic = "force-dynamic";
@@ -48,10 +49,16 @@ export default async function MeetingPage({ params }: { params: Promise<{ id: st
           <Card>
             <CardBody className="space-y-4">
               <MeetingControls id={meeting.id} status={meeting.status} isParticipant={meeting.isParticipant} myRsvp={meeting.myRsvp} canAdmin={meeting.canAdmin} />
-              <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-2/60 p-3 text-sm" data-testid="meeting-video-disabled">
-                <VideoOff className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
-                <p className="text-muted">{meeting.video.reason} Use a reunião para organizar convites, presença, ata e encaminhamentos.</p>
-              </div>
+              {!meeting.video.enabled ? (
+                <div className="flex items-start gap-3 rounded-lg border border-border bg-surface-2/60 p-3 text-sm" data-testid="meeting-video-disabled">
+                  <VideoOff className="mt-0.5 h-4 w-4 shrink-0 text-muted" aria-hidden />
+                  <p className="text-muted">{meeting.video.reason} Use a reunião para organizar convites, presença, ata e encaminhamentos.</p>
+                </div>
+              ) : meeting.status === "IN_PROGRESS" && meeting.isParticipant && meeting.myRsvp !== "DECLINED" ? (
+                <VideoRoom meetingId={meeting.id} />
+              ) : (
+                <p className="rounded-lg border border-border bg-surface-2/60 p-3 text-sm text-muted" data-testid="meeting-video-waiting">{meeting.status === "SCHEDULED" ? "A chamada de vídeo abre quando o anfitrião iniciar a reunião." : meeting.status === "IN_PROGRESS" ? "Só participantes convidados que não recusaram entram na chamada." : "A reunião terminou; a chamada foi encerrada."}</p>
+              )}
               {meeting.description ? <div><h3 className="text-xs font-semibold uppercase text-muted">Pauta</h3><p className="mt-1 whitespace-pre-wrap text-sm">{meeting.description}</p></div> : null}
               <div className="flex flex-wrap gap-3 text-xs text-muted">
                 {meeting.channel ? <Link className="underline" href={`/cowork?c=${meeting.channel.id}`}>Conversa: {meeting.channel.kind === "CHANNEL" ? `#${meeting.channel.name}` : meeting.channel.name}</Link> : null}
