@@ -236,6 +236,37 @@ textarea { font: inherit; }
 
 .desktop-shell input:focus-visible { outline: none; }
 
+/* ───── Entrada após o login: as peças do logo se montam, saudação e o painel aparece ───── */
+.login-intro {
+  --li-1: #7C8CFF; --li-2: #2DD4BF; --li-3: #FACC15; --li-4: #FF3B4E;
+  position: fixed; inset: 0; z-index: 200; display: grid; place-items: center;
+  background: var(--bg); color: var(--fg); pointer-events: none;
+  animation: li-out .4s cubic-bezier(.4, 0, .2, 1) 1.05s both;
+}
+:root[data-theme="light"] .login-intro { --li-1: #4F5DE0; --li-2: #0F9F8F; --li-3: #C79A00; --li-4: #E5243B; }
+.login-intro::before {
+  content: ""; position: absolute; inset: 0;
+  background: radial-gradient(circle at 50% 45%, color-mix(in srgb, var(--li-4) 16%, transparent), transparent 55%);
+  animation: li-glow 1s ease .3s both;
+}
+.login-intro-stack { position: relative; display: flex; flex-direction: column; align-items: center; gap: 18px; padding: 0 16px; text-align: center; }
+.login-intro-logo { width: clamp(72px, 18vw, 96px); height: auto; overflow: visible; animation: li-shine .9s ease .45s both; }
+.li-p { transform-box: fill-box; transform-origin: center; animation: li-snap .55s cubic-bezier(.34, 1.56, .64, 1) both; }
+.li-p1 { fill: var(--li-1); --x: -60px; --y: -60px; }
+.li-p2 { fill: var(--li-2); --x: -60px; --y: 60px; animation-delay: .07s; }
+.li-p3 { fill: var(--li-3); --x: 60px; --y: 60px; animation-delay: .14s; }
+.li-p4 { fill: var(--li-4); --x: 60px; --y: -60px; animation-delay: .24s; }
+.login-intro-hello { margin: 0; font-size: clamp(22px, 5vw, 30px); font-weight: 650; letter-spacing: -.01em; animation: li-rise .45s ease .5s both; }
+.login-intro-sub { margin: -10px 0 0; font-size: 14px; color: var(--muted); animation: li-rise .45s ease .62s both; }
+@keyframes li-snap { from { opacity: 0; transform: translate(var(--x), var(--y)) rotate(-25deg) scale(.4); } to { opacity: 1; transform: none; } }
+@keyframes li-shine { 0%, 100% { filter: drop-shadow(0 0 0 transparent); } 50% { filter: drop-shadow(0 0 18px color-mix(in srgb, var(--li-4) 55%, transparent)); } }
+@keyframes li-glow { from { opacity: 0; transform: scale(.6); } to { opacity: 1; transform: none; } }
+@keyframes li-rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@keyframes li-out { to { opacity: 0; transform: translateY(-12px); visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) {
+  .login-intro { display: none; }
+}
+
 [data-space="comercial"] {
   --primary: #ea580c;
   --primary-hover: #f97316;
