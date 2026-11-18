@@ -22,6 +22,7 @@ import {
   FlaskConical,
   Globe,
   Zap,
+  MessagesSquare,
 } from "lucide-react";
 import type { PermissionKey } from "@/lib/permissions/catalog";
 
@@ -42,6 +43,7 @@ export type NavItem = {
 
 export const NAV_ITEMS: NavItem[] = [
   { key: "workspace", label: "Área de Trabalho", href: "/area-de-trabalho", icon: FolderOpen, permission: "clients:read", phase: 2, implemented: true, summary: "Pastas por cliente com casos, processos, atividades, conversas, documentos e financeiro conectados." },
+  { key: "cowork", label: "Cowork", href: "/cowork", icon: MessagesSquare, permission: "cowork:read", phase: 13, implemented: true, summary: "Comunicação interna da equipe: canais por departamento, conversas diretas e em grupo, threads, menções, cartões de processos e documentos, reuniões e trabalho gerado das conversas." },
   { key: "overview", label: "Dashboard", href: "/dashboard", icon: LayoutDashboard, phase: 1, implemented: true, summary: "Indicadores e atividade do escritório." },
   { key: "indicators", label: "Indicadores", href: "/indicadores", icon: BarChart3, phase: 9, implemented: true, summary: "Atrasados por tipo, movimentação de processos, evolução da carteira, processos por cliente e os seus números." },
   { key: "alerts", label: "Central de alertas", href: "/alertas", icon: Bell, phase: 9, implemented: true, summary: "Processos parados, tarefas, prazos, agenda, financeiro e integrações, com link direto para agir." },

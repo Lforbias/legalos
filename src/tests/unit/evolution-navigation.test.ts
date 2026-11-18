@@ -55,7 +55,8 @@ describe("evolution navigation config", () => {
 });
 
 it("links the office modules from Evolution navigation", () => {
-  const separateLinks = ["overview", "portal", "prototypes", "help"];
+  // Cowork é transversal (não pertence a um departamento): tem link próprio no topo do menu Evolution.
+  const separateLinks = ["overview", "portal", "prototypes", "help", "cowork"];
   const routes = new Set(EVOLUTION_NAV.map((item) => item.href));
   for (const item of NAV_ITEMS) {
     if (!separateLinks.includes(item.key)) {

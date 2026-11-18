@@ -11,6 +11,7 @@ export function AppShell(props: {
   activeOrganizationId: string;
   visibleKeys: string[];
   chatBadge: number;
+  coworkBadge?: number;
   evolutionKeys: string[];
   canInvite: boolean;
   canCreateClient: boolean;
@@ -21,7 +22,7 @@ export function AppShell(props: {
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const fullBleed = pathname === "/atendimento"; // o Chat ocupa a tela inteira, como um aplicativo de mensagens
+  const fullBleed = pathname === "/atendimento" || pathname === "/cowork"; // Chat e Cowork ocupam a tela inteira, como aplicativos de mensagens
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const close = React.useCallback(() => setMobileOpen(false), []);
   return (
@@ -29,7 +30,7 @@ export function AppShell(props: {
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:absolute focus:left-2 focus:top-2 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-fg">
         Pular para o conteúdo
       </a>
-      <EvolutionSidebar visibleKeys={props.evolutionKeys} menuKeys={props.visibleKeys} chatBadge={props.chatBadge} mobileOpen={mobileOpen} onCloseMobile={close} />
+      <EvolutionSidebar visibleKeys={props.evolutionKeys} menuKeys={props.visibleKeys} chatBadge={props.chatBadge} coworkBadge={props.coworkBadge} mobileOpen={mobileOpen} onCloseMobile={close} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar
           user={props.user}

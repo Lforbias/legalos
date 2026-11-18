@@ -60,3 +60,29 @@ describe("isSubset", () => {
     expect(isSubset([], new Set())).toBe(true);
   });
 });
+
+describe("permissões do Cowork", () => {
+  const role = (k: string) => SYSTEM_ROLES.find((r) => r.key === k)!;
+  it("todos os perfis internos usam o Cowork; o cliente externo não", () => {
+    for (const k of ["OWNER", "ADMIN", "LAWYER", "CONTROLLER", "FINANCE", "ASSISTANT"]) expect(role(k).permissions).toContain("cowork:read");
+    expect(role("CLIENT").permissions.some((p) => p.startsWith("cowork:"))).toBe(false);
+  });
+  it("administração do Cowork e gestão de participantes ficam com proprietário e administrador", () => {
+    for (const r of SYSTEM_ROLES) {
+      expect(r.permissions.includes("cowork:manage"), r.key).toBe(["OWNER", "ADMIN"].includes(r.key));
+      expect(r.permissions.includes("cowork:members"), r.key).toBe(["OWNER", "ADMIN"].includes(r.key));
+    }
+  });
+  it("painel do trabalho só para gestão (controladoria e administração)", () => {
+    for (const r of SYSTEM_ROLES) expect(r.permissions.includes("cowork:insights"), r.key).toBe(["OWNER", "ADMIN", "CONTROLLER"].includes(r.key));
+  });
+  it("a migração concede aos perfis do sistema as mesmas permissões do código", async () => {
+    const fs = await import("node:fs");
+    const sql = fs.readFileSync("prisma/migrations/20270119000000_cowork/migration.sql", "utf8");
+    const grants = (keys: string) => [...sql.matchAll(/ARRAY\[([^\]]+)\]\s+WHERE is_system AND key (?:IN \(([^)]+)\)|= '([A-Z]+)')/g)].filter((m) => (m[2] ?? `'${m[3]}'`).includes(`'${keys}'`)).flatMap((m) => m[1]!.split(",").map((s) => s.trim().replace(/'/g, "")));
+    for (const k of ["OWNER", "ADMIN", "LAWYER", "CONTROLLER", "FINANCE", "ASSISTANT"]) {
+      const fromCode = role(k).permissions.filter((p) => p.startsWith("cowork:")).sort();
+      expect(grants(k).sort(), k).toEqual(fromCode);
+    }
+  });
+});
