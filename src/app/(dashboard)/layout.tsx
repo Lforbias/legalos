@@ -6,6 +6,7 @@ import { NAV_ITEMS } from "@/config/navigation";
 import { can } from "@/server/context";
 import { prototypesEnabled } from "@/modules/prototypes/registry";
 import { ResendVerificationButton } from "@/modules/auth/components";
+import { LoginIntro } from "@/modules/auth/login-intro-overlay";
 import { listNotifications, syncDueNotifications, unreadCount } from "@/server/services/notification.service";
 import { listUserOrganizations } from "@/server/services/organization.service";
 import { getEntitlements } from "@/server/services/plan.service";
@@ -67,6 +68,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         )
       }
     >
+      <LoginIntro name={session.user.name} />
       {children}
     </AppShell>
   );

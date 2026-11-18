@@ -28,6 +28,7 @@ import {
   type RegisterInput,
   type ResetPasswordInput,
 } from "./schemas";
+import { markLoginIntro } from "./login-intro";
 
 function useGo() {
   const router = useRouter();
@@ -38,7 +39,12 @@ function useGo() {
 }
 
 export function LoginForm({ next, inviteToken }: { next?: string; inviteToken?: string }) {
-  const go = useGo();
+  const navigate = useGo();
+  // marca a animação de entrada só para quem acabou de entrar (vale também após o código de 2 etapas)
+  const go = (to: string) => {
+    markLoginIntro();
+    navigate(to);
+  };
   const [challenge, setChallenge] = React.useState<string | null>(null);
   const { form, submit, pending, message } = useServerForm<LoginInput, LoginResult>({
     schema: loginSchema,
