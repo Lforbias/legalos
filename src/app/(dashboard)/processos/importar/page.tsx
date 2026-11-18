@@ -27,6 +27,11 @@ export default async function ImportPage() {
       <PageHeader title="Importar processos" description="Cadastre vários processos de uma vez pelo número CNJ." actions={<Link href="/processos" className={buttonVariants({ variant: "secondary" })}>Voltar aos processos</Link>} />
       <ImportForm datajudReady={dj.keyConfigured && dj.orgEnabled} mniReady={mniCount > 0} canDocs={can(ctx, "documents:write")} />
       {ctx.isOwner ? <AstreaBackupForm /> : null}
+      {can(ctx, "documents:write") ? (
+        <Card>
+          <CardHeader title="Trazer também os arquivos" description="Depois de importar clientes e processos, envie os documentos (PDFs, Word, imagens) de uma vez: arquivos soltos, uma pasta inteira ou um ZIP. O LegalOS liga cada arquivo ao processo ou cliente certo pelo número do processo, CPF/CNPJ ou nome da pasta." action={<Link href="/documentos/importar" className={buttonVariants({ variant: "secondary", size: "sm" })}>Enviar documentos em lote</Link>} />
+        </Card>
+      ) : null}
       {batches.length ? (
         <Card>
           <CardHeader title="Importações anteriores" />
