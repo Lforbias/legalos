@@ -1,0 +1,84 @@
+/* Apresentação do LegalOS: mesma direção de arte da landing (landing.module.css), com capítulos e roadmap. */
+
+/* ── Abertura ── */
+.hero { position: relative; overflow: hidden; background: #07080b; color: #f2f2ee; }
+.heroInner { position: relative; z-index: 3; max-width: 1240px; margin: 0 auto; padding: 56px 28px 0; display: grid; grid-template-columns: 1.25fr 0.75fr; gap: 48px; align-items: end; }
+.heroTitle { margin: 18px 0 0; font-size: clamp(44px, 7.2vw, 108px); font-weight: 400; line-height: 0.92; letter-spacing: -0.05em; }
+.heroTitle em { font-style: normal; color: transparent; -webkit-text-stroke: 1px rgba(255, 255, 255, 0.55); }
+.heroLead { max-width: 560px; margin: 26px 0 0; font-size: 18px; color: #a3a5ad; }
+.toc { margin: 0; padding: 0; list-style: none; border-top: 1px solid rgba(255, 255, 255, 0.14); }
+.toc li { border-bottom: 1px solid rgba(255, 255, 255, 0.14); }
+.toc a { display: flex; justify-content: space-between; gap: 16px; padding: 11px 2px; color: #d6d7dc; transition: color 0.2s, padding 0.2s; }
+.toc a:hover { color: #fff; padding-left: 8px; }
+.toc span:last-child { color: #6f727b; }
+
+.stage { position: relative; z-index: 2; max-width: 1240px; margin: 64px auto 0; padding: 0 28px; perspective: 1600px; }
+.stageShot { transform: rotateX(18deg) scale(0.96); transform-origin: 50% 100%; border: 1px solid rgba(255, 255, 255, 0.12); background: #0b0c10; padding: 8px; box-shadow: 0 -20px 120px -10px rgba(255, 59, 78, 0.35), 0 60px 120px -40px rgba(0, 0, 0, 0.9); animation: rise 1.6s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.stageShot img { display: block; width: 100%; height: auto; }
+@keyframes rise { from { opacity: 0; transform: rotateX(32deg) translateY(80px) scale(0.92); } }
+.horizon { position: absolute; z-index: 1; left: 50%; bottom: -1180px; width: 2600px; height: 1400px; transform: translateX(-50%); border-radius: 50%; background: radial-gradient(closest-side, #e7e7e3 93%, #c9c9c6 99%, transparent 100%); box-shadow: 0 -6px 40px 6px rgba(255, 59, 78, 0.55), 0 -40px 160px 40px rgba(255, 59, 78, 0.2); }
+.heroBottom { position: relative; z-index: 3; height: 140px; }
+
+/* ── Números ── */
+.stats { display: grid; grid-template-columns: repeat(3, 1fr); margin: 0; padding: 0; list-style: none; border-top: 1px solid rgba(18, 19, 24, 0.18); border-left: 1px solid rgba(18, 19, 24, 0.18); }
+.stats li { padding: 28px 24px; border-right: 1px solid rgba(18, 19, 24, 0.18); border-bottom: 1px solid rgba(18, 19, 24, 0.18); }
+.stats b { display: block; font-size: clamp(40px, 5vw, 64px); font-weight: 400; line-height: 1; letter-spacing: -0.04em; font-variant-numeric: tabular-nums; }
+.stats span { display: block; margin-top: 10px; color: #4f5158; }
+
+/* ── Capítulos ── */
+.chapter { display: grid; grid-template-columns: 0.85fr 1.15fr; gap: 64px; align-items: center; }
+.reverse > :first-child { order: 2; }
+.points { margin: 28px 0 0; padding: 0; list-style: none; border-top: 1px solid rgba(18, 19, 24, 0.18); }
+.points li { display: grid; grid-template-columns: 40px 1fr; gap: 8px; padding: 12px 0; border-bottom: 1px solid rgba(18, 19, 24, 0.18); font-size: 15px; }
+.points li > span { color: #d61f35; padding-top: 3px; }
+.dark .points, .dark .points li { border-color: rgba(255, 255, 255, 0.14); }
+.dark .points li > span { color: #ff8490; }
+.deptDot { display: inline-block; width: 12px; height: 12px; margin-right: 12px; border-radius: 50%; vertical-align: 0.12em; }
+
+.funnel { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.funnel li { display: flex; justify-content: space-between; align-items: center; height: 54px; padding: 0 20px; background: #121318; color: #f2f2ee; transition: transform 0.2s; }
+.funnel li:hover { transform: translateX(6px); }
+.funnel li span:last-child { color: #8d9099; }
+
+/* ── Segurança ── */
+.secGrid { display: grid; grid-template-columns: repeat(3, 1fr); margin: 48px 0 0; padding: 0; list-style: none; border-top: 1px solid rgba(255, 255, 255, 0.14); border-left: 1px solid rgba(255, 255, 255, 0.14); }
+.secGrid li { padding: 26px; border-right: 1px solid rgba(255, 255, 255, 0.14); border-bottom: 1px solid rgba(255, 255, 255, 0.14); }
+.secGrid h3 { margin: 12px 0 6px; font-size: 19px; font-weight: 500; letter-spacing: -0.01em; }
+.secGrid p { margin: 0; color: #a3a5ad; font-size: 14px; }
+.secGrid .mono { color: #6f727b; }
+
+/* ── Roadmap ── */
+.track { position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 0; margin: 56px 0 0; padding: 0; list-style: none; }
+.track::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 1px; background: rgba(18, 19, 24, 0.3); }
+.stop { position: relative; padding: 30px 28px 0 0; }
+.stop::before { content: ""; position: absolute; left: 0; top: 0; width: 15px; height: 15px; border-radius: 50%; background: #d9d9d6; border: 1px solid #121318; }
+.stopNow::before { background: #121318; }
+.stopLaunch::before { background: #d61f35; border-color: #d61f35; box-shadow: 0 0 0 6px rgba(214, 31, 53, 0.18); }
+.stop h3 { margin: 10px 0 14px; font-size: 26px; font-weight: 500; letter-spacing: -0.02em; }
+.stop ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 8px; font-size: 14px; color: #3d3f46; }
+.stop li::before { content: "— "; color: #9a9b9f; }
+
+
+.ctaBox { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
+
+@media (max-width: 960px) {
+  .heroInner, .chapter, .track { grid-template-columns: 1fr; }
+  .reverse > :first-child { order: 0; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .secGrid { grid-template-columns: 1fr 1fr; }
+  .track::before { display: none; }
+  .stop { padding: 26px 0 24px; border-top: 1px solid rgba(18, 19, 24, 0.3); }
+  .stop::before { top: -8px; }
+  .heroInner { padding: 40px 18px 0; }
+  .stage { padding: 0 12px; margin-top: 40px; }
+  .heroBottom { height: 80px; }
+}
+@media (max-width: 560px) {
+  .stats, .secGrid { grid-template-columns: 1fr; }
+  .stageShot { transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stageShot { animation: none; }
+  .toc a, .funnel li { transition: none; }
+  .funnel li:hover { transform: none; }
+}

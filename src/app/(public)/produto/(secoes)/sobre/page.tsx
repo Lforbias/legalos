@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PHASES_2, PHASES_3, RELEASES } from "@/lib/updates";
+import { PRICING_RELEASE_IDS, pricingIsPublic } from "@/lib/public-pricing";
 import { CtaLink, SectionTitle } from "../../_parts";
 import { Reveal } from "../../showcase-client";
 import { FounderCards } from "../fundadores/founder-cards";
@@ -39,7 +40,7 @@ export default function Sobre() {
         <div className="mx-auto max-w-4xl px-4">
           <SectionTitle eyebrow="Evolução" title="O que já foi entregue" />
           <ol className="mt-12 space-y-10 border-l border-border pl-8">
-            {RELEASES.map((r, i) => (
+            {RELEASES.filter((r) => pricingIsPublic() || !(PRICING_RELEASE_IDS as readonly string[]).includes(r.id)).map((r, i) => (
               <Reveal key={r.id} delay={i * 60}>
                 <li className="relative">
                   <span className="absolute -left-[2.45rem] top-1.5 h-3 w-3 rounded-full border-2 border-primary bg-bg" aria-hidden />

@@ -4,6 +4,7 @@ import { Brand } from "@/components/layout/brand";
 import { viewer } from "@/server/audience/auth";
 import { publicUrl } from "@/lib/audience/policy";
 import "./audience.css";
+import { pricingIsPublic } from "@/lib/public-pricing";
 export const metadata: Metadata = {
   title: {
     default: "LegalOS — conteúdo e ferramentas",
@@ -28,6 +29,7 @@ export default async function Layout({
   children: React.ReactNode;
 }) {
   const m = await viewer();
+  const links = nav.filter(([href]) => href !== "/produto/precos" || pricingIsPublic());
   return (
     <div className="audience force-light">
       <header className="aud-head force-dark">
@@ -36,7 +38,7 @@ export default async function Layout({
             <Brand />
           </Link>
           <nav aria-label="Principal" className="aud-nav">
-            {nav.map(([href, label]) => (
+            {links.map(([href, label]) => (
               <Link key={href} href={href}>
                 {label}
               </Link>
@@ -66,7 +68,7 @@ export default async function Layout({
           </div>
           <div>
             <b>Explorar</b>
-            {nav.slice(2, 6).map(([href, label]) => (
+            {links.slice(2, 6).map(([href, label]) => (
               <Link href={href} key={href}>
                 {label}
               </Link>

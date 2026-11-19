@@ -43,6 +43,10 @@ export function greetingFor(hour: number): string {
   return hour < 5 ? "Boa noite" : hour < 12 ? "Bom dia" : hour < 18 ? "Boa tarde" : "Boa noite";
 }
 
+const TITLES = /^(dr|dra|sr|sra|srta|prof|profa)\.?$/i;
+
+/** Primeiro nome, sem pronome de tratamento ("Dra. Helena Albuquerque" → "Helena"). */
 export function firstName(name: string | null | undefined): string {
-  return (name ?? "").trim().split(/\s+/)[0] ?? "";
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  return parts.find((p) => !TITLES.test(p)) ?? parts[0] ?? "";
 }
