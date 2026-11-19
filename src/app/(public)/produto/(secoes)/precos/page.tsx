@@ -5,6 +5,8 @@ import { ArrowDown, ArrowRight, Check, ExternalLink, Minus } from "lucide-react"
 import { Brand } from "@/components/layout/brand";
 import { COMPETITORS, COMPARISON_LABELS, COMPARISON_ROWS, LEGALOS_PLANS, PRICING_CHECKED_AT, formatBRL, publishedPlanAverage, type ComparisonCell } from "@/config/pricing";
 import { PRICING_FEATURES } from "@/config/pricing-features";
+import { notFound } from "next/navigation";
+import { pricingIsPublic } from "@/lib/public-pricing";
 import { SectionTitle } from "../../_parts";
 import { FeatureCatalogue } from "./feature-catalogue";
 
@@ -20,6 +22,7 @@ function Status({ value }: { value: ComparisonCell }) {
 }
 
 export default function PricingPage() {
+  if (!pricingIsPublic()) notFound();
   const featureCount = PRICING_FEATURES.reduce((sum, g) => sum + g.features.length, 0);
   return <>
     <section className="force-dark relative overflow-hidden bg-[#0a0c13] text-white">

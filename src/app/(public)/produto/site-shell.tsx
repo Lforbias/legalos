@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Menu } from "lucide-react";
 import { Brand } from "@/components/layout/brand";
 import { registrationMode } from "@/lib/security/registration";
+import { pricingIsPublic } from "@/lib/public-pricing";
 import { cn } from "@/lib/utils";
 
 const NAV = [
@@ -23,6 +24,7 @@ export function canSignUp(): boolean {
 
 export function SiteShell({ children, dark = false }: { children: React.ReactNode; dark?: boolean }) {
   const signUp = canSignUp();
+  const nav = NAV.filter((n) => n.href !== "/produto/precos" || pricingIsPublic());
   return (
     <div className={cn("min-h-dvh", dark ? "force-dark bg-[#08090b] text-[#f5f5f7]" : "bg-bg text-fg")}>
       <a href="#conteudo" className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-lg focus:bg-surface focus:px-4 focus:py-2">Pular para o conteúdo</a>
@@ -32,7 +34,7 @@ export function SiteShell({ children, dark = false }: { children: React.ReactNod
             <Brand />
           </Link>
           <nav className="hidden items-center gap-7 md:flex" aria-label="Principal">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <Link key={n.href} href={n.href} className="text-[13px] font-medium text-muted transition hover:text-fg">{n.label}</Link>
             ))}
           </nav>
@@ -50,7 +52,7 @@ export function SiteShell({ children, dark = false }: { children: React.ReactNod
                 <Menu size={22} aria-hidden />
               </summary>
               <nav className="absolute inset-x-0 top-16 border-b border-border bg-bg p-6 shadow-xl" aria-label="Navegação móvel">
-                {NAV.map((n) => (
+                {nav.map((n) => (
                   <Link key={n.href} href={n.href} className="block py-3 text-lg text-muted hover:text-fg">{n.label}</Link>
                 ))}
                 <Link href="/login" className="mt-2 block py-3 text-lg font-medium">Acessar o sistema</Link>
