@@ -1,204 +1,144 @@
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element -- logos SVG e a tela do produto já otimizada; sem processamento de imagem. */
 import Link from "next/link";
-import { ArrowRight, Bot, MessageCircle, MessagesSquare } from "lucide-react";
-import { HONESTY, INTEGRATIONS, PWA, RUTE_INFO } from "@/config/showcase";
-import { COWORK_AREA, OFFICE_AREAS, areaInfo, areaItemLabels } from "@/config/office-map";
-import { CtaLink, Eyebrow, SectionTitle, contact } from "./_parts";
-import { Reveal } from "./showcase-client";
-import { SiteShell, canSignUp } from "./site-shell";
+import { OFFICE_AREAS, areaInfo } from "@/config/office-map";
+import { LAUNCH_AT, LAUNCH_LABEL, launchCountdown } from "@/lib/launch";
+import { Countdown } from "@/modules/launch/countdown";
+import { InterestForm } from "@/modules/launch/interest-form";
+import { contact } from "./_parts";
+import { canSignUp } from "./site-shell";
+import s from "./landing.module.css";
 
 export const dynamic = "force-dynamic";
 
-const dept = (color: string) => ({ "--dept": color }) as React.CSSProperties;
+const LETTERS = ["L", "E", "G", "A", "L", "O", "S"];
 
-const NEWS = [
-  {
-    id: "cowork", icon: MessagesSquare, color: COWORK_AREA.color, title: "LegalOS Cowork",
-    text: "Canais e conversas da equipe em tempo real, uma sala para cada processo e reuniões internas, sem misturar com o WhatsApp dos clientes.",
-    items: ["Canais, grupos e conversas diretas", "Sala do processo, respeitando o sigilo", "Mensagem vira tarefa sem copiar e colar"],
-  },
-  {
-    id: "rute", icon: Bot, color: RUTE_INFO.tone, title: "RUTE, a IA do escritório",
-    text: "Consulta o sistema com as permissões de quem pergunta e mostra de onde tirou cada resposta. O que ela propõe só vale depois que uma pessoa aprova.",
-    items: ["Funciona com Claude, ChatGPT ou Gemini", "Propostas revisadas por uma pessoa", "Limites de uso e relatório de LGPD"],
-  },
-  {
-    id: "chat", icon: MessageCircle, color: "#10b981", title: "Atendimento por WhatsApp e e-mail",
-    text: "Fila, etiquetas e respostas rápidas, com o cliente, o processo e o financeiro ao lado da conversa.",
-    items: ["API oficial da Meta ou conexão por QR-Code", "Nada é enviado sem autorização", "Campanhas com aprovação e agendamento"],
-  },
-] as const;
+const NOTES = [
+  { when: "08:02 · Minha Mesa", text: "Você tem 3 prazos nesta semana. O de quinta ainda não foi conferido." },
+  { when: "10:30 · Atendimento", text: "A cliente perguntou do processo. O último andamento foi ontem." },
+  { when: "16:45 · Cowork", text: "Reunião da equipe às 17h, na sala do processo." },
+];
 
-export default function ProdutoHome() {
+export default function LaunchLanding() {
+  const now = new Date().getTime();
+  const launched = launchCountdown(new Date(now), LAUNCH_AT).done;
   const signUp = canSignUp();
+  const wa = contact().whatsapp;
+
   return (
-    <SiteShell>
-      {/* HERO: o mapa do escritório */}
-      <section className="relative overflow-hidden" aria-labelledby="home-title">
-        <div className="prod-grid-bg pointer-events-none absolute inset-0" aria-hidden />
-        <div className="relative mx-auto grid max-w-7xl items-center gap-12 px-4 pb-14 pt-28 md:pt-36 lg:grid-cols-[1.05fr_.95fr]">
-          <div className="prod-hero-in">
-            <span className="inline-flex items-center gap-2 rounded-full border border-border bg-surface/70 px-4 py-1.5 text-xs text-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden /> LegalOS Evolution · organizado por departamentos
-            </span>
-            <h1 id="home-title" className="mt-6 text-[40px] font-semibold leading-[1.03] tracking-[-0.035em] sm:text-5xl md:text-[64px]">
-              Cada área do escritório <span className="text-primary-text">no seu lugar.</span> Todas conversando.
-            </h1>
-            <p className="mt-6 max-w-xl text-lg text-muted">
-              Jurídico, Atendimento, Comercial, Financeiro e Gestão num só sistema, com a mesa de trabalho de cada pessoa, o Cowork da equipe e a RUTE ajudando no dia a dia.
-            </p>
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <CtaLink variant="primary" />
-              {signUp ? <Link href="/register" className="inline-flex h-11 items-center gap-2 rounded-full border border-border-strong px-6 text-sm font-semibold transition hover:bg-surface-2" data-testid="home-criar-conta">Criar conta</Link> : null}
-              <a href="#departamentos" className="inline-flex h-11 items-center gap-2 px-3 text-sm font-medium text-muted underline underline-offset-4 transition hover:text-fg">Ver os departamentos</a>
-            </div>
-            {contact().available ? <p className="mt-4 text-sm text-muted">Já usa o LegalOS? <Link href="/login" className="font-semibold text-fg underline underline-offset-4">Entrar</Link></p> : null}
+    <div className={s.page}>
+      <div className={s.grain} aria-hidden="true" />
+      <a href="#interesse" className={s.srOnly}>Ir para o formulário de interesse</a>
+      <p className={`${s.bar} ${s.mono}`}>
+        {launched ? <strong>O LegalOS chegou</strong> : <><strong>Lançamento em {LAUNCH_LABEL}</strong> · Conheça o LegalOS no nosso estande</>}
+      </p>
+
+      <header className={s.hero}>
+        <nav className={s.nav} aria-label="Principal">
+          <div className={s.navLeft}>
+            <a className={`${s.mono} ${s.navLink}`} href="#produto">Produto</a>
+            <a className={`${s.mono} ${s.navLink}`} href="#departamentos">Departamentos</a>
+            <a className={`${s.mono} ${s.navLink}`} href="#interesse">Interesse</a>
           </div>
-
-          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3" aria-label="Departamentos do LegalOS" data-testid="home-mapa">
-            {OFFICE_AREAS.map((d, i) => {
-              const info = areaInfo(d);
-              const wide = d === "mesa" || d === "administracao";
-              return (
-                <li key={d} style={{ ...dept(info.color), animationDelay: `${i * 60}ms` }}
-                  className={`dept-tile dept-pop flex min-h-[120px] flex-col justify-between gap-3 rounded-[22px] border border-border bg-surface p-4 sm:min-h-[132px] ${wide ? "dept-tile-strong col-span-2" : ""}`}>
-                  <span className={`dept-swatch h-7 w-7 ${d === "mesa" ? "rounded-full" : "rounded-[9px]"}`} aria-hidden />
-                  <span>
-                    <span className="block text-[15px] font-semibold">{info.name}</span>
-                    <span className="block text-xs text-muted">{info.summary}</span>
-                  </span>
-                </li>
-              );
-            })}
-            <li style={{ ...dept(COWORK_AREA.color), animationDelay: `${OFFICE_AREAS.length * 60}ms` }}
-              className="dept-tile dept-pop col-span-2 flex min-h-[120px] flex-col justify-between gap-3 rounded-[22px] border border-border bg-surface p-4 sm:col-span-1 sm:min-h-[132px]">
-              <span className="dept-swatch h-7 w-7 rounded-full" aria-hidden />
-              <span>
-                <span className="block text-[15px] font-semibold">{COWORK_AREA.name}</span>
-                <span className="block text-xs text-muted">A equipe junta, dentro do sistema.</span>
-              </span>
-            </li>
-          </ul>
-        </div>
-
-        <div className="relative mx-auto max-w-7xl px-4 pb-20">
-          <figure className="overflow-hidden rounded-[20px] border border-border bg-surface shadow-2xl shadow-black/20">
-            <div className="flex gap-1.5 border-b border-border px-4 py-2.5" aria-hidden>
-              <span className="h-2.5 w-2.5 rounded-full bg-border-strong" /><span className="h-2.5 w-2.5 rounded-full bg-border-strong" /><span className="h-2.5 w-2.5 rounded-full bg-border-strong" />
-            </div>
-            <Image src="/produto/lobby.webp" alt="Lobby do LegalOS com o resumo do dia e os departamentos do escritório" width={1440} height={900} priority unoptimized className="block h-auto w-full" />
-          </figure>
-          <p className="mt-3 text-center text-xs text-muted">Tela real do LegalOS com dados fictícios.</p>
-        </div>
-      </section>
-
-      {/* DEPARTAMENTOS */}
-      <section id="departamentos" className="scroll-mt-20 border-t border-border py-20 md:py-24">
-        <div className="mx-auto max-w-7xl px-4">
-          <SectionTitle eyebrow="Departamentos" title="O menu segue a rotina do escritório." text="Cada pessoa abre o departamento em que trabalha e encontra só o que precisa. O que é de outras áreas fica a um clique, sempre ligado ao cliente e ao processo." />
-          <div className="mt-12 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {OFFICE_AREAS.map((d, i) => {
-              const info = areaInfo(d);
-              return (
-                <Reveal key={d} delay={i * 60} className="h-full">
-                  <article className="h-full rounded-[18px] border border-t-[3px] border-border bg-surface p-6" style={{ borderTopColor: info.color }} data-testid={`home-area-${d}`}>
-                    <h3 className="text-lg font-semibold">{info.name}</h3>
-                    <p className="mt-1.5 text-sm text-muted">{info.summary}</p>
-                    <ul className="mt-4 flex flex-wrap gap-1.5" aria-label={`O que tem em ${info.name}`}>
-                      {areaItemLabels(d).map((label) => <li key={label} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-muted">{label}</li>)}
-                    </ul>
-                  </article>
-                </Reveal>
-              );
-            })}
+          <Link href="/produto" aria-label="LegalOS, página inicial"><img className={s.logo} src="/brand/legalos-horizontal-dark.svg" alt="LegalOS" width={96} height={24} /></Link>
+          <div className={s.navRight}>
+            <Link className={`${s.mono} ${s.navLink} ${s.navAccent}`} href="/login" data-testid="site-entrar">Entrar</Link>
+            {signUp ? <Link className={`${s.mono} ${s.navLink}`} href="/register" data-testid="site-criar-conta">Criar conta</Link> : null}
           </div>
-        </div>
-      </section>
+        </nav>
 
-      {/* NOVIDADES: Cowork, RUTE e Atendimento */}
-      <section className="border-t border-border py-20 md:py-24">
-        <div className="mx-auto max-w-7xl px-4">
-          <SectionTitle eyebrow="Novidades" title="Equipe junta, IA com supervisão." />
-          <div className="mt-12 grid gap-4 md:grid-cols-3">
-            {NEWS.map((n, i) => (
-              <Reveal key={n.id} delay={i * 80} className="h-full">
-                <article id={n.id} style={dept(n.color)} className="dept-tile h-full scroll-mt-24 rounded-[22px] border border-border bg-surface p-7" data-testid={`home-${n.id}`}>
-                  <span className="dept-swatch inline-flex h-10 w-10 items-center justify-center rounded-xl text-white" aria-hidden><n.icon className="h-5 w-5" /></span>
-                  <h3 className="mt-5 text-xl font-semibold">{n.title}</h3>
-                  <p className="mt-2 text-sm text-muted">{n.text}</p>
-                  <ul className="mt-5 space-y-2 text-sm">
-                    {n.items.map((it) => <li key={it} className="flex items-center gap-2"><span className="dept-swatch h-1.5 w-1.5 shrink-0 rounded-full" aria-hidden />{it}</li>)}
-                  </ul>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-          <p className="mt-6 text-sm text-muted">A RUTE e as automações nascem desligadas em cada escritório e só funcionam depois que a administração configura e autoriza.</p>
+        <div className={s.word} aria-hidden="true">
+          {LETTERS.map((l, i) => <span key={i} style={{ animationDelay: `${i * 80}ms` }}>{l}</span>)}
         </div>
-      </section>
+        <div className={s.planet} aria-hidden="true" />
+        <div className={s.mark} aria-hidden="true"><i className={s.block} /><i className={`${s.block} ${s.dot}`} /><i className={s.block} /><i className={s.block} /></div>
 
-      {/* PRINCÍPIOS */}
-      <section className="border-t border-border bg-surface/60 py-20 md:py-24">
-        <div className="mx-auto max-w-7xl px-4">
-          <SectionTitle eyebrow="Princípios" title="Honesto. Privado. Sob o seu controle." />
-          <div className="mt-12 grid gap-4 md:grid-cols-3">
-            {HONESTY.map((h, i) => (
-              <Reveal key={h.title} delay={i * 80} className="h-full">
-                <article className="h-full rounded-[22px] border border-border bg-bg p-7">
-                  <h3 className="text-lg font-semibold">{h.title}</h3>
-                  <p className="mt-2 text-sm text-muted">{h.text}</p>
-                </article>
-              </Reveal>
-            ))}
-          </div>
-          <p className="mt-8"><Link href="/produto/seguranca" className="inline-flex items-center gap-2 text-sm font-semibold text-primary-text hover:underline">Como protegemos os dados do escritório <ArrowRight className="h-4 w-4" aria-hidden /></Link></p>
-        </div>
-      </section>
-
-      {/* CELULAR E INTEGRAÇÕES */}
-      <section className="border-t border-border py-20 md:py-24">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 lg:grid-cols-2">
-          <div data-testid="produto-pwa">
-            <SectionTitle eyebrow="Aplicativo" title={PWA.title} text={PWA.text} />
-            <ul className="mt-8 grid gap-3 sm:grid-cols-2">
-              {PWA.points.map((p) => (
-                <li key={p.title} className="rounded-2xl border border-border bg-surface p-5">
-                  <h3 className="font-semibold">{p.title}</h3>
-                  <p className="mt-1 text-sm text-muted">{p.text}</p>
-                </li>
-              ))}
-            </ul>
-          </div>
+        <div className={s.heroFoot}>
           <div>
-            <SectionTitle eyebrow="Conecta com o que você já usa" title="Integrações" />
-            <ul className="mt-8 flex flex-wrap gap-2.5" aria-label="Integrações">
-              {INTEGRATIONS.map((x) => (
-                <li key={x.name} className="rounded-full border border-border bg-surface px-5 py-2.5 text-sm font-medium">
-                  {x.name}{x.note ? <span className="ml-2 text-xs font-normal text-muted">({x.note})</span> : null}
-                </li>
-              ))}
+            <h1 className={s.heroTitle}>O sistema operacional do escritório de advocacia</h1>
+            <ul className={`${s.chips} ${s.mono}`} aria-label="Destaques">
+              <li className={s.chip}>Por departamentos</li>
+              <li className={s.chip}>RUTE · IA supervisionada</li>
+              <li className={s.chip}>Cowork da equipe</li>
+              <li className={s.chip}>WhatsApp integrado</li>
             </ul>
-            <p className="mt-8 flex flex-wrap gap-x-6 gap-y-2 text-sm">
-              <Link href="/produto/recursos" className="font-semibold text-primary-text hover:underline">Todos os recursos →</Link>
-              <Link href="/produto/roadmap" className="font-semibold text-primary-text hover:underline">O que vem por aí →</Link>
-            </p>
+          </div>
+          <div className={s.cta}>
+            <p className={`${s.tag} ${s.mono}`}>{launched ? "Disponível agora" : "Lista de interesse aberta"}</p>
+            {launched ? null : <><p className={s.srOnly}>Lançamento em 5 de janeiro de 2027.</p><Countdown className={`${s.count} ${s.mono}`} initialNow={now} /></>}
+            <a className={`${s.btn} ${s.btnRed}`} href="#interesse" data-testid="cta-interesse">Registrar interesse →</a>
+            {wa ? <a className={`${s.btn} ${s.btnLine}`} href={wa} target="_blank" rel="noopener noreferrer" data-testid="cta-whatsapp">Falar no WhatsApp</a> : null}
           </div>
         </div>
-      </section>
+      </header>
 
-      {/* CONVITE FINAL */}
-      <section className="relative overflow-hidden border-t border-border" aria-labelledby="home-cta">
-        <div className="prod-glow pointer-events-none absolute left-1/2 top-0 h-[300px] w-[680px] max-w-full -translate-x-1/2 rounded-full bg-primary/20 blur-[110px]" aria-hidden />
-        <div className="relative mx-auto max-w-3xl px-4 py-24 text-center">
-          <Eyebrow>Vamos conversar</Eyebrow>
-          <h2 id="home-cta" className="mt-4 text-4xl font-semibold leading-[1.06] tracking-tight md:text-6xl">Veja o LegalOS no seu escritório.</h2>
-          <p className="mx-auto mt-5 max-w-xl text-lg text-muted">Mostramos o sistema funcionando, com dados de demonstração, e respondemos o que for preciso.</p>
-          <div className="mt-9 flex flex-wrap justify-center gap-3">
-            <CtaLink variant="primary" />
-            <Link href="/produto/contato" className="inline-flex h-11 items-center rounded-full border border-border-strong px-6 text-sm font-semibold transition hover:bg-surface-2">Outras formas de contato</Link>
+      <main>
+        <section id="produto" className={s.section} aria-labelledby="produto-titulo">
+          <div className={`${s.wrap} ${s.split}`}>
+            <div>
+              <p className={`${s.kicker} ${s.mono}`}>01 / Produto</p>
+              <h2 id="produto-titulo" className={s.h2}>Cada área no seu lugar. Todas conversando.</h2>
+              <p className={s.lead}>Processos, prazos, atendimento por WhatsApp, CRM, financeiro e a equipe num só sistema, organizado do jeito que o escritório trabalha.</p>
+              <p style={{ marginTop: 28 }}><a className={`${s.btn} ${s.btnRed}`} href="#interesse">Quero conhecer →</a></p>
+            </div>
+            <figure style={{ margin: 0 }}>
+              <div className={s.frame}><img src="/produto/lobby.webp" alt="Lobby do LegalOS com o resumo do dia e os departamentos do escritório" width={1440} height={900} loading="lazy" /></div>
+              <figcaption className={`${s.caption} ${s.mono}`}>Tela real · dados fictícios</figcaption>
+            </figure>
           </div>
-        </div>
-      </section>
-    </SiteShell>
+        </section>
+
+        <section id="departamentos" className={s.section} aria-labelledby="dep-titulo">
+          <div className={s.wrap}>
+            <p className={`${s.kicker} ${s.mono}`}>02 / Departamentos</p>
+            <h2 id="dep-titulo" className={s.h2}>O menu segue a rotina do escritório.</h2>
+            <ul className={s.grid}>
+              {OFFICE_AREAS.map((d) => {
+                const info = areaInfo(d);
+                return (
+                  <li key={d} className={s.cell} data-testid={`home-area-${d}`}>
+                    <span className={s.swatch} style={{ background: info.color }} aria-hidden="true" />
+                    <div><h3>{info.name}</h3><p>{info.summary}</p></div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+
+        <section className={`${s.section} ${s.dark}`} aria-labelledby="rute-titulo" data-testid="home-rute">
+          <div className={s.wrap}>
+            <p className={`${s.kicker} ${s.mono}`}>03 / Inteligência</p>
+            <h2 id="rute-titulo" className={s.h2}>A RUTE propõe.<br />Uma pessoa decide.</h2>
+            <p className={s.lead}>A IA do escritório consulta o sistema com as permissões de quem pergunta e mostra de onde tirou cada resposta. Nada é criado ou enviado sem confirmação.</p>
+            <ul className={s.notes} aria-label="Exemplos ilustrativos">
+              {NOTES.map((n) => <li key={n.when} className={s.note}><span className={s.mono}>{n.when}</span><p>{n.text}</p></li>)}
+            </ul>
+            <p className={s.fine}>Exemplos ilustrativos. A RUTE nasce desligada em cada escritório e só funciona depois que a administração configura e autoriza.</p>
+          </div>
+        </section>
+
+        <section id="interesse" className={s.section} aria-labelledby="interesse-titulo">
+          <div className={`${s.wrap} ${s.split}`} style={{ alignItems: "start" }}>
+            <div>
+              <p className={`${s.kicker} ${s.mono}`}>04 / Lançamento · {LAUNCH_LABEL}</p>
+              <h2 id="interesse-titulo" className={s.h2}>Seja um dos primeiros escritórios.</h2>
+              <p className={s.lead}>Deixe seu contato e o nosso comercial fala com você antes do lançamento, com uma demonstração no seu escritório.</p>
+            </div>
+            <InterestForm s={{ form: s.form, row: s.row, field: s.field, input: s.input, error: s.error, consent: s.consent, trap: s.trap, btn: s.btn, btnRed: s.btnRed, done: s.done, mono: s.mono }} />
+          </div>
+        </section>
+      </main>
+
+      <footer className={`${s.footer} ${s.mono}`}>
+        <img className={s.logo} src="/brand/legalos-horizontal-light.svg" alt="LegalOS" width={88} height={22} style={{ height: 22 }} />
+        <nav aria-label="Rodapé">
+          <Link href="/login">Entrar</Link>
+          {signUp ? <Link href="/register">Criar conta</Link> : null}
+          <Link href="/produto/seguranca">Segurança</Link>
+          <Link href="/produto/contato">Contato</Link>
+        </nav>
+        <span>© {new Date().getFullYear()} LegalOS</span>
+      </footer>
+    </div>
   );
 }

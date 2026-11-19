@@ -17,6 +17,7 @@ import { mergeStageNumbers, OPEN_STAGES, STAGE_KEYS, type StageKey } from "@/lib
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { isValidCnpj, normalizeCnpj } from "@/lib/validation/br-documents";
 import type { RequestMeta } from "@/server/context";
+import { INTEREST_TAG } from "@/lib/launch";
 import { audit } from "./audit.service";
 
 export type ComRole = "GERENTE" | "VENDEDOR";
@@ -76,7 +77,7 @@ export async function saveSettings(cx: ComCtx, input: { probabilities: Partial<R
 }
 
 // ───────────────────────── Prospects ─────────────────────────
-export type ProspectFilters = { q?: string; stage?: StageKey; ownerId?: string; top?: boolean; noCoords?: boolean; overdue?: boolean; page?: number; pageSize?: number };
+export type ProspectFilters = { q?: string; stage?: StageKey; ownerId?: string; top?: boolean; noCoords?: boolean; overdue?: boolean; interest?: boolean; page?: number; pageSize?: number };
 
 function whereFrom(f: ProspectFilters): Prisma.ComProspectWhereInput {
   const w: Prisma.ComProspectWhereInput = { deletedAt: null };
@@ -94,6 +95,7 @@ function whereFrom(f: ProspectFilters): Prisma.ComProspectWhereInput {
   if (f.ownerId) w.ownerId = f.ownerId === "none" ? null : f.ownerId;
   if (f.top) w.rankingPosition = { not: null };
   if (f.noCoords) w.lat = null;
+  if (f.interest) w.tags = { has: INTEREST_TAG };
   if (f.overdue) {
     w.nextActionAt = { lt: new Date() };
     w.stage = { in: OPEN_STAGES };
@@ -113,7 +115,7 @@ export async function listProspects(_cx: ComCtx, f: ProspectFilters = {}) {
       orderBy: [{ rankingPosition: { sort: "asc", nulls: "last" } }, { name: "asc" }],
       skip: (page - 1) * pageSize,
       take: pageSize,
-      select: { id: true, name: true, cnpj: true, phone: true, email: true, district: true, stage: true, rankingPosition: true, ownerId: true, expectedMonthlyCents: true, nextActionAt: true, lat: true, doNotContact: true },
+      select: { id: true, name: true, cnpj: true, phone: true, email: true, district: true, stage: true, rankingPosition: true, ownerId: true, expectedMonthlyCents: true, nextActionAt: true, lat: true, doNotContact: true, tags: true },
     }),
   ]);
   return { total, page, pageSize, rows };
