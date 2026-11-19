@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE } from "@/lib/auth/cookie";
 import { BOX_AVAILABLE, BOX_UNAVAILABLE_MESSAGE, isBoxPath } from "@/lib/box-retirement";
 import { liveKitCspOrigins } from "@/server/cowork/livekit";
+import { THEME_SCRIPT_CSP_HASH } from "@/lib/theme-script";
 
 // /api/cron e /api/v1 não usam cookie de sessão: autenticam por conta própria (segredo do agendador / chave de API).
 const PUBLIC_PREFIXES = ["/blog", "/ferramentas", "/comunidade", "/acesso", "/minha-conta", "/transparencia", "/sair-das-novidades", "/api/audience", "/sitemap.xml", "/robots.txt", "/brand", "/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook", "/api/cowork/livekit/webhook"];
@@ -13,11 +14,11 @@ const PUBLIC_PREFIXES = ["/blog", "/ferramentas", "/comunidade", "/acesso", "/mi
  */
 const isProd = process.env.NODE_ENV === "production";
 
-/** CSP com nonce por requisição (o Next aplica o nonce aos próprios scripts). Sem scripts de terceiros. */
+/** CSP com nonce por requisição (o Next aplica o nonce aos próprios scripts) e o hash do script de tema. Sem scripts de terceiros. */
 function buildCsp(nonce: string): string {
   return [
     "default-src 'self'",
-    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${isProd ? "" : " 'unsafe-eval'"}`,
+    `script-src 'self' 'nonce-${nonce}' ${THEME_SCRIPT_CSP_HASH} 'strict-dynamic'${isProd ? "" : " 'unsafe-eval'"}`,
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https://tile.openstreetmap.org",
     "font-src 'self' data:",

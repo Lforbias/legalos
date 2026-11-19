@@ -220,6 +220,42 @@ textarea { font: inherit; }
   .prod-reveal { opacity: 1; transform: none; transition: none; }
 }
 
+/* ───── Mapa do escritório: departamentos com a cor de cada área (site público e Lobby) ───── */
+.dept-tile {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+.dept-tile::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  right: -36px;
+  top: -36px;
+  width: 132px;
+  height: 132px;
+  border-radius: 9999px;
+  background: var(--dept);
+  opacity: 0.13;
+  filter: blur(30px);
+  transition: opacity 0.2s ease;
+}
+a.dept-tile:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--dept) 55%, var(--border)); }
+a.dept-tile:hover::before { opacity: 0.3; }
+.dept-tile-strong { background: linear-gradient(135deg, color-mix(in srgb, var(--dept) 22%, var(--surface)), var(--surface)); }
+.dept-swatch { background: var(--dept); }
+@keyframes dept-pop {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.dept-pop { animation: dept-pop 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+@media (prefers-reduced-motion: reduce) {
+  .dept-pop { animation: none; }
+  .dept-tile, .dept-tile::before { transition: none; }
+  a.dept-tile:hover { transform: none; }
+}
+
 /* Desktop is a separate, computer-first workspace. */
 @keyframes desktop-arrive {
   from { opacity: 0; transform: translateY(20px) scale(.985); filter: blur(5px); }

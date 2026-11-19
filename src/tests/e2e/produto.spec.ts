@@ -1,40 +1,60 @@
 import { expect, test } from "@playwright/test";
 
-test("site /produto: páginas públicas abrem sem login, imagens carregam e as abas de módulos funcionam", async ({ page }) => {
+test("site /produto: página inicial repaginada com os departamentos atuais, nos dois temas e no celular", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { level: 1, name: /Cada área do escritório/ })).toBeVisible();
   await page.goto("/produto");
   await expect(page).toHaveURL(/\/produto$/);
-  await expect(page.getByRole("heading", { level: 1, name: /O escritório inteiro/ })).toBeVisible();
-  await expect(page.getByText("Estas são telas reais do LegalOS, com dados de demonstração. Nenhum cliente real aparece aqui.")).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Cada área do escritório/ })).toBeVisible();
 
-  // futuro: deixa claro que ainda não existe
-  const ai = page.getByTestId("future-ai");
-  await expect(ai).toContainText("RUTE");
-  await expect(ai).toContainText("Disponível");
-  await expect(ai).toContainText("Nasce desligada");
+  // caminhos para entrar e criar conta (o servidor de testes tem o cadastro aberto)
+  await expect(page.getByTestId("site-entrar")).toHaveAttribute("href", "/login");
+  await expect(page.getByTestId("site-criar-conta")).toHaveAttribute("href", "/register");
+  await expect(page.getByTestId("home-criar-conta")).toHaveAttribute("href", "/register");
 
-  const desktop = page.getByTestId("produto-desktop");
-  await desktop.scrollIntoViewIfNeeded();
-  await expect(desktop.getByRole("img", { name: "LegalOS Desktop", exact: true }).filter({ visible: true })).toHaveCount(1);
-  await expect(desktop).toContainText("Uso exclusivo em computador");
-  await expect(desktop.getByRole("link", { name: "Conhecer o LegalOS Desktop" })).toHaveAttribute("href", "/produto/desktop");
+  // mapa: as seis áreas do menu Evolution e o Cowork
+  const map = page.getByTestId("home-mapa");
+  for (const name of ["Minha Mesa", "Jurídico", "Atendimento", "Comercial", "Financeiro & Contábil", "Administração & Gestão", "Cowork"]) {
+    await expect(map.getByText(name, { exact: true })).toBeVisible();
+  }
+  for (const slug of ["mesa", "juridico", "atendimento", "comercial", "financeiro", "administracao"]) await expect(page.getByTestId(`home-area-${slug}`)).toHaveCount(1);
+  await expect(page.getByTestId("home-cowork")).toContainText("LegalOS Cowork");
+  await expect(page.getByTestId("home-rute")).toContainText("uma pessoa aprova");
+  await expect(page.getByText("A RUTE e as automações nascem desligadas")).toBeVisible();
 
-  // seção do aplicativo (PWA): só o que existe; os avisos no celular são opcionais e sem dados de cliente
+  // nada da versão antiga
+  await expect(page.getByText(/LegalOS Func|LegalOS Box|Func e Chat/)).toHaveCount(0);
+
+  // a tela do produto é real e carrega
+  const shot = page.getByRole("img", { name: /Lobby do LegalOS/ });
+  await expect.poll(() => shot.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+
+  // aplicativo (PWA): só o que existe; os avisos no celular são opcionais e sem dados de cliente
   const pwa = page.getByTestId("produto-pwa");
   await expect(pwa).toContainText("No celular, como aplicativo");
-  await expect(pwa).toContainText("Instala em Android e iPhone");
   await expect(pwa).toContainText("Avisos de vencimento no celular");
   await expect(pwa).toContainText("nunca nome de cliente");
 
-  // vitrine de módulos: troca de aba muda o conteúdo e a imagem carrega
-  await page.getByRole("tab", { name: "Financeiro" }).scrollIntoViewIfNeeded();
-  await page.getByRole("tab", { name: "Financeiro" }).click();
-  await expect(page.getByRole("heading", { name: "Honorários e despesas sob controle" })).toBeVisible();
-  const img = page.getByRole("tabpanel").getByRole("img");
-  await expect(img).toBeVisible();
-  await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
-  await expect(page.getByRole("tab", { name: "Intimações" })).toHaveCount(0);
-  await page.getByRole("tab", { name: "LegalOS Chat" }).click();
-  await expect(page.getByRole("tab", { name: "LegalOS Chat" })).toHaveAttribute("aria-selected", "true");
+  // âncoras do menu
+  await page.getByRole("navigation", { name: "Principal" }).getByRole("link", { name: "Departamentos" }).click();
+  await expect(page).toHaveURL(/#departamentos$/);
+
+  // o tema salvo é aplicado antes da pintura (o script de tema é liberado pela CSP)
+  await page.evaluate(() => localStorage.setItem("lo-theme", "light"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.evaluate(() => localStorage.setItem("lo-theme", "dark"));
+  await page.reload();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+  }
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.locator("summary[aria-label=\"Abrir navegação\"]").click();
+  await expect(page.getByRole("navigation", { name: "Navegação móvel" }).getByRole("link", { name: "Acessar o sistema" })).toHaveAttribute("href", "/login");
+  await page.setViewportSize({ width: 1440, height: 900 });
 
   for (const [path, h1] of [["/produto/recursos", /Tudo o que o escritório/], ["/produto/roadmap", /Tudo o que temos/], ["/produto/seguranca", /Privado/], ["/produto/sobre", /Feito por quem/], ["/produto/contato", /Vamos/]] as const) {
     const res = await page.goto(path);

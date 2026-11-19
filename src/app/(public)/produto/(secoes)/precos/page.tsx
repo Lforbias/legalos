@@ -5,7 +5,7 @@ import { ArrowDown, ArrowRight, Check, ExternalLink, Minus } from "lucide-react"
 import { Brand } from "@/components/layout/brand";
 import { COMPETITORS, COMPARISON_LABELS, COMPARISON_ROWS, LEGALOS_PLANS, PRICING_CHECKED_AT, formatBRL, publishedPlanAverage, type ComparisonCell } from "@/config/pricing";
 import { PRICING_FEATURES } from "@/config/pricing-features";
-import { SectionTitle } from "../_parts";
+import { SectionTitle } from "../../_parts";
 import { FeatureCatalogue } from "./feature-catalogue";
 
 export const metadata: Metadata = {

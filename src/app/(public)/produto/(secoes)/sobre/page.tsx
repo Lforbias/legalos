@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { PHASES_2, PHASES_3, RELEASES } from "@/lib/updates";
-import { CtaLink, SectionTitle } from "../_parts";
-import { Reveal } from "../showcase-client";
+import { CtaLink, SectionTitle } from "../../_parts";
+import { Reveal } from "../../showcase-client";
 import { FounderCards } from "../fundadores/founder-cards";
 
 export const dynamic = "force-dynamic";

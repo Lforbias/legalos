@@ -1,124 +1,164 @@
 import Link from "next/link";
-import { ArrowRight, CalendarClock, CheckSquare, Clock, MessageCircle, Briefcase, Scale, Wallet } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { ArrowRight, Bot, Briefcase, CalendarClock, CheckSquare, Clock, FilePlus2, MessageCircle, MessagesSquare, UserPlus, Wallet } from "lucide-react";
 import { DEPARTMENTS, departmentItems, type Department } from "@/config/evolution-navigation";
-import { DepartmentHeader } from "@/components/evolution/department-header";
-import { StatCard } from "@/components/evolution/stat-card";
+import { COWORK_AREA } from "@/config/office-map";
 import { DataError } from "@/components/evolution/data-error";
+import { firstName, greetingFor } from "@/modules/auth/login-intro";
 import { requireTenant } from "@/server/session";
 import { can } from "@/server/context";
 import { getIndicators } from "@/server/services/insights.service";
+import { coworkUnreadTotal } from "@/server/services/cowork-channel.service";
+
+export const metadata = { title: "Meu Escritório" };
 
 const DEPT_ORDER: Department[] = ["juridico", "atendimento", "comercial", "financeiro", "administracao"];
+const dept = (color: string) => ({ "--dept": color }) as React.CSSProperties;
+
+function localNow(timeZone: string) {
+  const now = new Date();
+  const hour = Number(new Intl.DateTimeFormat("pt-BR", { hour: "numeric", hourCycle: "h23", timeZone }).format(now));
+  const date = new Intl.DateTimeFormat("pt-BR", { weekday: "long", day: "numeric", month: "long", timeZone }).format(now);
+  return { hour, date };
+}
+
+function Stat({ icon: Icon, label, value, href, alert = false, color }: { icon: LucideIcon; label: string; value: number; href: string; alert?: boolean; color: string }) {
+  return (
+    <Link href={href} style={dept(color)} className="dept-tile block rounded-2xl border border-border bg-surface p-4">
+      <span className="flex items-center justify-between gap-2 text-xs text-muted">
+        {label}
+        <Icon className="h-4 w-4 shrink-0" style={{ color }} aria-hidden />
+      </span>
+      <span className={`mt-1.5 block text-[28px] font-semibold tracking-[-0.035em] tabular-nums ${alert ? "text-danger" : ""}`}>{value}</span>
+    </Link>
+  );
+}
 
 export default async function EvolutionLobby() {
-  const { ctx } = await requireTenant();
+  const { ctx, session, organization } = await requireTenant();
   const [ind, indErr] = await getIndicators(ctx).then((r) => [r, false] as const).catch(() => [null, true] as const);
-  return (
-    <>
-      <DepartmentHeader
-        icon={DEPARTMENTS.lobby.icon}
-        color={DEPARTMENTS.lobby.color}
-        title="Meu Escritório"
-        description="Bem-vindo ao LegalOS Evolution. Escolha um departamento para começar."
-      />
+  const coworkOn = can(ctx, "cowork:read");
+  const unread = coworkOn ? await coworkUnreadTotal(ctx).catch(() => 0) : 0;
+  const { hour, date } = localNow(organization.timezone);
+  const name = firstName(session.user.name);
+  const mine = ind?.mine;
 
-      <section className="mb-8 rounded-xl border border-border bg-surface p-5" aria-labelledby="my-desk-heading">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 id="my-desk-heading" className="text-base font-semibold">Minha Mesa hoje</h2>
-            <p className="mt-1 text-sm text-muted">Resumo pessoal de tarefas e prazos atribuídos a você.</p>
-          </div>
-          <Link href="/evolution/mesa" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-            Abrir mesa <ArrowRight className="h-4 w-4" aria-hidden />
-          </Link>
+  const flows = [
+    can(ctx, "whatsapp:read") && can(ctx, "crm:write") ? { href: "/crm/novo", icon: MessageCircle, from: "atendimento" as Department, label: "Atendimento → Comercial", text: "Registrar uma oportunidade no CRM" } : null,
+    can(ctx, "crm:read") && can(ctx, "cases:write") ? { href: "/processos/novo", icon: Briefcase, from: "comercial" as Department, label: "Comercial → Jurídico", text: "Iniciar o cadastro de um processo" } : null,
+    can(ctx, "cases:read") && can(ctx, "finance:write") ? { href: "/financeiro/lancamentos/novo", icon: Wallet, from: "juridico" as Department, label: "Jurídico → Financeiro", text: "Registrar honorários ou despesas" } : null,
+  ].filter((f) => f !== null);
+
+  const shortcuts = [
+    can(ctx, "clients:write") ? { href: "/clientes/novo", icon: UserPlus, label: "Novo cliente" } : null,
+    can(ctx, "tasks:write") ? { href: "/tarefas/nova", icon: CheckSquare, label: "Nova tarefa" } : null,
+    can(ctx, "cases:write") ? { href: "/processos/novo", icon: FilePlus2, label: "Novo processo" } : null,
+    can(ctx, "ai:use") ? { href: "/ia", icon: Bot, label: "Perguntar à RUTE" } : null,
+  ].filter((s) => s !== null);
+
+  return (
+    <div className="mx-auto max-w-7xl">
+      <header className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-border/70 pb-6">
+        <div>
+          <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary-text">Meu Escritório</p>
+          <h1 className="mt-2 text-[28px] font-semibold tracking-[-0.035em] sm:text-[34px]">{greetingFor(hour)}{name ? `, ${name}` : ""}</h1>
+          <p className="mt-1 text-sm text-muted">{organization.name} · {date}</p>
         </div>
-        {indErr && <DataError message="Não foi possível carregar o resumo pessoal" />}
-        {!indErr && (
-          <div className="grid gap-3 sm:grid-cols-3">
-            {ind?.mine.tasksOpen != null && <StatCard icon={CheckSquare} label="Tarefas pendentes" value={ind.mine.tasksOpen} detail={ind.mine.tasksOverdue ? `${ind.mine.tasksOverdue} em atraso` : undefined} color="#6366f1" />}
-            {ind?.mine.deadlinesNext7 != null && <StatCard icon={CalendarClock} label="Prazos nos próximos 7 dias" value={ind.mine.deadlinesNext7} color="#f59e0b" />}
-            {ind?.mine.deadlinesOverdue != null && <StatCard icon={Clock} label="Prazos vencidos" value={ind.mine.deadlinesOverdue} color="#ef4444" />}
+        <Link href="/evolution/mesa" className="inline-flex h-10 items-center gap-2 rounded-full bg-primary px-5 text-sm font-semibold text-primary-fg transition hover:bg-primary-hover">
+          Abrir Minha Mesa <ArrowRight className="h-4 w-4" aria-hidden />
+        </Link>
+      </header>
+
+      <section aria-labelledby="lobby-today" className="mb-8">
+        <h2 id="lobby-today" className="sr-only">Minha Mesa hoje</h2>
+        {indErr ? <DataError message="Não foi possível carregar o resumo pessoal" /> : (
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {mine?.tasksOpen != null ? <Stat icon={CheckSquare} label="Minhas tarefas" value={mine.tasksOpen} href="/tarefas" color={DEPARTMENTS.mesa.color} /> : null}
+            {mine?.deadlinesNext7 != null ? <Stat icon={CalendarClock} label="Prazos em 7 dias" value={mine.deadlinesNext7} href="/prazos" color={DEPARTMENTS.comercial.color} /> : null}
+            {mine?.deadlinesOverdue != null ? <Stat icon={Clock} label="Prazos vencidos" value={mine.deadlinesOverdue} href="/prazos?atrasados=1" alert={mine.deadlinesOverdue > 0} color="#ef4444" /> : null}
+            {coworkOn ? <Stat icon={MessagesSquare} label="Cowork não lidas" value={unread} href={COWORK_AREA.href} color={COWORK_AREA.color} /> : null}
           </div>
         )}
       </section>
 
-      <section className="mb-8" aria-labelledby="department-flows-heading">
-        <div className="mb-3">
-          <h2 id="department-flows-heading" className="text-base font-semibold">Continue o fluxo entre áreas</h2>
-          <p className="mt-1 text-sm text-muted">Atalhos para registrar a próxima etapa nos módulos existentes.</p>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {can(ctx, "whatsapp:read") && can(ctx, "crm:write") && (
-            <Link href="/crm/novo" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
-              <MessageCircle className="h-5 w-5 text-muted" aria-hidden />
-              <div>
-                <p className="text-sm font-medium group-hover:text-primary">Atendimento → Comercial</p>
-                <p className="text-[12px] text-muted">Registrar uma oportunidade no CRM</p>
-              </div>
-              <ArrowRight className="ml-auto h-4 w-4 text-muted" aria-hidden />
-            </Link>
-          )}
-          {can(ctx, "crm:read") && can(ctx, "cases:write") && (
-            <Link href="/processos/novo" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
-              <Briefcase className="h-5 w-5 text-muted" aria-hidden />
-              <div>
-                <p className="text-sm font-medium group-hover:text-primary">Comercial → Jurídico</p>
-                <p className="text-[12px] text-muted">Iniciar o cadastro de um processo</p>
-              </div>
-              <ArrowRight className="ml-auto h-4 w-4 text-muted" aria-hidden />
-            </Link>
-          )}
-          {can(ctx, "cases:read") && can(ctx, "finance:write") && (
-            <Link href="/financeiro/lancamentos/novo" className="group flex items-center gap-3 rounded-xl border border-border bg-surface p-4 transition-shadow hover:shadow-md">
-              <Scale className="h-5 w-5 text-muted" aria-hidden />
-              <div>
-                <p className="text-sm font-medium group-hover:text-primary">Jurídico → Financeiro</p>
-                <p className="text-[12px] text-muted">Registrar honorários ou despesas</p>
-              </div>
-              <Wallet className="ml-auto h-4 w-4 text-muted" aria-hidden />
-            </Link>
-          )}
-        </div>
+      <section aria-labelledby="lobby-areas">
+        <h2 id="lobby-areas" className="mb-3 text-base font-semibold">Departamentos</h2>
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {DEPT_ORDER.map((d) => {
+            const info = DEPARTMENTS[d];
+            const Icon = info.icon;
+            const items = departmentItems(d).filter((n) => !n.permission || can(ctx, n.permission));
+            const week = d === "juridico" ? mine?.deadlinesNext7 ?? 0 : 0;
+            return (
+              <li key={d}>
+                <Link href={`/evolution/${d}`} style={dept(info.color)} className="dept-tile flex h-full flex-col rounded-[18px] border border-border bg-surface p-5" data-testid={`lobby-area-${d}`}>
+                  <span className="flex items-center gap-3">
+                    <span className="dept-swatch flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] text-white" aria-hidden><Icon className="h-[18px] w-[18px]" /></span>
+                    <span className="text-[15px] font-semibold">{info.name}</span>
+                    {week > 0 ? <span className="ml-auto text-xs text-muted">{week} {week === 1 ? "prazo" : "prazos"} na semana</span> : null}
+                  </span>
+                  <span className="mt-3 text-[13px] leading-relaxed text-muted">{info.summary}</span>
+                  {items.length > 0 ? (
+                    <span className="mt-3 flex flex-wrap gap-1.5">
+                      {items.slice(0, 4).map((item) => <span key={item.key} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-muted">{item.label}</span>)}
+                    </span>
+                  ) : null}
+                </Link>
+              </li>
+            );
+          })}
+          {coworkOn ? (
+            <li>
+              <Link href={COWORK_AREA.href} style={dept(COWORK_AREA.color)} className="dept-tile flex h-full flex-col rounded-[18px] border border-border bg-surface p-5" data-testid="lobby-area-cowork">
+                <span className="flex items-center gap-3">
+                  <span className="dept-swatch flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white" aria-hidden><MessagesSquare className="h-[18px] w-[18px]" /></span>
+                  <span className="text-[15px] font-semibold">{COWORK_AREA.name}</span>
+                  {unread > 0 ? <span className="ml-auto text-xs text-muted">{unread} não {unread === 1 ? "lida" : "lidas"}</span> : null}
+                </span>
+                <span className="mt-3 text-[13px] leading-relaxed text-muted">{COWORK_AREA.summary}</span>
+              </Link>
+            </li>
+          ) : null}
+        </ul>
       </section>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {DEPT_ORDER.map((dept) => {
-          const info = DEPARTMENTS[dept];
-          const items = departmentItems(dept);
-          const visibleItems = items.filter((n) => !n.permission || can(ctx, n.permission));
-          const Icon = info.icon;
-          return (
-            <Link
-              key={dept}
-              href={`/evolution/${dept}`}
-              className="group relative overflow-hidden rounded-xl border border-border bg-surface p-5 transition-shadow hover:shadow-md"
-            >
-              <div className="mb-3 flex items-center gap-3">
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg" style={{ background: `${info.color}18` }}>
-                  <Icon className="h-5 w-5" style={{ color: info.color }} aria-hidden />
-                </span>
-                <h2 className="text-base font-semibold">{info.name}</h2>
-              </div>
-              <p className="text-sm leading-relaxed text-muted">{info.summary}</p>
-              {visibleItems.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {visibleItems.slice(0, 4).map((item) => (
-                    <span key={item.key} className="rounded-md bg-surface-2 px-2 py-0.5 text-[11px] text-muted">{item.label}</span>
-                  ))}
-                </div>
-              )}
-              <ArrowRight className="absolute right-4 top-5 h-4 w-4 text-muted opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
-            </Link>
-          );
-        })}
-      </div>
-
-      <div className="mt-8 rounded-xl border border-border/60 bg-surface-2/50 p-5">
-        <h3 className="text-sm font-semibold">Sobre a Evolution 1.0</h3>
-        <p className="mt-1 text-sm leading-relaxed text-muted">
-          Esta é a nova experiência departamental do LegalOS. As funcionalidades existentes continuam disponíveis — os departamentos reorganizam o acesso em torno da rotina do escritório. Você pode voltar ao Ethos a qualquer momento pelo menu lateral.
-        </p>
-      </div>
-    </>
+      {flows.length > 0 || shortcuts.length > 0 ? (
+        <div className="mt-8 grid gap-3 lg:grid-cols-[1.3fr_1fr]">
+          {flows.length > 0 ? (
+            <section aria-labelledby="department-flows-heading" className="rounded-[18px] border border-border bg-surface p-5">
+              <h2 id="department-flows-heading" className="text-sm font-semibold">Continue o fluxo entre áreas</h2>
+              <ul className="mt-2">
+                {flows.map((f) => (
+                  <li key={f.href} className="border-t border-border first:border-t-0">
+                    <Link href={f.href} className="group flex items-center gap-3 py-3">
+                      <f.icon className="h-4 w-4 shrink-0" style={{ color: DEPARTMENTS[f.from].color }} aria-hidden />
+                      <span className="min-w-0">
+                        <span className="block text-sm font-medium group-hover:text-primary-text">{f.label}</span>
+                        <span className="block text-xs text-muted">{f.text}</span>
+                      </span>
+                      <ArrowRight className="ml-auto h-4 w-4 shrink-0 text-muted" aria-hidden />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+          {shortcuts.length > 0 ? (
+            <section aria-labelledby="lobby-shortcuts" className="rounded-[18px] border border-border bg-surface p-5">
+              <h2 id="lobby-shortcuts" className="text-sm font-semibold">Atalhos</h2>
+              <ul className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {shortcuts.map((s) => (
+                  <li key={s.href}>
+                    <Link href={s.href} className="flex items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm transition hover:bg-surface-2">
+                      <s.icon className="h-4 w-4 shrink-0 text-muted" aria-hidden /> {s.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
   );
 }

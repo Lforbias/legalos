@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Lock } from "lucide-react";
 import { HONESTY, SECURITY } from "@/config/showcase";
-import { CtaLink, SectionTitle } from "../_parts";
-import { Reveal } from "../showcase-client";
+import { CtaLink, SectionTitle } from "../../_parts";
+import { Reveal } from "../../showcase-client";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Segurança", description: "Como o LegalOS protege os dados do escritório: separação entre escritórios, permissões, 2FA, auditoria, cofre e backups." };
