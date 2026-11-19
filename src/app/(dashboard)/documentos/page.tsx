@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { FilePlus2, LayoutTemplate } from "lucide-react";
+import { FilePlus2, LayoutTemplate, Upload } from "lucide-react";
 import { AccessDenied } from "@/components/layout/access-denied";
 import { PageHeader } from "@/components/layout/page-header";
 import { Badge } from "@/components/ui/badge";
@@ -35,12 +35,17 @@ export default async function DocumentsPage({ searchParams }: { searchParams: Pr
     <div className="mx-auto max-w-6xl">
       <PageHeader
         title="Documentos"
-        description="Repositório privado do escritório. Para enviar arquivos, abra o processo ou o cliente; documentos de processos sigilosos só aparecem para quem pode ver o processo."
+        description="Repositório privado do escritório. Envie arquivos pela ficha do processo ou do cliente, ou vários de uma vez em Enviar em lote; documentos de processos sigilosos só aparecem para quem pode ver o processo."
         actions={
           <div className="flex gap-2">
             <Link href="/documentos/modelos" className={bv({ variant: "secondary" })}>
               <LayoutTemplate className="h-4 w-4" aria-hidden /> {canTemplates ? "Modelos" : "Ver modelos"}
             </Link>
+            {canWrite ? (
+              <Link href="/documentos/importar" className={bv({ variant: "secondary" })}>
+                <Upload className="h-4 w-4" aria-hidden /> Enviar em lote
+              </Link>
+            ) : null}
             {canWrite ? (
               <Link href="/documentos/classificar" className={bv({ variant: "secondary" })}>
                 Classificar com IA
