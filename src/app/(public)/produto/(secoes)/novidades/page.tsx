@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SectionTitle } from "../_parts";
+import { SectionTitle } from "../../_parts";
 export const metadata:Metadata={title:"Novidades do LegalOS",description:"As entregas recentes do LegalOS Chat e do espaço público, com condições de uso e próximos passos."};
 const CHAT=[
  ["Copiloto no atendimento","Sugestões de resposta, reescrita no tom do escritório e tradução no WhatsApp e no e-mail. A equipe revisa o texto, escolhe o que usar e confirma o envio."],

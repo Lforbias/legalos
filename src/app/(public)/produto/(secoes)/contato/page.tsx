@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Mail, MessageCircle } from "lucide-react";
 import Link from "next/link";
-import { contact } from "../_parts";
-import { Reveal } from "../showcase-client";
+import { contact } from "../../_parts";
+import { Reveal } from "../../showcase-client";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Contato", description: "Fale com a gente para conhecer o LegalOS no seu escritório." };

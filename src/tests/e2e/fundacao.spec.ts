@@ -21,7 +21,7 @@ test("cadastro → escritório → dashboard com dados reais → convite → ace
   // visitante na raiz vê a página pública (sem dados do sistema) e entra pelo botão; rota protegida vai ao login
   await page.goto("/");
   await expect(page).toHaveURL(/\/$/);
-  await expect(page.getByRole("heading", { name: /O escritório inteiro/ })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: /Cada área do escritório/ })).toBeVisible();
   await page.goto("/inicio");
   await expect(page.getByRole("heading", { name: /Advocacia com atenção/ })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Áreas de atuação" })).toBeVisible();

@@ -1,8 +1,8 @@
 import { CheckCircle2, Hammer, Lightbulb } from "lucide-react";
 import type { Metadata } from "next";
 import { PHASES_2, PHASES_3, PHASES_4, PHASES_5, PHASES_6, PHASES_7, type Phase } from "@/lib/updates";
-import { CtaLink, SectionTitle } from "../_parts";
-import { Reveal } from "../showcase-client";
+import { CtaLink, SectionTitle } from "../../_parts";
+import { Reveal } from "../../showcase-client";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Roadmap", description: "Tudo o que o LegalOS já entrega e tudo o que está sendo construído, versão por versão." };

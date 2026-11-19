@@ -17,6 +17,17 @@ test("Evolution: cinco departamentos com Jurídico integrado, navegação, Deskt
   await page.getByRole("button", { name: "Abrir menu", exact: true }).click();
   await page.getByRole("dialog", { name: "Menu", exact: true }).getByRole("link", { name: "Lobby", exact: true }).click();
   await expect(page).toHaveURL(/\/evolution$/);
+  // Lobby repaginado: saudação, resumo pessoal, mapa de departamentos e nada da versão antiga.
+  const lobby = page.getByRole("main");
+  await expect(lobby.getByRole("heading", { level: 1, name: /^(Bom dia|Boa tarde|Boa noite), Pessoa$/ })).toBeVisible();
+  await expect(lobby.getByRole("link", { name: /Abrir Minha Mesa/ })).toHaveAttribute("href", "/evolution/mesa");
+  for (const slug of ["juridico", "atendimento", "comercial", "financeiro", "administracao"]) {
+    await expect(lobby.getByTestId(`lobby-area-${slug}`)).toHaveAttribute("href", `/evolution/${slug}`);
+  }
+  await expect(lobby.getByTestId("lobby-area-cowork")).toHaveAttribute("href", "/cowork");
+  await expect(lobby.getByText(/Evolution 1\.0|Ethos/)).toHaveCount(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await page.screenshot({ path: testInfo.outputPath("lobby-390.png"), fullPage: true });
 
   const departments = [
     ["juridico", "Jurídico", "/processos"],

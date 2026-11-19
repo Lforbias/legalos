@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { DesktopShowcase } from "../desktop-showcase";
-import { SectionTitle } from "../_parts";
+import { DesktopShowcase } from "../../desktop-showcase";
+import { SectionTitle } from "../../_parts";
 
 export const metadata: Metadata = {
   title: "LegalOS Desktop",

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { MODULES } from "@/config/showcase";
-import { CtaLink, SectionTitle } from "../_parts";
-import { BrowserFrame, Reveal } from "../showcase-client";
+import { CtaLink, SectionTitle } from "../../_parts";
+import { BrowserFrame, Reveal } from "../../showcase-client";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Recursos", description: "Tudo o que o LegalOS faz hoje: processos, intimações, prazos, agenda, financeiro, WhatsApp e relatórios." };

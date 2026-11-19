@@ -149,7 +149,7 @@ Código aplicado localmente às lacunas de confiabilidade, automações e implan
 - Não validado em produção: testes Asaas/DataJud/DJEN/SMTP dependem das chaves reais do servidor.
 
 ### Extra — Site público do produto /produto (concluído e verificado)
-- Páginas públicas (sem login; `/produto` está em `PUBLIC_PREFIXES` do `proxy.ts`): Início, Recursos, Segurança, Sobre, Contato. Layout em `src/app/(public)/produto/`, conteúdo em `src/config/showcase.ts` (fatos e módulos) e `src/lib/updates.ts` (entregas e fases — NUNCA colocar `TEAM_TODO` em página pública).
+- Páginas públicas (sem login; `/produto` está em `PUBLIC_PREFIXES` do `proxy.ts`): Início, Recursos, Segurança, Sobre, Contato. Página inicial em `src/app/(public)/produto/page.tsx` (segue o tema da pessoa; departamentos vindos de `src/config/office-map.ts`, que lê o menu Evolution), demais páginas em `src/app/(public)/produto/(secoes)/` (visual escuro), cabeçalho e rodapé em `site-shell.tsx`; conteúdo em `src/config/showcase.ts` (fatos e módulos) e `src/lib/updates.ts` (entregas e fases — NUNCA colocar `TEAM_TODO` em página pública).
 - Regras: só fatos verificados; sem depoimentos, clientes, preços ou concorrentes inventados; telas reais com dados fictícios. Números de `FACTS` conferidos em 2026-10-21 (atualizar a cada entrega).
 - Contato: `PUBLIC_CONTACT_WHATSAPP` (só dígitos com DDI+DDD) e `PUBLIC_CONTACT_EMAIL` no `.env.production`. Sem eles o botão leva ao login e a página de contato avisa "Contato em breve".
 - Capturas: `scripts/demo-seed.ts` cria um escritório fictício (recusa rodar fora de banco terminado em `_demo`); `scripts/demo-shots.mjs` gera `public/produto/*.webp`.
