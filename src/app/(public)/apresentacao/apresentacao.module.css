@@ -40,6 +40,16 @@
 .funnel li:hover { transform: translateX(6px); }
 .funnel li span:last-child { color: #8d9099; }
 
+/* ── Funcionalidades especiais ── */
+.special { display: grid; grid-template-columns: repeat(3, 1fr); margin: 48px 0 0; padding: 0; list-style: none; border-top: 1px solid rgba(18, 19, 24, 0.18); border-left: 1px solid rgba(18, 19, 24, 0.18); }
+.specialCell { display: flex; flex-direction: column; gap: 12px; padding: 28px 26px 32px; border-right: 1px solid rgba(18, 19, 24, 0.18); border-bottom: 1px solid rgba(18, 19, 24, 0.18); transition: background 0.25s; }
+.specialCell:hover { background: #cfcfcb; }
+.specialCell h3 { margin: 6px 0 0; font-size: 24px; font-weight: 500; letter-spacing: -0.02em; }
+.specialCell p { margin: 0; font-size: 15px; color: #4f5158; }
+.tagOk, .tagSoon { align-self: flex-start; padding: 4px 8px; border: 1px solid currentColor; }
+.tagOk { color: #0f6b4a; }
+.tagSoon { color: #a8172a; }
+
 /* ── Segurança ── */
 .secGrid { display: grid; grid-template-columns: repeat(3, 1fr); margin: 48px 0 0; padding: 0; list-style: none; border-top: 1px solid rgba(255, 255, 255, 0.14); border-left: 1px solid rgba(255, 255, 255, 0.14); }
 .secGrid li { padding: 26px; border-right: 1px solid rgba(255, 255, 255, 0.14); border-bottom: 1px solid rgba(255, 255, 255, 0.14); }
@@ -65,7 +75,7 @@
   .heroInner, .chapter, .track { grid-template-columns: 1fr; }
   .reverse > :first-child { order: 0; }
   .stats { grid-template-columns: 1fr 1fr; }
-  .secGrid { grid-template-columns: 1fr 1fr; }
+  .secGrid, .special { grid-template-columns: 1fr 1fr; }
   .track::before { display: none; }
   .stop { padding: 26px 0 24px; border-top: 1px solid rgba(18, 19, 24, 0.3); }
   .stop::before { top: -8px; }
@@ -74,11 +84,11 @@
   .heroBottom { height: 80px; }
 }
 @media (max-width: 560px) {
-  .stats, .secGrid { grid-template-columns: 1fr; }
+  .stats, .secGrid, .special { grid-template-columns: 1fr; }
   .stageShot { transform: none; }
 }
 @media (prefers-reduced-motion: reduce) {
   .stageShot { animation: none; }
-  .toc a, .funnel li { transition: none; }
+  .toc a, .funnel li, .specialCell { transition: none; }
   .funnel li:hover { transform: none; }
 }
