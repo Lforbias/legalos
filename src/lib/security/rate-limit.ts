@@ -56,4 +56,6 @@ export const limiters = {
   coworkMessage: new RateLimiter(40 * mult, 30_000),
   /** Cowork: conexões de tempo real abertas por pessoa (reconexões em laço). */
   coworkStream: new RateLimiter(30 * mult, 60_000),
+  /** Landing de lançamento: registro de interesse por IP (o estande pode compartilhar a mesma rede). */
+  launchInterest: new RateLimiter(20 * mult, 60 * 60_000),
 };

@@ -9,26 +9,27 @@ import { brl, dateBR } from "@/lib/comercial/format";
 import { isStageKey, STAGE_INFO, STAGE_KEYS } from "@/lib/comercial/stages";
 import { NewProspect } from "@/modules/comercial/new-prospect";
 import { requireComercial } from "@/server/comercial";
+import { INTEREST_TAG } from "@/lib/launch";
 import { listProspects, ownersForSelect } from "@/server/services/comercial.service";
 
 export const metadata: Metadata = { title: "LegalOS Comercial — escritórios" };
 export const dynamic = "force-dynamic";
 
-type SP = Promise<{ q?: string; stage?: string; owner?: string; top?: string; overdue?: string; page?: string }>;
+type SP = Promise<{ q?: string; stage?: string; owner?: string; top?: string; overdue?: string; interesse?: string; page?: string }>;
 
 export default async function ProspectsPage({ searchParams }: { searchParams: SP }) {
   const sp = await searchParams;
   const { cx } = await requireComercial();
   const stage = isStageKey(sp.stage) ? sp.stage : undefined;
   const page = Math.max(1, Number(sp.page) || 1);
-  const [owners, list] = await Promise.all([ownersForSelect(cx), listProspects(cx, { q: sp.q, stage, ownerId: sp.owner, top: sp.top === "1", overdue: sp.overdue === "1", page, pageSize: 25 })]);
+  const [owners, list] = await Promise.all([ownersForSelect(cx), listProspects(cx, { q: sp.q, stage, ownerId: sp.owner, top: sp.top === "1", overdue: sp.overdue === "1", interest: sp.interesse === "1", page, pageSize: 25 })]);
   const name = new Map(owners.map((o) => [o.id, o.name]));
   const pages = Math.max(1, Math.ceil(list.total / list.pageSize));
-  const qs = (p: number) => { const u = new URLSearchParams(); if (sp.q) u.set("q", sp.q); if (stage) u.set("stage", stage); if (sp.owner) u.set("owner", sp.owner); if (sp.top === "1") u.set("top", "1"); if (sp.overdue === "1") u.set("overdue", "1"); u.set("page", String(p)); return `?${u.toString()}`; };
+  const qs = (p: number) => { const u = new URLSearchParams(); if (sp.q) u.set("q", sp.q); if (stage) u.set("stage", stage); if (sp.owner) u.set("owner", sp.owner); if (sp.top === "1") u.set("top", "1"); if (sp.overdue === "1") u.set("overdue", "1"); if (sp.interesse === "1") u.set("interesse", "1"); u.set("page", String(p)); return `?${u.toString()}`; };
   return (
     <div className="space-y-4">
       <PageHeader title="Escritórios" description="Todos os escritórios que vocês acompanham. Clique para ver contatos, histórico, proposta e localização." />
-      <Card><CardHeader title="Adicionar escritório" description="Pelo CNPJ, só com o nome ou escolhendo da base da Receita." /><CardBody className="space-y-3"><NewProspect /><p className="text-sm">Quer escolher entre os escritórios já importados? <Link className="underline" href="/comercial/base">Abrir a base da Receita</Link>.</p></CardBody></Card>
+      <Card><CardHeader title="Adicionar escritório" description="Pelo CNPJ, só com o nome ou escolhendo da base da Receita." /><CardBody className="space-y-3"><NewProspect /><p className="text-sm">Quer escolher entre os escritórios já importados? <Link className="underline" href="/comercial/base">Abrir a base da Receita</Link>.</p><p className="text-sm">Quem se cadastrou na landing de lançamento aparece com a etiqueta “lista de interesse”. <Link className="underline" href="?interesse=1">Ver só a lista de interesse</Link> · <a className="underline" href="/comercial/interesse.csv" download>Baixar em planilha (CSV)</a></p></CardBody></Card>
       <form className="grid gap-2 rounded-lg border border-border bg-surface p-3 sm:grid-cols-2 lg:grid-cols-5" role="search">
         <Input name="q" defaultValue={sp.q ?? ""} placeholder="Buscar por nome, bairro, CNPJ ou telefone" aria-label="Buscar" className="lg:col-span-2" />
         <Select name="stage" defaultValue={stage ?? ""} aria-label="Etapa"><option value="">Todas as etapas</option>{STAGE_KEYS.map((k) => <option key={k} value={k}>{STAGE_INFO[k].label}</option>)}</Select>
@@ -36,6 +37,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: SP
         <div className="flex items-center gap-3 text-sm">
           <label className="inline-flex items-center gap-1.5"><input type="checkbox" name="top" value="1" defaultChecked={sp.top === "1"} /> Lista dos 100</label>
           <label className="inline-flex items-center gap-1.5"><input type="checkbox" name="overdue" value="1" defaultChecked={sp.overdue === "1"} /> Atrasados</label>
+          <label className="inline-flex items-center gap-1.5"><input type="checkbox" name="interesse" value="1" defaultChecked={sp.interesse === "1"} /> Lista de interesse</label>
           <Button type="submit" size="sm">Filtrar</Button>
         </div>
       </form>
@@ -47,7 +49,7 @@ export default async function ProspectsPage({ searchParams }: { searchParams: SP
             {list.rows.map((r) => (
               <tr key={r.id} className="border-t border-border">
                 <td className="p-2 tabular-nums text-muted">{r.rankingPosition ?? ""}</td>
-                <td className="p-2"><Link href={`/comercial/escritorios/${r.id}`} className="font-medium hover:underline">{r.name}</Link> {r.doNotContact ? <Badge tone="danger">não contatar</Badge> : null}{r.lat == null ? <span className="ml-1 text-[11px] text-muted" title="Sem ponto no mapa">(sem mapa)</span> : null}</td>
+                <td className="p-2"><Link href={`/comercial/escritorios/${r.id}`} className="font-medium hover:underline">{r.name}</Link> {r.doNotContact ? <Badge tone="danger">não contatar</Badge> : null}{r.tags.includes(INTEREST_TAG) ? <Badge tone="success">lista de interesse</Badge> : null}{r.lat == null ? <span className="ml-1 text-[11px] text-muted" title="Sem ponto no mapa">(sem mapa)</span> : null}</td>
                 <td className="p-2 text-xs">{r.phone ?? "—"}<br /><span className="text-muted">{r.email ?? ""}</span></td>
                 <td className="p-2 text-xs">{r.district ?? "—"}</td>
                 <td className="p-2"><Badge>{STAGE_INFO[r.stage].label}</Badge></td>
