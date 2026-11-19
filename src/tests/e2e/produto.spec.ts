@@ -85,3 +85,30 @@ test("site /produto: a página da equipe do escritório (/inicio) e a raiz conti
   expect(res?.status()).toBe(200);
   await expect(page.getByTestId("landing-login")).toBeVisible();
 });
+
+test("apresentação pública: capítulos com telas reais, roadmap, sem preços e celular", async ({ page }) => {
+  const res = await page.goto("/apresentacao");
+  expect(res?.status()).toBe(200);
+  await expect(page.getByRole("heading", { level: 1 })).toContainText("O escritório inteiro");
+  await expect(page.getByText(/Lançamento em 05\.01\.2027/)).toBeVisible();
+  for (const id of ["mesa", "juridico", "atendimento", "financeiro", "gestao", "cowork"]) {
+    const ch = page.getByTestId(`apres-${id}`);
+    await expect(ch).toHaveCount(1);
+    const img = ch.getByRole("img");
+    await img.scrollIntoViewIfNeeded();
+    await expect.poll(() => img.evaluate((el: HTMLImageElement) => el.complete && el.naturalWidth > 0)).toBe(true);
+  }
+  await expect(page.locator("#rute")).toContainText("Uma pessoa decide");
+  await expect(page.locator("#roadmap")).toContainText("Central Judicial");
+  // preços ainda não são divulgados na apresentação
+  await expect(page.locator("main")).not.toContainText("R$");
+  await expect(page.locator("#planos")).toHaveCount(0);
+  await expect(page.getByText(/LegalOS Func|LegalOS Box|Func e Chat/)).toHaveCount(0);
+  // sem contato configurado: só o registro de interesse, nada inventado
+  await expect(page.getByTestId("apres-whatsapp")).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /Registrar interesse/ })).toHaveAttribute("href", "/produto#interesse");
+  for (const width of [390, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+  }
+});

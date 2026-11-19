@@ -5,7 +5,7 @@ import { liveKitCspOrigins } from "@/server/cowork/livekit";
 import { THEME_SCRIPT_CSP_HASH } from "@/lib/theme-script";
 
 // /api/cron e /api/v1 não usam cookie de sessão: autenticam por conta própria (segredo do agendador / chave de API).
-const PUBLIC_PREFIXES = ["/blog", "/ferramentas", "/comunidade", "/acesso", "/minha-conta", "/transparencia", "/sair-das-novidades", "/api/audience", "/sitemap.xml", "/robots.txt", "/brand", "/inicio", "/produto", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook", "/api/cowork/livekit/webhook"];
+const PUBLIC_PREFIXES = ["/blog", "/ferramentas", "/comunidade", "/acesso", "/minha-conta", "/transparencia", "/sair-das-novidades", "/api/audience", "/sitemap.xml", "/robots.txt", "/brand", "/inicio", "/produto", "/apresentacao", "/login", "/register", "/forgot-password", "/reset-password", "/accept-invite", "/verify-email", "/api/health", "/api/ready", "/api/cron", "/api/v1", "/api/mcp", "/api/oauth", "/.well-known", "/api/billing/asaas/webhook", "/api/webhooks/fees", "/api/whatsapp/webhook", "/api/cowork/livekit/webhook"];
 
 /**
  * Proxy (middleware do Next 16): correlation id + redirecionamento rápido de visitantes sem cookie.

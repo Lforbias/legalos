@@ -107,6 +107,8 @@ async function member(orgId: string, roleKey: string, name: string, email: strin
     ["INTIMACAO", "Intimação para manifestação sobre laudo", "Intimem-se as partes para manifestação sobre o laudo pericial juntado aos autos, no prazo comum de 10 (dez) dias.", 2],
   ] as const;
   for (const n of notices) {
+    // Intimações dependem do Box, retirado provisoriamente: sem ele, a demonstração segue sem intimações.
+    if (process.env.BOX_AVAILABLE !== "1") break;
     await createNotice(ctx, { source: "MANUAL", kind: n[0], title: n[1], content: n[2], caseNumber: caseDefs[n[3]]![6], court: caseDefs[n[3]]![2].split(" · ")[0]!, publishedAt: ymd(-1), receivedAt: ymd(0), caseId: "" });
   }
 

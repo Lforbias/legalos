@@ -53,4 +53,11 @@ describe("animação de entrada após o login", () => {
     expect(firstName("  Ana Maria Souza ")).toBe("Ana");
     expect(firstName("")).toBe("");
   });
+
+  it("ignora pronomes de tratamento no primeiro nome", () => {
+    expect(firstName("Dra. Helena Albuquerque")).toBe("Helena");
+    expect(firstName("Dr Bruno Tavares")).toBe("Bruno");
+    expect(firstName("Talita Silva")).toBe("Talita");
+    expect(firstName("Dra.")).toBe("Dra.");
+  });
 });
