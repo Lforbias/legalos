@@ -100,10 +100,12 @@ test("apresentação pública: capítulos com telas reais, roadmap, sem preços 
   }
   await expect(page.locator("#rute")).toContainText("Uma pessoa decide");
   await expect(page.locator("#roadmap")).toContainText("Central Judicial");
-  // funcionalidades especiais: o protocolo nos tribunais aparece como em construção, nunca como pronto
+  // funcionalidades especiais
   await expect(page.getByTestId("apres-especial")).toHaveCount(6);
   await expect(page.getByTestId("apres-especial").filter({ hasText: "Google Drive integrado" })).toContainText("Disponível");
-  await expect(page.getByTestId("apres-especial").filter({ hasText: "Protocolo integrado aos tribunais" })).toContainText("Em construção");
+  // protocolo nos tribunais: funcionalidade principal, marcada para o lançamento (ainda não "disponível")
+  await expect(page.getByTestId("apres-protocolo")).toContainText("Disponível no lançamento · 05.01.2027");
+  await expect(page.getByTestId("apres-especial").filter({ hasText: "Protocolo" })).toHaveCount(0);
   // preços ainda não são divulgados na apresentação
   await expect(page.locator("main")).not.toContainText("R$");
   await expect(page.locator("#planos")).toHaveCount(0);

@@ -38,28 +38,28 @@ const CHAPTERS: Chapter[] = [
     image: "/apresentacao/processos.webp", alt: "Lista de processos e casos do LegalOS com dados fictícios",
   },
   {
-    id: "atendimento", n: "04", kicker: "Atendimento", color: DEPARTMENTS.atendimento.color,
+    id: "atendimento", n: "05", kicker: "Atendimento", color: DEPARTMENTS.atendimento.color,
     title: "WhatsApp e e-mail ligados ao processo.",
     text: "A equipe atende em fila, com etiquetas e respostas rápidas. Ao lado da conversa aparecem o cliente, o processo, as tarefas e o financeiro, e dá para criar tarefa ou prazo na hora.",
     points: ["API oficial da Meta ou conexão por QR-Code", "Filas, atribuição, notas internas e SLA", "Copiloto que sugere a resposta; a equipe revisa", "Campanhas com aprovação, opt-out e agendamento"],
     image: "/apresentacao/atendimento.webp", alt: "Conversa de WhatsApp no LegalOS com o painel do cliente ao lado",
   },
   {
-    id: "financeiro", n: "06", kicker: "Financeiro & Contábil", color: DEPARTMENTS.financeiro.color,
+    id: "financeiro", n: "07", kicker: "Financeiro & Contábil", color: DEPARTMENTS.financeiro.color,
     title: "Honorários e despesas, centavo por centavo.",
     text: "Contas a receber e a pagar, parcelas, baixas, conciliação e fluxo de caixa, ligados ao cliente e ao processo. Valores em reais, sem arredondamento.",
     points: ["Lançamentos parcelados e contratos de êxito", "Categorias, centros de custo e várias contas", "Cobrança por Pix e boleto (Asaas)", "Exportação em planilha"],
     image: "/apresentacao/financeiro.webp", alt: "Visão geral do financeiro com valores a receber e a pagar",
   },
   {
-    id: "gestao", n: "07", kicker: "Administração & Gestão", color: DEPARTMENTS.administracao.color,
+    id: "gestao", n: "08", kicker: "Administração & Gestão", color: DEPARTMENTS.administracao.color,
     title: "Os números do escritório, calculados agora.",
     text: "Indicadores, relatórios e metas da equipe a partir dos dados reais. Cada pessoa vê só o que o perfil dela permite.",
     points: ["Indicadores e central de alertas", "Relatórios com exportação e metas por pessoa", "Automações entre áreas, com botão de ligar e desligar", "API REST, MCP e webhooks assinados"],
     image: "/apresentacao/indicadores.webp", alt: "Indicadores do escritório com tarefas, prazos e honorários",
   },
   {
-    id: "cowork", n: "08", kicker: "LegalOS Cowork", color: COWORK_AREA.color,
+    id: "cowork", n: "09", kicker: "LegalOS Cowork", color: COWORK_AREA.color,
     title: "A equipe junta, dentro do sistema.",
     text: "Canais por departamento, conversas diretas e reuniões. Cada processo pode ter a própria sala, que respeita o sigilo do processo. Nada se mistura com o WhatsApp dos clientes.",
     points: ["Canais, grupos e conversas em tempo real", "Sala do processo com o mesmo sigilo do processo", "Mensagem vira tarefa sem copiar e colar", "Reuniões internas da equipe"],
@@ -69,7 +69,7 @@ const CHAPTERS: Chapter[] = [
 
 const SPECIAL = [
   { title: "Google Drive integrado", status: "Disponível", text: "Uma pasta por cliente no Drive do próprio escritório. Envie documentos como Google Docs, edite lá e traga a versão de volta. Processos sigilosos nunca vão para o Drive." },
-  { title: "Protocolo integrado aos tribunais", status: "Em construção", text: "Protocolar a petição direto do processo, com certificado digital e recibo guardado no caso. Chega com a Central Judicial, junto da captura de publicações e dos autos." },
+  { title: "Área de trabalho por cliente", status: "Disponível", text: "Busque o cliente e abra a pasta dele, com processos, conversas, documentos e financeiro num só lugar." },
   { title: "Claude, ChatGPT ou Gemini", status: "Disponível", text: "Quem já usa uma dessas IAs conecta com o login do LegalOS e consulta o escritório de dentro dela, com as mesmas permissões." },
   { title: "Calculadoras jurídicas", status: "Disponível", text: "Atrasados da Justiça Federal, débito do TJSP e atualização trabalhista, salvos no processo com memorial e planilha." },
   { title: "Migração do Astrea", status: "Disponível", text: "Traga clientes, processos e o histórico do sistema antigo, sem redigitar." },
@@ -94,7 +94,7 @@ export default function Apresentacao() {
     { n: String(features), label: "recursos e operações no catálogo" },
     { n: String(ALL_PERMISSIONS.length), label: "permissões para montar os perfis" },
   ];
-  const toc = [["01", "Visão geral", "#visao"], ["02", "Departamentos", "#mesa"], ["09", "Especiais", "#especiais"], ["10", "RUTE", "#rute"], ["11", "Segurança", "#seguranca"], ["12", "O que vem", "#roadmap"]];
+  const toc = [["01", "Visão geral", "#visao"], ["02", "Departamentos", "#mesa"], ["04", "Protocolo", "#protocolo"], ["10", "Especiais", "#especiais"], ["11", "RUTE", "#rute"], ["13", "O que vem", "#roadmap"]];
 
   return (
     <div className={l.page}>
@@ -144,12 +144,31 @@ export default function Apresentacao() {
           </div>
         </section>
 
-        {CHAPTERS.slice(0, 3).map((ch, i) => <ChapterSection key={ch.id} ch={ch} reverse={i % 2 === 1} />)}
+        {CHAPTERS.slice(0, 2).map((ch, i) => <ChapterSection key={ch.id} ch={ch} reverse={i % 2 === 1} />)}
+
+        <section id="protocolo" className={`${l.section} ${l.dark} ${a.dark}`} aria-labelledby="protocolo-titulo" data-testid="apres-protocolo">
+          <div className={`${l.wrap} ${a.chapter}`}>
+            <div>
+              <p className={`${l.kicker} ${l.mono}`}>04 / Protocolo nos tribunais</p>
+              <h2 id="protocolo-titulo" className={l.h2}><span className={a.deptDot} style={{ background: DEPARTMENTS.juridico.color }} aria-hidden="true" />Do processo ao tribunal, sem sair do LegalOS.</h2>
+              <p className={l.lead}>A petição pronta é protocolada direto do processo, com o certificado digital do advogado, e o comprovante volta para o caso.</p>
+              <ol className={a.points}>
+                {["Petição enviada a partir do próprio processo", "Certificado digital guardado cifrado", "Fila de protocolos com acompanhamento", "Comprovante salvo no processo, com quem protocolou e quando"].map((p, j) => <li key={p}><span className={l.mono}>{String(j + 1).padStart(2, "0")}</span>{p}</li>)}
+              </ol>
+              <p className={`${a.launchTag} ${l.mono}`}>Disponível no lançamento · {LAUNCH_LABEL}</p>
+            </div>
+            <ol className={`${a.flow} ${l.mono}`} aria-label="Como funciona o protocolo">
+              {["Petição pronta no processo", "Assinatura com certificado digital", "Protocolo no tribunal", "Comprovante de volta no caso"].map((step, j) => <li key={step}><span>{String(j + 1).padStart(2, "0")}</span>{step}</li>)}
+            </ol>
+          </div>
+        </section>
+
+        {CHAPTERS.slice(2, 3).map((ch) => <ChapterSection key={ch.id} ch={ch} reverse={false} />)}
 
         <section id="comercial" className={l.section} aria-labelledby="comercial-titulo">
           <div className={`${l.wrap} ${a.chapter}`}>
             <div>
-              <p className={`${l.kicker} ${l.mono}`}>05 / Comercial</p>
+              <p className={`${l.kicker} ${l.mono}`}>06 / Comercial</p>
               <h2 id="comercial-titulo" className={l.h2}><span className={a.deptDot} style={{ background: DEPARTMENTS.comercial.color }} aria-hidden="true" />Do primeiro contato ao contrato.</h2>
               <p className={l.lead}>Leads e oportunidades num funil, com a conversa de origem, o responsável e o próximo passo. Quando fecha, o cliente e o processo já nascem cadastrados.</p>
               <ol className={`${a.points}`}>
@@ -166,7 +185,7 @@ export default function Apresentacao() {
 
         <section id="especiais" className={l.section} aria-labelledby="especiais-titulo">
           <div className={l.wrap}>
-            <p className={`${l.kicker} ${l.mono}`}>09 / Funcionalidades especiais</p>
+            <p className={`${l.kicker} ${l.mono}`}>10 / Funcionalidades especiais</p>
             <h2 id="especiais-titulo" className={l.h2}>O que faz diferença<br />no dia a dia.</h2>
             <ul className={a.special}>
               {SPECIAL.map((f) => (
@@ -182,7 +201,7 @@ export default function Apresentacao() {
 
         <section id="rute" className={`${l.section} ${l.dark} ${a.dark}`} aria-labelledby="rute-titulo">
           <div className={l.wrap}>
-            <p className={`${l.kicker} ${l.mono}`}>10 / Inteligência</p>
+            <p className={`${l.kicker} ${l.mono}`}>11 / Inteligência</p>
             <h2 id="rute-titulo" className={l.h2}>A RUTE propõe.<br />Uma pessoa decide.</h2>
             <p className={l.lead}>A IA do escritório consulta o sistema com as permissões de quem pergunta e mostra de onde tirou cada resposta. Tarefa, prazo, anotação ou minuta viram propostas: só valem depois que alguém aprova.</p>
             <ul className={l.notes} aria-label="Exemplos ilustrativos">
@@ -197,7 +216,7 @@ export default function Apresentacao() {
 
         <section id="seguranca" className={`${l.section} ${l.dark} ${a.dark}`} style={{ borderTop: "1px solid rgba(255,255,255,.08)" }} aria-labelledby="seg-titulo">
           <div className={l.wrap}>
-            <p className={`${l.kicker} ${l.mono}`}>11 / Segurança</p>
+            <p className={`${l.kicker} ${l.mono}`}>12 / Segurança</p>
             <h2 id="seg-titulo" className={l.h2}>Privado por padrão.</h2>
             <ul className={a.secGrid}>
               {SECURITY.map((s, j) => <li key={s.title}><span className={`${l.mono} ${a.mono}`}>{String(j + 1).padStart(2, "0")}</span><h3>{s.title}</h3><p>{s.text}</p></li>)}
@@ -207,12 +226,12 @@ export default function Apresentacao() {
 
         <section id="roadmap" className={l.section} aria-labelledby="roadmap-titulo">
           <div className={l.wrap}>
-            <p className={`${l.kicker} ${l.mono}`}>12 / O que vem</p>
+            <p className={`${l.kicker} ${l.mono}`}>13 / O que vem</p>
             <h2 id="roadmap-titulo" className={l.h2}>Hoje, no lançamento<br />e depois.</h2>
             <ol className={a.track}>
               <li className={`${a.stop} ${a.stopNow}`}><span className={l.mono}>Hoje</span><h3>Já funciona</h3><ul>{AVAILABLE.map((t) => <li key={t}>{t}</li>)}</ul></li>
-              <li className={`${a.stop} ${a.stopLaunch}`}><span className={l.mono} style={{ color: "#d61f35" }}>{LAUNCH_LABEL}</span><h3>Lançamento</h3><ul><li>Abertura para novos escritórios</li><li>Demonstração e implantação com o nosso time</li><li>Migração de dados de outros sistemas</li></ul></li>
-              <li className={a.stop}><span className={l.mono}>Depois</span><h3>Em construção</h3><ul>{COMING_SOON.map((t) => <li key={t}>{t}</li>)}<li>Protocolo integrado aos tribunais, com a Central Judicial (captura de publicações e autos)</li></ul></li>
+              <li className={`${a.stop} ${a.stopLaunch}`}><span className={l.mono} style={{ color: "#d61f35" }}>{LAUNCH_LABEL}</span><h3>Lançamento</h3><ul><li>Protocolo integrado aos tribunais</li><li>Abertura para novos escritórios</li><li>Demonstração e implantação com o nosso time</li><li>Migração de dados de outros sistemas</li></ul></li>
+              <li className={a.stop}><span className={l.mono}>Depois</span><h3>Em construção</h3><ul>{COMING_SOON.map((t) => <li key={t}>{t}</li>)}<li>Captura de publicações e autos (Central Judicial)</li></ul></li>
             </ol>
           </div>
         </section>
