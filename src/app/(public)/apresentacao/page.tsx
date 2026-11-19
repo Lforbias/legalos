@@ -67,6 +67,15 @@ const CHAPTERS: Chapter[] = [
   },
 ];
 
+const SPECIAL = [
+  { title: "Google Drive integrado", status: "Disponível", text: "Uma pasta por cliente no Drive do próprio escritório. Envie documentos como Google Docs, edite lá e traga a versão de volta. Processos sigilosos nunca vão para o Drive." },
+  { title: "Protocolo integrado aos tribunais", status: "Em construção", text: "Protocolar a petição direto do processo, com certificado digital e recibo guardado no caso. Chega com a Central Judicial, junto da captura de publicações e dos autos." },
+  { title: "Claude, ChatGPT ou Gemini", status: "Disponível", text: "Quem já usa uma dessas IAs conecta com o login do LegalOS e consulta o escritório de dentro dela, com as mesmas permissões." },
+  { title: "Calculadoras jurídicas", status: "Disponível", text: "Atrasados da Justiça Federal, débito do TJSP e atualização trabalhista, salvos no processo com memorial e planilha." },
+  { title: "Migração do Astrea", status: "Disponível", text: "Traga clientes, processos e o histórico do sistema antigo, sem redigitar." },
+  { title: "Aplicativo no celular", status: "Disponível", text: "Instala na tela inicial do Android ou do iPhone, sem loja, com avisos opcionais de prazos e tarefas a vencer." },
+];
+
 const FUNNEL = ["Identificado", "Qualificado", "Contato", "Demonstração", "Proposta", "Ganho"];
 
 const NOTES = [
@@ -75,7 +84,7 @@ const NOTES = [
   { when: "16:45 · Cowork", text: "Reunião da equipe às 17h, na sala do processo." },
 ];
 
-const AVAILABLE = ["Seis departamentos e a Minha Mesa", "Processos, prazos, documentos e cálculos", "WhatsApp e e-mail da equipe", "CRM, funil e portal do cliente", "Financeiro com Pix e boleto", "Indicadores, relatórios e metas", "Cowork da equipe", "RUTE com aprovação humana", "Aplicativo no celular (PWA)"];
+const AVAILABLE = ["Seis departamentos e a Minha Mesa", "Processos, prazos, documentos e cálculos", "WhatsApp e e-mail da equipe", "CRM, funil e portal do cliente", "Financeiro com Pix e boleto", "Indicadores, relatórios e metas", "Cowork da equipe", "Google Drive integrado", "RUTE com aprovação humana", "Aplicativo no celular (PWA)"];
 
 export default function Apresentacao() {
   const features = PRICING_FEATURES.reduce((n, g) => n + g.features.length, 0);
@@ -85,7 +94,7 @@ export default function Apresentacao() {
     { n: String(features), label: "recursos e operações no catálogo" },
     { n: String(ALL_PERMISSIONS.length), label: "permissões para montar os perfis" },
   ];
-  const toc = [["01", "Visão geral", "#visao"], ["02", "Departamentos", "#mesa"], ["09", "RUTE", "#rute"], ["10", "Segurança", "#seguranca"], ["11", "O que vem", "#roadmap"]];
+  const toc = [["01", "Visão geral", "#visao"], ["02", "Departamentos", "#mesa"], ["09", "Especiais", "#especiais"], ["10", "RUTE", "#rute"], ["11", "Segurança", "#seguranca"], ["12", "O que vem", "#roadmap"]];
 
   return (
     <div className={l.page}>
@@ -155,9 +164,25 @@ export default function Apresentacao() {
 
         {CHAPTERS.slice(3).map((ch, i) => <ChapterSection key={ch.id} ch={ch} reverse={i % 2 === 0} />)}
 
+        <section id="especiais" className={l.section} aria-labelledby="especiais-titulo">
+          <div className={l.wrap}>
+            <p className={`${l.kicker} ${l.mono}`}>09 / Funcionalidades especiais</p>
+            <h2 id="especiais-titulo" className={l.h2}>O que faz diferença<br />no dia a dia.</h2>
+            <ul className={a.special}>
+              {SPECIAL.map((f) => (
+                <li key={f.title} className={a.specialCell} data-testid="apres-especial">
+                  <span className={`${l.mono} ${f.status === "Disponível" ? a.tagOk : a.tagSoon}`}>{f.status}</span>
+                  <h3>{f.title}</h3>
+                  <p>{f.text}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
         <section id="rute" className={`${l.section} ${l.dark} ${a.dark}`} aria-labelledby="rute-titulo">
           <div className={l.wrap}>
-            <p className={`${l.kicker} ${l.mono}`}>09 / Inteligência</p>
+            <p className={`${l.kicker} ${l.mono}`}>10 / Inteligência</p>
             <h2 id="rute-titulo" className={l.h2}>A RUTE propõe.<br />Uma pessoa decide.</h2>
             <p className={l.lead}>A IA do escritório consulta o sistema com as permissões de quem pergunta e mostra de onde tirou cada resposta. Tarefa, prazo, anotação ou minuta viram propostas: só valem depois que alguém aprova.</p>
             <ul className={l.notes} aria-label="Exemplos ilustrativos">
@@ -172,7 +197,7 @@ export default function Apresentacao() {
 
         <section id="seguranca" className={`${l.section} ${l.dark} ${a.dark}`} style={{ borderTop: "1px solid rgba(255,255,255,.08)" }} aria-labelledby="seg-titulo">
           <div className={l.wrap}>
-            <p className={`${l.kicker} ${l.mono}`}>10 / Segurança</p>
+            <p className={`${l.kicker} ${l.mono}`}>11 / Segurança</p>
             <h2 id="seg-titulo" className={l.h2}>Privado por padrão.</h2>
             <ul className={a.secGrid}>
               {SECURITY.map((s, j) => <li key={s.title}><span className={`${l.mono} ${a.mono}`}>{String(j + 1).padStart(2, "0")}</span><h3>{s.title}</h3><p>{s.text}</p></li>)}
@@ -182,12 +207,12 @@ export default function Apresentacao() {
 
         <section id="roadmap" className={l.section} aria-labelledby="roadmap-titulo">
           <div className={l.wrap}>
-            <p className={`${l.kicker} ${l.mono}`}>11 / O que vem</p>
+            <p className={`${l.kicker} ${l.mono}`}>12 / O que vem</p>
             <h2 id="roadmap-titulo" className={l.h2}>Hoje, no lançamento<br />e depois.</h2>
             <ol className={a.track}>
               <li className={`${a.stop} ${a.stopNow}`}><span className={l.mono}>Hoje</span><h3>Já funciona</h3><ul>{AVAILABLE.map((t) => <li key={t}>{t}</li>)}</ul></li>
               <li className={`${a.stop} ${a.stopLaunch}`}><span className={l.mono} style={{ color: "#d61f35" }}>{LAUNCH_LABEL}</span><h3>Lançamento</h3><ul><li>Abertura para novos escritórios</li><li>Demonstração e implantação com o nosso time</li><li>Migração de dados de outros sistemas</li></ul></li>
-              <li className={a.stop}><span className={l.mono}>Depois</span><h3>Em construção</h3><ul>{COMING_SOON.map((t) => <li key={t}>{t}</li>)}<li>Central Judicial: captura de publicações, autos e protocolo (em reconstrução)</li></ul></li>
+              <li className={a.stop}><span className={l.mono}>Depois</span><h3>Em construção</h3><ul>{COMING_SOON.map((t) => <li key={t}>{t}</li>)}<li>Protocolo integrado aos tribunais, com a Central Judicial (captura de publicações e autos)</li></ul></li>
             </ol>
           </div>
         </section>
