@@ -40,6 +40,13 @@
 .funnel li:hover { transform: translateX(6px); }
 .funnel li span:last-child { color: #8d9099; }
 
+/* ── Protocolo ── */
+.flow { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+.flow li { display: flex; align-items: center; gap: 20px; min-height: 76px; padding: 0 24px; border: 1px solid rgba(255, 255, 255, 0.16); background: rgba(255, 255, 255, 0.03); color: #f2f2ee; }
+.flow li:last-child { border-color: #d61f35; background: rgba(214, 31, 53, 0.14); }
+.flow li span { color: #ff8490; }
+.launchTag { display: inline-block; margin: 28px 0 0; padding: 6px 12px; border: 1px solid #ff8490; color: #ff8490; }
+
 /* ── Funcionalidades especiais ── */
 .special { display: grid; grid-template-columns: repeat(3, 1fr); margin: 48px 0 0; padding: 0; list-style: none; border-top: 1px solid rgba(18, 19, 24, 0.18); border-left: 1px solid rgba(18, 19, 24, 0.18); }
 .specialCell { display: flex; flex-direction: column; gap: 12px; padding: 28px 26px 32px; border-right: 1px solid rgba(18, 19, 24, 0.18); border-bottom: 1px solid rgba(18, 19, 24, 0.18); transition: background 0.25s; }
