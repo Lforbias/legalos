@@ -42,7 +42,7 @@ O `deploy.sh` agora **se recusa a publicar** quando falta alguma destas configur
 - [ ] `MAIL_DRIVER=smtp`, com o SMTP configurado. Teste com `npm run mail-test`.
 - [ ] `REGISTRATION_MODE=code` (com um `REGISTRATION_CODE` de 12 caracteres ou mais) ou `closed`.
 - [ ] `CRON_SECRET` com 24 caracteres ou mais. Depois, rode `scripts/server/install-cron.sh`.
-- [ ] `BACKUP_OFFSITE=usuario@outro-servidor:/caminho`, com a chave SSH autorizada nesse destino.
+- [ ] (Recomendado, não obrigatório) `BACKUP_OFFSITE=usuario@outro-servidor:/caminho`, com a chave SSH autorizada nesse destino. Sem ele, o backup diário fica só no servidor e o deploy apenas avisa.
 - [ ] **Teste de restauração** antes do piloto: rode `scripts/server/backup-docker.sh` e depois `scripts/verify-backup.sh` (veja [backup-restore.md](backup-restore.md)).
 - [ ] `ALERT_WEBHOOK_URL` com um webhook https (Slack, Discord, Teams ou n8n), que recebe um aviso a cada erro do servidor, sem dados pessoais. Crie também um monitor de uptime externo (UptimeRobot, Better Stack ou similar) apontando para `https://SEU-DOMINIO/api/ready`.
 - [ ] `LEGALOS_PILOT_TERMS=1`: obriga cada usuário a aceitar os termos do piloto, e o aceite fica registrado.
