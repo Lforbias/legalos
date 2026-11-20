@@ -32,7 +32,7 @@ export function checkProductionEnv(env: Record<string, string | undefined>): Che
   if (ck && mfa && ck === mfa) err("CERT_KEY_REUSE", "CERT_ENCRYPTION_KEY não pode ser igual a MFA_ENCRYPTION_KEY.");
 
   const mailDriver = env.MAIL_DRIVER ?? "console";
-  if (mailDriver === "console") warn("MAIL_CONSOLE", "MAIL_DRIVER=console: convites, confirmação de e-mail e recuperação de senha NÃO são entregues (o administrador precisa repassar os links manualmente). Configure MAIL_DRIVER=smtp (veja .env.example).");
+  if (mailDriver === "console") err("MAIL_CONSOLE", "MAIL_DRIVER=console: convites, confirmação de e-mail e recuperação de senha NÃO são entregues (o administrador precisa repassar os links manualmente). Configure MAIL_DRIVER=smtp (veja .env.example).");
   else if (mailDriver === "smtp") {
     const m = smtpConfigFromEnv(env);
     if (m.error) err("MAIL_SMTP", `MAIL_DRIVER=smtp, mas a configuração está incompleta: ${m.error}`);
@@ -56,7 +56,8 @@ export function checkProductionEnv(env: Record<string, string | undefined>): Che
     if (!ck) err("WHATSAPP_KEY", "O WhatsApp precisa de CERT_ENCRYPTION_KEY para guardar o token com segurança.");
     if (env.WHATSAPP_API_URL && !/^https:\/\//.test(env.WHATSAPP_API_URL)) err("WHATSAPP_URL", "WHATSAPP_API_URL deve ser https:// (use só para apontar a um simulador em testes).");
   }
-  if (mailDriver === "smtp" && !env.CRON_SECRET) warn("MAIL_QUEUE_CRON", "Sem CRON_SECRET o agendador da fila de e-mails (avisos de cobrança, reenvio) não roda.");
+  if (!env.CRON_SECRET?.trim()) err("CRON_SECRET", "CRON_SECRET ausente: as rotinas agendadas (fila de e-mails, avisos de prazo, push) não rodam.");
+  else if (env.CRON_SECRET.trim().length < 24) err("CRON_SECRET_LEN", "CRON_SECRET precisa ter pelo menos 24 caracteres (openssl rand -hex 24).");
 
   if (!env.STORAGE_DIR?.trim()) warn("STORAGE_DIR", "STORAGE_DIR não definido: os documentos vão para ./.storage dentro do app e somem se o contêiner for recriado. Use um volume persistente com backup.");
 
@@ -66,9 +67,15 @@ export function checkProductionEnv(env: Record<string, string | undefined>): Che
   if ((env.PETITIONING_ADAPTER ?? "demo") === "demo") warn("PETITION_DEMO", "Peticionamento em modo demonstração: nenhuma petição é protocolada em tribunal.");
   if (env.PETITIONING_ADAPTER === "mni") warn("PETITION_MNI", "Protocolo REAL pelo MNI ligado: ainda não validado em tribunal real (tipos de documento, assinatura digital e recibo variam por tribunal). Valide em homologação antes de usar com processos de clientes.");
   const regMode = env.REGISTRATION_MODE?.trim().toLowerCase();
-  if (!regMode || regMode === "open") warn("REGISTRATION_OPEN", "Cadastro ABERTO: qualquer visitante pode criar conta e escritório. Defina REGISTRATION_MODE=closed (só por convite) ou code (com REGISTRATION_CODE) em produção.");
+  if (!regMode || regMode === "open") err("REGISTRATION_OPEN", "Cadastro ABERTO: qualquer visitante pode criar conta e escritório. Defina REGISTRATION_MODE=closed (só por convite) ou code (com REGISTRATION_CODE) em produção.");
   if (regMode === "code" && (env.REGISTRATION_CODE?.trim().length ?? 0) < 12) err("REGISTRATION_CODE", "REGISTRATION_MODE=code exige REGISTRATION_CODE com pelo menos 12 caracteres (sem isso o cadastro fica fechado).");
   if (env.ANTHROPIC_API_KEY && !env.AI_MONTHLY_TOKEN_LIMIT) warn("AI_LIMIT", "IA ligada sem AI_MONTHLY_TOKEN_LIMIT: vale o padrão de 500.000 tokens/mês por escritório.");
   if (!env.BACKUP_DIR?.trim()) warn("BACKUP_DIR", "BACKUP_DIR não definido: configure e agende scripts/backup.sh (veja docs/backup-restore.md).");
+  if (!env.BACKUP_OFFSITE?.trim()) err("BACKUP_OFFSITE", "BACKUP_OFFSITE ausente: o backup só existe neste servidor e se perde junto com ele. Configure a cópia externa (veja docs/backup-restore.md).");
+  if (env.MNI_ALLOW_LOCAL_ENDPOINTS === "1") err("MNI_LOCAL", "MNI_ALLOW_LOCAL_ENDPOINTS=1 desliga a proteção contra acesso à rede interna (SSRF); é só para testes.");
+  if (!env.ALERT_WEBHOOK_URL?.trim()) warn("ALERT_WEBHOOK", "ALERT_WEBHOOK_URL ausente: erros do servidor só ficam no log, ninguém é avisado. Configure um webhook (Slack, Discord, Teams ou similar) e um monitor de uptime em /api/ready.");
+  else if (!/^https:\/\//.test(env.ALERT_WEBHOOK_URL.trim())) err("ALERT_WEBHOOK_URL", "ALERT_WEBHOOK_URL deve ser https://.");
+  if (env.LEGALOS_PILOT_TERMS !== "1") warn("PILOT_TERMS", "LEGALOS_PILOT_TERMS não está ligado: os usuários do piloto entram sem aceitar os termos de uso e privacidade.");
+  if (env.EVOLUTION_PJE_LOGIN_ENABLED === "1" && !env.EVOLUTION_PJE_LOGIN_ORGS?.trim()) warn("PJE_PILOT_ORGS", "Piloto de certificado ligado sem EVOLUTION_PJE_LOGIN_ORGS: nenhum escritório consegue usá-lo.");
   return issues;
 }

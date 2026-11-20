@@ -103,8 +103,9 @@ test("apresentação pública: capítulos com telas reais, roadmap, sem preços 
   // funcionalidades especiais
   await expect(page.getByTestId("apres-especial")).toHaveCount(6);
   await expect(page.getByTestId("apres-especial").filter({ hasText: "Google Drive integrado" })).toContainText("Disponível");
-  // protocolo nos tribunais: funcionalidade principal, marcada para o lançamento (ainda não "disponível")
-  await expect(page.getByTestId("apres-protocolo")).toContainText("Disponível no lançamento · 05.01.2027");
+  // protocolo nos tribunais: em desenvolvimento, NÃO prometido para o lançamento (MVP)
+  await expect(page.getByTestId("apres-protocolo")).toContainText("Em breve · depois do lançamento");
+  await expect(page.getByTestId("apres-protocolo")).not.toContainText("Disponível no lançamento");
   await expect(page.getByTestId("apres-especial").filter({ hasText: "Protocolo" })).toHaveCount(0);
   // preços ainda não são divulgados na apresentação
   await expect(page.locator("main")).not.toContainText("R$");

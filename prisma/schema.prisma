@@ -4707,3 +4707,18 @@ model CoworkWorkItem {
   @@index([taskId])
   @@map("cowork_work_items")
 }
+
+/// MVP: aceite dos termos do piloto (versão do texto, quando, de onde). Sem relação para não acoplar ao User.
+model PilotTermAcceptance {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  version        String
+  acceptedAt     DateTime @default(now()) @map("accepted_at") @db.Timestamptz(3)
+  ipAddress      String?  @map("ip_address")
+  userAgent      String?  @map("user_agent")
+
+  @@unique([userId, version])
+  @@index([organizationId])
+  @@map("pilot_term_acceptances")
+}

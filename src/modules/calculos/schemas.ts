@@ -8,6 +8,12 @@ import { ACTS } from "@/lib/calc/prazos";
 
 export const CALC_KINDS = ["JF_ATRASADOS", "TJSP", "TRABALHISTA", "RESCISAO", "PRAZO"] as const;
 export type CalcKind = (typeof CALC_KINDS)[number];
+/**
+ * MVP: a atualização trabalhista fica escondida até revisão por especialista (ADC 58/59, Lei 14.905/2024).
+ * Para religar conscientemente: LEGALOS_CALC_TRABALHISTA=1.
+ */
+export const calcKindEnabled = (k: CalcKind) => k !== "TRABALHISTA" || process.env.LEGALOS_CALC_TRABALHISTA === "1";
+export const enabledCalcKinds = () => CALC_KINDS.filter(calcKindEnabled);
 export const CALC_KIND_LABEL: Record<CalcKind, string> = {
   JF_ATRASADOS: "Atrasados previdenciários (Justiça Federal)",
   TJSP: "Débito judicial cível (TJSP)",

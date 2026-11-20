@@ -83,9 +83,13 @@ describe("trabalhista", () => {
 });
 
 describe("prazos e exportação", () => {
-  it("recurso ordinário: 8 dias corridos", () => {
+  it("recurso ordinário: 8 dias úteis (art. 775 CLT), pulando o feriado de 12/10", () => {
     const r = calcPrazo({ actKey: "clt-ro", intimacao: "2026-10-01", hoje: "2026-10-05" });
-    expect(r.summary.find(([k]) => k === "VENCIMENTO")![1]).toBe("09/10/2026");
+    expect(r.summary.find(([k]) => k === "VENCIMENTO")![1]).toBe("14/10/2026");
+  });
+  it("Juizado e CLT contam em dias úteis", async () => {
+    const { ACTS } = await import("@/lib/calc/prazos");
+    for (const a of ACTS.filter((x) => x.rite === "JEC" || x.rite === "CLT")) expect(a.type).toBe("BUSINESS");
   });
   it("gera CSV, memorial e xlsx", async () => {
     const r = calcPrazo({ actKey: "cpc-contestacao", intimacao: "2026-10-19", hoje: "2026-10-20" });

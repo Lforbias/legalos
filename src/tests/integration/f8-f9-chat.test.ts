@@ -37,6 +37,7 @@ describe("2.0-F8/F9 — vários números e extras do Chat", () => {
   beforeAll(async () => {
     process.env.MFA_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
     process.env.CERT_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    process.env.WHATSAPP_QR_ENABLED = "1"; // QR desligado no MVP; aqui testamos o fluxo quando religado
     const url = await fake.start();
     Object.assign(process.env, { WHATSAPP_API_URL: url, WHATSAPP_APP_SECRET: APP_SECRET, WHATSAPP_VERIFY_TOKEN: "verifica-0123456789" });
     setQrDriver(fakeDriver);
@@ -96,6 +97,9 @@ describe("2.0-F8/F9 — vários números e extras do Chat", () => {
   });
 
   it("número por QR exige aceitar os riscos e nasce conectando", async () => {
+    delete process.env.WHATSAPP_QR_ENABLED;
+    await expect(addQrNumber(A.ctx, { label: "QR", riskAck: true })).rejects.toThrow(/QR-Code está desativada/);
+    process.env.WHATSAPP_QR_ENABLED = "1";
     await expect(addQrNumber(A.ctx, { label: "QR", riskAck: false })).rejects.toBeInstanceOf(ValidationError);
     const r = await addQrNumber(A.ctx, { label: "QR", riskAck: true });
     const n = (await listNumbers(A.ctx)).find((x) => x.id === r.id)!;

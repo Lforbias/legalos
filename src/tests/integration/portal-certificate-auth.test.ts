@@ -19,6 +19,7 @@ describe("login TJMG com certificado + autenticador", () => {
     process.env.MFA_ENCRYPTION_KEY = Buffer.alloc(32, 9).toString("base64");
     process.env.EVOLUTION_PJE_LOGIN_ENABLED = "1";
     a = await makeOrgWithOwner("portal-cert-auth");
+    process.env.EVOLUTION_PJE_LOGIN_ORGS = a.org.id; // piloto só para escritórios autorizados
     const enrollment = await startEnrollment(a.owner.id, a.owner.email);
     authenticatorSecret = enrollment.secret;
     await confirmEnrollment(a.owner.id, totpCode(authenticatorSecret, totpStep()), META);

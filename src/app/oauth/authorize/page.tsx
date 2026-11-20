@@ -3,7 +3,7 @@ import { Brand } from "@/components/layout/brand";
 import { Alert } from "@/components/ui/alert";
 import { can } from "@/server/context";
 import { OAuthConsent } from "@/modules/rute/oauth-consent";
-import { getClient, MCP_SCOPES, parseScopes, OAuthError } from "@/server/services/mcp-auth.service";
+import { getClient, MCP_SCOPES, parseScopes, OAuthError, redirectHost, trustedRedirectHost } from "@/server/services/mcp-auth.service";
 import { getRuteSettings, MCP_ENABLED } from "@/server/services/rute-settings.service";
 import { requireTenant } from "@/server/session";
 import { db } from "@/lib/db/client";
@@ -39,6 +39,7 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
     </Shell>
   );
   if (!client || !client.redirectUris.includes(redirectUri)) return bad("Aplicativo ou endereço de retorno não reconhecido. Volte ao aplicativo de IA e tente de novo.");
+  if (!trustedRedirectHost(redirectUri)) return bad(`O endereço de retorno (${redirectHost(redirectUri)}) não está na lista de aplicativos de IA confiáveis. Por segurança, a conexão foi recusada.`);
   if (one(sp.response_type) !== "code" || one(sp.code_challenge_method) !== "S256" || !/^[A-Za-z0-9_-]{43}$/.test(challenge)) return bad("Pedido de conexão inválido (falta a verificação PKCE).");
   let scopes;
   try {
@@ -56,8 +57,16 @@ export default async function AuthorizePage({ searchParams }: { searchParams: Pr
   return (
     <Shell>
       <h1 className="text-lg font-semibold">Conectar “{client.name}” ao LegalOS</h1>
+      <p className="rounded-md border border-border bg-background px-3 py-2 text-sm">
+        O acesso será entregue a: <strong className="font-mono">{redirectHost(redirectUri)}</strong>
+        <span className="block text-xs text-muted">Só clique em Permitir se foi você quem iniciou esta conexão a partir desse site.</span>
+      </p>
       <p className="text-sm text-muted">
-        Escritório: <strong>{organization.name}</strong>. A IA vai agir como você, com as suas permissões e o seu sigilo. Ela só consulta e propõe: nada é criado, alterado ou enviado sem a sua confirmação aqui no LegalOS. CPF, CNPJ e e-mails são ocultados.
+        Escritório: <strong>{organization.name}</strong>. A IA vai agir como você, com as suas permissões e o seu sigilo.{" "}
+        {scopes.includes("mcp:execute")
+          ? <strong className="text-foreground">Este pedido inclui EXECUTAR ações: a IA poderá criar e alterar registros no LegalOS em seu nome.</strong>
+          : "Ela só consulta e propõe: nada é criado, alterado ou enviado sem a sua confirmação aqui no LegalOS."}{" "}
+        CPF, CNPJ e e-mails são ocultados.
       </p>
       <OAuthConsent
         key={clientId + challenge}

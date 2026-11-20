@@ -17,13 +17,13 @@ export const ACTS: ActDef[] = [
   { key: "lef-embargos", label: "Embargos à execução fiscal", days: 30, type: "CALENDAR", rite: "LEF", basis: "art. 16 LEF" },
   { key: "cpc-laudo", label: "Manifestação sobre laudo pericial", days: 15, type: "BUSINESS", rite: "CPC", basis: "art. 477 CPC" },
   { key: "cpc-gratuidade", label: "Impugnação à gratuidade", days: 15, type: "BUSINESS", rite: "CPC", basis: "art. 100 CPC" },
-  { key: "jec-recurso-inominado", label: "Recurso inominado", days: 10, type: "CALENDAR", rite: "JEC", basis: "Lei 9.099/95" },
-  { key: "jec-contrarrazoes", label: "Contrarrazões de recurso inominado", days: 10, type: "CALENDAR", rite: "JEC", basis: "Lei 9.099/95" },
-  { key: "jec-embargos", label: "Embargos de declaração (JEC)", days: 5, type: "CALENDAR", rite: "JEC", basis: "Lei 9.099/95" },
-  { key: "clt-ro", label: "Recurso ordinário", days: 8, type: "CALENDAR", rite: "CLT", basis: "CLT" },
-  { key: "clt-rr", label: "Recurso de revista", days: 8, type: "CALENDAR", rite: "CLT", basis: "CLT" },
-  { key: "clt-ed", label: "Embargos de declaração (trabalho)", days: 5, type: "CALENDAR", rite: "CLT", basis: "CLT" },
-  { key: "clt-ai", label: "Agravo de instrumento (trabalho)", days: 8, type: "CALENDAR", rite: "CLT", basis: "CLT" },
+  { key: "jec-recurso-inominado", label: "Recurso inominado", days: 10, type: "BUSINESS", rite: "JEC", basis: "art. 12-A Lei 9.099/95" },
+  { key: "jec-contrarrazoes", label: "Contrarrazões de recurso inominado", days: 10, type: "BUSINESS", rite: "JEC", basis: "art. 12-A Lei 9.099/95" },
+  { key: "jec-embargos", label: "Embargos de declaração (JEC)", days: 5, type: "BUSINESS", rite: "JEC", basis: "art. 12-A Lei 9.099/95" },
+  { key: "clt-ro", label: "Recurso ordinário", days: 8, type: "BUSINESS", rite: "CLT", basis: "art. 775 CLT" },
+  { key: "clt-rr", label: "Recurso de revista", days: 8, type: "BUSINESS", rite: "CLT", basis: "art. 775 CLT" },
+  { key: "clt-ed", label: "Embargos de declaração (trabalho)", days: 5, type: "BUSINESS", rite: "CLT", basis: "art. 775 CLT" },
+  { key: "clt-ai", label: "Agravo de instrumento (trabalho)", days: 8, type: "BUSINESS", rite: "CLT", basis: "art. 775 CLT" },
 ];
 
 export type PrazoInput = { processo?: string; actKey: string; intimacao: string; hoje: string; customDays?: number; customType?: CountType };

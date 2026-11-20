@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { checkMachineAccess } from "./org-security.service";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { assertCan, can, type RequestMeta, type TenantContext } from "@/server/context";
@@ -68,11 +69,27 @@ export function validRedirectUri(u: string): boolean {
   return url.protocol === "http:" && ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname);
 }
 
+/**
+ * Destinos de retorno confiáveis. No MVP só aceitamos aplicativos de IA conhecidos (e ferramentas locais), para
+ * a tela de consentimento não ser usada em golpe ("Permitir" entregando dados a um site qualquer).
+ * Acrescente domínios em MCP_OAUTH_TRUSTED_HOSTS (separados por vírgula) ou libere tudo com MCP_OAUTH_ALLOW_ANY=1.
+ */
+const DEFAULT_TRUSTED_HOSTS = ["claude.ai", "claude.com", "chatgpt.com", "chat.openai.com", "localhost", "127.0.0.1", "[::1]"];
+export function trustedRedirectHost(u: string): boolean {
+  if (process.env.MCP_OAUTH_ALLOW_ANY === "1") return true;
+  let host: string;
+  try { host = new URL(u).hostname.toLowerCase(); } catch { return false; }
+  const extra = (process.env.MCP_OAUTH_TRUSTED_HOSTS ?? "").split(",").map((h) => h.trim().toLowerCase()).filter(Boolean);
+  return [...DEFAULT_TRUSTED_HOSTS, ...extra].some((t) => host === t || host.endsWith(`.${t}`));
+}
+export const redirectHost = (u: string) => { try { return new URL(u).host; } catch { return u; } };
+
 export async function registerClient(input: { client_name?: unknown; redirect_uris?: unknown }) {
   const name = typeof input.client_name === "string" ? input.client_name.trim().slice(0, 80) : "";
   const uris = Array.isArray(input.redirect_uris) ? input.redirect_uris.filter((x): x is string => typeof x === "string") : [];
   if (uris.length === 0 || uris.length > 5 || uris.length !== (input.redirect_uris as unknown[]).length) throw new OAuthError("invalid_redirect_uri", "Informe de 1 a 5 redirect_uris.");
   if (!uris.every(validRedirectUri)) throw new OAuthError("invalid_redirect_uri", "redirect_uri inválido (use https ou localhost).");
+  if (!uris.every(trustedRedirectHost)) throw new OAuthError("invalid_redirect_uri", "Aplicativo não autorizado: o endereço de retorno não está na lista de aplicativos de IA confiáveis.");
   if ((await db.mcpOAuthClient.count()) >= MAX_CLIENTS) throw new OAuthError("invalid_client_metadata", "Limite de aplicativos cadastrados atingido.");
   const clientId = `mcpc_${randomBytes(16).toString("hex")}`;
   const c = await db.mcpOAuthClient.create({ data: { clientId, name: name || "Aplicativo de IA", redirectUris: [...new Set(uris)] } });
@@ -172,6 +189,7 @@ export async function authenticateMcpBearer(token: string, meta: RequestMeta = {
   if (!t.startsWith("lgmcp_a_")) return null;
   const row = await db.mcpOAuthToken.findUnique({ where: { accessHash: sha256(t) } });
   if (!row || row.revokedAt || row.accessExpiresAt <= new Date()) return null;
+  if (!(await checkMachineAccess(row.organizationId, row.userId, meta.ipAddress))) return null;
   const ctx = await resolveTenantContext(row.userId, row.organizationId, meta);
   if (!ctx || !can(ctx, "ai:use")) return null;
   if (!row.lastUsedAt || Date.now() - row.lastUsedAt.getTime() > 60_000) await db.mcpOAuthToken.update({ where: { id: row.id }, data: { lastUsedAt: new Date() } }).catch(() => undefined);

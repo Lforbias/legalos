@@ -10,7 +10,7 @@ import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from "@
 import { onlyDigits } from "@/lib/validation/br-documents";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { requireMfa } from "./certificate.service";
+import { assertMfaEnabled } from "./mfa.service";
 import { isUniqueViolation } from "./db-errors";
 import { assignNoticeToTeam } from "./inbox-flow.service";
 import { assignNotice } from "./notice.service";
@@ -111,7 +111,7 @@ export async function setMonitorEnabled(ctx: TenantContext, id: string, enabled:
 
 export async function deleteMonitor(ctx: TenantContext, id: string) {
   assertCanManagePublications(ctx);
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const r = await db.djenMonitor.deleteMany({ where: { id, organizationId: ctx.organizationId } });
   if (r.count !== 1) throw new NotFoundError("Monitoramento não encontrado.");
   await audit({ action: "djen.monitor_delete", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "djen_monitor", resourceId: id, meta: ctx.meta });

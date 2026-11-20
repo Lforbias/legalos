@@ -1,6 +1,6 @@
 import { assertBoxAvailable } from "@/server/box-guard";
 import {
-  assertEvolutionJudicialLoginEnabled,
+  assertEvolutionJudicialLoginEnabled, evolutionJudicialLoginEnabled,
   EVOLUTION_EPROC_JOB_ORIGIN,
   EVOLUTION_EPROC_SYSTEM,
   EVOLUTION_PJE_JOB_ORIGIN,
@@ -36,6 +36,7 @@ function assertPortalSurface(surface: PortalAccessSurface) {
 
 function assertPortalPermission(ctx: TenantContext, surface: PortalAccessSurface) {
   assertCan(ctx, surface !== "legacy" ? "integrations:manage" : "cases:read");
+  if (surface !== "legacy" && !evolutionJudicialLoginEnabled(ctx.organizationId)) throw new ConflictError("O acesso privado aos portais judiciais não está liberado para este escritório.");
 }
 
 function requireKey(): Buffer {

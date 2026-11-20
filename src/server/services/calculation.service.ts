@@ -9,10 +9,10 @@ import { CalcError, fx, memorial, type CalcResult, type RateMap } from "@/lib/ca
 import { REAJUSTE_INSS, REAJUSTE_SOURCE, TJSP_FACTORS, TJSP_SOURCE } from "@/lib/calc/bundled-tables";
 import { toCsv, toXlsx } from "@/lib/calc/export";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
-import { CALC_KINDS, CALC_KIND_LABEL, SCHEMAS, indexInputSchema, type CalcKind } from "@/modules/calculos/schemas";
+import { CALC_KINDS, CALC_KIND_LABEL, SCHEMAS, calcKindEnabled, indexInputSchema, type CalcKind } from "@/modules/calculos/schemas";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { assertCaseVisible } from "./case.service";
+import { assertCaseVisible, hiddenCaseIds } from "./case.service";
 
 export const CALC_SERIES = ["IPCAE", "TR", "TJSP", "REAJUSTE_INSS", "SALMIN"] as const;
 export const SERIES_LABEL: Record<string, string> = {
@@ -44,6 +44,7 @@ const parsedCache = <T,>(kind: CalcKind, raw: unknown): T => {
 export async function runCalculation(ctx: TenantContext, kind: CalcKind, raw: unknown): Promise<{ input: unknown; result: CalcResult }> {
   assertCan(ctx, "cases:read");
   if (!(CALC_KINDS as readonly string[]).includes(kind)) throw new ValidationError("Tipo de cálculo inválido.");
+  if (!calcKindEnabled(kind)) throw new ConflictError("Esta calculadora está temporariamente indisponível enquanto passa por revisão técnica.");
   const org = ctx.organizationId;
   const nowYm = todayYmd(ctx.timezone).slice(0, 7);
   const input = parsedCache<Record<string, unknown>>(kind, raw);
@@ -84,8 +85,10 @@ export async function saveCalculation(ctx: TenantContext, kind: CalcKind, raw: u
 export async function listCalculations(ctx: TenantContext, opts: { caseId?: string; limit?: number } = {}) {
   assertCan(ctx, "cases:read");
   if (opts.caseId) await assertCaseVisible(ctx, opts.caseId);
+  // sigilo: cálculos ligados a processos que o usuário não pode ver não aparecem na lista (nem título, nem valor)
+  const hidden = opts.caseId ? [] : await hiddenCaseIds(ctx);
   const rows = await db.calculation.findMany({
-    where: { organizationId: ctx.organizationId, ...(opts.caseId ? { caseId: opts.caseId } : {}) },
+    where: { organizationId: ctx.organizationId, ...(opts.caseId ? { caseId: opts.caseId } : {}), ...(hidden.length ? { OR: [{ caseId: null }, { caseId: { notIn: hidden } }] } : {}) },
     orderBy: { createdAt: "desc" }, take: Math.min(opts.limit ?? 100, 200),
     select: { id: true, kind: true, title: true, total: true, caseId: true, createdAt: true, createdById: true },
   });

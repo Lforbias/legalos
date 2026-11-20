@@ -1,4 +1,5 @@
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { checkMachineAccess } from "./org-security.service";
 import { BOX_AVAILABLE, isBoxPermission } from "@/lib/box-retirement";
 import { db } from "@/lib/db/client";
 import type { PermissionKey } from "@/lib/permissions/catalog";
@@ -124,6 +125,7 @@ export async function authenticateApiKey(token: string, meta: RequestMeta = {}):
   const real = Buffer.from(key?.keyHash ?? "0".repeat(64));
   const same = given.length === real.length && timingSafeEqual(given, real);
   if (!key || !same || key.revokedAt || (key.expiresAt && key.expiresAt <= new Date()) || !key.createdById) return null;
+  if (!(await checkMachineAccess(key.organizationId, key.createdById, meta.ipAddress))) return null;
   const ctx = await resolveTenantContext(key.createdById, key.organizationId, meta);
   if (!ctx) return null;
   const scopes = new Set<ApiScope>();

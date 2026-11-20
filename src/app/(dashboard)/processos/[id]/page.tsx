@@ -63,7 +63,7 @@ import { listPublicDjenNoticesForCase } from "@/server/services/public-judicial.
 import { PlainUpdatesPanel } from "@/modules/portal/plus-ui";
 import { listPortalUpdatesForCase } from "@/server/services/portal-plus.service";
 import { listCalculations } from "@/server/services/calculation.service";
-import { CALC_KINDS, CALC_KIND_LABEL } from "@/modules/calculos/schemas";
+import { CALC_KIND_LABEL, enabledCalcKinds } from "@/modules/calculos/schemas";
 import { requireTenant } from "@/server/session";
 
 export const metadata: Metadata = { title: "Processo" };
@@ -532,7 +532,7 @@ export default async function CaseDetailPage({
               )}
               {can(ctx, "cases:write") ? (
                 <div className="flex flex-wrap gap-2">
-                  {CALC_KINDS.map((k) => <Link key={k} href={`/calculos/novo?tipo=${k}&processo=${c.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>{CALC_KIND_LABEL[k]}</Link>)}
+                  {enabledCalcKinds().map((k) => <Link key={k} href={`/calculos/novo?tipo=${k}&processo=${c.id}`} className={buttonVariants({ variant: "secondary", size: "sm" })}>{CALC_KIND_LABEL[k]}</Link>)}
                 </div>
               ) : null}
             </CardBody>

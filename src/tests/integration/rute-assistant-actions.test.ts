@@ -11,11 +11,25 @@ import { makeOrgWithOwner } from "./helpers";
 describe("Assistant direct actions", () => {
   let a: Awaited<ReturnType<typeof makeOrgWithOwner>>;
   beforeAll(async () => {
+    process.env.LEGALOS_RUTE_EXECUTE = "1"; // MVP: gravar direto fica desligado; aqui testamos o modo quando religado
     a = await makeOrgWithOwner("assistant-actions");
     await setOrgAiEnabled(a.ctx, true);
     await setRuteFeature(a.ctx, "assistant", true);
   });
   afterEach(() => __setToolChatForTests(undefined));
+  it("MVP: sem LEGALOS_RUTE_EXECUTE a RUTE não recebe ferramentas que gravam direto", async () => {
+    delete process.env.LEGALOS_RUTE_EXECUTE;
+    try {
+      __setToolChatForTests({ name: "test", model: "test", async run(i) {
+        expect(i.tools.some(t => t.name === "criar_tarefa")).toBe(false);
+        return { text: "ok", inputTokens: 1, outputTokens: 1, model: "test", toolCalls: 0 };
+      } });
+      const c = await createConversation(a.ctx);
+      await sendMessage(a.ctx, c.id, "Crie uma tarefa");
+    } finally {
+      process.env.LEGALOS_RUTE_EXECUTE = "1";
+    }
+  });
   it("executes once, persists action references and exposes permitted actions", async () => {
     __setToolChatForTests({ name: "test", model: "test", async run(i) {
       expect(i.tools.some(t => t.name === "criar_tarefa")).toBe(true);

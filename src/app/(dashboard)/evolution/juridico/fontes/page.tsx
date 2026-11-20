@@ -29,7 +29,7 @@ export default async function FontesPage() {
         icon={Globe}
         color={dept.color}
         title="Fontes e conexões"
-        description="Conectores da Justiça Estadual, Federal e do Trabalho nos estados do Sul e Sudeste. Login, consulta e protocolo são habilitados conforme validação de cada portal."
+        description="Conectores da Justiça Estadual, Federal e do Trabalho nos estados do Sul e Sudeste. Nesta versão, apenas o teste de login está disponível, e só para escritórios autorizados no piloto. Consulta e protocolo virão depois da validação de cada portal."
       />
       <ConnectionPanel />
       <h2 className="mt-8 mb-4 text-base font-semibold">Tribunais no escopo dos conectores</h2>

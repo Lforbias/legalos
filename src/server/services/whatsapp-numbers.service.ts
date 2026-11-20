@@ -1,4 +1,5 @@
 import QRCode from "qrcode";
+import { qrConnectionEnabled } from "@/lib/whatsapp/qr";
 import { db } from "@/lib/db/client";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 import { sealBytes } from "@/lib/security/pfx";
@@ -76,6 +77,7 @@ export async function addMetaNumber(ctx: TenantContext, input: { label: string; 
 export async function addQrNumber(ctx: TenantContext, input: { label: string; riskAck: boolean }) {
   assertCan(ctx, "whatsapp:manage");
   assertCan(ctx, "integrations:manage");
+  if (!qrConnectionEnabled()) throw new ConflictError("A conexão por QR-Code está desativada nesta versão. Use a conexão oficial da Meta.");
   requireCertKey();
   await assertMfaEnabled(ctx.userId);
   await assertRoom(ctx);

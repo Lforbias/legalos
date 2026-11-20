@@ -5,11 +5,15 @@ import { assertCaseVisible, caseVisibility, logCaseEvent } from "./case.service"
 import { audit } from "./audit.service";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
 
-const PUBLIC_DJEN_NOTICE = {
+/**
+ * Publicações visíveis na Central Judicial: as do DJEN público e as trazidas do Astrea na importação
+ * (antes ficavam invisíveis porque o importador não marcava a origem).
+ */
+const PUBLIC_NOTICE_FILTER: Prisma.CourtNoticeWhereInput = {
   source: "IMPORTED",
-  sourceSystem: "djen",
-  originKind: "DJEN_PUBLICATION",
-} as const;
+  OR: [{ sourceSystem: "djen", originKind: "DJEN_PUBLICATION" }, { sourceSystem: "astrea" }],
+};
+const PUBLIC_DJEN_NOTICE = { AND: [PUBLIC_NOTICE_FILTER] } satisfies Prisma.CourtNoticeWhereInput;
 
 /** Publicações do DJEN, sem abrir permissões nem rotas da antiga caixa do BOX. */
 export async function listPublicDjenNotices(ctx: TenantContext, take = 100) {

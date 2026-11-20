@@ -149,13 +149,13 @@ export default function Apresentacao() {
         <section id="protocolo" className={`${l.section} ${l.dark} ${a.dark}`} aria-labelledby="protocolo-titulo" data-testid="apres-protocolo">
           <div className={`${l.wrap} ${a.chapter}`}>
             <div>
-              <p className={`${l.kicker} ${l.mono}`}>04 / Protocolo nos tribunais</p>
+              <p className={`${l.kicker} ${l.mono}`}>04 / Protocolo nos tribunais · em breve</p>
               <h2 id="protocolo-titulo" className={l.h2}><span className={a.deptDot} style={{ background: DEPARTMENTS.juridico.color }} aria-hidden="true" />Do processo ao tribunal, sem sair do LegalOS.</h2>
-              <p className={l.lead}>A petição pronta é protocolada direto do processo, com o certificado digital do advogado, e o comprovante volta para o caso.</p>
+              <p className={l.lead}>Em desenvolvimento: a petição pronta será protocolada direto do processo, com o certificado digital do advogado, e o comprovante voltará para o caso. Ainda não faz parte da versão de lançamento.</p>
               <ol className={a.points}>
                 {["Petição enviada a partir do próprio processo", "Certificado digital guardado cifrado", "Fila de protocolos com acompanhamento", "Comprovante salvo no processo, com quem protocolou e quando"].map((p, j) => <li key={p}><span className={l.mono}>{String(j + 1).padStart(2, "0")}</span>{p}</li>)}
               </ol>
-              <p className={`${a.launchTag} ${l.mono}`}>Disponível no lançamento · {LAUNCH_LABEL}</p>
+              <p className={`${a.launchTag} ${l.mono}`}>Em breve · depois do lançamento</p>
             </div>
             <ol className={`${a.flow} ${l.mono}`} aria-label="Como funciona o protocolo">
               {["Petição pronta no processo", "Assinatura com certificado digital", "Protocolo no tribunal", "Comprovante de volta no caso"].map((step, j) => <li key={step}><span>{String(j + 1).padStart(2, "0")}</span>{step}</li>)}
@@ -230,8 +230,8 @@ export default function Apresentacao() {
             <h2 id="roadmap-titulo" className={l.h2}>Hoje, no lançamento<br />e depois.</h2>
             <ol className={a.track}>
               <li className={`${a.stop} ${a.stopNow}`}><span className={l.mono}>Hoje</span><h3>Já funciona</h3><ul>{AVAILABLE.map((t) => <li key={t}>{t}</li>)}</ul></li>
-              <li className={`${a.stop} ${a.stopLaunch}`}><span className={l.mono} style={{ color: "#d61f35" }}>{LAUNCH_LABEL}</span><h3>Lançamento</h3><ul><li>Protocolo integrado aos tribunais</li><li>Abertura para novos escritórios</li><li>Demonstração e implantação com o nosso time</li><li>Migração de dados de outros sistemas</li></ul></li>
-              <li className={a.stop}><span className={l.mono}>Depois</span><h3>Em construção</h3><ul>{COMING_SOON.map((t) => <li key={t}>{t}</li>)}<li>Captura de publicações e autos (Central Judicial)</li></ul></li>
+              <li className={`${a.stop} ${a.stopLaunch}`}><span className={l.mono} style={{ color: "#d61f35" }}>{LAUNCH_LABEL}</span><h3>Lançamento</h3><ul><li>Abertura para novos escritórios</li><li>Demonstração e implantação com o nosso time</li><li>Migração de dados de outros sistemas</li></ul></li>
+              <li className={a.stop}><span className={l.mono}>Depois</span><h3>Em construção</h3><ul>{COMING_SOON.map((t) => <li key={t}>{t}</li>)}<li>Protocolo integrado aos tribunais</li><li>Captura de publicações e autos (Central Judicial)</li></ul></li>
             </ol>
           </div>
         </section>

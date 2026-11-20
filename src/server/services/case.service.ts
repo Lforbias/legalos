@@ -32,6 +32,16 @@ export function caseVisibility(ctx: TenantContext): Prisma.CaseWhereInput {
   return { OR: [{ confidential: false }, { members: { some: { userId: ctx.userId } } }] };
 }
 
+/**
+ * IDs dos processos que o usuário NÃO pode ver (sigilosos fora da equipe). Vazio para quem administra.
+ * Atenção: `NOT: {}` no Prisma não filtra nada — por isso o caso "vê tudo" é tratado à parte.
+ */
+export async function hiddenCaseIds(ctx: TenantContext, client: Tx | typeof db = db): Promise<string[]> {
+  const vis = caseVisibility(ctx);
+  if (Object.keys(vis).length === 0) return [];
+  return (await client.case.findMany({ where: { organizationId: ctx.organizationId, NOT: vis }, select: { id: true } })).map((c) => c.id);
+}
+
 /** Garante que o processo existe NESTE escritório, não foi excluído e é visível ao usuário. Caso contrário, "não encontrado". */
 export async function assertCaseVisible(ctx: TenantContext, caseId: string, client: Tx | typeof db = db) {
   const found = await client.case.findFirst({

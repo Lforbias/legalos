@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { needsPilotTerms } from "@/server/services/pilot-terms.service";
 import { AppShell } from "@/components/layout/app-shell";
 import { EVOLUTION_NAV } from "@/config/evolution-navigation";
 import { NAV_ITEMS } from "@/config/navigation";
@@ -25,13 +26,17 @@ export default async function DashboardLayout({ children }: { children: React.Re
   const { session, ctx } = await requireTenant();
   // cliente externo só usa o portal; o painel interno não é para ele
   if (ctx.roleKey === "CLIENT") redirect("/portal");
-  const organizations = await listUserOrganizations(session.user.id);
-  // avisos de vencimento são gerados sob demanda (no máximo 1x/min por usuário); falha aqui nunca derruba a página
-  await syncDueNotifications(ctx).catch(() => 0);
-  const [unread, latest] = await Promise.all([unreadCount(ctx), listNotifications(ctx, { take: 8 })]);
-  const chatBadge = can(ctx, "whatsapp:read") ? await unreadTotal(ctx).catch(() => 0) : 0;
-  const coworkBadge = can(ctx, "cowork:read") ? await coworkUnreadTotal(ctx).catch(() => 0) : 0;
-  const ent = await getEntitlements(ctx.organizationId).catch(() => null);
+  // MVP: termos do piloto com aceite registrado (LEGALOS_PILOT_TERMS=1)
+  if (await needsPilotTerms(ctx.userId)) redirect("/termos-do-piloto");
+  // consultas independentes em paralelo (antes eram 6 em sequência a cada navegação)
+  const [organizations, [unread, latest], chatBadge, coworkBadge, ent] = await Promise.all([
+    listUserOrganizations(session.user.id),
+    // avisos de vencimento são gerados sob demanda (no máximo 1x/min por usuário); falha aqui nunca derruba a página
+    syncDueNotifications(ctx).catch(() => 0).then(() => Promise.all([unreadCount(ctx), listNotifications(ctx, { take: 8 })])),
+    can(ctx, "whatsapp:read") ? unreadTotal(ctx).catch(() => 0) : Promise.resolve(0),
+    can(ctx, "cowork:read") ? coworkUnreadTotal(ctx).catch(() => 0) : Promise.resolve(0),
+    getEntitlements(ctx.organizationId).catch(() => null),
+  ]);
   const planNotice = ent ? PLAN_NOTICE[ent.state]?.(ent.trialDaysLeft) ?? null : null;
   const visibleKeys = NAV_ITEMS.filter((n) => {
     const permitted = n.permissionAny ? n.permissionAny.some((permission) => can(ctx, permission)) : !n.permission || can(ctx, n.permission);

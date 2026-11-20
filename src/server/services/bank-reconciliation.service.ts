@@ -7,11 +7,17 @@ import { audit } from "./audit.service";
 import { parseStatementCsv, type StatementMapping } from "@/lib/finance/statement-csv";
 import { todayYmd, ymdToDate } from "@/lib/dates/ymd";
 import { caseVisibility } from "./case.service";
+import { reconciliationEnabled } from "@/lib/finance/flags";
+
+function assertReconciliationEnabled() {
+  if (!reconciliationEnabled()) throw new ConflictError("A conciliação bancária está temporariamente desativada enquanto passa por revisão.");
+}
 
 const MAX_CSV_BYTES = 8 * 1024 * 1024;
 const MAX_ROWS = 5000;
 
 export async function importStatementCsv(ctx: TenantContext, input: { accountId: string; fileName: string; content: string; mapping: StatementMapping }) {
+  assertReconciliationEnabled();
   assertCan(ctx, "finance:write");
   if (Buffer.byteLength(input.content, "utf8") > MAX_CSV_BYTES) throw new ValidationError("O extrato deve ter até 8 MB.");
   const account = await db.financeAccount.findFirst({
@@ -66,6 +72,7 @@ export async function importStatementCsv(ctx: TenantContext, input: { accountId:
 }
 
 export async function listStatementImports(ctx: TenantContext) {
+  assertReconciliationEnabled();
   assertCan(ctx, "finance:read");
   return db.bankStatementImport.findMany({
     where: { organizationId: ctx.organizationId },
@@ -76,6 +83,7 @@ export async function listStatementImports(ctx: TenantContext) {
 }
 
 export async function getStatementImport(ctx: TenantContext, importId: string) {
+  assertReconciliationEnabled();
   assertCan(ctx, "finance:read");
   const statement = await db.bankStatementImport.findFirst({
     where: { id: importId, organizationId: ctx.organizationId },
@@ -128,6 +136,7 @@ export async function getStatementImport(ctx: TenantContext, importId: string) {
 }
 
 export async function reconcileStatementLine(ctx: TenantContext, importId: string, lineId: string, entryId: string) {
+  assertReconciliationEnabled();
   assertCan(ctx, "finance:write");
   return db.$transaction(async (tx) => {
     const line = await tx.bankStatementLine.findFirst({
@@ -171,6 +180,7 @@ export async function reconcileStatementLine(ctx: TenantContext, importId: strin
 }
 
 export async function ignoreStatementLine(ctx: TenantContext, importId: string, lineId: string) {
+  assertReconciliationEnabled();
   assertCan(ctx, "finance:write");
   const result = await db.bankStatementLine.updateMany({ where: { id: lineId, importId, organizationId: ctx.organizationId, status: "PENDING" }, data: { status: "IGNORED" } });
   if (!result.count) throw new ConflictError("A linha já foi tratada. Atualize a tela.");

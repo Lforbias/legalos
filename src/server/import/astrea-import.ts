@@ -468,6 +468,8 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
         id,
         organizationId,
         source: "IMPORTED",
+        sourceSystem: "astrea",
+        originKind: "IMPORT",
         status: d.status,
         kind: parsed.kind ?? "INTIMACAO",
         title: d.title,

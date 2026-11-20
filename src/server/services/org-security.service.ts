@@ -89,12 +89,31 @@ export async function checkOrgAccess(organizationId: string, ip: string | null, 
   }
 }
 
+/**
+ * Acesso por máquina (chave de API e conexões MCP/OAuth): aplica a lista de IPs do escritório e a exigência
+ * de 2FA da pessoa dona da credencial. Diferente da sessão, falha de leitura NEGA o acesso.
+ */
+export async function checkMachineAccess(organizationId: string, userId: string, ip: string | null | undefined): Promise<boolean> {
+  try {
+    const [s, org, mfa] = await Promise.all([
+      db.orgSecuritySettings.findUnique({ where: { organizationId }, select: { ipEnforced: true, ipAllowlist: true } }),
+      db.organization.findUnique({ where: { id: organizationId }, select: { requireMfa: true } }),
+      db.userMfa.findUnique({ where: { userId }, select: { enabledAt: true } }),
+    ]);
+    if (s?.ipEnforced && s.ipAllowlist.length > 0 && !ipAllowed(ip ?? null, s.ipAllowlist)) return false;
+    if (org?.requireMfa && !mfa?.enabledAt) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 // ---------- sessões da equipe ----------
 
 export async function listOrgSessions(ctx: TenantContext) {
   assertCan(ctx, "organization:manage");
   const rows = await db.session.findMany({
-    where: { revokedAt: null, expiresAt: { gt: new Date() }, user: { memberships: { some: { organizationId: ctx.organizationId, status: "ACTIVE" } } } },
+    where: { revokedAt: null, expiresAt: { gt: new Date() }, activeOrganizationId: ctx.organizationId, user: { memberships: { some: { organizationId: ctx.organizationId, status: "ACTIVE" } } } },
     orderBy: { lastSeenAt: "desc" }, take: 200,
     select: { id: true, userAgent: true, ipAddress: true, createdAt: true, lastSeenAt: true, userId: true, user: { select: { name: true, email: true } } },
   });
@@ -103,7 +122,7 @@ export async function listOrgSessions(ctx: TenantContext) {
 
 export async function revokeOrgSession(ctx: TenantContext, sessionId: string) {
   assertCan(ctx, "organization:manage");
-  const s = await db.session.findFirst({ where: { id: sessionId, revokedAt: null, user: { memberships: { some: { organizationId: ctx.organizationId, status: "ACTIVE" } } } }, select: { id: true, userId: true } });
+  const s = await db.session.findFirst({ where: { id: sessionId, revokedAt: null, activeOrganizationId: ctx.organizationId, user: { memberships: { some: { organizationId: ctx.organizationId, status: "ACTIVE" } } } }, select: { id: true, userId: true } });
   if (!s) throw new NotFoundError("Sessão não encontrada.");
   await db.session.update({ where: { id: s.id }, data: { revokedAt: new Date() } });
   await audit({ action: "org.session_revoked", organizationId: ctx.organizationId, userId: ctx.userId, resourceType: "session", resourceId: s.id, metadata: { target: s.userId }, meta: ctx.meta });
