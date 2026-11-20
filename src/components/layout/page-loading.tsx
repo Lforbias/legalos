@@ -1,5 +1,5 @@
-/** Mostrado enquanto a próxima tela do painel carrega (o menu continua visível). */
-export default function DashboardLoading() {
+/** Esqueleto de carregamento do painel. Só em seções SEM notFound() abaixo: com loading.tsx a resposta começa antes e um 404 sairia como 200. */
+export function PageLoading() {
   return (
     <div role="status" aria-live="polite" className="mx-auto w-full max-w-5xl animate-pulse space-y-4 py-2">
       <span className="sr-only">Carregando…</span>
