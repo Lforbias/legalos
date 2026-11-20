@@ -71,7 +71,7 @@ export function checkProductionEnv(env: Record<string, string | undefined>): Che
   if (regMode === "code" && (env.REGISTRATION_CODE?.trim().length ?? 0) < 12) err("REGISTRATION_CODE", "REGISTRATION_MODE=code exige REGISTRATION_CODE com pelo menos 12 caracteres (sem isso o cadastro fica fechado).");
   if (env.ANTHROPIC_API_KEY && !env.AI_MONTHLY_TOKEN_LIMIT) warn("AI_LIMIT", "IA ligada sem AI_MONTHLY_TOKEN_LIMIT: vale o padrão de 500.000 tokens/mês por escritório.");
   if (!env.BACKUP_DIR?.trim()) warn("BACKUP_DIR", "BACKUP_DIR não definido: configure e agende scripts/backup.sh (veja docs/backup-restore.md).");
-  if (!env.BACKUP_OFFSITE?.trim()) err("BACKUP_OFFSITE", "BACKUP_OFFSITE ausente: o backup só existe neste servidor e se perde junto com ele. Configure a cópia externa (veja docs/backup-restore.md).");
+  if (!env.BACKUP_OFFSITE?.trim()) warn("BACKUP_OFFSITE", "BACKUP_OFFSITE ausente: o backup só existe neste servidor e se perde junto com ele. Configure a cópia externa (veja docs/backup-restore.md).");
   if (env.MNI_ALLOW_LOCAL_ENDPOINTS === "1") err("MNI_LOCAL", "MNI_ALLOW_LOCAL_ENDPOINTS=1 desliga a proteção contra acesso à rede interna (SSRF); é só para testes.");
   if (!env.ALERT_WEBHOOK_URL?.trim()) warn("ALERT_WEBHOOK", "ALERT_WEBHOOK_URL ausente: erros do servidor só ficam no log, ninguém é avisado. Configure um webhook (Slack, Discord, Teams ou similar) e um monitor de uptime em /api/ready.");
   else if (!/^https:\/\//.test(env.ALERT_WEBHOOK_URL.trim())) err("ALERT_WEBHOOK_URL", "ALERT_WEBHOOK_URL deve ser https://.");

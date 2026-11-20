@@ -42,9 +42,9 @@ if [ "${DEPLOY_SKIP_PILOT_CHECK:-}" != 1 ]; then
   [ "$(env_get MAIL_DRIVER)" = smtp ] || MISSING="$MISSING MAIL_DRIVER=smtp(convites/senha não chegam)"
   case "$(env_get REGISTRATION_MODE)" in closed|code) ;; *) MISSING="$MISSING REGISTRATION_MODE=closed|code(cadastro aberto)";; esac
   CRON_VAL="$(env_get CRON_SECRET)"; [ "${#CRON_VAL}" -ge 24 ] || MISSING="$MISSING CRON_SECRET(>=24 caracteres)"
-  [ -n "$(env_get BACKUP_OFFSITE)" ] || MISSING="$MISSING BACKUP_OFFSITE(cópia externa do backup)"
   [ "$(env_get MNI_ALLOW_LOCAL_ENDPOINTS)" != 1 ] || MISSING="$MISSING MNI_ALLOW_LOCAL_ENDPOINTS!=1"
   [ -z "$MISSING" ] || die "configuração de produção incompleta em $ENV_FILE:$MISSING. Corrija ou rode com DEPLOY_SKIP_PILOT_CHECK=1."
+  [ -n "$(env_get BACKUP_OFFSITE)" ] || log "AVISO: BACKUP_OFFSITE não definido; o backup diário fica só neste servidor."
   [ -n "$(env_get ALERT_WEBHOOK_URL)" ] || log "AVISO: ALERT_WEBHOOK_URL não definido; erros do servidor não geram alerta."
 fi
 

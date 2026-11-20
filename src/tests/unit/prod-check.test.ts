@@ -43,9 +43,12 @@ describe("checagem de produção", () => {
     expect(w).toEqual(expect.arrayContaining(["DATABASE_LOCAL", "STORAGE_DIR", "BACKUP_DIR", "PETITION_DEMO", "ALERT_WEBHOOK"]));
     expect(codes({ ...good, DATABASE_URL: "postgresql://u:p@db.exemplo.com:5432/x" }, "warn")).toContain("DATABASE_SSL");
   });
-  it("MVP: e-mail real, cadastro fechado, rotinas e backup externo são obrigatórios", () => {
+  it("MVP: e-mail real, cadastro fechado e rotinas são obrigatórios", () => {
     const { MAIL_DRIVER: _m, REGISTRATION_MODE: _r, CRON_SECRET: _c, BACKUP_OFFSITE: _b, ...rest } = good;
-    expect(codes(rest, "error")).toEqual(expect.arrayContaining(["MAIL_CONSOLE", "REGISTRATION_OPEN", "CRON_SECRET", "BACKUP_OFFSITE"]));
+    expect(codes(rest, "error")).toEqual(expect.arrayContaining(["MAIL_CONSOLE", "REGISTRATION_OPEN", "CRON_SECRET"]));
+    // backup externo é recomendado, não obrigatório (decisão do escritório)
+    expect(codes(rest, "warn")).toContain("BACKUP_OFFSITE");
+    expect(codes(rest, "error")).not.toContain("BACKUP_OFFSITE");
     expect(codes({ ...good, MNI_ALLOW_LOCAL_ENDPOINTS: "1" }, "error")).toContain("MNI_LOCAL");
   });
 });
