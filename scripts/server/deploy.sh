@@ -35,6 +35,19 @@ PREV_LOGIN_FLAG="$(env_get EVOLUTION_PJE_LOGIN_ENABLED)"
 PREV="$(cat "$APP_DIR/.deployed-sha" 2>/dev/null || echo desconhecida)"
 log "publicando $SHA (anterior: $PREV)"
 
+# MVP / piloto: recusa publicar com configuração que deixa o produto inseguro ou mudo (antes de tocar em qualquer coisa).
+# Para publicar mesmo assim (ex.: servidor de testes), rode com DEPLOY_SKIP_PILOT_CHECK=1.
+if [ "${DEPLOY_SKIP_PILOT_CHECK:-}" != 1 ]; then
+  MISSING=""
+  [ "$(env_get MAIL_DRIVER)" = smtp ] || MISSING="$MISSING MAIL_DRIVER=smtp(convites/senha não chegam)"
+  case "$(env_get REGISTRATION_MODE)" in closed|code) ;; *) MISSING="$MISSING REGISTRATION_MODE=closed|code(cadastro aberto)";; esac
+  CRON_VAL="$(env_get CRON_SECRET)"; [ "${#CRON_VAL}" -ge 24 ] || MISSING="$MISSING CRON_SECRET(>=24 caracteres)"
+  [ -n "$(env_get BACKUP_OFFSITE)" ] || MISSING="$MISSING BACKUP_OFFSITE(cópia externa do backup)"
+  [ "$(env_get MNI_ALLOW_LOCAL_ENDPOINTS)" != 1 ] || MISSING="$MISSING MNI_ALLOW_LOCAL_ENDPOINTS!=1"
+  [ -z "$MISSING" ] || die "configuração de produção incompleta em $ENV_FILE:$MISSING. Corrija ou rode com DEPLOY_SKIP_PILOT_CHECK=1."
+  [ -n "$(env_get ALERT_WEBHOOK_URL)" ] || log "AVISO: ALERT_WEBHOOK_URL não definido; erros do servidor não geram alerta."
+fi
+
 EXCLUDES=(--exclude='.deploy-meta' --exclude='.deployed-image' --exclude='.env' --exclude='.env.*' --exclude='.storage' --exclude='node_modules' --exclude='*.tar.gz' --exclude='*.log' --exclude='docker-compose.override.yml' --exclude='.deployed-sha' --exclude='/_arquivos' --exclude='/_entregas' --exclude='/relatorio.json' --exclude='/ssh-copy-id*' --exclude='/Claude outputs' --exclude='/BACKUP*' --exclude='._*' --exclude='.git')
 
 install_tree() { # $1 = pacote
@@ -120,11 +133,12 @@ rollback() {
 # 3) troca o código, baixa/constrói a imagem e migra
 STAGE="copiar código"; install_tree "$TAR" || rollback
 chmod +x "$APP_DIR"/scripts/server/*.sh
-if [ -n "$(env_get CERT_ENCRYPTION_KEY)" ]; then
-  set_env_value EVOLUTION_PJE_LOGIN_ENABLED 1 || rollback
-  log "piloto autenticado TJMG habilitado com cofre configurado"
+# MVP: o piloto de certificado/robô NÃO é mais ligado automaticamente. Para ligar de propósito, defina no .env
+# EVOLUTION_PJE_LOGIN_ENABLED=1 e EVOLUTION_PJE_LOGIN_ORGS=<ids dos escritórios autorizados>.
+if [ "$(env_get EVOLUTION_PJE_LOGIN_ENABLED)" = 1 ]; then
+  log "piloto autenticado TJMG ligado manualmente no .env (só para EVOLUTION_PJE_LOGIN_ORGS)"
 else
-  log "cofre ausente; piloto autenticado TJMG permanece desligado"
+  log "piloto autenticado TJMG desligado"
 fi
 if [ "$FAST" = 1 ]; then
   STAGE="baixar imagens"; log "baixando as imagens prontas"

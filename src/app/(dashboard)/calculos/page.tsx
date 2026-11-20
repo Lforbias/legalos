@@ -6,7 +6,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatMoneyBR } from "@/lib/validation/money";
 import { formatYmd } from "@/lib/dates/ymd";
-import { CALC_KINDS, CALC_KIND_LABEL } from "@/modules/calculos/schemas";
+import { CALC_KINDS, CALC_KIND_LABEL, enabledCalcKinds } from "@/modules/calculos/schemas";
 import { can } from "@/server/context";
 import { listCalculations } from "@/server/services/calculation.service";
 import { requireTenant } from "@/server/session";
@@ -29,7 +29,7 @@ export default async function CalculosPage() {
     <div className="mx-auto max-w-5xl">
       <PageHeader title="Cálculos" description="Calculadoras do escritório. Ferramenta de apoio: confira o resultado com a decisão e, quando exigido, com o cálculo oficial do juízo." actions={<Link href="/calculos/indices" className={buttonVariants({ variant: "secondary" })}>Índices</Link>} />
       <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {CALC_KINDS.map((k) => (
+        {enabledCalcKinds().map((k) => (
           <Link key={k} href={`/calculos/novo?tipo=${k}`} className="rounded-lg border border-border bg-surface p-4 transition-colors hover:border-primary">
             <p className="text-sm font-semibold">{CALC_KIND_LABEL[k]}</p>
             <p className="mt-1 text-xs text-muted">{DESC[k]}</p>

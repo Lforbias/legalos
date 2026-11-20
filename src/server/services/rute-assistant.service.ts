@@ -25,6 +25,15 @@ const MAX_MESSAGES = 200;
 const MAX_CONVERSATIONS = 100;
 const HISTORY = 20;
 
+/**
+ * MVP: no modo "Criar e alterar" a RUTE só PROPÕE (a pessoa confirma cada gravação). Gravar direto, sem aprovação,
+ * fica desligado porque um texto de cliente lido pela IA poderia induzi-la a alterar dados. Religar: LEGALOS_RUTE_EXECUTE=1.
+ */
+function assistantScopes(mode: string): Set<"read" | "propose" | "execute"> {
+  if (mode === "consult") return new Set(["read"]);
+  return new Set(process.env.LEGALOS_RUTE_EXECUTE === "1" ? ["read", "propose", "execute"] : ["read", "propose"]);
+}
+
 export const ASSISTANT_SYSTEM = `Você é a RUTE, assistente do LegalOS (sistema de um escritório de advocacia). Você fala com um membro da equipe, em português do Brasil.
 Regras obrigatórias:
 - Para perguntas de quantidade ou totais (membros, clientes ativos, processos, prazos, tarefas ou intimações), consulte indicadores_escritorio antes de responder. Não use o tamanho de uma lista paginada como total. Cite a fonte e não diga que falta acesso sem antes consultar as ferramentas disponíveis. Se o indicador for omitido por permissão, explique essa limitação.
@@ -192,7 +201,7 @@ async function performSendMessage(ctx: TenantContext, conversationId: string, ra
 
   const started = new Date();
   const refs: MessageRef[] = [];
-  const scopes = new Set<"read" | "propose" | "execute">(mode === "consult" ? ["read"] : ["read", "propose", "execute"]);
+  const scopes = assistantScopes(mode);
   const tools = toolList(ctx, scopes).map((t) => ({ name: t.name, description: t.description, input: t.input }));
   const note = await contextNote(ctx, conv);
   const origin = { via: "ASSISTANT" as const, connection: conv.id, provider: provider.name };
@@ -201,7 +210,7 @@ async function performSendMessage(ctx: TenantContext, conversationId: string, ra
   let result;
   try {
     result = await provider.run({
-      system: `${ASSISTANT_SYSTEM}\n\n${mode === "consult" ? "MODO CONSULTA: apenas leitura. Não crie propostas nem execute alterações. Oriente a pessoa a selecionar Criar e alterar se quiser gravar." : "MODO AÇÕES: use ações apenas para pedidos explícitos da pessoa; perguntas continuam sendo consultas."}\n\n${note}`,
+      system: `${ASSISTANT_SYSTEM}\n\n${mode === "consult" ? "MODO CONSULTA: apenas leitura. Não crie propostas nem execute alterações. Oriente a pessoa a selecionar Criar e alterar se quiser gravar." : "MODO AÇÕES: use propostas (ou ações, quando disponíveis) apenas para pedidos explícitos da pessoa; perguntas continuam sendo consultas."}\n\n${note}`,
       history,
       tools,
       maxTokens: 2000,
@@ -291,7 +300,7 @@ export async function sendMessage(ctx: TenantContext, conversationId: string, ra
   if (previous[0]) {
     if (previous[0].request_hash !== requestHash) throw new ConflictError("Essa solicitação já foi usada com outro texto ou modo.");
     if (previous[0].state === "DONE" && previous[0].result) {
-      const allowed = new Set(toolList(ctx, new Set<"read" | "propose" | "execute">(mode === "consult" ? ["read"] : ["read", "propose", "execute"])).map(t => t.name));
+      const allowed = new Set(toolList(ctx, assistantScopes(mode)).map(t => t.name));
       if (previous[0].result.refs.some(ref => ref.name && !allowed.has(ref.name))) throw new ForbiddenError("Suas permissões mudaram. Consulte os registros novamente com seu acesso atual.");
       return previous[0].result;
     }

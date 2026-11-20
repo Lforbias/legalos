@@ -118,7 +118,7 @@ export default async function IntegrationsPage({ searchParams }: { searchParams:
         <Card>
           <CardHeader title="DJEN — publicações por OAB" action={monitors.some((m) => m.enabled) ? <Badge tone="success">Ativo</Badge> : <Badge tone="warning">Desligado</Badge>} />
           <CardBody className="space-y-4 text-sm">
-            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado e mostra as publicações na Central Judicial, sem repetir. Não precisa de certificado nem de senha. A verificação automática depende de um agendador chamar o sistema (variável CRON_SECRET); sem isso, use “Verificar agora”. Se o serviço público estiver indisponível, a tela informa a falha em vez de apresentar uma captura vazia como sucesso.</p>
+            <p>Consulta a base pública do Diário de Justiça Eletrônico Nacional pela OAB do advogado e mostra as publicações na Central Judicial, sem repetir. Não precisa de certificado nem de senha. Nesta versão a verificação é manual: use “Verificar agora” (a verificação automática volta numa próxima versão). Se o serviço público estiver indisponível, a tela informa a falha em vez de apresentar uma captura vazia como sucesso.</p>
             <MonitorList items={monitors.map((m) => ({ id: m.id, label: m.label, oabNumber: m.oabNumber, oabUf: m.oabUf, enabled: m.enabled, lastSyncAt: m.lastSyncAt ? m.lastSyncAt.toISOString() : null, lastStatus: m.lastStatus, lastMessage: m.lastMessage, defaultAssigneeId: m.defaultAssigneeId, defaultTeamId: m.defaultTeamId }))} recipients={BOX_AVAILABLE ? { members: rcvMembers.map((u) => ({ id: u.id, name: u.name })), teams: rcvTeams.map((t) => ({ id: t.id, name: t.name })) } : undefined} />
             <MonitorForm ufs={UFS} />
           </CardBody>

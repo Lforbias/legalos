@@ -6,7 +6,7 @@ import { certKey, openBytes, sealBytes } from "@/lib/security/pfx";
 import { getObjectStream } from "@/lib/storage/local-storage";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { requireMfa } from "./certificate.service";
+import { assertMfaEnabled } from "./mfa.service";
 import { addDocumentVersion, loadDocumentChecked } from "./document.service";
 
 /**
@@ -43,7 +43,7 @@ export async function getDriveSettings(ctx: TenantContext) {
 export async function saveDriveCredentials(ctx: TenantContext, input: { clientId: string; clientSecret: string; folderName?: string | null }) {
   assertCan(ctx, "integrations:manage");
   const key = requireKey();
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const clientId = input.clientId.trim();
   const clientSecret = input.clientSecret.trim();
   const folderName = (input.folderName ?? "").trim() || "LegalOS";
@@ -69,7 +69,7 @@ export async function setDriveEnabled(ctx: TenantContext, enabled: boolean) {
 /** Desconecta: revoga o token no Google (melhor esforço), apaga o token daqui e desliga. Os arquivos já enviados continuam no Drive. */
 export async function disconnectDrive(ctx: TenantContext, f: FetchFn = fetch) {
   assertCan(ctx, "integrations:manage");
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const g = await load(ctx.organizationId);
   if (!g) throw new NotFoundError("Integração não cadastrada.");
   if (g.refreshTokenEnc) await revokeToken(openBytes(g.refreshTokenEnc, requireKey()).toString("utf8"), f);
@@ -80,7 +80,7 @@ export async function disconnectDrive(ctx: TenantContext, f: FetchFn = fetch) {
 /** Apaga tudo (credenciais e token). Revoga antes, se estiver conectado. */
 export async function deleteDriveIntegration(ctx: TenantContext, f: FetchFn = fetch) {
   assertCan(ctx, "integrations:manage");
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const g = await load(ctx.organizationId);
   if (!g) throw new NotFoundError("Integração não cadastrada.");
   if (g.refreshTokenEnc) await revokeToken(openBytes(g.refreshTokenEnc, requireKey()).toString("utf8"), f);
@@ -115,7 +115,7 @@ export function readState(state: string, now = Date.now()): { organizationId: st
 
 export async function startDriveConnect(ctx: TenantContext): Promise<{ url: string }> {
   assertCan(ctx, "integrations:manage");
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   const g = await load(ctx.organizationId);
   if (!g) throw new NotFoundError("Cadastre o Client ID e o Client Secret primeiro.");
   return { url: buildAuthUrl({ clientId: g.clientId, redirectUri: redirectUri(), state: makeState(ctx) }) };

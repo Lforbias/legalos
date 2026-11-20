@@ -29,7 +29,7 @@ export async function listAvailableTargetsAction() {
     const { ctx } = await requireTenant();
     assertCan(ctx, "integrations:manage");
     ensureAdapters();
-    const pilotEnabled = evolutionJudicialLoginEnabled();
+    const pilotEnabled = evolutionJudicialLoginEnabled(ctx.organizationId);
     const all = allSupportedTargets().filter(({ adapter, target }) => adapter.descriptor.key === "pje-portal" && PJE_TARGETS.some((pje) => pje.key === target.unitCode && isRegionalPjeTarget(pje)));
     const targets: AvailableTarget[] = all.map(({ adapter, target }) => {
       const court = getCourtByCode(target.courtCode);

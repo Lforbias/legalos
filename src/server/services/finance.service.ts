@@ -8,7 +8,7 @@ import { parseMoneyBR } from "@/lib/validation/money";
 import { accountSchema, categorySchema, costCenterSchema, entrySchema, paymentSchema, reasonSchema, type EntryInput } from "@/modules/finance/schemas";
 import { assertCan, type TenantContext } from "@/server/context";
 import { audit } from "./audit.service";
-import { caseVisibility } from "./case.service";
+import { caseVisibility, hiddenCaseIds } from "./case.service";
 import { isUniqueViolation } from "./db-errors";
 import { userNames } from "./members";
 
@@ -300,6 +300,15 @@ function entryWhere(ctx: TenantContext, f: EntryFilters): Prisma.FinanceEntryWhe
   return { AND: and };
 }
 
+/**
+ * Regra única de sigilo do Financeiro: lançamentos ligados a processo que o usuário não pode ver não aparecem
+ * (nem descrição, nem valor) — mesma regra da exportação e da conciliação. Os totais do painel continuam agregados.
+ */
+async function hiddenCaseFilter(ctx: TenantContext): Promise<Prisma.FinanceEntryWhereInput | null> {
+  const hidden = await hiddenCaseIds(ctx);
+  return hidden.length ? { OR: [{ caseId: null }, { caseId: { notIn: hidden } }] } : null;
+}
+
 /** Títulos de processos, mas só para os que o usuário pode ver (sigilosos viram null). */
 async function visibleCaseTitles(ctx: TenantContext, ids: (string | null)[]): Promise<Map<string, string | null>> {
   const unique = [...new Set(ids.filter((x): x is string => !!x))];
@@ -312,7 +321,9 @@ async function visibleCaseTitles(ctx: TenantContext, ids: (string | null)[]): Pr
 
 export async function listEntries(ctx: TenantContext, f: EntryFilters = {}) {
   assertCan(ctx, "finance:read");
-  const where = entryWhere(ctx, f);
+  const base = entryWhere(ctx, f);
+  const hidden = await hiddenCaseFilter(ctx);
+  const where: Prisma.FinanceEntryWhereInput = hidden ? { AND: [base, hidden] } : base;
   const page = Math.max(1, Math.floor(f.page ?? 1));
   const [items, total, sums] = await Promise.all([
     db.financeEntry.findMany({ where, orderBy: [{ dueDate: "asc" }, { createdAt: "asc" }], skip: (page - 1) * PAGE_SIZE, take: PAGE_SIZE }),
@@ -339,7 +350,8 @@ export async function listEntries(ctx: TenantContext, f: EntryFilters = {}) {
 
 export async function getEntry(ctx: TenantContext, id: string) {
   assertCan(ctx, "finance:read");
-  const entry = await db.financeEntry.findFirst({ where: { id, organizationId: ctx.organizationId }, include: { payments: { orderBy: { createdAt: "desc" } } } });
+  const hidden = await hiddenCaseFilter(ctx);
+  const entry = await db.financeEntry.findFirst({ where: { AND: [{ id, organizationId: ctx.organizationId }, ...(hidden ? [hidden] : [])] }, include: { payments: { orderBy: { createdAt: "desc" } } } });
   if (!entry) throw new NotFoundError("Lançamento não encontrado.");
   const [client, titles, account, category, costCenter, names] = await Promise.all([
     entry.clientId ? db.client.findFirst({ where: { id: entry.clientId, organizationId: ctx.organizationId }, select: { id: true, name: true } }) : null,

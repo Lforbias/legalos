@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { qrCampaignsEnabled } from "@/lib/whatsapp/qr";
 import { db } from "@/lib/db/client";
 import { logger } from "@/lib/logging/logger";
 import { ConflictError, NotFoundError, ValidationError } from "@/lib/permissions/check";
@@ -78,6 +79,7 @@ export async function createCampaign(ctx: TenantContext, raw: unknown) {
   assertCan(ctx,"clients:read");
   const account = d.accountId ? await db.whatsappAccount.findFirst({ where: { id: d.accountId, organizationId: ctx.organizationId, enabled: true }, select: { id: true, provider: true } }) : await db.whatsappAccount.findFirst({ where: { organizationId: ctx.organizationId, isPrimary: true, enabled: true }, select: { id: true, provider: true } });
   if (!account) throw new ConflictError("Nenhum número de WhatsApp conectado para enviar a campanha.");
+  if (account.provider === "QR" && !qrCampaignsEnabled()) throw new ConflictError("Campanhas pelo número conectado por QR-Code estão desativadas (risco de banimento do número). Use a conexão oficial da Meta com um modelo aprovado.");
   if (account.provider !== "QR") {
     if (!d.templateId) throw new ValidationError("Na conexão oficial da Meta, campanhas só saem com um modelo aprovado.", { templateId: ["Escolha um modelo aprovado."] });
     const t = await db.whatsappTemplate.findFirst({ where: { id: d.templateId, organizationId: ctx.organizationId, status: "APPROVED" }, select: { id: true } });

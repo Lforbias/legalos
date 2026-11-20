@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { reconciliationEnabled } from "@/lib/finance/flags";
 
 const ITEMS = [
   { key: "visao", label: "Visão geral", href: "/financeiro" },
@@ -14,7 +15,7 @@ const ITEMS = [
 export function FinanceNav({ current }: { current: (typeof ITEMS)[number]["key"] }) {
   return (
     <nav aria-label="Financeiro" className="mb-4 flex gap-1 overflow-x-auto border-b border-border">
-      {ITEMS.map((t) => (
+      {ITEMS.filter((t) => t.key !== "conciliacao" || reconciliationEnabled()).map((t) => (
         <Link
           key={t.key}
           href={t.href}

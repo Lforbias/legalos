@@ -89,9 +89,13 @@ describe("4.0 — Chat: robô 2.0, campanhas, relatórios, segurança e módulos
   });
 
   it("sessões da equipe: admin lista e encerra; de outro escritório não aparece", async () => {
-    const s = await db.session.create({ data: { userId: ana.user.id, tokenHash: `h-${Math.random()}`, expiresAt: new Date(Date.now() + 3600_000), ipAddress: "1.2.3.4" } });
+    const s = await db.session.create({ data: { userId: ana.user.id, activeOrganizationId: A.org.id, tokenHash: `h-${Math.random()}`, expiresAt: new Date(Date.now() + 3600_000), ipAddress: "1.2.3.4" } });
+    // sessão da mesma pessoa em OUTRO escritório (ou sem escritório ativo) não aparece nem pode ser derrubada daqui
+    const other = await db.session.create({ data: { userId: ana.user.id, activeOrganizationId: null, tokenHash: `h-${Math.random()}`, expiresAt: new Date(Date.now() + 3600_000), ipAddress: "9.9.9.9" } });
     const list = await listOrgSessions(A.ctx);
     expect(list.some((x) => x.id === s.id)).toBe(true);
+    expect(list.some((x) => x.id === other.id)).toBe(false);
+    await expect(revokeOrgSession(A.ctx, other.id)).rejects.toThrow(/não encontrada/);
     await expect(listOrgSessions(ana.ctx)).rejects.toBeInstanceOf(ForbiddenError);
     const B = await makeOrgWithOwner("f40-b");
     await expect(revokeOrgSession(B.ctx, s.id)).rejects.toThrow(/não encontrada/);

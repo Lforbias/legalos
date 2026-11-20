@@ -10,6 +10,8 @@ import {startQrSession,stopQrSession,restartQr} from "@/server/services/whatsapp
 import {startEnrollment,confirmEnrollment} from "@/server/services/mfa.service";
 import {totpCode,totpStep} from "@/lib/security/totp";
 import {META} from "./helpers";
+// campanhas pelo QR-Code ficam desligadas no MVP; este arquivo testa a mecânica delas, então religa aqui
+process.env.WHATSAPP_QR_CAMPAIGNS="1";
 const orgs:string[]=[];const saved={...process.env};
 afterEach(async()=>{for(const a of await db.whatsappAccount.findMany({where:{organizationId:{in:orgs}},select:{id:true}}))await stopQrSession(a.id,{logout:false});await db.whatsappAccount.deleteMany({where:{organizationId:{in:orgs.splice(0)}}});setQrDriver(null);process.env={...saved};});
 async function fixture(label:string){const a=await makeOrgWithOwner(label);orgs.push(a.org.id);const account=await db.whatsappAccount.create({data:{organizationId:a.org.id,label:"Atendimento",provider:"QR",riskAckAt:new Date(),enabled:true}});return {...a,account};}

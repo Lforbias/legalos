@@ -30,7 +30,7 @@ function assertBoxSurface(surface: BoxSurface = "legacy") {
 
 /** The preview only permits local vault administration; signing/material access keeps the legacy guard. */
 function canManageVault(ctx: TenantContext, surface: BoxSurface): boolean {
-  if (surface === "portal") return evolutionJudicialLoginEnabled() && ctx.permissions.has("integrations:manage");
+  if (surface === "portal") return evolutionJudicialLoginEnabled(ctx.organizationId) && ctx.permissions.has("integrations:manage");
   return surface === "v3" ? boxV3PreviewEnabled() && ctx.permissions.has("certificates:manage") : can(ctx, "certificates:manage");
 }
 

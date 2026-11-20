@@ -20,6 +20,9 @@ const good = {
   WHATSAPP_APP_SECRET: "s".repeat(32),
   WHATSAPP_VERIFY_TOKEN: "v".repeat(24),
   CRON_SECRET: "c".repeat(32),
+  BACKUP_OFFSITE: "backup@outro-servidor:/backups/legalos",
+  ALERT_WEBHOOK_URL: "https://hooks.exemplo.com/legalos",
+  LEGALOS_PILOT_TERMS: "1",
 };
 const codes = (env: Record<string, string | undefined>, level?: string) => checkProductionEnv(env).filter((i) => !level || i.level === level).map((i) => i.code);
 
@@ -37,7 +40,12 @@ describe("checagem de produção", () => {
   });
   it("avisos honestos: e-mail console, banco local, storage e backup não configurados, peticionamento demo", () => {
     const w = codes({ NODE_ENV: "production", DATABASE_URL: "postgresql://legalos:legalos_dev@localhost:5432/legalos", APP_URL: "https://a.com", MFA_ENCRYPTION_KEY: good.MFA_ENCRYPTION_KEY }, "warn");
-    expect(w).toEqual(expect.arrayContaining(["DATABASE_LOCAL", "MAIL_CONSOLE", "STORAGE_DIR", "BACKUP_DIR", "PETITION_DEMO"]));
+    expect(w).toEqual(expect.arrayContaining(["DATABASE_LOCAL", "STORAGE_DIR", "BACKUP_DIR", "PETITION_DEMO", "ALERT_WEBHOOK"]));
     expect(codes({ ...good, DATABASE_URL: "postgresql://u:p@db.exemplo.com:5432/x" }, "warn")).toContain("DATABASE_SSL");
+  });
+  it("MVP: e-mail real, cadastro fechado, rotinas e backup externo são obrigatórios", () => {
+    const { MAIL_DRIVER: _m, REGISTRATION_MODE: _r, CRON_SECRET: _c, BACKUP_OFFSITE: _b, ...rest } = good;
+    expect(codes(rest, "error")).toEqual(expect.arrayContaining(["MAIL_CONSOLE", "REGISTRATION_OPEN", "CRON_SECRET", "BACKUP_OFFSITE"]));
+    expect(codes({ ...good, MNI_ALLOW_LOCAL_ENDPOINTS: "1" }, "error")).toContain("MNI_LOCAL");
   });
 });

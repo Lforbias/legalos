@@ -8,6 +8,7 @@ import { Card, CardBody, CardHeader } from "@/components/ui/card";
 import { formatDateTime } from "@/lib/dates/format";
 import { uuidSchema } from "@/lib/validation/common";
 import { FinanceNav } from "@/modules/finance/finance-nav";
+import { reconciliationEnabled } from "@/lib/finance/flags";
 import { StatementImportForm } from "@/modules/finance/statement-import-form";
 import { StatementLines } from "@/modules/finance/statement-lines";
 import { can } from "@/server/context";
@@ -18,6 +19,7 @@ import { requireTenant } from "@/server/session";
 export const metadata: Metadata = { title: "Conciliação bancária" };
 
 export default async function BankReconciliationPage({ searchParams }: { searchParams: Promise<{ importacao?: string }> }) {
+  if (!reconciliationEnabled()) notFound();
   const { ctx } = await requireTenant();
   if (!can(ctx, "finance:read")) return <AccessDenied />;
   const sp = await searchParams;

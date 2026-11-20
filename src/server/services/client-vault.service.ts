@@ -5,8 +5,7 @@ import { RateLimiter } from "@/lib/security/rate-limit";
 import { assertCan, can, type TenantContext } from "@/server/context";
 import { assertModule } from "./org-security.service";
 import { audit } from "./audit.service";
-import { requireMfa } from "./certificate.service";
-import { verifySecondFactor } from "./mfa.service";
+import { assertMfaEnabled, verifySecondFactor } from "./mfa.service";
 
 /**
  * 2.0-F11 — cofre de credenciais de CLIENTES (ex.: Meu INSS, gov.br, e-CAC). Mínimo de acesso:
@@ -49,7 +48,7 @@ export async function saveClientCredential(ctx: TenantContext, clientId: string,
   assertCan(ctx, "vault:manage");
   await assertModule(ctx.organizationId, "cofre");
   const k = key();
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   await client(ctx, clientId);
   const system = clean(input.system, 40);
   const label = clean(input.label, 80);
@@ -85,7 +84,7 @@ export async function revealClientCredential(ctx: TenantContext, id: string, cod
   assertCan(ctx, "vault:read");
   await assertModule(ctx.organizationId, "cofre");
   const k = key();
-  await requireMfa(ctx.userId);
+  await assertMfaEnabled(ctx.userId);
   if (!limiter.check(ctx.userId)) throw new ConflictError("Muitas tentativas. Aguarde alguns minutos.");
   const row = await db.clientCredential.findFirst({ where: { id, organizationId: ctx.organizationId }, select: { id: true, system: true, label: true, secretEnc: true } });
   if (!row) throw new NotFoundError("Credencial não encontrada.");

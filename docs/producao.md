@@ -38,13 +38,13 @@ Coloque um proxy HTTPS (Caddy/Nginx/Traefik) na frente da porta 3000. **Não exp
 | Antivírus em uploads, expurgo LGPD, RLS no PostgreSQL | ❌ pendentes |
 | Teste de carga | ❌ não feito |
 
-## Agendador do DJEN
-Defina `CRON_SECRET` (mín. 24 caracteres) e agende no servidor, por exemplo a cada 30 minutos:
-`*/30 * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/djen`
-O servidor precisa estar **no Brasil**: relatos indicam que o DJEN recusa IPs de fora.
+## Agendadores
+Defina `CRON_SECRET` (mín. 24 caracteres; o deploy recusa publicar sem ele) e instale as rotinas com `scripts/server/install-cron.sh`.
+As rotas `/api/cron/djen` e `/api/cron/mni` estão **desligadas** desde a retirada do módulo judicial (respondem 410) — não agende.
+No MVP, a consulta ao DJEN é feita pelo botão "Verificar agora" em Integrações.
 
-## Agendadores do MNI e dos webhooks
-Mesmo `CRON_SECRET`. MNI (sincronização automática): `POST /api/cron/mni`, por exemplo a cada 30 minutos. Webhooks: `POST /api/cron/webhooks`, **a cada minuto** (é ele que entrega e repete os avisos):
+## Agendador dos webhooks
+Mesmo `CRON_SECRET`. Webhooks: `POST /api/cron/webhooks`, **a cada minuto** (é ele que entrega e repete os avisos):
 `* * * * * curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/webhooks`
 
 ## Teste de fumaça pós-deploy
@@ -55,10 +55,6 @@ Mesmo `CRON_SECRET`. MNI (sincronização automática): `POST /api/cron/mni`, po
 
 ## Administração da plataforma
 Crie o primeiro super-administrador no servidor (a conta precisa existir e ter 2FA ativo para entrar): `npm run platform-admin -- grant seu@email.com`. Liste com `npm run platform-admin -- list` e remova com `revoke`. O painel fica em `/admin`.
-
-## Agendador do MNI
-
-A rota `POST /api/cron/mni` (mesmo `CRON_SECRET`) sincroniza os avisos de todas as conexões PJe/MNI ligadas. Exemplo: `curl -fsS -X POST -H "Authorization: Bearer $CRON_SECRET" https://SEU-DOMINIO/api/cron/mni` a cada 30 min. Diferente do DJEN, o MNI **não** exige servidor no Brasil por regra nossa, mas alguns tribunais restringem por IP: confirme com o tribunal.
 
 ## Chave trocada ("Unsupported state or unable to authenticate data")
 

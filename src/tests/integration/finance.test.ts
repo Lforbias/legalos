@@ -91,8 +91,9 @@ describe("financeiro (Fase 7)", () => {
       await expect(createEntry(fin.ctx, entry({ caseId: secret.id }))).rejects.toBeInstanceOf(ValidationError);
       const e = await createEntry(A.ctx, entry({ caseId: secret.id, description: "Vinculado ao sigiloso" }));
       const asFin = await listEntries(fin.ctx, { status: "todos", q: "Vinculado ao sigiloso" });
-      expect(asFin.items[0]?.caseTitle).toBeNull();
-      expect((await getEntry(fin.ctx, e.id)).caseHidden).toBe(true);
+      // regra única de sigilo: o lançamento some por inteiro para quem não vê o processo (como na exportação)
+      expect(asFin.items).toHaveLength(0);
+      await expect(getEntry(fin.ctx, e.id)).rejects.toBeInstanceOf(NotFoundError);
       const asOwner = await listEntries(A.ctx, { status: "todos", q: "Vinculado ao sigiloso" });
       expect(asOwner.items[0]?.caseTitle).toBe("Segredo de justiça");
     });
