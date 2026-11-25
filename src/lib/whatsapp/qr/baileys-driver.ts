@@ -26,7 +26,7 @@ export const baileysDriver: QrDriver = {
       auth: { creds: state.creds, keys: B.makeCacheableSignalKeyStore(state.keys, silent) },
       ...(version ? { version } : {}),
       logger: silent,
-      browser: B.Browsers.macOS("Desktop"),
+      browser: B.Browsers.macOS("Chrome"),
       markOnlineOnConnect: false,
       syncFullHistory: true,
       shouldSyncHistoryMessage: () => true,
