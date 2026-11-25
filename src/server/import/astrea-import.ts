@@ -81,7 +81,7 @@ async function loadMap(client: Tx, organizationId: string, entity: string): Prom
 /**
  * Importa o backup completo (CSV) do Astrea para UM escritório. Idempotente: códigos já importados são pulados
  * (tabela import_map). Em `dryRun` nada é gravado; o relatório mostra o que aconteceria.
- * Não importa: documentos (o backup só traz links), histórico/andamentos e comentários soltos.
+ * Documentos entram só como links (o backup não traz os arquivos); do histórico, só andamentos e anotações manuais.
  */
 export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport> {
   const client = opts.transaction ?? db;
@@ -757,7 +757,7 @@ export async function runAstreaImport(opts: ImportOptions): Promise<ImportReport
   }
 
   report.naoImportado = [
-    "Documentos: entram só os que têm link (Google Docs, Drive, URL), como links. Arquivos anexados no Astrea não vêm no backup.",
+    "Documentos: entram só os que têm link (Google Docs, Drive, URL), como links. Arquivos anexados no Astrea não vêm no backup: envie-os depois em Documentos → Enviar em lote.",
     "Financeiro: faturas (agrupadores) e a planilha Honorários/Despesas (espelham as Entradas); transferências entre contas (vazias no backup).",
     "Comentários avulsos, timesheets e listas de tarefa. Do histórico só entram andamentos e anotações manuais (o resto já existe como tarefas, prazos, intimações e agenda).",
     "Contatos que não são clientes nem partes de processos importados.",
